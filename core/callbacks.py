@@ -7,7 +7,7 @@ from tensorflow.keras.callbacks import EarlyStopping, TensorBoard
 def get_callbacks(basepath='./experiments/test'):
     os.makedirs(basepath, exist_ok=True)
 
-    earlystopping = EarlyStopping(monitor="val_loss",
+    earlystopping = EarlyStopping(monitor="val_sparse_categorical_crossentropy",
                                     patience=40,
                                     min_delta=1e-4,
                                     mode='min',
@@ -20,7 +20,7 @@ def get_callbacks(basepath='./experiments/test'):
 
     checkpoint_path = os.path.join(basepath, 'train_model.h5')
     checkpoint = tf.keras.callbacks.ModelCheckpoint(checkpoint_path,
-                                                    monitor='val_loss',
+                                                    monitor='val_sparse_categorical_crossentropy',
                                                     save_best_only=True,
                                                     verbose=0)
     return [tboard, earlystopping, checkpoint]
