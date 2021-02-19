@@ -63,9 +63,9 @@ transformer.compile(optimizer=optimizer,
                     loss_function=loss_object,
                     metrics=['accuracy', loss_object])
 
-transformer.fit(train_batches, 
+transformer.fit(train_batches.take(5), 
                 epochs=EPOCHS, 
                 verbose=1, 
-                validation_data=val_batches,
+                validation_data=val_batches.take(5),
                 callbacks=get_callbacks(exp_path))
 
