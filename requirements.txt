@@ -1,0 +1,3 @@
+pandas
+tensorflow_datasets
+tensorflow_text
