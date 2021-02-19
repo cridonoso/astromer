@@ -2,11 +2,12 @@ version: '3'
 services:
     model:
         build: .
-        container_name: transformer
+        container_name: astromer
         volumes:
             - ./:/usr/src/transformer/
         ports:
             - 6006:6006
             - 8888:8888
+        runtime: nvidia
         environment:
             FLASK_DEBUG: 1
