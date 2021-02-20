@@ -6,7 +6,7 @@ from tensorflow.keras import Model
 from core.encoder import Encoder
 from core.decoder import Decoder
 from core.masking import create_masks
-
+from core.data import tokenizers
 
 class Transformer(Model):
     def __init__(self, num_layers, d_model, num_heads, dff, input_vocab_size, 
@@ -141,3 +141,10 @@ class MiniTransformer(Model):
         return {m.name: m.result() for m in self.metrics}
 
     
+    def predict_step(self, data):
+        inp, tar = data
+        inp_mask = create_masks(inp)
+
+        predictions = self((inp, inp_mask), training=True)
+        index = tf.argmax(predictions, 2)
+        return tokenizers.en.detokenize(index), tokenizers.en.detokenize(tar)

@@ -52,7 +52,7 @@ transformer = MiniTransformer(num_layers=num_layers,
                               d_model=d_model,
                               num_heads=num_heads,
                               dff=dff,
-                              input_vocab_size=tokenizers.pt.get_vocab_size(),
+                              input_vocab_size=tokenizers.en.get_vocab_size(),
                               target_vocab_size=tokenizers.en.get_vocab_size(),
                               pe_input=1000,
                               rate=0.1)
