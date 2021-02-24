@@ -75,7 +75,7 @@ class ASTROMER(Model):
 
         inputs = create_input(x1, x2, cls_true)
 
-        rec_pred, cls_pred = self((inputs, mask), training=True)
+        rec_pred, cls_pred = self((inputs, mask), training=False)
         rec_true = tf.slice(inputs, [0,1,1], [-1, -1, 1])
         loss_cls = self.cls_loss(tf.squeeze(cls_true), tf.squeeze(cls_pred))
         loss_rec = self.rec_loss(rec_true, rec_pred)
@@ -88,9 +88,15 @@ class ASTROMER(Model):
 
     
     def predict_step(self, data):
-        inp, tar = data
-        inp_mask = create_masks(inp)
+        x1, x2, length, cls_true = data
 
-        predictions = self((inp, inp_mask), training=True)
-        index = tf.argmax(predictions, 2)
-        return tokenizers.en.detokenize(index), tokenizers.en.detokenize(tar)
+        mask1 = create_mask(x1)
+        mask2 = create_mask(x2, length)
+        mask = concat_mask(mask1, mask2, cls_true)
+
+        inputs = create_input(x1, x2, cls_true)
+
+        rec_pred, cls_pred = self((inputs, mask), training=True)
+        rec_true = tf.slice(inputs, [0,1,1], [-1, -1, 1])
+
+        return rec_pred, rec_true, cls_pred, cls_true
