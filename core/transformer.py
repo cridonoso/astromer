@@ -5,138 +5,84 @@ from tensorflow.keras import Model
 
 from core.encoder import Encoder
 from core.decoder import Decoder
-from core.masking import create_masks
-from core.data import tokenizers
+from core.masking import create_mask, concat_mask
 
-class Transformer(Model):
-    def __init__(self, num_layers, d_model, num_heads, dff, input_vocab_size, 
-                target_vocab_size, pe_input, pe_target, rate=0.1):
-        super(Transformer, self).__init__()
 
-        self.tokenizer = Encoder(num_layers, d_model, num_heads, dff, 
-                                input_vocab_size, pe_input, rate)
+def create_input(x1, x2, cls):
+    cls = tf.tile(tf.expand_dims(cls, 2), [1, 1, tf.shape(x1)[-1]])
+    sep = tf.tile([[[102.]]], [tf.shape(x1)[0],1,tf.shape(x1)[-1]])
+    inputs = tf.concat([cls, x1, sep, x2], 1)
+    return inputs
 
-        self.decoder = Decoder(num_layers, d_model, num_heads, dff, 
-                                target_vocab_size, pe_target, rate)
+class ASTROMER(Model):
+    def __init__(self, num_layers, d_model, num_heads, dff, pe_input, rate=0.1):
+        super(ASTROMER, self).__init__()
 
-        self.final_layer = tf.keras.layers.Dense(target_vocab_size)
+        self.encoder = Encoder(num_layers, d_model, num_heads, dff, pe_input, rate)
 
-    def compile(self, optimizer, loss_function, **kwargs):
-        super(Transformer, self).compile(**kwargs)
+        self.final_layer = tf.keras.layers.Dense(1)
+
+    def compile(self, optimizer, rec_loss, cls_loss, **kwargs):
+        super(ASTROMER, self).compile(**kwargs)
         self.optimizer = optimizer
-        self.loss_function = loss_function
+        self.rec_loss = rec_loss
+        self.cls_loss = cls_loss
 
     def model(self, batch_size):
-        inp = Input(shape=(100), batch_size=batch_size, name='Input')
-        tar = Input(shape=(100
-        ), batch_size=batch_size, name='Target')
-        tar_inp  = tar[:, :-1]
-        tar_real = tar[:, 1:]
-        enc_padding_mask, combined_mask, dec_padding_mask = create_masks(inp, tar_inp)
-        inputs = (inp, tar_inp, enc_padding_mask, combined_mask, dec_padding_mask)
-        return Model(inputs=inputs, outputs=self.call(inputs, training=True))
-
-
-    def call(self, inputs, training=False):
-        inp, tar, enc_padding_mask, look_ahead_mask, dec_padding_mask = inputs
-        enc_output = self.tokenizer(inp, training, enc_padding_mask)  # (batch_size, inp_seq_len, d_model)
-
-        # dec_output.shape == (batch_size, tar_seq_len, d_model)
-        dec_output, attention_weights = self.decoder(
-            tar, enc_output, training, look_ahead_mask, dec_padding_mask)
-
-        final_output = self.final_layer(dec_output)  # (batch_size, tar_seq_len, target_vocab_size)
-
-        return final_output, attention_weights
-
-    def train_step(self, data):
-        inp, tar = data
-        tar_inp  = tar[:, :-1]
-        tar_real = tar[:, 1:]
-
-        enc_padding_mask, combined_mask, dec_padding_mask = create_masks(inp, tar_inp)
-
-        with tf.GradientTape() as tape:
-            predictions, _ = self((inp, tar_inp,  
-                                  enc_padding_mask, 
-                                  combined_mask, 
-                                  dec_padding_mask), 
-                                  training=True)
-            loss = self.loss_function(tar_real, predictions)
-
-        gradients = tape.gradient(loss, self.trainable_variables)    
-        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
-        self.compiled_metrics.update_state(tar_real, predictions)
-
-        return {m.name: m.result() for m in self.metrics}
-
-    def test_step(self, data):
-        inp, tar = data
-        tar_inp  = tar[:, :-1]
-        tar_real = tar[:, 1:]
-
-        enc_padding_mask, combined_mask, dec_padding_mask = create_masks(inp, tar_inp)
-
-        predictions, _ = self((inp, tar_inp,  
-                               enc_padding_mask, 
-                               combined_mask, 
-                               dec_padding_mask), 
-                               training=False)
-        loss = self.loss_function(tar_real, predictions)
-        self.compiled_metrics.update_state(tar_real, predictions)
-
-        return {m.name: m.result() for m in self.metrics}
-
-class MiniTransformer(Model):
-    def __init__(self, num_layers, d_model, num_heads, dff, input_vocab_size, 
-                target_vocab_size, pe_input, rate=0.1):
-        super(MiniTransformer, self).__init__()
-
-        self.encoder = Encoder(num_layers, d_model, num_heads, dff, 
-                                input_vocab_size, pe_input, rate)
-
-        self.final_layer = tf.keras.layers.Dense(target_vocab_size)
-
-    def compile(self, optimizer, loss_function, **kwargs):
-        super(MiniTransformer, self).compile(**kwargs)
-        self.optimizer = optimizer
-        self.loss_function = loss_function
-
-    def model(self, batch_size):
-        inp = Input(shape=(66), batch_size=batch_size, name='Input')
-        mask = Input(shape=(1, 66, 66), batch_size=batch_size, name='Mask')
-
+        inp = Input(shape=(202, 2), batch_size=batch_size, name='Input')
+        mask = Input(shape=(1, 202, 202), batch_size=batch_size, name='Mask')
         return Model(inputs=(inp, mask), outputs=self.call((inp, mask)))
 
 
     def call(self, inputs, training=False):
         inp, mask = inputs
-        enc_output = self.encoder(inp, training, mask) 
+        enc_output = self.encoder(inp, training, mask=mask) 
         final_output = self.final_layer(enc_output)
-        return final_output
+        cls_pred = tf.slice(final_output, [0,0,0], [-1, 1, -1])
+        rec_pred = tf.slice(final_output, [0,1,0], [-1, -1, -1])
+
+        return rec_pred, cls_pred
 
     def train_step(self, data):
-        inp, tar = data
-        inp_mask = create_masks(inp)
+        x1, x2, length, cls_true = data
+
+        mask1 = create_mask(x1)
+        mask2 = create_mask(x2, length)
+        mask = concat_mask(mask1, mask2, cls_true)
+
+        inputs = create_input(x1, x2, cls_true)
 
         with tf.GradientTape() as tape:
-            predictions = self((inp, inp_mask), training=True)
-            loss = self.loss_function(tar, predictions)
+            rec_pred, cls_pred = self((inputs, mask), training=True)
+            rec_true = tf.slice(inputs, [0,1,1], [-1, -1, 1])
+            loss_cls = self.cls_loss(tf.squeeze(cls_true), tf.squeeze(cls_pred))
+            loss_rec = self.rec_loss(rec_true, rec_pred)
+            loss_rec = tf.reduce_sum(loss_rec, 1)
+            loss = loss_cls+loss_rec
 
         gradients = tape.gradient(loss, self.trainable_variables)    
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
-        self.compiled_metrics.update_state(tar, predictions)
 
+        self.compiled_metrics.update_state(rec_true, rec_pred)
         return {m.name: m.result() for m in self.metrics}
 
     def test_step(self, data):
-        inp, tar = data
-        inp_mask = create_masks(inp)
+        x1, x2, length, cls_true = data
 
-        predictions = self((inp, inp_mask), training=True)
+        mask1 = create_mask(x1)
+        mask2 = create_mask(x2, length)
+        mask = concat_mask(mask1, mask2, cls_true)
 
-        loss = self.loss_function(tar, predictions)
-        self.compiled_metrics.update_state(tar, predictions)
+        inputs = create_input(x1, x2, cls_true)
+
+        rec_pred, cls_pred = self((inputs, mask), training=True)
+        rec_true = tf.slice(inputs, [0,1,1], [-1, -1, 1])
+        loss_cls = self.cls_loss(tf.squeeze(cls_true), tf.squeeze(cls_pred))
+        loss_rec = self.rec_loss(rec_true, rec_pred)
+        loss_rec = tf.reduce_sum(loss_rec, 1)
+        loss = loss_cls+loss_rec
+
+        self.compiled_metrics.update_state(rec_true, rec_pred)
 
         return {m.name: m.result() for m in self.metrics}
 
