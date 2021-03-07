@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow.keras.losses import BinaryCrossentropy
 
 class CustomMSE(tf.keras.losses.Loss):
-    def __init__(self, name="MSE"):
+    def __init__(self, name="RMSE"):
         super(CustomMSE, self).__init__(name=name)
 
     def call(self, y_true, y_pred):

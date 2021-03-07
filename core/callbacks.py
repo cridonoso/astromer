@@ -7,7 +7,7 @@ from tensorflow.keras.callbacks import EarlyStopping, TensorBoard
 def get_callbacks(basepath='./experiments/test'):
     os.makedirs(basepath, exist_ok=True)
 
-    earlystopping = EarlyStopping(monitor="mean_squared_error",
+    earlystopping = EarlyStopping(monitor="val_loss",
                                     patience=40,
                                     min_delta=1e-4,
                                     mode='min',

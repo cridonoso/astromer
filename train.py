@@ -51,7 +51,7 @@ def train(opt):
     test_file = os.path.join(opt.p, 'test/test_metrics.json')
     with open(test_file, 'w') as json_file:
         json.dump({'loss': metrics[0], 
-                   'mse':metrics[1], 
+                   'rmse':metrics[1], 
                    'accuracy':metrics[2]}, json_file, indent=4)
 
     conf_file = os.path.join(opt.p, 'conf.json')
