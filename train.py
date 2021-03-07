@@ -20,9 +20,6 @@ def train(opt):
     valid_batches = load_records(os.path.join(opt.data, 'val'), opt.batch_size)
     test_batches = load_records(os.path.join(opt.data, 'test'), opt.batch_size)
 
-    train_batches = test_batches.take(1)
-    valid_batches = test_batches.take(1)
-    test_batches = test_batches.take(1)
     # Optimizer
     learning_rate = CustomSchedule(opt.head_dim)
     optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98, 
