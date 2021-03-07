@@ -37,15 +37,14 @@ class CustomDense(Layer):
     def __init__(self, **kwargs):
         super(CustomDense, self).__init__(**kwargs)
         self.reg_layer = tf.keras.layers.Dense(1)
-        self.cls_layer = tf.keras.layers.Dense(1, 
-                            activation='softmax')
+        self.cls_layer = tf.keras.layers.Dense(2)
 
     def call(self, inputs):
         logist_rec = tf.slice(inputs, [0,1,0], [-1, -1, -1])
         logist_cls = tf.slice(inputs, [0,0,0], [-1, 1, -1])
         cls_prob = self.cls_layer(logist_cls)
+        cls_prob = tf.transpose(cls_prob, [0,2,1])
         reconstruction = self.reg_layer(logist_rec)
-        
         final_output = tf.concat([cls_prob, reconstruction], 
                                  axis=1)
 
@@ -71,8 +70,10 @@ class ASTROMER(Model):
         inp, mask_inp, mask_tar = self.input_layer(inputs)
         enc_output = self.encoder(inp, training, mask=mask_inp) 
         final_output = self.dense(enc_output)
-        output_mask = tf.concat([final_output, tf.expand_dims(mask_tar, 2)], 2)
-        return output_mask, inp
+        m = tf.concat([tf.expand_dims(mask_tar[:, 0], 1), mask_tar], 1)
+        output_mask = tf.concat([final_output, tf.expand_dims(m, 2)], 2)
+        
+        return output_mask, inp 
 
     def train_step(self, data):
         cls_true = data[-1]

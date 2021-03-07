@@ -12,10 +12,12 @@ class CustomACC(tf.keras.metrics.Metric):
     def update_state(self, y_true, y_pred, sample_weight=None):     
 
 
-        cls_pred = tf.slice(y_pred, [0,0,0], [-1, 1, 1])
+        cls_pred = tf.slice(y_pred, [0,0,0], [-1, 2, 1])
         cls_true = tf.slice(y_true, [0,0,0], [-1, 1, 1])
 
-        value = self.object(cls_true, cls_pred)
+        cls_pred = tf.argmax(tf.squeeze(cls_pred), 1)
+
+        value = self.object(tf.squeeze(cls_true), cls_pred)
         self.acc_value = value
 
 
