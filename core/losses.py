@@ -15,8 +15,10 @@ class CustomMSE(tf.keras.losses.Loss):
         rec_true = tf.slice(y_true, [0,1,1], [-1, -1, -1])
         
         mse = tf.square(rec_true - rec_pred)
+        mse = tf.math.sqrt(mse)
         masked_mse = tf.multiply(mse, rec_mask)
         masked_mse = tf.reduce_sum(masked_mse, 1)
+
         return tf.reduce_mean(masked_mse)
         
 class CustomBCE(tf.keras.losses.Loss):
@@ -42,7 +44,8 @@ class ASTROMERLoss(tf.keras.losses.Loss):
         self.bce = CustomBCE()
 
     def call(self, y_true, y_pred):
-        mse = self.mse(y_true, y_pred)
+        rmse = self.mse(y_true, y_pred)
+        
         bce = self.bce(y_true, y_pred)
-        total = tf.reduce_sum(mse) + tf.reduce_sum(bce)
+        total = tf.reduce_sum(rmse) + tf.reduce_sum(bce)
         return total

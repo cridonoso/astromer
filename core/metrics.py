@@ -7,8 +7,7 @@ class CustomACC(tf.keras.metrics.Metric):
 
         self.object = tf.keras.metrics.Accuracy(name='accuracy')
 
-        self.acc_value = self.add_weight(name="value", 
-                                         initializer="zeros")
+        self.acc_value = tf.constant(0.)
 
     def update_state(self, y_true, y_pred, sample_weight=None):     
 
@@ -17,7 +16,7 @@ class CustomACC(tf.keras.metrics.Metric):
         cls_true = tf.slice(y_true, [0,0,0], [-1, 1, 1])
 
         value = self.object(cls_true, cls_pred)
-        self.acc_value.assign_add(value)
+        self.acc_value = value
 
 
     def result(self):
