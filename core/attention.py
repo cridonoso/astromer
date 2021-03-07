@@ -31,9 +31,9 @@ def scaled_dot_product_attention(q, k, v, mask):
 
   # softmax is normalized on the last axis (seq_len_k) so that the scores
   # add up to 1.
-  attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1)  # (..., seq_len_q, seq_len_k)
+  attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
 
-  output = tf.matmul(attention_weights, v)  # (..., seq_len_q, depth_v)
+  output = tf.matmul(attention_weights, v, name='Z')  # (..., seq_len_q, depth_v)
 
   return output, attention_weights
 
@@ -47,18 +47,18 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         self.depth = d_model // self.num_heads # final dimension
 
-        self.wq = tf.keras.layers.Dense(d_model)
-        self.wk = tf.keras.layers.Dense(d_model)
-        self.wv = tf.keras.layers.Dense(d_model)
+        self.wq = tf.keras.layers.Dense(d_model, name='WQ')
+        self.wk = tf.keras.layers.Dense(d_model, name='WK')
+        self.wv = tf.keras.layers.Dense(d_model, name='WV')
 
-        self.dense = tf.keras.layers.Dense(d_model)
+        self.dense = tf.keras.layers.Dense(d_model, name='MixerDense')
 
-    def split_heads(self, x, batch_size):
+    def split_heads(self, x, batch_size, name='qkv'):
         """Split the last dimension into (num_heads, depth).
         Transpose the result such that the shape is (batch_size, num_heads, seq_len, depth)
         """
         x = tf.reshape(x, (batch_size, -1, self.num_heads, self.depth))
-        return tf.transpose(x, perm=[0, 2, 1, 3])
+        return tf.transpose(x, perm=[0, 2, 1, 3], name=name)
 
     def call(self, x, mask):
         batch_size = tf.shape(x)[0]
@@ -67,9 +67,9 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         k = self.wk(x)  # (batch_size, seq_len, d_model)
         v = self.wv(x)  # (batch_size, seq_len, d_model)
 
-        q = self.split_heads(q, batch_size)  # (batch_size, num_heads, seq_len_q, depth)
-        k = self.split_heads(k, batch_size)  # (batch_size, num_heads, seq_len_k, depth)
-        v = self.split_heads(v, batch_size)  # (batch_size, num_heads, seq_len_v, depth)
+        q = self.split_heads(q, batch_size, name='Q')  # (batch_size, num_heads, seq_len_q, depth)
+        k = self.split_heads(k, batch_size, name='K')  # (batch_size, num_heads, seq_len_k, depth)
+        v = self.split_heads(v, batch_size, name='V')  # (batch_size, num_heads, seq_len_v, depth)
 
         # scaled_attention.shape == (batch_size, num_heads, seq_len_q, depth)
         # attention_weights.shape == (batch_size, num_heads, seq_len_q, seq_len_k)

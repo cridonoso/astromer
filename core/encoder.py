@@ -1,7 +1,7 @@
 import tensorflow as tf 
 
 from core.attention import MultiHeadAttention
-from core.data import positional_encoding
+from core.positional import positional_encoding
 
 
 def point_wise_feed_forward_network(d_model, dff):

@@ -8,26 +8,30 @@ from core.decoder import Decoder
 from core.masking import create_mask, concat_mask
 
 
-def create_input(x1, x2, cls):
-    cls = tf.tile(tf.expand_dims(cls, 2), [1, 1, tf.shape(x1)[-1]])
-    sep = tf.tile([[[102.]]], [tf.shape(x1)[0],1,tf.shape(x1)[-1]])
-    inputs = tf.concat([cls, x1, sep, x2], 1)
-    return inputs
-
 class InputComposer(Layer):
-    def __init__(self, **kwargs):
+    def __init__(self, frac=0.15, rand_frac=0.1, same_frac=0.1, sep_token=102., **kwargs):
         super(InputComposer, self).__init__(**kwargs)
+        self.frac = frac # TOKENS 
+        self.randfrac = rand_frac # Replace by random magnitude
+        self.samefrac = same_frac # Replace by the same magnitude
+        self.sep_token = sep_token
 
     def call(self, data):
         x1, x2, length, cls_true = data
 
-        mask1 = create_mask(x1)
-        mask2 = create_mask(x2, length)
-        mask = concat_mask(mask1, mask2, cls_true)
+        mask_1_tar, mask_1_inp = create_mask(x1)
+        
+        mask_2_tar, mask_2_inp = create_mask(x2, length=length, frac=self.frac, 
+                            frac_random=self.randfrac, frac_same=self.samefrac)
 
-        inputs = create_input(x1, x2, cls_true)
+        mask_inp = concat_mask(mask_1_inp, mask_2_inp, cls_true, sep=self.sep_token)
+        mask_tar = concat_mask(mask_1_tar, mask_2_tar, cls_true, sep=self.sep_token, reshape=False)
 
-        return inputs, mask
+        cls_true = tf.tile(tf.expand_dims(cls_true, 2), [1, 1, tf.shape(x1)[-1]], name='CLSTokens')
+        sep = tf.tile([[[self.sep_token]]], [tf.shape(x1)[0],1,tf.shape(x1)[-1]], name='SepTokens')
+        inputs = tf.concat([cls_true, x1, sep, x2], 1, name='NetworkInput')
+
+        return inputs, mask_inp, mask_tar
 
 class CustomDense(Layer):
     def __init__(self, **kwargs):
@@ -64,38 +68,30 @@ class ASTROMER(Model):
 
     def call(self, inputs, training=False):
         # inp, mask = inputs
-        inp, mask = self.input_layer(inputs)
-        enc_output = self.encoder(inp, training, mask=mask) 
+        inp, mask_inp, mask_tar = self.input_layer(inputs)
+        enc_output = self.encoder(inp, training, mask=mask_inp) 
         final_output = self.dense(enc_output)
-        return final_output, inp
+        output_mask = tf.concat([final_output, tf.expand_dims(mask_tar, 2)], 2)
+        return output_mask, inp
 
     def train_step(self, data):
         cls_true = data[-1]
         with tf.GradientTape() as tape:
             output, inputs = self(data, training=True)
             t_loss = self.compiled_loss(inputs, output)
+            
         gradients = tape.gradient(t_loss, self.trainable_variables)    
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
         self.compiled_metrics.update_state(inputs, output)
         return {m.name: m.result() for m in self.metrics}
 
     def test_step(self, data):
-        output, inputs = self(data, training=True)
+        output, inputs = self(data, training=False)
         t_loss = self.compiled_loss(inputs, output)
         self.compiled_metrics.update_state(inputs, output)
         return {m.name: m.result() for m in self.metrics}
-
     
     def predict_step(self, data):
-        x1, x2, length, cls_true = data
-
-        mask1 = create_mask(x1)
-        mask2 = create_mask(x2, length)
-        mask = concat_mask(mask1, mask2, cls_true)
-
-        inputs = create_input(x1, x2, cls_true)
-
-        rec_pred, cls_pred = self((inputs, mask), training=True)
-        rec_true = tf.slice(inputs, [0,1,1], [-1, -1, 1])
-
-        return rec_pred, rec_true, cls_pred, cls_true
+        output, inputs = self(data, training=False)
+        self.compiled_metrics.update_state(inputs, output)
+        return {m.name: m.result() for m in self.metrics}
