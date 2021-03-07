@@ -47,5 +47,5 @@ class ASTROMERLoss(tf.keras.losses.Loss):
         rmse = self.mse(y_true, y_pred)
         
         bce = self.bce(y_true, y_pred)
-        total = tf.reduce_sum(rmse) + tf.reduce_sum(bce)
+        total = tf.reduce_mean(rmse) + tf.reduce_mean(bce)
         return total
