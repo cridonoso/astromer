@@ -21,9 +21,11 @@ def train(opt):
     test_batches = load_records(os.path.join(opt.data, 'test'), opt.batch_size)
 
     # Optimizer
-    learning_rate = CustomSchedule(opt.head_dim)
-    optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98, 
-                                        epsilon=1e-9)
+    learning_rate = 1e-3#CustomSchedule(opt.head_dim)
+    optimizer = tf.keras.optimizers.Adam(learning_rate, 
+                                         beta_1=0.9, 
+                                         beta_2=0.98, 
+                                         epsilon=1e-9)
     # Model Instance
     transformer = ASTROMER(num_layers=opt.layers,
                         d_model=opt.head_dim,
