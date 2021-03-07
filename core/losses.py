@@ -5,7 +5,7 @@ class CustomMSE(tf.keras.losses.Loss):
     def __init__(self, name="RMSE"):
         super(CustomMSE, self).__init__(name=name)
 
-    def call(self, y_true, y_pred):
+    def call(self, y_true, y_pred, sample_weight=None):
         '''
         y_true = (batch_size, steps, 2)
         y_pred = (batch_size, steps, 2) being the last dimension the mask
@@ -27,7 +27,7 @@ class CustomBCE(tf.keras.losses.Loss):
         self.lossobject = BinaryCrossentropy(from_logits=False, 
                                              reduction='none')
 
-    def call(self, y_true, y_pred):
+    def call(self, y_true, y_pred, sample_weight=None):
         '''
         y_true = (batch_size, steps, 2)
         y_pred = (batch_size, steps, 2) being the last dimension the mask
@@ -43,7 +43,7 @@ class ASTROMERLoss(tf.keras.losses.Loss):
         self.mse = CustomMSE()
         self.bce = CustomBCE()
 
-    def call(self, y_true, y_pred):
+    def call(self, y_true, y_pred, sample_weight=None):
         rmse = self.mse(y_true, y_pred)
         
         bce = self.bce(y_true, y_pred)

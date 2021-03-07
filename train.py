@@ -9,7 +9,7 @@ from core.data  import load_records
 from core.transformer import ASTROMER
 from core.scheduler import CustomSchedule
 from core.callbacks import get_callbacks
-from core.losses import CustomMSE, ASTROMERLoss
+from core.losses import CustomMSE, ASTROMERLoss, CustomBCE
 from core.metrics import CustomACC
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
@@ -34,7 +34,7 @@ def train(opt):
     # Compile
     transformer.compile(optimizer=optimizer, 
                         loss=ASTROMERLoss(),
-                        metrics=[CustomMSE(), CustomACC()])
+                        metrics=[CustomMSE(), CustomBCE(), CustomACC()])
     # Create graph
     transformer.model(opt.batch_size).summary()
     # Training
