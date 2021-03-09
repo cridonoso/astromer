@@ -68,7 +68,7 @@ if __name__ == '__main__':
                         help='Dataset folder containing the records files')
     parser.add_argument('--p', default="./experiments/macho", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
-    parser.add_argument('--batch-size', default=128, type=int,
+    parser.add_argument('--batch-size', default=512, type=int,
                         help='batch size')
     parser.add_argument('--epochs', default=1000, type=int,
                         help='Number of epochs')
@@ -79,7 +79,7 @@ if __name__ == '__main__':
                         help='Number of self-attention heads')
     parser.add_argument('--head-dim', default=512, type=int,
                         help='Head-attention Dimensionality ')
-    parser.add_argument('--dff', default=2048, type=int,
+    parser.add_argument('--dff', default=1024, type=int,
                         help='Dimensionality of the middle  dense layer at the end of the encoder')
     parser.add_argument('--pe', default=1000, type=int,
                         help='Positional encoding maximum length')
