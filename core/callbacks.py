@@ -20,7 +20,7 @@ def get_callbacks(basepath='./experiments/test'):
 
     checkpoint_path = os.path.join(basepath, 'train_model.h5')
     checkpoint = tf.keras.callbacks.ModelCheckpoint(checkpoint_path,
-                                                    monitor='mean_squared_error',
+                                                    monitor='val_loss',
                                                     save_best_only=True,
                                                     verbose=0)
     return [tboard, earlystopping, checkpoint]

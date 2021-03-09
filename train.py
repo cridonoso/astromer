@@ -85,6 +85,8 @@ if __name__ == '__main__':
                         help='Positional encoding maximum length')
     parser.add_argument('--dropout', default=0.1, type=float,
                         help='dropout_rate for the encoder')
+    parser.add_argument('--lr', default=1e-3, type=float,
+                        help='optimizer initial learning rate')
 
     opt = parser.parse_args()
 
