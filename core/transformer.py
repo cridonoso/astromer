@@ -92,5 +92,10 @@ class ASTROMER(Model):
     
     def predict_step(self, data):
         output, inputs = self(data, training=False)
-        self.compiled_metrics.update_state(inputs, output)
-        return {m.name: m.result() for m in self.metrics}
+        return output, inputs
+
+    def get_attention(self, data):
+        for d in data:
+            inp, mask_inp, mask_tar = self.input_layer(d)
+            enc_output = self.encoder(inp, False, mask=mask_inp) 
+            return enc_output
