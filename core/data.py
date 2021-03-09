@@ -145,7 +145,7 @@ def normalice(tensor):
                      (tensor - min_value)/den)
     return normed
 
-def _parse(sample):
+def _parse(sample, magn_normed=False, time_normed=False):
     feat_keys = dict() # features for record
 
 
@@ -166,8 +166,12 @@ def _parse(sample):
 
     ex1 = tf.io.parse_example(sample, feat_keys)
 
-    ex1['x_times'] = normalice(ex1['x_times'])
-    ex1['y_times'] = normalice(ex1['y_times'])
+    if magn_normed:
+        ex1['x_magn'] = normalice(ex1['x_magn'])
+        ex1['y_magn'] = normalice(ex1['y_magn'])
+    if time_normed:
+        ex1['x_times'] = normalice(ex1['x_times'])
+        ex1['y_times'] = normalice(ex1['y_times'])
 
     SEPTOKEN = tf.expand_dims(101, 0)
     SEPTOKEN = tf.cast(SEPTOKEN, tf.float32)
@@ -175,22 +179,25 @@ def _parse(sample):
     class_id = tf.expand_dims(class_id, 0)
 
     first_serie  = tf.stack([ex1['x_times'],
-                              ex1['x_magn']], 
-                              1)
-    second_serie = tf.stack([ex1['y_times']+1, # assuming we are normalizing
-                              ex1['y_magn']], 
-                              1)
+                             ex1['x_magn']], 
+                             1)
+    second_serie = tf.stack([ex1['y_times']+1, # assuming we are normalizing times
+                             ex1['y_magn']], 
+                             1)
 
     return first_serie, second_serie, tf.cast(ex1['length'], tf.int32), class_id
 
 
-def load_records(source, batch_size):
+def load_records(source, batch_size, magn_normed=False, time_normed=False):
 
     datasets = [tf.data.TFRecordDataset(os.path.join(source,x)) for x in os.listdir(source)]  
 
     datasets = [
         dataset.map(
-            lambda x: _parse(x), num_parallel_calls=8) for dataset in datasets
+            lambda x: _parse(x, 
+                             magn_normed=magn_normed, 
+                             time_normed=time_normed), 
+                             num_parallel_calls=tf.data.experimental.AUTOTUNE) for dataset in datasets
     ]
     
     # datasets = [dataset.repeat() for dataset in datasets]

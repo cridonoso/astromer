@@ -16,9 +16,15 @@ logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 def train(opt):
     # Loading data
-    train_batches = load_records(os.path.join(opt.data, 'train'), opt.batch_size)
-    valid_batches = load_records(os.path.join(opt.data, 'val'), opt.batch_size)
-    test_batches = load_records(os.path.join(opt.data, 'test'), opt.batch_size)
+    train_batches = load_records(os.path.join(opt.data, 'train'), opt.batch_size, 
+                                 magn_normed=opt.magn_normed, 
+                                 time_normed=opt.time_normed)
+    valid_batches = load_records(os.path.join(opt.data, 'val'), opt.batch_size,
+                                 magn_normed=opt.magn_normed, 
+                                 time_normed=opt.time_normed)
+    test_batches = load_records(os.path.join(opt.data, 'test'), opt.batch_size,
+                                 magn_normed=opt.magn_normed, 
+                                 time_normed=opt.time_normed)
 
     # Optimizer
     learning_rate = 1e-3#CustomSchedule(opt.head_dim)
@@ -63,6 +69,11 @@ def train(opt):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    # DATA
+    parser.add_argument('--time-normed', action='store_true',
+                    help='Normalize times between 0 and 1')
+    parser.add_argument('--magn-normed', action='store_true',
+                    help='Normalize magnitudes between 0 and 1')
     # TRAINING PAREMETERS
     parser.add_argument('--data', default='./data/records/macho', type=str,
                         help='Dataset folder containing the records files')
