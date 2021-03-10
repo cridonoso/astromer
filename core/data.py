@@ -145,6 +145,29 @@ def normalice(tensor):
                      (tensor - min_value)/den)
     return normed
 
+def normalice_both(tensor1, tensor2):
+    min_value1 = tf.expand_dims(tf.reduce_min(tensor1, 0), 0,
+                name='min_value1')
+    max_value1 = tf.expand_dims(tf.reduce_max(tensor1, 0), 0,
+                name='max_value1')
+
+    min_value2 = tf.expand_dims(tf.reduce_min(tensor2, 0), 0,
+                name='min_value2')
+    max_value2 = tf.expand_dims(tf.reduce_max(tensor2, 0), 0,
+                name='max_value2')
+
+    max_value = tf.maximum(max_value1, max_value2)
+    min_value = tf.minimum(max_value1, max_value2)
+
+    den = (max_value - min_value)
+    normed_1 = tf.where(den== 0.,
+                     (tensor1 - min_value),
+                     (tensor1 - min_value)/den)
+    normed_2 = tf.where(den== 0.,
+                     (tensor2 - min_value),
+                     (tensor2 - min_value)/den)
+    return normed_1, normed_2
+
 def _parse(sample, magn_normed=False, time_normed=False):
     feat_keys = dict() # features for record
 
@@ -167,11 +190,9 @@ def _parse(sample, magn_normed=False, time_normed=False):
     ex1 = tf.io.parse_example(sample, feat_keys)
 
     if magn_normed:
-        ex1['x_magn'] = normalice(ex1['x_magn'])
-        ex1['y_magn'] = normalice(ex1['y_magn'])
+        ex1['x_magn'], ex1['y_magn'] = normalice_both(ex1['x_magn'], ex1['y_magn'])
     if time_normed:
-        ex1['x_times'] = normalice(ex1['x_times'])
-        ex1['y_times'] = normalice(ex1['y_times'])
+        ex1['x_times'], ex1['y_times'] = normalice_both(ex1['x_times'], ex1['y_times'])
 
     SEPTOKEN = tf.expand_dims(101, 0)
     SEPTOKEN = tf.cast(SEPTOKEN, tf.float32)
