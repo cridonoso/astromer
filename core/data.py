@@ -202,7 +202,7 @@ def _parse(sample, magn_normed=False, time_normed=False):
     first_serie  = tf.stack([ex1['x_times'],
                              ex1['x_magn']], 
                              1)
-    second_serie = tf.stack([ex1['y_times']+1, # assuming we are normalizing times
+    second_serie = tf.stack([ex1['y_times'], # assuming we are normalizing times
                              ex1['y_magn']], 
                              1)
 
