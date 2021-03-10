@@ -96,10 +96,13 @@ class ASTROMER(Model):
         rec_pred = tf.slice(y_pred, [0,2,0], [-1, -1, 1])
         rec_mask = tf.slice(y_pred, [0,2,1], [-1, -1, 1])
         rec_true = tf.slice(y_true, [0,1,1], [-1, -1, -1])
+        rec_times = tf.slice(y_true, [0,1,0], [-1, -1, 1])
         cls_pred = tf.argmax(tf.slice(y_pred, [0,0,0], [-1, 2, 1]), 1)
         cls_true = tf.slice(y_true, [0,0,0], [-1, 1, 1])
 
-        return tf.squeeze(rec_pred), tf.squeeze(rec_mask), tf.squeeze(rec_true), tf.squeeze(cls_pred), tf.squeeze(cls_true)
+        return tf.squeeze(rec_pred), tf.squeeze(rec_mask), \
+               tf.squeeze(rec_true), tf.squeeze(rec_times), \
+               tf.squeeze(cls_pred), tf.squeeze(cls_true)
 
     def get_attention(self, data):
         for d in data:

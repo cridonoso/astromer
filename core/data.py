@@ -168,7 +168,7 @@ def normalice_both(tensor1, tensor2):
                      (tensor2 - min_value)/den)
     return normed_1, normed_2
 
-def _parse(sample, magn_normed=False, time_normed=False):
+def _parse(sample, magn_normed=False, time_normed=False, shifted=False):
     feat_keys = dict() # features for record
 
 
@@ -204,14 +204,18 @@ def _parse(sample, magn_normed=False, time_normed=False):
     first_serie  = tf.stack([ex1['x_times'],
                              ex1['x_magn']], 
                              1)
-    second_serie = tf.stack([ex1['y_times'], # assuming we are normalizing times
-                             ex1['y_magn']], 
-                             1)
-
+    if shifted:
+        second_serie = tf.stack([ex1['y_times']+1, # assuming we are normalizing times
+                                ex1['y_magn']], 
+                                1)
+    else:
+        second_serie = tf.stack([ex1['y_times'], # assuming we are normalizing times
+                                ex1['y_magn']], 
+                                1)
     return first_serie, second_serie, tf.cast(ex1['length'], tf.int32), class_id
 
 
-def load_records(source, batch_size, magn_normed=False, time_normed=False):
+def load_records(source, batch_size, magn_normed=False, time_normed=False, shifted=False):
 
     datasets = [tf.data.TFRecordDataset(os.path.join(source,x)) for x in os.listdir(source)]  
 
@@ -219,7 +223,8 @@ def load_records(source, batch_size, magn_normed=False, time_normed=False):
         dataset.map(
             lambda x: _parse(x, 
                              magn_normed=magn_normed, 
-                             time_normed=time_normed), 
+                             time_normed=time_normed,
+                             shifted=shifted), 
                              num_parallel_calls=tf.data.experimental.AUTOTUNE) for dataset in datasets
     ]
     

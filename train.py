@@ -46,25 +46,25 @@ def train(opt):
     # Create graph
     transformer.model(opt.batch_size).summary()
     # Training
-    transformer.fit(train_batches, 
-                    epochs=opt.epochs, 
-                    verbose=1,
-                    validation_data=valid_batches,
-                    callbacks=get_callbacks(opt.p))
-    # Testing
-    metrics = transformer.evaluate(test_batches)
+    # transformer.fit(train_batches, 
+    #                 epochs=opt.epochs, 
+    #                 verbose=1,
+    #                 validation_data=valid_batches,
+    #                 callbacks=get_callbacks(opt.p))
+    # # Testing
+    # metrics = transformer.evaluate(test_batches)
 
-    # Saving metrics and setup file
-    os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
-    test_file = os.path.join(opt.p, 'test/test_metrics.json')
-    with open(test_file, 'w') as json_file:
-        json.dump({'loss': metrics[0], 
-                   'rmse':metrics[1], 
-                   'accuracy':metrics[2]}, json_file, indent=4)
+    # # Saving metrics and setup file
+    # os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
+    # test_file = os.path.join(opt.p, 'test/test_metrics.json')
+    # with open(test_file, 'w') as json_file:
+    #     json.dump({'loss': metrics[0], 
+    #                'rmse':metrics[1], 
+    #                'accuracy':metrics[2]}, json_file, indent=4)
 
-    conf_file = os.path.join(opt.p, 'conf.json')
-    with open(conf_file, 'w') as json_file:
-        json.dump(vars(opt), json_file, indent=4)
+    # conf_file = os.path.join(opt.p, 'conf.json')
+    # with open(conf_file, 'w') as json_file:
+    #     json.dump(vars(opt), json_file, indent=4)
 
 
 if __name__ == '__main__':
@@ -74,6 +74,8 @@ if __name__ == '__main__':
                     help='Normalize times between 0 and 1')
     parser.add_argument('--magn-normed', action='store_true',
                     help='Normalize magnitudes between 0 and 1')
+    parser.add_argument('--time-shifted', action='store_true',
+                    help='add +1 to times of the second serie (continous time)')
     # TRAINING PAREMETERS
     parser.add_argument('--data', default='./data/records/macho', type=str,
                         help='Dataset folder containing the records files')
