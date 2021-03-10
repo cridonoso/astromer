@@ -91,8 +91,15 @@ class ASTROMER(Model):
         return {m.name: m.result() for m in self.metrics}
     
     def predict_step(self, data):
-        output, inputs = self(data, training=False)
-        return output, inputs
+        y_pred, y_true = self(data, training=False)
+
+        rec_pred = tf.slice(y_pred, [0,2,0], [-1, -1, 1])
+        rec_mask = tf.slice(y_pred, [0,2,1], [-1, -1, 1])
+        rec_true = tf.slice(y_true, [0,1,1], [-1, -1, -1])
+        cls_pred = tf.argmax(tf.slice(y_pred, [0,0,0], [-1, 2, 1]), 1)
+        cls_true = tf.slice(y_true, [0,0,0], [-1, 1, 1])
+
+        return tf.squeeze(rec_pred), tf.squeeze(rec_mask), tf.squeeze(rec_true), tf.squeeze(cls_pred), tf.squeeze(cls_true)
 
     def get_attention(self, data):
         for d in data:

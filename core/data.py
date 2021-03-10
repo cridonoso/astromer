@@ -190,10 +190,11 @@ def _parse(sample, magn_normed=False, time_normed=False):
     ex1 = tf.io.parse_example(sample, feat_keys)
 
     if magn_normed:
-        ex1['x_magn'], ex1['y_magn'] = normalice_both(ex1['x_magn'], ex1['y_magn'])
+        ex1['x_magn'] = normalice(ex1['x_magn']) 
+        ex1['y_magn'] = normalice(ex1['y_magn'])
     if time_normed:
-        ex1['x_times'], ex1['y_times'] = normalice_both(ex1['x_times'], ex1['y_times'])
-        ex1['y_times'] = ex1['y_times']+tf.reduce_max(ex1['x_times'])
+        ex1['x_times'] = normalice(ex1['x_times'])
+        ex1['y_times'] = normalice(ex1['y_times'])
 
     SEPTOKEN = tf.expand_dims(101, 0)
     SEPTOKEN = tf.cast(SEPTOKEN, tf.float32)

@@ -13,7 +13,7 @@ class CustomMSE(tf.keras.losses.Loss):
         rec_pred = tf.slice(y_pred, [0,2,0], [-1, -1, 1])
         rec_mask = tf.slice(y_pred, [0,2,1], [-1, -1, 1])
         rec_true = tf.slice(y_true, [0,1,1], [-1, -1, -1])
-        
+
         mse = tf.square(rec_true - rec_pred)
         # mse = tf.math.sqrt(mse)
         masked_mse = tf.multiply(mse, rec_mask)
