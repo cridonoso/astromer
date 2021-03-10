@@ -18,13 +18,16 @@ def train(opt):
     # Loading data
     train_batches = load_records(os.path.join(opt.data, 'train'), opt.batch_size, 
                                  magn_normed=opt.magn_normed, 
-                                 time_normed=opt.time_normed)
+                                 time_normed=opt.time_normed,
+                                 shifted=opt.time_shifted)
     valid_batches = load_records(os.path.join(opt.data, 'val'), opt.batch_size,
                                  magn_normed=opt.magn_normed, 
-                                 time_normed=opt.time_normed)
+                                 time_normed=opt.time_normed,
+                                 shifted=opt.time_shifted)
     test_batches = load_records(os.path.join(opt.data, 'test'), opt.batch_size,
                                  magn_normed=opt.magn_normed, 
-                                 time_normed=opt.time_normed)
+                                 time_normed=opt.time_normed,
+                                 shifted=opt.time_shifted)
 
     # Optimizer
     learning_rate = 1e-3#CustomSchedule(opt.head_dim)
