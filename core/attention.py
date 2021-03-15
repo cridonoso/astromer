@@ -1,18 +1,18 @@
-import tensorflow as tf 
+import tensorflow as tf
 
 
 def scaled_dot_product_attention(q, k, v, mask):
   """Calculate the attention weights.
   q, k, v must have matching leading dimensions.
   k, v must have matching penultimate dimension, i.e.: seq_len_k = seq_len_v.
-  The mask has different shapes depending on its type(padding or look ahead) 
+  The mask has different shapes depending on its type(padding or look ahead)
   but it must be broadcastable for addition.
 
   Args:
     q: query shape == (..., seq_len_q, depth)
     k: key shape == (..., seq_len_k, depth)
     v: value shape == (..., seq_len_v, depth_v)
-    mask: Float tensor with shape broadcastable 
+    mask: Float tensor with shape broadcastable
           to (..., seq_len_q, seq_len_k). Defaults to None.
 
   Returns:
@@ -27,7 +27,7 @@ def scaled_dot_product_attention(q, k, v, mask):
 
   # add the mask to the scaled tensor.
   if mask is not None:
-    scaled_attention_logits += (mask * -1e9)  
+    scaled_attention_logits += (mask * -1e9)
 
   # softmax is normalized on the last axis (seq_len_k) so that the scores
   # add up to 1.
@@ -77,7 +77,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         scaled_attention = tf.transpose(scaled_attention, perm=[0, 2, 1, 3])  # (batch_size, seq_len_q, num_heads, depth)
 
-        concat_attention = tf.reshape(scaled_attention, 
+        concat_attention = tf.reshape(scaled_attention,
                                         (batch_size, -1, self.d_model))  # (batch_size, seq_len_q, d_model)
 
         output = self.dense(concat_attention)  # (batch_size, seq_len_q, d_model)

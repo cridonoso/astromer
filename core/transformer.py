@@ -1,4 +1,4 @@
-import tensorflow as tf 
+import tensorflow as tf
 
 from tensorflow.keras.layers import Input, Layer
 from tensorflow.keras import Model
@@ -11,25 +11,34 @@ from core.masking import create_mask, concat_mask
 class InputComposer(Layer):
     def __init__(self, frac=0.15, rand_frac=0.1, same_frac=0.1, sep_token=102., **kwargs):
         super(InputComposer, self).__init__(**kwargs)
-        self.frac = frac # TOKENS 
+        self.frac = frac # TOKENS
         self.randfrac = rand_frac # Replace by random magnitude
         self.samefrac = same_frac # Replace by the same magnitude
         self.sep_token = sep_token
 
     def call(self, data):
-        x1, x2, length, cls_true = data
+        x1, x2, length, cls_true, _ = data
 
         mask_1_tar, mask_1_inp = create_mask(x1)
-        
-        mask_2_tar, mask_2_inp = create_mask(x2, length=length, frac=self.frac, 
+
+        mask_2_tar, mask_2_inp = create_mask(x2, length=length, frac=self.frac,
                             frac_random=self.randfrac, frac_same=self.samefrac)
+
 
         mask_inp = concat_mask(mask_1_inp, mask_2_inp, cls_true, sep=self.sep_token)
         mask_tar = concat_mask(mask_1_tar, mask_2_tar, cls_true, sep=self.sep_token, reshape=False)
 
-        cls_true = tf.tile(tf.expand_dims(cls_true, 2), [1, 1, tf.shape(x1)[-1]], name='CLSTokens')
-        sep = tf.tile([[[self.sep_token]]], [tf.shape(x1)[0],1,tf.shape(x1)[-1]], name='SepTokens')
+        batch_size = tf.shape(x1)[0]
+        inp_dim = tf.shape(x1)[-1]
+
+        cls_true = tf.expand_dims(cls_true, 2) # (1, 1, 1)
+        cls_true = tf.tile(cls_true, [1, 1, inp_dim], name='CLSTokens')
+
+        sep_tokn = [[[self.sep_token]]] # (1,1,1)
+        sep = tf.tile(sep_tokn, [batch_size, 1, inp_dim], name='SepTokens')
+
         inputs = tf.concat([cls_true, x1, sep, x2], 1, name='NetworkInput')
+
 
         return inputs, mask_inp, mask_tar
 
@@ -45,51 +54,51 @@ class CustomDense(Layer):
         cls_prob = self.cls_layer(logist_cls)
         cls_prob = tf.transpose(cls_prob, [0,2,1], name='CategoricalClsPred')
         reconstruction = self.reg_layer(logist_rec)
-        final_output = tf.concat([cls_prob, reconstruction], 
+        final_output = tf.concat([cls_prob, reconstruction],
                                  axis=1, name='ConcatClassRec')
         return final_output
 
 class ASTROMER(Model):
-    def __init__(self, num_layers, d_model, num_heads, dff, pe_input, rate=0.1):
+    def __init__(self, num_layers, d_model, num_heads, dff, pe_input, rate=0.1, inp_dim=4):
         super(ASTROMER, self).__init__(name='ASTROMER')
         self.input_layer = InputComposer(name='BuildInput')
-        self.encoder = Encoder(num_layers, d_model, num_heads, dff, pe_input, rate, name='Encoder')
+        self.encoder = Encoder(num_layers, d_model, num_heads, dff,
+                               pe_input, rate, inp_dim=inp_dim, name='Encoder')
         self.dense   = CustomDense(name='Dense')
 
     def model(self, batch_size):
-        serie_1  = Input(shape=(202, 2), batch_size=batch_size, name='Serie1')
-        serie_2  = Input(shape=(202, 2), batch_size=batch_size, name='Serie2')
+        serie_1  = Input(shape=(202, 4), batch_size=batch_size, name='Serie1')
+        serie_2  = Input(shape=(202, 4), batch_size=batch_size, name='Serie2')
+        serie_3  = Input(shape=(406, ), batch_size=batch_size, name='sample_weight')
         length_i = Input(shape=(), batch_size=batch_size, dtype=tf.int32, name='TrueLength')
         class_i  = Input(shape=(1,), batch_size=batch_size, name='IsRandom')
-        data = (serie_1, serie_2, length_i, class_i)
+        data = (serie_1, serie_2, length_i, class_i, serie_3)
         return Model(inputs=data, outputs=self.call(data))
 
     def call(self, inputs, training=False):
         inp, mask_inp, mask_tar = self.input_layer(inputs)
-        enc_output = self.encoder(inp, training, mask=mask_inp) 
+        enc_output = self.encoder(inp, training, mask=mask_inp)
         final_output = self.dense(enc_output)
-        
         m = tf.concat([tf.expand_dims(mask_tar[:, 0], 1), mask_tar], 1, name='RepeatClassMask')
         output_mask = tf.concat([final_output, tf.expand_dims(m, 2)], 2, name='ConcatPredsAndMask')
-        return output_mask, inp 
+        return output_mask, inp
 
     def train_step(self, data):
-        cls_true = data[-1]
         with tf.GradientTape() as tape:
             output, inputs = self(data, training=True)
-            t_loss = self.compiled_loss(inputs, output)
-            
-        gradients = tape.gradient(t_loss, self.trainable_variables)    
+            t_loss = self.compiled_loss(inputs, output, sample_weight=data[-1])
+
+        gradients = tape.gradient(t_loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
         self.compiled_metrics.update_state(inputs, output)
         return {m.name: m.result() for m in self.metrics}
 
     def test_step(self, data):
         output, inputs = self(data, training=False)
-        t_loss = self.compiled_loss(inputs, output)
+        t_loss = self.compiled_loss(inputs, output, sample_weight=data[-1])
         self.compiled_metrics.update_state(inputs, output)
         return {m.name: m.result() for m in self.metrics}
-    
+
     def predict_step(self, data):
         y_pred, y_true = self(data, training=False)
 
@@ -107,5 +116,5 @@ class ASTROMER(Model):
     def get_attention(self, data):
         for d in data:
             inp, mask_inp, mask_tar = self.input_layer(d)
-            enc_output = self.encoder(inp, False, mask=mask_inp) 
+            enc_output = self.encoder(inp, False, mask=mask_inp)
             return enc_output

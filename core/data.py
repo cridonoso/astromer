@@ -36,11 +36,11 @@ def get_example(inp, tar, random_cond, label, label2):
     f['y_times'] = _float_feature(tar[:, 0].flatten().tolist())
     f['y_magn'] = _float_feature(tar[:, 1].flatten().tolist())
     f['y_std'] = _float_feature(tar[:, 2].flatten().tolist())
-    
+
     ex = tf.train.Example(features=tf.train.Features(feature=f))
     return ex
 
-def process_lc(path_0, meta_df, root, max_inp_len, 
+def process_lc(path_0, meta_df, root, max_inp_len,
                 max_tar_len, label):
     path_1 = meta_df.sample(n=1)
     label2 = path_1['Class'].values[0]
@@ -70,12 +70,12 @@ def process_lc(path_0, meta_df, root, max_inp_len,
         random_cond = np.random.randint(2)
 
         if random_cond:
-            pos_x = random_lc.iloc[:max_tar_len, :]       
-            
+            pos_x = random_lc.iloc[:max_tar_len, :]
+
         final_x = pd.concat([pre_x, pos_x])
-        
-        ex = get_example(pre_x.values, 
-                         pos_x.values, 
+
+        ex = get_example(pre_x.values,
+                         pos_x.values,
                          random_cond,
                          label,
                          label2)
@@ -98,28 +98,28 @@ def write_record(subset, folder, filename):
         for ex in subset:
             writer.write(ex.SerializeToString())
 
-def create_dataset(max_inp_len=100, 
-                   max_tar_len=100, 
+def create_dataset(max_inp_len=100,
+                   max_tar_len=100,
                    source='data/raw_data/macho/MACHO/',
                    target='data/records/macho/',
                    n_jobs=None):
-            
+
     n_jobs = mp.cpu_count() if n_jobs is not None else n_jobs
     metadata = source+'MACHO_dataset.dat'
     meta_df = pd.read_csv(metadata)
-    
+
     # Separate by classes
     grp_class = meta_df.groupby('Class')
 
     # Iterate over lightcurves
     for label, lab_frame in grp_class:
         response = Parallel(n_jobs=n_jobs)(delayed(process_lc)\
-                    (path_0, meta_df, source, 
+                    (path_0, meta_df, source,
                     max_inp_len, max_tar_len, label) \
                     for path_0 in lab_frame['Path'])
 
         response = [r for r in response if r is not None]
-           
+
         Parallel(n_jobs=n_jobs)(delayed(write_record)\
                 (subset, '{}/{}'.format(target, name), label) \
                 for subset, name in train_val_test_split(response))
@@ -145,28 +145,11 @@ def normalice(tensor):
                      (tensor - min_value)/den)
     return normed
 
-def normalice_both(tensor1, tensor2):
-    min_value1 = tf.expand_dims(tf.reduce_min(tensor1, 0), 0,
-                name='min_value1')
-    max_value1 = tf.expand_dims(tf.reduce_max(tensor1, 0), 0,
-                name='max_value1')
-
-    min_value2 = tf.expand_dims(tf.reduce_min(tensor2, 0), 0,
-                name='min_value2')
-    max_value2 = tf.expand_dims(tf.reduce_max(tensor2, 0), 0,
-                name='max_value2')
-
-    max_value = tf.maximum(max_value1, max_value2)
-    min_value = tf.minimum(max_value1, max_value2)
-
-    den = (max_value - min_value)
-    normed_1 = tf.where(den== 0.,
-                     (tensor1 - min_value),
-                     (tensor1 - min_value)/den)
-    normed_2 = tf.where(den== 0.,
-                     (tensor2 - min_value),
-                     (tensor2 - min_value)/den)
-    return normed_1, normed_2
+def get_delta(tensor, name='TensorDelta'):
+    times0 = tf.concat([[tensor[0]] , tensor[:-1]], axis=0,
+             name=name)
+    dt = tensor - times0
+    return dt
 
 def _parse(sample, magn_normed=False, time_normed=False, shifted=False):
     feat_keys = dict() # features for record
@@ -190,44 +173,57 @@ def _parse(sample, magn_normed=False, time_normed=False, shifted=False):
     ex1 = tf.io.parse_example(sample, feat_keys)
 
     if magn_normed:
-        ex1['x_magn'] = normalice(ex1['x_magn']) 
-        ex1['y_magn'] = normalice(ex1['y_magn'])
-    if time_normed:
-        ex1['x_times'] = normalice(ex1['x_times'])
-        ex1['y_times'] = normalice(ex1['y_times'])
+        ex1['x_magn'] = standardize(ex1['x_magn'])
+        ex1['y_magn'] = standardize(ex1['y_magn'])
+        ex1['x_std'] = normalice(1./ex1['x_std'])
+        ex1['y_std'] = normalice(1./ex1['y_std'])
 
-    SEPTOKEN = tf.expand_dims(101, 0)
-    SEPTOKEN = tf.cast(SEPTOKEN, tf.float32)
+    if time_normed:
+        ex1['x_times'] = standardize(ex1['x_times'])
+        ex1['y_times'] = standardize(ex1['y_times'])
+
+    # First derivative
+    dmagn_x = get_delta(ex1['x_magn'], name='amplitude_x')
+    dmagn_y = get_delta(ex1['y_magn'], name='amplitude_y')
+    dtime_x = get_delta(ex1['x_times'], name='cadence_x')
+    dtime_y = get_delta(ex1['y_times'], name='cadence_y')
+
+    # SepTOKEN
     class_id = tf.cast(ex1['class'], tf.float32)
     class_id = tf.expand_dims(class_id, 0)
 
+    std = tf.concat([ex1['x_std'], [0.], ex1['y_std']], 0)
+
     first_serie  = tf.stack([ex1['x_times'],
-                             ex1['x_magn']], 
+                             ex1['x_magn'],
+                             dmagn_x,
+                             dtime_x],
                              1)
-    if shifted:
-        second_serie = tf.stack([ex1['y_times']+1, # assuming we are normalizing times
-                                ex1['y_magn']], 
-                                1)
-    else:
-        second_serie = tf.stack([ex1['y_times'], # assuming we are normalizing times
-                                ex1['y_magn']], 
-                                1)
-    return first_serie, second_serie, tf.cast(ex1['length'], tf.int32), class_id
+
+    second_serie = tf.stack([ex1['y_times'],
+                             ex1['y_magn'],
+                             dmagn_y,
+                             dtime_y],
+                             1)
+
+
+
+    return first_serie, second_serie, tf.cast(ex1['length'], tf.int32), class_id, std
 
 
 def load_records(source, batch_size, magn_normed=False, time_normed=False, shifted=False):
 
-    datasets = [tf.data.TFRecordDataset(os.path.join(source,x)) for x in os.listdir(source)]  
+    datasets = [tf.data.TFRecordDataset(os.path.join(source,x)) for x in os.listdir(source)]
 
     datasets = [
         dataset.map(
-            lambda x: _parse(x, 
-                             magn_normed=magn_normed, 
+            lambda x: _parse(x,
+                             magn_normed=magn_normed,
                              time_normed=time_normed,
-                             shifted=shifted), 
+                             shifted=shifted),
                              num_parallel_calls=tf.data.experimental.AUTOTUNE) for dataset in datasets
     ]
-    
+
     # datasets = [dataset.repeat() for dataset in datasets]
     datasets = [dataset.shuffle(1000, reshuffle_each_iteration=True) for dataset in datasets]
     dataset  = tf.data.experimental.sample_from_datasets(datasets)

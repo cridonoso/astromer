@@ -16,53 +16,55 @@ logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 def train(opt):
     # Loading data
-    train_batches = load_records(os.path.join(opt.data, 'train'), opt.batch_size, 
-                                 magn_normed=opt.magn_normed, 
+    train_batches = load_records(os.path.join(opt.data, 'train'), opt.batch_size,
+                                 magn_normed=opt.magn_normed,
                                  time_normed=opt.time_normed,
                                  shifted=opt.time_shifted)
     valid_batches = load_records(os.path.join(opt.data, 'val'), opt.batch_size,
-                                 magn_normed=opt.magn_normed, 
+                                 magn_normed=opt.magn_normed,
                                  time_normed=opt.time_normed,
                                  shifted=opt.time_shifted)
     test_batches = load_records(os.path.join(opt.data, 'test'), opt.batch_size,
-                                 magn_normed=opt.magn_normed, 
+                                 magn_normed=opt.magn_normed,
                                  time_normed=opt.time_normed,
                                  shifted=opt.time_shifted)
 
     # Optimizer
+
     learning_rate = 1e-3#CustomSchedule(opt.head_dim)
-    optimizer = tf.keras.optimizers.Adam(learning_rate, 
-                                         beta_1=0.9, 
-                                         beta_2=0.98, 
+    optimizer = tf.keras.optimizers.Adam(learning_rate,
+                                         beta_1=0.9,
+                                         beta_2=0.98,
                                          epsilon=1e-9)
     # Model Instance
     transformer = ASTROMER(num_layers=opt.layers,
-                        d_model=opt.head_dim,
-                        num_heads=opt.heads,
-                        dff=opt.dff,
-                        pe_input=opt.pe,
-                        rate=opt.dropout)
+                           d_model=opt.head_dim,
+                           num_heads=opt.heads,
+                           dff=opt.dff,
+                           pe_input=opt.pe,
+                           rate=opt.dropout,
+                           inp_dim=opt.inp_dim)
     # Compile
-    transformer.compile(optimizer=optimizer, 
+    transformer.compile(optimizer=optimizer,
                         loss=ASTROMERLoss(),
                         metrics=[CustomMSE(), CustomBCE(), CustomACC()])
     # Create graph
     transformer.model(opt.batch_size).summary()
     # Training
-    transformer.fit(train_batches, 
-                    epochs=opt.epochs, 
+    transformer.fit(train_batches.take(1),
+                    epochs=opt.epochs,
                     verbose=1,
-                    validation_data=valid_batches,
+                    validation_data=valid_batches.take(1),
                     callbacks=get_callbacks(opt.p))
     # Testing
-    metrics = transformer.evaluate(test_batches)
+    metrics = transformer.evaluate(test_batches.take(1))
 
     # Saving metrics and setup file
     os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
     test_file = os.path.join(opt.p, 'test/test_metrics.json')
     with open(test_file, 'w') as json_file:
-        json.dump({'loss': metrics[0], 
-                   'rmse':metrics[1], 
+        json.dump({'loss': metrics[0],
+                   'rmse':metrics[1],
                    'accuracy':metrics[2]}, json_file, indent=4)
 
     conf_file = os.path.join(opt.p, 'conf.json')
@@ -93,7 +95,7 @@ if __name__ == '__main__':
                         help='Number of encoder layers')
     parser.add_argument('--heads', default=4, type=int,
                         help='Number of self-attention heads')
-    parser.add_argument('--head-dim', default=512, type=int,
+    parser.add_argument('--head-dim', default=1628, type=int,
                         help='Head-attention Dimensionality ')
     parser.add_argument('--dff', default=1024, type=int,
                         help='Dimensionality of the middle  dense layer at the end of the encoder')
@@ -101,6 +103,8 @@ if __name__ == '__main__':
                         help='Positional encoding maximum length')
     parser.add_argument('--dropout', default=0.1, type=float,
                         help='dropout_rate for the encoder')
+    parser.add_argument('--inp-dim', default=4, type=int,
+                        help='Input dim')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
 
