@@ -51,13 +51,13 @@ def train(opt):
     # Create graph
     transformer.model(opt.batch_size).summary()
     # Training
-    transformer.fit(train_batches.take(1),
+    transformer.fit(train_batches,
                     epochs=opt.epochs,
                     verbose=1,
-                    validation_data=valid_batches.take(1),
+                    validation_data=valid_batches,
                     callbacks=get_callbacks(opt.p))
     # Testing
-    metrics = transformer.evaluate(test_batches.take(1))
+    metrics = transformer.evaluate(test_batches)
 
     # Saving metrics and setup file
     os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
