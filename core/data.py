@@ -207,8 +207,16 @@ def parse_2(sample, input_size):
 
     # input dictionary
     inp_dict = dict()
-    inp_dict['serie_1'] = serie_1
+    inp_dict['serie_1'] = standardize(serie_1)
+
+    serie_2 = standardize(serie_2)
+    # Shift serie_2 to the end of serie_1
+    times_2 = tf.slice(serie_2, [0, 0], [-1, 1])
+    rest_2  = tf.slice(serie_2, [0, 1], [-1, -1])
+    times_2 = times_2 + (tf.abs(inp_dict['serie_1'][0, 0])+inp_dict['serie_1'][-1, 0])
+    serie_2 = tf.concat([times_2, rest_2], 1)
     inp_dict['serie_2'] = serie_2
+
     inp_dict['steps_2'] = steps_2
     inp_dict['steps_1'] = steps_1
     return inp_dict
