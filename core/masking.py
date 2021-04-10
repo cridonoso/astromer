@@ -14,7 +14,7 @@ def create_padding_mask(tensor, lengths):
     mask = tf.greater(range_row, lengths_transposed)
     return tf.cast(mask, tf.float32, name='LengthMask')
 
-def create_prediction_mask(tensor, frac=0.15):
+def get_mask(tensor, frac=0.15):
     '''
     Creates a random mask given an observation fraction
     '''

@@ -1,87 +1,70 @@
 import tensorflow as tf
 
-from tensorflow.keras.layers import Input, Layer
+from tensorflow.keras.layers import Input
 from tensorflow.keras import Model
 
+from core.input   import InputLayer
+from core.output  import OutputLayer
 from core.encoder import Encoder
 from core.decoder import Decoder
-from core.masking import create_mask, concat_mask
 
 
-class InputComposer(Layer):
-    def __init__(self, frac=0.15, rand_frac=0.1, same_frac=0.1, sep_token=102., **kwargs):
-        super(InputComposer, self).__init__(**kwargs)
-        self.frac = frac # TOKENS
-        self.randfrac = rand_frac # Replace by random magnitude
-        self.samefrac = same_frac # Replace by the same magnitude
-        self.sep_token = sep_token
-
-    def call(self, data):
-        x1, x2, length, cls_true, _ = data
-
-        mask_1_tar, mask_1_inp = create_mask(x1)
-
-        mask_2_tar, mask_2_inp = create_mask(x2, length=length, frac=self.frac,
-                            frac_random=self.randfrac, frac_same=self.samefrac)
-
-
-        mask_inp = concat_mask(mask_1_inp, mask_2_inp, cls_true, sep=self.sep_token)
-        mask_tar = concat_mask(mask_1_tar, mask_2_tar, cls_true, sep=self.sep_token, reshape=False)
-
-        batch_size = tf.shape(x1)[0]
-        inp_dim = tf.shape(x1)[-1]
-
-        cls_true = tf.expand_dims(cls_true, 2) # (1, 1, 1)
-        cls_true = tf.tile(cls_true, [1, 1, inp_dim], name='CLSTokens')
-
-        sep_tokn = [[[self.sep_token]]] # (1,1,1)
-        sep = tf.tile(sep_tokn, [batch_size, 1, inp_dim], name='SepTokens')
-
-        inputs = tf.concat([cls_true, x1, sep, x2], 1, name='NetworkInput')
-
-
-        return inputs, mask_inp, mask_tar
-
-class CustomDense(Layer):
-    def __init__(self, **kwargs):
-        super(CustomDense, self).__init__(**kwargs)
-        self.reg_layer = tf.keras.layers.Dense(1, name='RegressionLayer')
-        self.cls_layer = tf.keras.layers.Dense(2, name='ClassificationLayer')
-
-    def call(self, inputs):
-        logist_rec = tf.slice(inputs, [0,1,0], [-1, -1, -1], name='RecontructionSplit')
-        logist_cls = tf.slice(inputs, [0,0,0], [-1, 1, -1], name='ClassPredictedSplit')
-        cls_prob = self.cls_layer(logist_cls)
-        cls_prob = tf.transpose(cls_prob, [0,2,1], name='CategoricalClsPred')
-        reconstruction = self.reg_layer(logist_rec)
-        final_output = tf.concat([cls_prob, reconstruction],
-                                 axis=1, name='ConcatClassRec')
-        return final_output
 
 class ASTROMER(Model):
-    def __init__(self, num_layers, d_model, num_heads, dff, pe_input, rate=0.1, inp_dim=4):
+    def __init__(self, num_layers, d_model, num_heads, dff, pe_input, rate=0.1, inp_dim=4, ):
         super(ASTROMER, self).__init__(name='ASTROMER')
-        self.input_layer = InputComposer(name='BuildInput')
-        self.encoder = Encoder(num_layers, d_model, num_heads, dff,
-                               pe_input, rate, inp_dim=inp_dim, name='Encoder')
-        self.dense   = CustomDense(name='Dense')
+        self.num_heads  = num_heads
+        self.num_layers = num_layers
+        self.d_model    = d_model 
+        self.num_heads  = num_heads
+        self.dff        = dff
+        self.pe_input   = pe_input
+        self.rate       = rate
+        self.inp_dim    = inp_dim
 
-    def model(self, batch_size):
-        serie_1  = Input(shape=(202, 4), batch_size=batch_size, name='Serie1')
-        serie_2  = Input(shape=(202, 4), batch_size=batch_size, name='Serie2')
-        serie_3  = Input(shape=(406, ), batch_size=batch_size, name='sample_weight')
-        length_i = Input(shape=(), batch_size=batch_size, dtype=tf.int32, name='TrueLength')
-        class_i  = Input(shape=(1,), batch_size=batch_size, name='IsRandom')
-        data = (serie_1, serie_2, length_i, class_i, serie_3)
-        return Model(inputs=data, outputs=self.call(data))
+        self.input_layer = InputLayer(name='BuildInput')
+
+        self.encoder     = Encoder(num_layers, 
+                                   d_model, 
+                                   num_heads, 
+                                   dff,
+                                   pe_input, 
+                                   rate, 
+                                   inp_dim=inp_dim, 
+                                   name='Encoder')
+
+        self.dense       = OutputLayer(name='Dense')
 
     def call(self, inputs, training=False):
-        inp, mask_inp, mask_tar = self.input_layer(inputs)
-        enc_output = self.encoder(inp, training, mask=mask_inp)
-        final_output = self.dense(enc_output)
-        m = tf.concat([tf.expand_dims(mask_tar[:, 0], 1), mask_tar], 1, name='RepeatClassMask')
-        output_mask = tf.concat([final_output, tf.expand_dims(m, 2)], 2, name='ConcatPredsAndMask')
-        return output_mask, inp
+        ids, serie_1, serie_2, label = inputs
+
+        # Join series by [SEP]
+        inp_vector, mask_input, mask_target = self.input_layer(serie_1, 
+                                                               serie_2)
+
+
+        # enc_output = self.encoder(inp, training, mask=mask_inp)
+        # final_output = self.dense(enc_output)
+        # m = tf.concat([tf.expand_dims(mask_tar[:, 0], 1), mask_tar], 1, name='RepeatClassMask')
+        # output_mask = tf.concat([final_output, tf.expand_dims(m, 2)], 2, name='ConcatPredsAndMask')
+        # return output_mask, inp
+        return inp_vector
+
+    def model(self, batch_size):
+        serie_1  = Input(shape=(100, 3), batch_size=batch_size, name='Serie1')
+        serie_2  = Input(shape=(100, 3), batch_size=batch_size, name='Serie2')
+
+        length_i = Input(shape=(), batch_size=batch_size, dtype=tf.int32, name='TrueLength')
+        id_i     = Input(shape=(), batch_size=batch_size, dtype=tf.string, name='ID')
+        lab_cls  = Input(shape=(), batch_size=batch_size, name='label')
+
+        data = (id_i, serie_1, serie_2,lab_cls)
+        return Model(inputs=data, outputs=self.call(data))
+    
+    def get_config(self):
+        base_config = super(MyLayer, self).get_config()
+        base_config['output_dim'] = self.output_dim
+        return base_config
 
     def train_step(self, data):
         with tf.GradientTape() as tape:
@@ -114,7 +97,10 @@ class ASTROMER(Model):
                tf.squeeze(cls_pred), tf.squeeze(cls_true)
 
     def get_attention(self, data):
+        all_vectors = []
         for d in data:
             inp, mask_inp, mask_tar = self.input_layer(d)
             enc_output = self.encoder(inp, False, mask=mask_inp)
-            return enc_output
+            all_vectors.append(enc_output)
+
+        return all_vectors

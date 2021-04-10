@@ -30,7 +30,6 @@ def train(opt):
                                  shifted=opt.time_shifted)
 
     # Optimizer
-
     learning_rate = 1e-3#CustomSchedule(opt.head_dim)
     optimizer = tf.keras.optimizers.Adam(learning_rate,
                                          beta_1=0.9,
@@ -50,26 +49,28 @@ def train(opt):
                         metrics=[CustomMSE(), CustomBCE(), CustomACC()])
     # Create graph
     transformer.model(opt.batch_size).summary()
+
+
     # Training
-    transformer.fit(train_batches,
-                    epochs=opt.epochs,
-                    verbose=1,
-                    validation_data=valid_batches,
-                    callbacks=get_callbacks(opt.p))
-    # Testing
-    metrics = transformer.evaluate(test_batches)
+    # transformer.fit(train_batches,
+    #                 epochs=opt.epochs,
+    #                 verbose=1,
+    #                 validation_data=valid_batches,
+    #                 callbacks=get_callbacks(opt.p))
+    # # Testing
+    # metrics = transformer.evaluate(test_batches)
 
-    # Saving metrics and setup file
-    os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
-    test_file = os.path.join(opt.p, 'test/test_metrics.json')
-    with open(test_file, 'w') as json_file:
-        json.dump({'loss': metrics[0],
-                   'rmse':metrics[1],
-                   'accuracy':metrics[2]}, json_file, indent=4)
+    # # Saving metrics and setup file
+    # os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
+    # test_file = os.path.join(opt.p, 'test/test_metrics.json')
+    # with open(test_file, 'w') as json_file:
+    #     json.dump({'loss': metrics[0],
+    #                'rmse':metrics[1],
+    #                'accuracy':metrics[2]}, json_file, indent=4)
 
-    conf_file = os.path.join(opt.p, 'conf.json')
-    with open(conf_file, 'w') as json_file:
-        json.dump(vars(opt), json_file, indent=4)
+    # conf_file = os.path.join(opt.p, 'conf.json')
+    # with open(conf_file, 'w') as json_file:
+    #     json.dump(vars(opt), json_file, indent=4)
 
 
 if __name__ == '__main__':

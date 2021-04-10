@@ -6,7 +6,7 @@ import logging
 import os
 
 from joblib import Parallel, delayed
-
+from tqdm import tqdm
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
@@ -22,108 +22,97 @@ def _float_feature(list_of_floats):  # float32
 def _int64_feature(value):
     return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
-def get_example(inp, tar, random_cond, label, label2):
+def get_example(lcid, label, lightcurve):
     f = dict()
-    f['length'] = _int64_feature(tar.shape[0])
-    f['class'] = _int64_feature(random_cond)
-    f['label'] = _bytes_feature(label.encode('utf-8'))
-    f['label2'] = _bytes_feature(label2.encode('utf-8'))
+    
+    dict_features={
+    'id': tf.train.Feature(bytes_list=tf.train.BytesList(value=[str(lcid).encode()])),
+    'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label])),
+    'length': tf.train.Feature(int64_list=tf.train.Int64List(value=[lightcurve.shape[0]])),
+    }
+    element_context = tf.train.Features(feature = dict_features)
 
-    f['x_times'] = _float_feature(inp[:, 0].flatten().tolist())
-    f['x_magn'] = _float_feature(inp[:, 1].flatten().tolist())
-    f['x_std'] = _float_feature(inp[:, 2].flatten().tolist())
+    dict_sequence = {}
+    for col in range(lightcurve.shape[1]):
+        seqfeat = _float_feature(lightcurve[:, col])
+        seqfeat = tf.train.FeatureList(feature = [seqfeat])
+        dict_sequence['dim_{}'.format(col)] = seqfeat
 
-    f['y_times'] = _float_feature(tar[:, 0].flatten().tolist())
-    f['y_magn'] = _float_feature(tar[:, 1].flatten().tolist())
-    f['y_std'] = _float_feature(tar[:, 2].flatten().tolist())
+    element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
+    ex = tf.train.SequenceExample(context = element_context,
+                                  feature_lists= element_lists)
+    return ex 
 
-    ex = tf.train.Example(features=tf.train.Features(feature=f))
-    return ex
+def divide_training_subset(frame, train, val):
+    frame = frame.sample(frac=1)
+    n_samples = frame.shape[0]
+    n_train = int(n_samples*train)
+    n_val = int(n_samples*val)
 
-def process_lc(path_0, meta_df, root, max_inp_len,
-                max_tar_len, label):
-    path_1 = meta_df.sample(n=1)
-    label2 = path_1['Class'].values[0]
-    path_1 = path_1['Path'].values[0]
+    sub_train = frame.iloc[:n_train]
+    sub_val   = frame.iloc[n_train:n_train+n_val]
+    sub_test  = frame.iloc[n_train+n_val:]
 
-    current_lc = pd.read_csv(root+path_0)
-    random_lc  = pd.read_csv(root+path_1)
+    return ('train', sub_train), ('val', sub_val), ('test', sub_test)
 
-    # Sort values by time
-    current_lc = current_lc.sort_values('mjd')
-    random_lc = random_lc.sort_values('mjd')
+def process_lc(row, source, lc_index, unique_classes, writer):
+    path  = row['Path'].split('/')[-1]
+    label = list(unique_classes).index(row['Class'])
+    lc_path = os.path.join(source, path)
+    observations = pd.read_csv(lc_path)
+    observations = observations.dropna()
+    observations.sort_values('mjd')
+    observations = observations.drop_duplicates(keep='last')
+    numpy_lc = observations.values
+    ex = get_example(lc_index, label, numpy_lc)
+    writer.write(ex.SerializeToString())
 
-    # Remove Nan values
-    current_lc = current_lc.dropna()
-    random_lc  = random_lc.dropna()
-
-    # Split lightcurve
-    time_steps = current_lc.shape[0]
-    start = int(max_inp_len)
-    end = int(max_inp_len) + max_tar_len
-
-    ex = None
-    if time_steps >= end:
-        pre_x = current_lc.iloc[:start, :]
-        pos_x = current_lc.iloc[start:end, :]
-
-        random_cond = np.random.randint(2)
-
-        if random_cond:
-            pos_x = random_lc.iloc[:max_tar_len, :]
-
-        final_x = pd.concat([pre_x, pos_x])
-
-        ex = get_example(pre_x.values,
-                         pos_x.values,
-                         random_cond,
-                         label,
-                         label2)
-    return ex
-
-def train_val_test_split(lightcurves, val_ptge=0.25, test_ptge=0.25):
-    '''train test and validation split'''
-    size = len(lightcurves)
-    indices = np.arange(0, size)
-    np.random.shuffle(indices)
-    test_split = lightcurves[:int(test_ptge*size)]
-    val_split = lightcurves[int(test_ptge*size):int(test_ptge*size)+int(val_ptge*size)]
-    train_split = lightcurves[int(test_ptge*size)+int(val_ptge*size):]
-    return (train_split, 'train'), (val_split, 'val'), (test_split, 'test')
-
-def write_record(subset, folder, filename):
-    # Creates a record file for a given subset of lightcurves
-    os.makedirs(folder, exist_ok=True)
-    with tf.io.TFRecordWriter('{}/{}.record'.format(folder, filename)) as writer:
-        for ex in subset:
-            writer.write(ex.SerializeToString())
-
-def create_dataset(max_inp_len=100,
-                   max_tar_len=100,
-                   source='data/raw_data/macho/MACHO/',
-                   target='data/records/macho/',
-                   n_jobs=None):
-
+def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None):
     n_jobs = mp.cpu_count() if n_jobs is not None else n_jobs
-    metadata = source+'MACHO_dataset.dat'
+    # Get frames with fixed number of lightcurves
+    collection = [frame.iloc[i:i+max_lcs_per_record] \
+                  for i in range(0, frame.shape[0], max_lcs_per_record)]
+    # Iterate over subset 
+    for counter, subframe in enumerate(collection):
+        with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
+            Parallel(n_jobs=n_jobs)(delayed(process_lc)(row, source, k, unique, writer) \
+                                    for k, row in subframe.iterrows())
+
+
+def create_dataset(source='data/raw_data/macho/MACHO/LCs',
+                   metadata='data/raw_data/macho/MACHO/MACHO_dataset.dat',
+                   target='data/records/macho/',
+                   n_jobs=None,
+                   subsets_frac=(0.5, 0.25),
+                   max_lcs_per_record=100):
+    os.makedirs(target, exist_ok=True)
+    
     meta_df = pd.read_csv(metadata)
+    
+    bands = meta_df['Band'].unique()
+    if len(bands) > 1:
+        b = input('Filters {} were found. Type one to continue'.format(' and'.join(bands)))
+        meta_df = meta_df[meta_df['Band'] == b]
 
-    # Separate by classes
-    grp_class = meta_df.groupby('Class')
+    unique, counts = np.unique(meta_df['Class'], return_counts=True)
+    info_df = pd.DataFrame()
+    info_df['label'] = unique
+    info_df['size'] = counts 
+    info_df.to_csv(os.path.join(target, 'objects.csv'), index=False)
+    
+    # Separate by class 
+    cls_groups = meta_df.groupby('Class')
 
-    # Iterate over lightcurves
-    for label, lab_frame in grp_class:
-        response = Parallel(n_jobs=n_jobs)(delayed(process_lc)\
-                    (path_0, meta_df, source,
-                    max_inp_len, max_tar_len, label) \
-                    for path_0 in lab_frame['Path'])
-
-        response = [r for r in response if r is not None]
-
-        Parallel(n_jobs=n_jobs)(delayed(write_record)\
-                (subset, '{}/{}'.format(target, name), label) \
-                for subset, name in train_val_test_split(response))
-
+    for cls_name, cls_meta in tqdm(cls_groups, total=len(cls_groups)):
+        subsets = divide_training_subset(cls_meta, 
+                                         train=subsets_frac[0], 
+                                         val=subsets_frac[0])
+        
+        for subset_name, frame in subsets:
+            dest = os.path.join(target, subset_name, cls_name)
+            os.makedirs(dest, exist_ok=True)
+            write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs)
+        
 def standardize(tensor):
     mean_value = tf.expand_dims(tf.reduce_mean(tensor, 0), 0,
                 name='min_value')
@@ -151,82 +140,105 @@ def get_delta(tensor, name='TensorDelta'):
     dt = tensor - times0
     return dt
 
-def _parse(sample, magn_normed=False, time_normed=False, shifted=False):
-    feat_keys = dict() # features for record
+def _parse(sample):
+    
 
+    context_features = {'label': tf.io.FixedLenFeature([],dtype=tf.int64),
+                        'length': tf.io.FixedLenFeature([],dtype=tf.int64),
+                        'id': tf.io.FixedLenFeature([], dtype=tf.string)}
+    sequence_features = dict()
+    for i in range(3):
+        sequence_features['dim_{}'.format(i)] = tf.io.VarLenFeature(dtype=tf.float32)
+    
+    context, sequence = tf.io.parse_single_sequence_example(
+                            serialized=sample,
+                            context_features=context_features,
+                            sequence_features=sequence_features
+                            )
 
-    for k in ['times', 'magn', 'std']:
-        feat_keys["x_{}".format(k)] = tf.io.FixedLenSequenceFeature([],
-                                                        dtype=tf.float32,
-                                                        allow_missing=True)
-        feat_keys["y_{}".format(k)] = tf.io.FixedLenSequenceFeature([],
-                                                        dtype=tf.float32,
-                                                        allow_missing=True)
+    input_dict = dict()
+    input_dict['lcid']   = tf.cast(context['id'], tf.string)
+    input_dict['length'] = tf.cast(context['length'], tf.int32)
+    input_dict['label']  = tf.cast(context['label'], tf.int32)
 
+    casted_inp_parameters = []
+    for i in range(3):
+        seq_dim = sequence['dim_{}'.format(i)]
+        seq_dim = tf.sparse.to_dense(seq_dim)
+        seq_dim = tf.cast(seq_dim, tf.float32)
+        casted_inp_parameters.append(seq_dim)
 
+    input_dict['input'] = tf.stack(casted_inp_parameters, axis=2)
+    return input_dict
 
-    feat_keys['length'] = tf.io.FixedLenFeature([], tf.int64)
-    feat_keys['class'] = tf.io.FixedLenFeature([], tf.int64)
-    feat_keys['label'] = tf.io.FixedLenFeature([], tf.string)
-    feat_keys['label2'] = tf.io.FixedLenFeature([], tf.string)
+def parse_2(sample, input_size):
+    param_dim = tf.cast(tf.shape(sample['input'])[-1], tf.int32)
 
-    ex1 = tf.io.parse_example(sample, feat_keys)
+    single_len = tf.cast(tf.math.floordiv(input_size, 2), tf.int32)
 
-    if magn_normed:
-        ex1['x_magn'] = standardize(ex1['x_magn'])
-        ex1['y_magn'] = standardize(ex1['y_magn'])
-        ex1['x_std'] = normalice(1./ex1['x_std'])
-        ex1['y_std'] = normalice(1./ex1['y_std'])
+    steps_1 = steps_2 = 0
+    if tf.math.less_equal(sample['length'], single_len):
+        # masking needed
+        serie_1 = sample['input'][0]
+        filler  = tf.zeros([single_len - sample['length'], param_dim])
+        serie_1 = tf.concat([serie_1, filler], axis=0)
+        serie_2 = tf.zeros_like(serie_1)
+        steps_1 = sample['length']
 
-    if time_normed:
-        ex1['x_times'] = standardize(ex1['x_times'])
-        ex1['y_times'] = standardize(ex1['y_times'])
+    elif tf.math.greater(sample['length'], input_size):
+        # no masking needed
+        pivot = tf.random.uniform(shape=[1],
+                                  minval=0, 
+                                  maxval=int(sample['length']-input_size), 
+                                  dtype=tf.dtypes.int32)[0]
 
-    # First derivative
-    dmagn_x = get_delta(ex1['x_magn'], name='amplitude_x')
-    dmagn_y = get_delta(ex1['y_magn'], name='amplitude_y')
-    dtime_x = get_delta(ex1['x_times'], name='cadence_x')
-    dtime_y = get_delta(ex1['y_times'], name='cadence_y')
+        serie_1 = sample['input'][:, pivot:(pivot+single_len), :][0]
+        serie_2 = sample['input'][:, (pivot+single_len):(pivot+2*single_len), :][0]
+        steps_1 = steps_2 = single_len
+    else:
+        # masking needed
+        serie_1 = sample['input'][:, :single_len , :][0]
+        serie_2 = sample['input'][:, single_len: , :][0]
+        step_s2 = tf.cast(tf.shape(serie_2)[0], tf.int32)
+        filler  = tf.zeros([single_len - step_s2, param_dim])
+        serie_2 = tf.concat([serie_2, filler], axis=0)
+        steps_1 = single_len
+        steps_2 = step_s2
 
-    # SepTOKEN
-    class_id = tf.cast(ex1['class'], tf.float32)
-    class_id = tf.expand_dims(class_id, 0)
+    # input dictionary
+    inp_dict = dict()
+    inp_dict['serie_1'] = serie_1
+    inp_dict['serie_2'] = serie_2
+    inp_dict['steps_2'] = steps_2
+    inp_dict['steps_1'] = steps_1
+    return inp_dict
 
-    std = tf.concat([ex1['x_std'], [0.], ex1['y_std']], 0)
+def adjust_length(func, input_len):
+    '''Decorator that reports the execution time.'''
+    def wrap(*args, **kwargs):
+        result = func(*args, input_len)
+        return result
+    return wrap
 
-    first_serie  = tf.stack([ex1['x_times'],
-                             ex1['x_magn'],
-                             dmagn_x,
-                             dtime_x],
-                             1)
+def load_records(source, batch_size, repeat=3, input_len=100):
+    datasets = [tf.data.TFRecordDataset(os.path.join(source, folder, x)) \
+                for folder in os.listdir(source) for x in os.listdir(os.path.join(source, folder))]
 
-    second_serie = tf.stack([ex1['y_times'],
-                             ex1['y_magn'],
-                             dmagn_y,
-                             dtime_y],
-                             1)
+    parse_2_adjusted = adjust_length(parse_2, input_len)
 
+    op = lambda x: tf.data.Dataset.from_tensors(x).repeat(repeat).shuffle(1000).map(_parse).map(parse_2_adjusted)
+    datasets = [dataset.interleave(op,
+                                   cycle_length = 25,
+                                   block_length=1,
+                                   deterministic=False,
+                                   num_parallel_calls=tf.data.experimental.AUTOTUNE) \
+                for dataset in datasets]
+    
 
-
-    return first_serie, second_serie, tf.cast(ex1['length'], tf.int32), class_id, std
-
-
-def load_records(source, batch_size, magn_normed=False, time_normed=False, shifted=False):
-
-    datasets = [tf.data.TFRecordDataset(os.path.join(source,x)) for x in os.listdir(source)]
-
-    datasets = [
-        dataset.map(
-            lambda x: _parse(x,
-                             magn_normed=magn_normed,
-                             time_normed=time_normed,
-                             shifted=shifted),
-                             num_parallel_calls=tf.data.experimental.AUTOTUNE) for dataset in datasets
-    ]
-
-    # datasets = [dataset.repeat() for dataset in datasets]
     datasets = [dataset.shuffle(1000, reshuffle_each_iteration=True) for dataset in datasets]
     dataset  = tf.data.experimental.sample_from_datasets(datasets)
-    dataset  = dataset.cache()
-    dataset  = dataset.padded_batch(batch_size).prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    dataset = dataset.cache()
+    dataset = dataset.batch(100)
+    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+
     return dataset
