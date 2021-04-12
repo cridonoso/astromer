@@ -12,12 +12,15 @@ class CustomMSE(tf.keras.losses.Loss):
         '''
         rec_pred = tf.slice(y_pred, [0,2,0], [-1, -1, 1])
         rec_mask = tf.slice(y_pred, [0,2,1], [-1, -1, 1])
-        rec_true = tf.slice(y_true, [0,1,1], [-1, -1, -1])
+        rec_true = tf.slice(y_true, [0,1,1], [-1, -1, 1])
 
         mse = tf.square(rec_true - rec_pred)
-        if sample_weight is not None:
-            mse = mse * tf.expand_dims(sample_weight, 2)
 
+        if sample_weight is None:
+
+            sample_weight = tf.slice(y_true, [0,1,2], [-1, -1, 1])
+            mse = mse * sample_weight
+        
         masked_mse = tf.multiply(mse, rec_mask)
         masked_mse = tf.reduce_sum(masked_mse, 1)
 

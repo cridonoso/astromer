@@ -114,24 +114,29 @@ def create_dataset(source='data/raw_data/macho/MACHO/LCs',
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs)
         
 def standardize(tensor):
-    mean_value = tf.expand_dims(tf.reduce_mean(tensor, 0), 0,
-                name='min_value')
-    std_value = tf.expand_dims(tf.math.reduce_std(tensor, 0), 0,
-                name='max_value')
+    mean_value = tf.expand_dims(tf.reduce_mean(tensor, 1), 1, name='mean_value')
+    std_value = tf.expand_dims(tf.math.reduce_std(tensor, 1), 1, name='std_value')
     normed = tf.where(std_value == 0.,
                      (tensor - mean_value),
                      (tensor - mean_value)/std_value)
     return normed
 
-def normalice(tensor):
-    min_value = tf.expand_dims(tf.reduce_min(tensor, 0), 0,
-                name='min_value')
-    max_value = tf.expand_dims(tf.reduce_max(tensor, 0), 0,
-                name='max_value')
+def normalize(tensor, only_time=False, min_value=None, max_value=None):
+    if only_time:
+        rest = tf.slice(tensor, [0, 0, 1], [-1, -1, 2])
+        tensor = tf.slice(tensor, [0, 0, 0], [-1, -1, 1])
+
+    if min_value is None or max_value is None:
+        min_value = tf.expand_dims(tf.reduce_min(tensor, 1), 1, name='min_value')
+        max_value = tf.expand_dims(tf.reduce_max(tensor, 1), 1, name='max_value')
+
     den = (max_value - min_value)
     normed = tf.where(den== 0.,
                      (tensor - min_value),
                      (tensor - min_value)/den)
+
+    if only_time:
+        normed = tf.concat([normed, rest], 2)
     return normed
 
 def get_delta(tensor, name='TensorDelta'):
@@ -207,18 +212,12 @@ def parse_2(sample, input_size):
 
     # input dictionary
     inp_dict = dict()
-    inp_dict['serie_1'] = standardize(serie_1)
-
-    serie_2 = standardize(serie_2)
-    # Shift serie_2 to the end of serie_1
-    times_2 = tf.slice(serie_2, [0, 0], [-1, 1])
-    rest_2  = tf.slice(serie_2, [0, 1], [-1, -1])
-    times_2 = times_2 + (tf.abs(inp_dict['serie_1'][0, 0])+inp_dict['serie_1'][-1, 0])
-    serie_2 = tf.concat([times_2, rest_2], 1)
+    inp_dict['serie_1'] = serie_1
     inp_dict['serie_2'] = serie_2
 
     inp_dict['steps_2'] = steps_2
     inp_dict['steps_1'] = steps_1
+
     return inp_dict
 
 def adjust_length(func, input_len):
@@ -234,7 +233,7 @@ def load_records(source, batch_size, repeat=3, input_len=100):
 
     parse_2_adjusted = adjust_length(parse_2, input_len)
 
-    op = lambda x: tf.data.Dataset.from_tensors(x).repeat(repeat).shuffle(1000).map(_parse).map(parse_2_adjusted)
+    op = lambda x: tf.data.Dataset.from_tensors(x).cache().repeat(repeat).shuffle(1000).map(_parse).map(parse_2_adjusted)
     datasets = [dataset.interleave(op,
                                    cycle_length = 25,
                                    block_length=1,
@@ -245,8 +244,7 @@ def load_records(source, batch_size, repeat=3, input_len=100):
 
     datasets = [dataset.shuffle(1000, reshuffle_each_iteration=True) for dataset in datasets]
     dataset  = tf.data.experimental.sample_from_datasets(datasets)
-    dataset = dataset.cache()
-    dataset = dataset.batch(100)
+    dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
     return dataset

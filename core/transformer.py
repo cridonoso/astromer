@@ -11,16 +11,15 @@ from core.decoder import Decoder
 
 
 class ASTROMER(Model):
-    def __init__(self, num_layers, d_model, num_heads, dff, pe_input, rate=0.1, inp_dim=4, ):
+    def __init__(self, num_layers, d_model, num_heads, dff, rate=0.1, base=10000, ):
         super(ASTROMER, self).__init__(name='ASTROMER')
         self.num_heads  = num_heads
         self.num_layers = num_layers
         self.d_model    = d_model 
         self.num_heads  = num_heads
         self.dff        = dff
-        self.pe_input   = pe_input
         self.rate       = rate
-        self.inp_dim    = inp_dim
+        self.base    = base
 
         self.input_layer = InputLayer(name='BuildInput')
 
@@ -28,58 +27,55 @@ class ASTROMER(Model):
                                    d_model, 
                                    num_heads, 
                                    dff,
-                                   pe_input, 
+                                   base, 
                                    rate, 
-                                   inp_dim=inp_dim, 
                                    name='Encoder')
 
-        self.dense       = OutputLayer(name='Dense')
+        self.output_layer = OutputLayer(name='Dense')
 
     def call(self, inputs, training=False):
-        ids, serie_1, serie_2, label = inputs
-
         # Join series by [SEP]
-        inp_vector, mask_input, mask_target = self.input_layer(serie_1, 
-                                                               serie_2)
+        in_dict = self.input_layer(inputs)
+        enc_output = self.encoder(in_dict, training)
+        final_output = self.output_layer(enc_output)
 
+        # we need to adjust our mask to match the current dimensionality
+        in_dict['tar_mask'] = tf.concat([tf.expand_dims(in_dict['tar_mask'][:, 0], 1), 
+                                         in_dict['tar_mask']], 1, name='RepeatClassMask')
 
-        # enc_output = self.encoder(inp, training, mask=mask_inp)
-        # final_output = self.dense(enc_output)
-        # m = tf.concat([tf.expand_dims(mask_tar[:, 0], 1), mask_tar], 1, name='RepeatClassMask')
-        # output_mask = tf.concat([final_output, tf.expand_dims(m, 2)], 2, name='ConcatPredsAndMask')
-        # return output_mask, inp
-        return inp_vector
+        output_mask = tf.concat([final_output, tf.expand_dims(in_dict['tar_mask'], 2)], 
+                                2, 
+                                name='ConcatPredsAndMask')
+        
+        return output_mask, in_dict['target']
 
     def model(self, batch_size):
-        serie_1  = Input(shape=(100, 3), batch_size=batch_size, name='Serie1')
-        serie_2  = Input(shape=(100, 3), batch_size=batch_size, name='Serie2')
+        serie_1  = Input(shape=(50, 3), batch_size=batch_size, name='Serie1')
+        serie_2  = Input(shape=(50, 3), batch_size=batch_size, name='Serie2')
 
-        length_i = Input(shape=(), batch_size=batch_size, dtype=tf.int32, name='TrueLength')
-        id_i     = Input(shape=(), batch_size=batch_size, dtype=tf.string, name='ID')
-        lab_cls  = Input(shape=(), batch_size=batch_size, name='label')
+        steps_1 = Input(shape=(), batch_size=batch_size, dtype=tf.int32, name='steps_1')
+        steps_2 = Input(shape=(), batch_size=batch_size, dtype=tf.int32, name='steps_2')
 
-        data = (id_i, serie_1, serie_2,lab_cls)
+        data = {'serie_1':serie_1, 'serie_2':serie_2,
+                'steps_1':steps_1, 'steps_2':steps_2}
+
         return Model(inputs=data, outputs=self.call(data))
     
-    def get_config(self):
-        base_config = super(MyLayer, self).get_config()
-        base_config['output_dim'] = self.output_dim
-        return base_config
 
     def train_step(self, data):
         with tf.GradientTape() as tape:
-            output, inputs = self(data, training=True)
-            t_loss = self.compiled_loss(inputs, output, sample_weight=data[-1])
+            output, x_true = self(data, training=True)
+            t_loss = self.compiled_loss(x_true, output)
 
         gradients = tape.gradient(t_loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
-        self.compiled_metrics.update_state(inputs, output)
+        self.compiled_metrics.update_state(x_true, output)
         return {m.name: m.result() for m in self.metrics}
 
     def test_step(self, data):
-        output, inputs = self(data, training=False)
-        t_loss = self.compiled_loss(inputs, output, sample_weight=data[-1])
-        self.compiled_metrics.update_state(inputs, output)
+        output, x_true = self(data, training=False)
+        t_loss = self.compiled_loss(x_true, output)
+        self.compiled_metrics.update_state(x_true, output)
         return {m.name: m.result() for m in self.metrics}
 
     def predict_step(self, data):
@@ -104,3 +100,14 @@ class ASTROMER(Model):
             all_vectors.append(enc_output)
 
         return all_vectors
+
+    def get_config(self):
+        base_config = super(ASTROMER, self).get_config()
+        base_config['num_heads'] = self.num_heads  
+        base_config['num_layers'] = self.num_layers 
+        base_config['d_model'] = self.d_model     
+        base_config['num_heads'] = self.num_heads  
+        base_config['dff'] = self.dff        
+        base_config['rate'] = self.rate       
+        base_config['base'] = self.base    
+        return base_config

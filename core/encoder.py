@@ -38,33 +38,32 @@ class EncoderLayer(tf.keras.layers.Layer):
         return out2
 
 class Encoder(tf.keras.layers.Layer):
-    def __init__(self, num_layers, d_model, num_heads, dff,
-                maximum_position_encoding, rate=0.1, inp_dim=4, **kwargs):
+    def __init__(self, num_layers, d_model, num_heads, dff, 
+                 base=10000, rate=0.1, **kwargs):
         super(Encoder, self).__init__(**kwargs)
 
         self.d_model = d_model
         self.num_layers = num_layers
-
-        self.pos_encoding = positional_encoding(maximum_position_encoding,
-                                                inp_dim)
-
+        self.base = base
+        self.inp_transform = tf.keras.layers.Dense(d_model)
         self.enc_layers = [EncoderLayer(d_model, num_heads, dff, rate)
                             for _ in range(num_layers)]
 
         self.dropout = tf.keras.layers.Dropout(rate)
 
 
-    def call(self, x, training, mask=None):
-        batch_size = tf.shape(x)[0]
-        seq_len = tf.shape(x)[1]
+    def call(self, data, training):
+        batch_size = tf.shape(data['inputs'])[0]
+        seq_len = tf.shape(data['inputs'])[1]
 
         # adding embedding and position encoding.
-        x_pe = tf.tile(self.pos_encoding[:, :seq_len, :], [batch_size, 1, 1])
-        x += x_pe
+        x_pe = positional_encoding(data['inputs'], self.d_model, base=self.base, mjd=True)
+        x_transformed = self.inp_transform(data['inputs'])
+        data['inputs'] = x_transformed + x_pe
 
-        x = self.dropout(x, training=training)
+        x = self.dropout(data['inputs'], training=training)
 
         for i in range(self.num_layers):
-            x = self.enc_layers[i](x, training, mask)
+            x = self.enc_layers[i](data['inputs'], training, data['inp_mask'])
 
         return x  # (batch_size, input_seq_len, d_model)

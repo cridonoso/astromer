@@ -12,82 +12,94 @@ def create_padding_mask(tensor, lengths):
     range_row = tf.expand_dims(tf.range(0, tf.shape(tensor)[1], 1), 0, name='Indices')
     # Use the logical operations to create a mask
     mask = tf.greater(range_row, lengths_transposed)
-    return tf.cast(mask, tf.float32, name='LengthMask')
+    return tf.cast(mask, tf.bool, name='LengthMask')
 
-def get_mask(tensor, frac=0.15):
-    '''
-    Creates a random mask given an observation fraction
-    '''
-    time_steps = tf.shape(tensor, name='NumSteps')[1]
-    indices = tf.map_fn(lambda x: tf.random.shuffle(tf.range(time_steps))[:int(tf.cast(time_steps, tf.float32)*frac)],
-                        tf.range(tf.shape(tensor)[0]), name='RandIndices')
-    one_hot = tf.one_hot(indices, time_steps, name='OneHotVec')
-    mask    = tf.reduce_sum(one_hot, 1, name='SumOverOneHot')
-    return tf.cast(mask, tf.float32)
+def create_MASK_token(tensor, frac=0.15):
+    """ Add [MASK] values to be predicted     
+    Args:
+        tensor : tensor values (only needed to get batch size and length)
+        frac (float, optional): percentage for masking [MASK]
+    Returns:
+        binary tensor: a time-distributed mask
+    """
+    inp_size = tf.shape(tensor)
+    def fn(x):
+        probs = tf.math.log([[1-frac, frac]])
+        m = tf.random.categorical(probs, inp_size[1], dtype=tf.int32)
+        return m
+    r = tf.map_fn(fn, tf.range(inp_size[0]))
+    mask = tf.squeeze(r)
+    return tf.cast(mask, dtype=tf.bool)
 
-
-def random_same_replacement(tensor, tensor_mask, frac_random=0.1, frac_same=0.1):
-    allmagn = tf.slice(tensor, [0, 0, 1], [-1, -1, 1])
-    allmagn = tf.reshape(allmagn, [tf.shape(allmagn)[0]*tf.shape(allmagn)[1]],
-               name='FlattenMagns')
-
-    def change_random(x):
-        inputs, mask = x
-        times = tf.slice(inputs, [0, 0], [-1, 1], name='times')
-        magn = tf.slice(inputs, [0, 1], [-1, 1], name='mangitudes')
-
-        size = tf.reduce_sum(mask, name='NumMaskedValues')
-        n_rand = tf.multiply(size, frac_random)
+def set_random(tensor, mask, n_masked, frac=0.10):
+    """ Insert random element in a tensor. 
+    They correspond to the "frac" portion of the total [MASK] tokens.    
+    Args:
+        tensor (tensor): input values
+        mask (binary tensor): [MASK] values
+        frac (float, optional): percentage of the total to change by random
+    """
+    if n_masked is None:
+        n_masked = tf.reduce_sum(tf.cast(mask, tf.int32), 1)
+    times  = tf.slice(tensor, [0,0,0],[-1, -1, 1], name='times')
+    values = tf.slice(tensor, [0,0,1],[-1, -1, 2], name='values')
+    def fn(x):
+        single_x, single_m, size = x
+        n_rand = tf.multiply(size, frac)
         n_rand = tf.cast(n_rand, dtype=tf.int32)
 
-        n_same = tf.multiply(size, frac_same)
+        randvalues = tf.random.shuffle(single_x, name='shuffle_values')
+        rand_elements = tf.slice(randvalues, [0, 0], [n_rand, -1])
+
+        indices = tf.random.shuffle(tf.where(single_m), name='ShuffleMaskedIndices')
+        selected = tf.slice(indices, [0, 0], [n_rand, -1])
+
+        shape = tf.cast(tf.shape(single_x), tf.int64)
+
+        rand_elements = tf.scatter_nd(selected, rand_elements, shape=shape)
+        partial_mask = tf.math.divide_no_nan(rand_elements, rand_elements)
+        partial_mask = tf.math.logical_not(tf.cast(partial_mask, tf.bool))
+        partial_mask = tf.cast(partial_mask, tf.float32)
+
+        new = tf.multiply(single_x, partial_mask)
+        single_x = new + rand_elements
+
+        single_m = tf.expand_dims(single_m, 1)        
+        single_m = tf.cast(single_m, tf.float32)*tf.slice(partial_mask, [0,0], [-1, 1])
+        single_m = tf.cast(single_m, tf.bool)
+
+        return [single_x, single_m, size]
+
+    values, mask, _ = tf.map_fn(fn, [values, mask, n_masked])
+    values = tf.concat([times, values], 2)
+
+    return values, mask
+
+def set_same(mask, n_masked=None, frac=0.10):
+    """Remove frac% of the [MASK] values
+    Args:
+        mask (TYPE): Description
+        frac (float, optional): Description
+    """
+    if n_masked is None:
+        n_masked = tf.reduce_sum(tf.cast(mask, tf.int32), 1)
+
+    def fn(x):
+        single_m , size = x
+        n_same = tf.multiply(size, frac)
         n_same = tf.cast(n_same, dtype=tf.int32)
+        single_m = tf.cast(single_m, tf.float32)
+        indices = tf.random.shuffle(tf.where(single_m == 1), name='ShuffleMaskedIndices')
+        selected = tf.slice(indices, [0, 0], [n_same, -1])
+        shape = tf.cast(tf.shape(single_m), tf.int64)
+        partial_mask = tf.scatter_nd(selected, tf.ones(tf.shape(selected)[0], 1), shape=shape)
+        partial_mask = tf.math.logical_not(tf.cast(partial_mask, tf.bool))
+        partial_mask = tf.cast(partial_mask, tf.float32)
+        single_m = single_m*partial_mask
+        return [tf.cast(single_m, tf.bool), size]
 
-        if n_rand > 0 :
-            randmang = tf.random.shuffle(allmagn, name='ShuffleMagns')
-            rand_elements = tf.slice(randmang, [0], [n_rand])
-
-            indices = tf.random.shuffle(tf.where(mask == 1), name='ShuffleMaskedIndices')
-            selected = tf.slice(indices, [0, 0], [n_rand, -1])
-
-            rand_elements = tf.scatter_nd(selected, rand_elements, [tf.shape(magn)[0]])
-            partial_mask = tf.scatter_nd(selected, [1.], [tf.shape(magn)[0]])
-            partial_mask = tf.math.logical_not(tf.cast(partial_mask, tf.bool))
-            partial_mask = tf.cast(partial_mask, tf.float32)
-            new = tf.multiply(magn, tf.expand_dims(partial_mask, 1))
-            new = new + tf.expand_dims(rand_elements, 1)
-
-            inputs = tf.concat([times, new], 1)
-            mask = mask*partial_mask
-
-
-        if n_same > 0:
-            indices = tf.random.shuffle(tf.where(mask == 1), name='ShuffleMaskedIndices')
-            selected = tf.slice(indices, [0, 0], [n_same, -1])
-            partial_mask = tf.scatter_nd(selected, [1.], [tf.shape(magn)[0]])
-            partial_mask = tf.math.logical_not(tf.cast(partial_mask, tf.bool))
-            partial_mask = tf.cast(partial_mask, tf.float32)
-            mask = mask*partial_mask
-
-        return [inputs, mask]
-
-
-
-    tensor, tensor_mask = tf.map_fn(change_random, [tensor, tensor_mask])
-
-
-    return tensor, tensor_mask
-
-def create_mask(tensor, length=None, frac=0.15, frac_random=0.1, frac_same=0.1):
-    ''' Creates random and variable length masks '''
-    mask = create_prediction_mask(tensor, frac=frac)
-    tensor, mask_inp = random_same_replacement(tensor, mask, frac_random=frac_random, frac_same=frac_same)
-
-    if length is not None:
-        mask_1 = create_padding_mask(tensor, length)
-        mask_inp = tf.maximum(mask_inp, mask_1, name='CombinedMask')
-
-    return mask, mask_inp
+    mask, _ = tf.map_fn(fn, [mask, n_masked])
+    return mask
 
 def concat_mask(mask1, mask2, cls, sep=102., reshape=True):
     ''' Concatenate Masks to build a BERT-style input'''
