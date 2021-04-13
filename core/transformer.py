@@ -11,17 +11,40 @@ from core.decoder import Decoder
 
 
 class ASTROMER(Model):
-    def __init__(self, num_layers, d_model, num_heads, dff, rate=0.1, base=10000, ):
-        super(ASTROMER, self).__init__(name='ASTROMER')
+    def __init__(self, 
+                 num_layers, 
+                 d_model, 
+                 num_heads, 
+                 dff, 
+                 rate=0.1, 
+                 base=10000, 
+                 mask_frac=0.15,
+                 npp_frac=0.5,
+                 rand_frac=0.1,
+                 same_frac=0.1,
+                 sep_token=102.,
+                 cls_token=101.):
+
+        super().__init__(name='ASTROMER')
         self.num_heads  = num_heads
         self.num_layers = num_layers
         self.d_model    = d_model 
         self.num_heads  = num_heads
         self.dff        = dff
         self.rate       = rate
-        self.base    = base
-
-        self.input_layer = InputLayer(name='BuildInput')
+        self.base       = base
+        self.mask_frac  = mask_frac
+        self.npp_frac   = npp_frac
+        self.rand_frac  = rand_frac
+        self.same_frac  = same_frac
+        self.sep_token  = sep_token
+        self.cls_token  = cls_token
+        self.input_layer = InputLayer(mask_frac=mask_frac, 
+                                      npp_frac=npp_frac, 
+                                      rand_frac=rand_frac, 
+                                      same_frac=same_frac, 
+                                      sep_token=sep_token, 
+                                      cls_token=cls_token, name='BuildInput')
 
         self.encoder     = Encoder(num_layers, 
                                    d_model, 

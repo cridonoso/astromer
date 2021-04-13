@@ -113,12 +113,21 @@ def create_dataset(source='data/raw_data/macho/MACHO/LCs',
             os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs)
         
-def standardize(tensor):
+def standardize(tensor, only_magn=False):
+    if only_magn:
+        rest_0 = tf.slice(tensor, [0, 0, 0], [-1, -1, 1])
+        rest_1 = tf.slice(tensor, [0, 0, 2], [-1, -1, 1])
+        tensor = tf.slice(tensor, [0, 0, 1], [-1, -1, 1])
+
     mean_value = tf.expand_dims(tf.reduce_mean(tensor, 1), 1, name='mean_value')
     std_value = tf.expand_dims(tf.math.reduce_std(tensor, 1), 1, name='std_value')
+    
     normed = tf.where(std_value == 0.,
                      (tensor - mean_value),
                      (tensor - mean_value)/std_value)
+    if only_magn:
+        normed = tf.concat([rest_0, normed, rest_1], 2)
+
     return normed
 
 def normalize(tensor, only_time=False, min_value=None, max_value=None):
@@ -217,6 +226,9 @@ def parse_2(sample, input_size):
 
     inp_dict['steps_2'] = steps_2
     inp_dict['steps_1'] = steps_1
+
+    inp_dict['label'] = sample['label']
+    inp_dict['lcid']  = sample['lcid'] 
 
     return inp_dict
 
