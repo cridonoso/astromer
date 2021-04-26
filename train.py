@@ -17,14 +17,14 @@ logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 def train(opt):
     print(opt.head_dim)
     # Loading data
-    train_batches = load_records(os.path.join(opt.data, 'train'), 
-                                 opt.batch_size, 
+    train_batches = load_records(os.path.join(opt.data, 'train'),
+                                 opt.batch_size,
                                  input_len=opt.max_obs)
-    valid_batches = load_records(os.path.join(opt.data, 'val'), 
-                                 opt.batch_size, 
+    valid_batches = load_records(os.path.join(opt.data, 'val'),
+                                 opt.batch_size,
                                  input_len=opt.max_obs)
-    test_batches = load_records(os.path.join(opt.data, 'test'), 
-                                 opt.batch_size, 
+    test_batches = load_records(os.path.join(opt.data, 'test'),
+                                 opt.batch_size,
                                  input_len=opt.max_obs)
 
     # Optimizer
@@ -40,7 +40,7 @@ def train(opt):
                            dff=opt.dff,
                            rate=opt.dropout,
                            base=opt.base,
-                           mask_frac=0.5)
+                           mask_frac=0.15)
     # Compile
     transformer.compile(optimizer=optimizer,
                         loss=ASTROMERLoss(),
@@ -74,7 +74,7 @@ def train(opt):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # DATA
-    parser.add_argument('--max-obs', default=200, type=int,
+    parser.add_argument('--max-obs', default=100, type=int,
                     help='Max number of observations')
     # TRAINING PAREMETERS
     parser.add_argument('--data', default='./data/records/macho', type=str,
