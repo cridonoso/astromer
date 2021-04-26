@@ -104,12 +104,12 @@ class ASTROMER(Model):
     def predict_step(self, data):
         y_pred, y_true = self(data, training=False)
 
-        rec_pred = tf.slice(y_pred, [0,2,0], [-1, -1, 1])
-        rec_mask = tf.slice(y_pred, [0,2,1], [-1, -1, 1])
-        rec_true = tf.slice(y_true, [0,1,1], [-1, -1, -1])
+        rec_pred  = tf.slice(y_pred, [0,2,0], [-1, -1, 1])
+        rec_mask  = tf.slice(y_pred, [0,2,1], [-1, -1, 1])
+        rec_true  = tf.slice(y_true, [0,1,1], [-1, -1, -1])
         rec_times = tf.slice(y_true, [0,1,0], [-1, -1, 1])
-        cls_pred = tf.argmax(tf.slice(y_pred, [0,0,0], [-1, 2, 1]), 1)
-        cls_true = tf.slice(y_true, [0,0,0], [-1, 1, 1])
+        cls_pred  = tf.argmax(tf.slice(y_pred, [0,0,0], [-1, 2, 1]), 1)
+        cls_true  = tf.slice(y_true, [0,0,0], [-1, 1, 1])
 
         return tf.squeeze(rec_pred), tf.squeeze(rec_mask), \
                tf.squeeze(rec_true), tf.squeeze(rec_times), \
@@ -118,8 +118,8 @@ class ASTROMER(Model):
     def get_attention(self, data):
         all_vectors = []
         for d in data:
-            inp, mask_inp, mask_tar = self.input_layer(d)
-            enc_output = self.encoder(inp, False, mask=mask_inp)
+            in_dict = self.input_layer(d)
+            enc_output = self.encoder(in_dict, False)
             all_vectors.append(enc_output)
 
         return all_vectors

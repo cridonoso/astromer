@@ -15,6 +15,7 @@ from core.metrics import CustomACC
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 def train(opt):
+    print(opt.head_dim)
     # Loading data
     train_batches = load_records(os.path.join(opt.data, 'train'), 
                                  opt.batch_size, 
@@ -38,7 +39,8 @@ def train(opt):
                            num_heads=opt.heads,
                            dff=opt.dff,
                            rate=opt.dropout,
-                           base=opt.base)
+                           base=opt.base,
+                           mask_frac=0.5)
     # Compile
     transformer.compile(optimizer=optimizer,
                         loss=ASTROMERLoss(),
@@ -72,35 +74,33 @@ def train(opt):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # DATA
-    parser.add_argument('--max-obs', default=100, type=int,
+    parser.add_argument('--max-obs', default=200, type=int,
                     help='Max number of observations')
     # TRAINING PAREMETERS
-    parser.add_argument('--data', default='./data/records/macho_v2', type=str,
+    parser.add_argument('--data', default='./data/records/macho', type=str,
                         help='Dataset folder containing the records files')
     parser.add_argument('--p', default="./experiments/macho", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
-    parser.add_argument('--batch-size', default=10, type=int,
+    parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
-    parser.add_argument('--epochs', default=1000, type=int,
+    parser.add_argument('--epochs', default=2000, type=int,
                         help='Number of epochs')
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=2, type=int,
                         help='Number of encoder layers')
     parser.add_argument('--heads', default=4, type=int,
                         help='Number of self-attention heads')
-    parser.add_argument('--head-dim', default=1628, type=int,
+    parser.add_argument('--head-dim', default=812, type=int,
                         help='Head-attention Dimensionality ')
     parser.add_argument('--dff', default=1024, type=int,
                         help='Dimensionality of the middle  dense layer at the end of the encoder')
-    parser.add_argument('--pe', default=1000, type=int,
-                        help='Positional encoding maximum length')
     parser.add_argument('--dropout', default=0.1, type=float,
                         help='dropout_rate for the encoder')
     parser.add_argument('--base', default=10000, type=int,
-                        help='Input dim')
+                        help='base of embedding')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
 
     opt = parser.parse_args()
-
+    opt.head_dim = (opt.max_obs + 3)*opt.heads
     train(opt)
