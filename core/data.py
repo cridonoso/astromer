@@ -24,7 +24,7 @@ def _int64_feature(value):
 
 def get_example(lcid, label, lightcurve):
     f = dict()
-    
+
     dict_features={
     'id': tf.train.Feature(bytes_list=tf.train.BytesList(value=[str(lcid).encode()])),
     'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label])),
@@ -41,13 +41,13 @@ def get_example(lcid, label, lightcurve):
     element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
     ex = tf.train.SequenceExample(context = element_context,
                                   feature_lists= element_lists)
-    return ex 
+    return ex
 
 def divide_training_subset(frame, train, val):
     frame = frame.sample(frac=1)
     n_samples = frame.shape[0]
     n_train = int(n_samples*train)
-    n_val = int(n_samples*val)
+    n_val = int(n_samples*val//2)
 
     sub_train = frame.iloc[:n_train]
     sub_val   = frame.iloc[n_train:n_train+n_val]
@@ -58,7 +58,7 @@ def divide_training_subset(frame, train, val):
 def process_lc(row, source, lc_index, unique_classes, writer):
     path  = row['Path'].split('/')[-1]
     label = list(unique_classes).index(row['Class'])
-    lc_path = os.path.join(source, path)
+    lc_path = os.path.join(source,'LCs', path)
     observations = pd.read_csv(lc_path)
     observations = observations.dropna()
     observations.sort_values('mjd')
@@ -72,7 +72,7 @@ def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None):
     # Get frames with fixed number of lightcurves
     collection = [frame.iloc[i:i+max_lcs_per_record] \
                   for i in range(0, frame.shape[0], max_lcs_per_record)]
-    # Iterate over subset 
+    # Iterate over subset
     for counter, subframe in enumerate(collection):
         with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
             Parallel(n_jobs=n_jobs)(delayed(process_lc)(row, source, k, unique, writer) \
@@ -86,9 +86,9 @@ def create_dataset(source='data/raw_data/macho/MACHO/LCs',
                    subsets_frac=(0.5, 0.25),
                    max_lcs_per_record=100):
     os.makedirs(target, exist_ok=True)
-    
+
     meta_df = pd.read_csv(metadata)
-    
+
     bands = meta_df['Band'].unique()
     if len(bands) > 1:
         b = input('Filters {} were found. Type one to continue'.format(' and'.join(bands)))
@@ -97,22 +97,22 @@ def create_dataset(source='data/raw_data/macho/MACHO/LCs',
     unique, counts = np.unique(meta_df['Class'], return_counts=True)
     info_df = pd.DataFrame()
     info_df['label'] = unique
-    info_df['size'] = counts 
+    info_df['size'] = counts
     info_df.to_csv(os.path.join(target, 'objects.csv'), index=False)
-    
-    # Separate by class 
+
+    # Separate by class
     cls_groups = meta_df.groupby('Class')
 
     for cls_name, cls_meta in tqdm(cls_groups, total=len(cls_groups)):
-        subsets = divide_training_subset(cls_meta, 
-                                         train=subsets_frac[0], 
+        subsets = divide_training_subset(cls_meta,
+                                         train=subsets_frac[0],
                                          val=subsets_frac[0])
-        
+
         for subset_name, frame in subsets:
             dest = os.path.join(target, subset_name, cls_name)
             os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs)
-        
+
 def standardize(tensor, only_magn=False):
     if only_magn:
         rest_0 = tf.slice(tensor, [0, 0, 0], [-1, -1, 1])
@@ -121,7 +121,7 @@ def standardize(tensor, only_magn=False):
 
     mean_value = tf.expand_dims(tf.reduce_mean(tensor, 1), 1, name='mean_value')
     std_value = tf.expand_dims(tf.math.reduce_std(tensor, 1), 1, name='std_value')
-    
+
     normed = tf.where(std_value == 0.,
                      (tensor - mean_value),
                      (tensor - mean_value)/std_value)
@@ -155,7 +155,7 @@ def get_delta(tensor, name='TensorDelta'):
     return dt
 
 def _parse(sample):
-    
+
 
     context_features = {'label': tf.io.FixedLenFeature([],dtype=tf.int64),
                         'length': tf.io.FixedLenFeature([],dtype=tf.int64),
@@ -163,7 +163,7 @@ def _parse(sample):
     sequence_features = dict()
     for i in range(3):
         sequence_features['dim_{}'.format(i)] = tf.io.VarLenFeature(dtype=tf.float32)
-    
+
     context, sequence = tf.io.parse_single_sequence_example(
                             serialized=sample,
                             context_features=context_features,
@@ -202,8 +202,8 @@ def parse_2(sample, input_size):
     elif tf.math.greater(sample['length'], input_size):
         # no masking needed
         pivot = tf.random.uniform(shape=[1],
-                                  minval=0, 
-                                  maxval=int(sample['length']-input_size), 
+                                  minval=0,
+                                  maxval=int(sample['length']-input_size),
                                   dtype=tf.dtypes.int32)[0]
 
         serie_1 = sample['input'][:, pivot:(pivot+single_len), :][0]
@@ -228,7 +228,7 @@ def parse_2(sample, input_size):
     inp_dict['steps_1'] = steps_1
 
     inp_dict['label'] = sample['label']
-    inp_dict['lcid']  = sample['lcid'] 
+    inp_dict['lcid']  = sample['lcid']
 
     return inp_dict
 
@@ -252,7 +252,7 @@ def load_records(source, batch_size, repeat=3, input_len=100):
                                    deterministic=False,
                                    num_parallel_calls=tf.data.experimental.AUTOTUNE) \
                 for dataset in datasets]
-    
+
 
     datasets = [dataset.shuffle(1000, reshuffle_each_iteration=True) for dataset in datasets]
     dataset  = tf.data.experimental.sample_from_datasets(datasets)

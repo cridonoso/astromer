@@ -8,6 +8,6 @@ services:
         ports:
             - 6006:6006
             - 8888:8888
-        runtime: nvidia
+        # runtime: nvidia
         environment:
             FLASK_DEBUG: 1

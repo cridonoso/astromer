@@ -1,4 +1,4 @@
-import tensorflow as tf 
+import tensorflow as tf
 
 from tensorflow.keras.layers import Input, Layer
 from core.masking import create_MASK_token, create_padding_mask, set_random, set_same
@@ -17,27 +17,27 @@ class InputLayer(Layer):
 	def call(self, data, training=False):
 		"""
 		This function creates a BERT-like input for ASTROMER.
-		i.e., 
+		i.e.,
 			1.- add [SEP], [MASK], and [CLS] tokens
 			2.- concat serie_1 and serie_2
 			3.- serie_2 could be replaced by another random serie_2 within the batch
-			4.- creates differnet masks	
+			4.- creates differnet masks
 		Args:
-		    data (dictonary): A dictonary containing the current batch. 
+		    data (dictonary): A dictonary containing the current batch.
 		    				  Keys: 'serie_1', 'serie_2', 'steps_1', 'steps_1'
 		    training (bool, optional): training varible
-		
+
 		Returns:
 		    dictonary: a dictionary containing the new input format
 		"""
-		# First serie 
+		# First serie
 		mask_1     = create_MASK_token(data['serie_1'], frac=self.maskfrac)
 		n_masked   = tf.reduce_sum(tf.cast(mask_1, tf.float32), 1)
 		s1, mask_1 = set_random(data['serie_1'], mask_1, n_masked, frac=self.randfrac)
 		mask_1     = set_same(mask_1, n_masked, frac=self.samefrac)
 		padd_mask  = create_padding_mask(data['serie_1'], data['steps_1'])
 
-		mask_1     = tf.math.logical_or(tf.squeeze(mask_1), padd_mask)	
+		mask_1     = tf.math.logical_or(tf.squeeze(mask_1), padd_mask)
 		serie_1    = normalize(s1, only_time=True)
 
 		# Second serie
@@ -50,7 +50,7 @@ class InputLayer(Layer):
 		serie_2    = normalize(s2, only_time=True)
 
 
-		# Next portion prediction 
+		# Next portion prediction
 		batch_size   = tf.shape(mask_2)[0]
 		indices      = tf.random.categorical(tf.math.log([[1-self.nppfrac, self.nppfrac]]), batch_size)[0]
 		indices      = tf.reshape(indices, [-1, 1, 1])
@@ -67,66 +67,73 @@ class InputLayer(Layer):
 		t_shift      = tf.math.reduce_mean(dt, 1)
 		t_shift      = tf.expand_dims(t_shift, 2) + 1.
 		r_shift 	 = tf.zeros([batch_size, 1, inp_dim-1])
-		shift 		 = tf.concat([t_shift, r_shift], 2)	
+		shift 		 = tf.concat([t_shift, r_shift], 2)
 
-		next_portion = tf.where(indices==1, rand_samples+shift, serie_2+shift) 	
-		next_mask    = tf.where(indices==1, rand_masks, tf.expand_dims(mask_2, 2)) 	
+		next_portion = tf.where(indices==1, rand_samples+shift, serie_2+shift)
+		next_mask    = tf.where(indices==1, rand_masks, tf.expand_dims(mask_2, 2))
 		next_mask    = tf.squeeze(next_mask)
 
-		# Create input format		
-		sep_tokn = [[[self.sep_token]]] 
+		# Create input tokens
+		sep_tokn = [[[self.sep_token]]]
 		sep_tokn = tf.tile(sep_tokn, [batch_size, 1, inp_dim], name='SepTokens')
 
-		cls_tokn = [[[self.cls_token]]] 
+		cls_tokn = [[[self.cls_token]]]
 		cls_tokn = tf.tile(cls_tokn, [batch_size, 1, inp_dim], name='ClsTokens')
 
-		serie_1 = standardize(serie_1, only_magn=True)
+		# =============================== INPUT ================================
+		serie_1      = standardize(serie_1, only_magn=True)
 		next_portion = standardize(next_portion, only_magn=True)
-		inputs   = tf.concat([cls_tokn, serie_1, sep_tokn, next_portion, sep_tokn], 1)
+		inputs       = tf.concat([cls_tokn,
+								  serie_1,
+								  sep_tokn,
+								  next_portion,
+								  sep_tokn], 1)
 
-		# Adding true npp labels 
-		cls_label = tf.tile(indices, [1, 1, inp_dim])
+		# =============================== TARGET ===============================
+		cls_label = tf.tile(indices, [1, 1, inp_dim]) # True NPP label
 		cls_label = tf.cast(cls_label, tf.float32)
-		target 	  = tf.concat([cls_label, serie_1, sep_tokn, next_portion, sep_tokn], 1)
-
-		# Create input and target masks
-		sep_tokn  = tf.slice(sep_tokn, [0, 0, 0], [-1, -1, 1])
-		sep_tokn  = tf.ones_like(tf.reshape(sep_tokn, [-1, 1]), dtype=tf.float32)
-		cls_label = tf.slice(cls_label, [0, 0, 0], [-1, -1, 1])
-		cls_label = tf.ones_like(tf.reshape(cls_label, [-1, 1]), dtype=tf.float32)
-
-		inp_mask  = tf.concat([cls_label, 
-				               tf.cast(mask_1, tf.float32), 
-							   sep_tokn, 
-							   tf.cast(next_mask, tf.float32),
+		target 	  = tf.concat([cls_label,
+							   serie_1,
+							   sep_tokn,
+							   next_portion,
 							   sep_tokn], 1)
+        # ======================================================================
 
+		sep_tokn_mask  = tf.slice(sep_tokn, [0, 0, 0], [-1, -1, 1])
+		sep_tokn_mask  = tf.zeros_like(tf.reshape(sep_tokn_mask, [-1, 1]), dtype=tf.float32)
+		cls_tokn_mask  = tf.slice(cls_label, [0, 0, 0], [-1, -1, 1])
+		cls_tokn_mask  = tf.zeros_like(tf.reshape(cls_tokn_mask, [-1, 1]), dtype=tf.float32)
+
+		# ============================= INPUT MASK =============================
+		inp_mask  = tf.concat([cls_tokn_mask,
+				               tf.cast(mask_1, tf.float32),
+							   sep_tokn_mask,
+							   tf.cast(next_mask, tf.float32),
+							   sep_tokn_mask], 1)
 		dim_mask  = tf.shape(inp_mask)[1]
 		inp_mask  = tf.tile(inp_mask, [1, dim_mask])
 		inp_mask  = tf.reshape(inp_mask, [tf.shape(inp_mask)[0], dim_mask, dim_mask])
 		inp_mask  = tf.expand_dims(inp_mask, 1)
-
-		tar_mask  = tf.concat([cls_label-1, 
-							   tf.cast(mask_1, tf.float32), 
-							   sep_tokn-1, 
+		# ============================ TARGET MASK =============================
+		tar_mask  = tf.concat([cls_tokn_mask,
+							   tf.cast(mask_1, tf.float32),
+							   sep_tokn_mask,
 							   tf.cast(next_mask, tf.float32),
-							   sep_tokn-1], 1)
-		
-		# removing times from the input matrix
-		times = tf.slice(inputs, [0,0,0], [-1, -1, 1])
+							   sep_tokn_mask], 1)
 
+		# ============================= TIMES ==================================
 		time_1 = tf.slice(inputs, [0,1,0], [-1, tf.shape(serie_1)[1], 1])
 		time_2 = tf.slice(inputs, [0,tf.shape(serie_1)[1]+2,0], [-1, tf.shape(serie_1)[1], 1])
 		time_1_2 = normalize(tf.concat([time_1, time_2], 1))
 		time_1, time_2 = tf.split(time_1_2, 2, axis=1)
-		times  = tf.concat([cls_label-1, 
-						    tf.squeeze(time_1), 
-						    sep_tokn-1, 
+		times  = tf.concat([cls_tokn_mask,
+						    tf.squeeze(time_1),
+						    sep_tokn_mask,
 						    tf.squeeze(time_2),
-						    sep_tokn-1], 1)
-		
+						    sep_tokn_mask], 1)
 		times = tf.expand_dims(times, 2)
 
+		# Drop times and uncertainties from the input vector
 		inputs = tf.slice(inputs, [0,0,1], [-1, -1, 1])
 
 		return {'inputs': inputs,
