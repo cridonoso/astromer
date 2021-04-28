@@ -15,7 +15,6 @@ from core.metrics import CustomACC
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 def train(opt):
-    print(opt.head_dim)
     # Loading data
     train_batches = load_records(os.path.join(opt.data, 'train'),
                                  opt.batch_size,
@@ -94,7 +93,7 @@ if __name__ == '__main__':
                         help='Head-attention Dimensionality ')
     parser.add_argument('--dff', default=1024, type=int,
                         help='Dimensionality of the middle  dense layer at the end of the encoder')
-    parser.add_argument('--dropout', default=0.1, type=float,
+    parser.add_argument('--dropout', default=0.1 , type=float,
                         help='dropout_rate for the encoder')
     parser.add_argument('--base', default=10000, type=int,
                         help='base of embedding')
