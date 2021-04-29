@@ -11,13 +11,13 @@ from core.decoder import Decoder
 
 
 class ASTROMER(Model):
-    def __init__(self, 
-                 num_layers, 
-                 d_model, 
-                 num_heads, 
-                 dff, 
-                 rate=0.1, 
-                 base=10000, 
+    def __init__(self,
+                 num_layers,
+                 d_model,
+                 num_heads,
+                 dff,
+                 rate=0.1,
+                 base=10000,
                  mask_frac=0.15,
                  npp_frac=0.5,
                  rand_frac=0.1,
@@ -28,7 +28,7 @@ class ASTROMER(Model):
         super().__init__(name='ASTROMER')
         self.num_heads  = num_heads
         self.num_layers = num_layers
-        self.d_model    = d_model 
+        self.d_model    = d_model
         self.num_heads  = num_heads
         self.dff        = dff
         self.rate       = rate
@@ -39,19 +39,21 @@ class ASTROMER(Model):
         self.same_frac  = same_frac
         self.sep_token  = sep_token
         self.cls_token  = cls_token
-        self.input_layer = InputLayer(mask_frac=mask_frac, 
-                                      npp_frac=npp_frac, 
-                                      rand_frac=rand_frac, 
-                                      same_frac=same_frac, 
-                                      sep_token=sep_token, 
-                                      cls_token=cls_token, name='BuildInput')
 
-        self.encoder     = Encoder(num_layers, 
-                                   d_model, 
-                                   num_heads, 
+        self.input_layer = InputLayer(mask_frac=mask_frac,
+                                      npp_frac=npp_frac,
+                                      rand_frac=rand_frac,
+                                      same_frac=same_frac,
+                                      sep_token=sep_token,
+                                      cls_token=cls_token,
+                                      name='BuildInput')
+
+        self.encoder     = Encoder(num_layers,
+                                   d_model,
+                                   num_heads,
                                    dff,
-                                   base, 
-                                   rate, 
+                                   base,
+                                   rate,
                                    name='Encoder')
 
         self.output_layer = OutputLayer(name='Dense')
@@ -63,13 +65,13 @@ class ASTROMER(Model):
         final_output = self.output_layer(enc_output)
 
         # we need to adjust our mask to match the current dimensionality
-        in_dict['tar_mask'] = tf.concat([tf.expand_dims(in_dict['tar_mask'][:, 0], 1), 
+        in_dict['tar_mask'] = tf.concat([tf.expand_dims(in_dict['tar_mask'][:, 0], 1),
                                          in_dict['tar_mask']], 1, name='RepeatClassMask')
 
-        output_mask = tf.concat([final_output, tf.expand_dims(in_dict['tar_mask'], 2)], 
-                                2, 
+        output_mask = tf.concat([final_output, tf.expand_dims(in_dict['tar_mask'], 2)],
+                                2,
                                 name='ConcatPredsAndMask')
-        
+
         return output_mask, in_dict['target']
 
     def model(self, batch_size):
@@ -83,7 +85,7 @@ class ASTROMER(Model):
                 'steps_1':steps_1, 'steps_2':steps_2}
 
         return Model(inputs=data, outputs=self.call(data))
-    
+
 
     def train_step(self, data):
         with tf.GradientTape() as tape:
@@ -126,11 +128,11 @@ class ASTROMER(Model):
 
     def get_config(self):
         base_config = super(ASTROMER, self).get_config()
-        base_config['num_heads'] = self.num_heads  
-        base_config['num_layers'] = self.num_layers 
-        base_config['d_model'] = self.d_model     
-        base_config['num_heads'] = self.num_heads  
-        base_config['dff'] = self.dff        
-        base_config['rate'] = self.rate       
-        base_config['base'] = self.base    
+        base_config['num_heads'] = self.num_heads
+        base_config['num_layers'] = self.num_layers
+        base_config['d_model'] = self.d_model
+        base_config['num_heads'] = self.num_heads
+        base_config['dff'] = self.dff
+        base_config['rate'] = self.rate
+        base_config['base'] = self.base
         return base_config
