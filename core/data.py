@@ -233,7 +233,6 @@ def parse_2(sample, input_size):
     return inp_dict
 
 def adjust_length(func, input_len):
-    '''Decorator that reports the execution time.'''
     def wrap(*args, **kwargs):
         result = func(*args, input_len)
         return result

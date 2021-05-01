@@ -1,58 +1,24 @@
 import tensorflow as tf
 from tensorflow.keras.losses import BinaryCrossentropy
 
-class CustomMSE(tf.keras.losses.Loss):
-    def __init__(self, name="MSE"):
-        super(CustomMSE, self).__init__(name=name)
+@tf.function
+def custom_mse(y_true, y_pred, sample_weight=None, mask=None):
+    mse = tf.square(y_true - y_pred)
 
-    def __call__(self, y_true, y_pred, sample_weight=None):
-        '''
-        y_true = (batch_size, steps, 2)
-        y_pred = (batch_size, steps, 2) being the last dimension the mask
-        '''
-        rec_pred = tf.slice(y_pred, [0,2,0], [-1, -1, 1])
-        rec_mask = tf.slice(y_pred, [0,2,1], [-1, -1, 1])
-        rec_true = tf.slice(y_true, [0,1,1], [-1, -1, 1])
+    if sample_weight is not None:
+        mse = tf.multiply(mse, sample_weight)
 
-        mse = tf.square(rec_true - rec_pred)
+    if mask is not None:
+        mse = tf.multiply(tf.squeeze(mse), mask)
 
-        if sample_weight is None:
-            sample_weight = tf.slice(y_true, [0,1,2], [-1, -1, 1])
-            mse = mse * sample_weight
+    mse = tf.reduce_sum(mse, 1)
+    return tf.reduce_mean(mse)
 
-        masked_mse = tf.multiply(mse, rec_mask)
-        masked_mse = tf.reduce_sum(masked_mse, 1)
+@tf.function
+def custom_bce(y_true, y_pred, num_cls=2, sample_weight=None):
+    y_true = tf.cast(tf.squeeze(y_true), dtype=tf.int32)
+    y_one = tf.one_hot(y_true, num_cls)
+    y_pred = tf.squeeze(y_pred)
+    bce = tf.nn.softmax_cross_entropy_with_logits(y_one, y_pred)
 
-        return tf.reduce_mean(masked_mse)
-
-class CustomBCE(tf.keras.losses.Loss):
-    def __init__(self, name="BCE"):
-        super(CustomBCE, self).__init__(name=name)
-
-    def __call__(self, y_true, y_pred, sample_weight=None):
-        '''
-        y_true = (batch_size, steps, 2)
-        y_pred = (batch_size, steps, 2) being the last dimension the mask
-        '''
-        cls_pred = tf.slice(y_pred, [0,0,0], [-1, 2, 1])
-        cls_true = tf.slice(y_true, [0,0,0], [-1, 1, 1])
-
-
-        y_one = tf.one_hot(tf.cast(tf.squeeze(cls_true), dtype=tf.int32), 2)
-
-
-        bce = tf.nn.softmax_cross_entropy_with_logits(y_one,
-                                                      tf.squeeze(cls_pred))
-        return bce
-
-class ASTROMERLoss(tf.keras.losses.Loss):
-    def __init__(self, name="AstromerLOSS"):
-        super(ASTROMERLoss, self).__init__(name=name)
-        self.mse = CustomMSE()
-        self.bce = CustomBCE()
-
-    def __call__(self, y_true, y_pred, sample_weight=None):
-        rmse = self.mse(y_true, y_pred, sample_weight)
-        bce = self.bce(y_true, y_pred)
-        total = tf.reduce_mean(rmse) + tf.reduce_mean(bce)
-        return total
+    return tf.reduce_mean(bce)
