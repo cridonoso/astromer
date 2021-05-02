@@ -185,7 +185,7 @@ def _parse(sample):
     input_dict['input'] = tf.stack(casted_inp_parameters, axis=2)
     return input_dict
 
-def parse_2(sample, input_size):
+def parse_2(sample, input_size, num_cls=None):
     param_dim = tf.cast(tf.shape(sample['input'])[-1], tf.int32)
 
     single_len = tf.cast(tf.math.floordiv(input_size, 2), tf.int32)
@@ -229,33 +229,43 @@ def parse_2(sample, input_size):
 
     inp_dict['label'] = sample['label']
     inp_dict['lcid']  = sample['lcid']
+    inp_dict['num_cls']  = num_cls if num_cls is not None else 2
 
     return inp_dict
 
-def adjust_length(func, input_len):
+def adjust_length(func, input_len, num_cls):
     def wrap(*args, **kwargs):
-        result = func(*args, input_len)
+        result = func(*args, input_len, num_cls)
         return result
     return wrap
 
-def load_records(source, batch_size, repeat=3, input_len=100):
-    datasets = [tf.data.TFRecordDataset(os.path.join(source, folder, x)) \
-                for folder in os.listdir(source) for x in os.listdir(os.path.join(source, folder))]
+def load_records(source, batch_size, repeat=1, input_len=100, balanced=False,
+                finetuning=False):
+    num_cls = len(os.listdir(source)) if finetuning else None
+    parse_2_adjusted = adjust_length(parse_2, input_len, num_cls)
 
-    parse_2_adjusted = adjust_length(parse_2, input_len)
+    if balanced:
+        datasets = [tf.data.TFRecordDataset(os.path.join(source, folder, x)) \
+                    for folder in os.listdir(source) for x in os.listdir(os.path.join(source, folder))]
 
-    op = lambda x: tf.data.Dataset.from_tensors(x).cache().repeat(repeat).shuffle(1000).map(_parse).map(parse_2_adjusted)
-    datasets = [dataset.interleave(op,
-                                   cycle_length = 25,
-                                   block_length=1,
-                                   deterministic=False,
-                                   num_parallel_calls=tf.data.experimental.AUTOTUNE) \
-                for dataset in datasets]
+        op = lambda x: tf.data.Dataset.from_tensors(x).cache().repeat(repeat).map(_parse).map(parse_2_adjusted)
+        datasets = [dataset.interleave(op,
+                                       cycle_length = 25,
+                                       block_length=1,
+                                       deterministic=False,
+                                       num_parallel_calls=tf.data.experimental.AUTOTUNE) \
+                    for dataset in datasets]
 
+        datasets = [dataset.shuffle(1000, reshuffle_each_iteration=True) for dataset in datasets]
+        dataset  = tf.data.experimental.sample_from_datasets(datasets)
+    else:
+        datasets = [os.path.join(source, folder, x) for folder in os.listdir(source) \
+                    for x in os.listdir(os.path.join(source, folder))]
 
-    datasets = [dataset.shuffle(1000, reshuffle_each_iteration=True) for dataset in datasets]
-    dataset  = tf.data.experimental.sample_from_datasets(datasets)
+        dataset = tf.data.TFRecordDataset(datasets)
+        dataset = dataset.cache()
+        dataset = dataset.map(_parse).map(parse_2_adjusted)
+
     dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-
     return dataset

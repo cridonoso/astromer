@@ -60,7 +60,6 @@ class Encoder(tf.keras.layers.Layer):
         x_pe = positional_encoding(data['times'], self.d_model, base=self.base, mjd=True)
         x_transformed = self.inp_transform(data['values'])
         data['values'] = x_transformed + x_pe
-
         x = self.dropout(data['values'], training=training)
 
         for i in range(self.num_layers):

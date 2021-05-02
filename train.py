@@ -6,64 +6,46 @@ import time
 import os
 
 from core.data  import load_records
-from core.transformer import ASTROMER
-from core.scheduler import CustomSchedule
-from core.callbacks import get_callbacks
-from core.losses import CustomMSE, ASTROMERLoss, CustomBCE
-from core.metrics import CustomACC
+from core.astromer import get_ASTROMER, get_FINETUNING, train
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
-def train(opt):
+def run(opt):
     # Loading data
     train_batches = load_records(os.path.join(opt.data, 'train'),
                                  opt.batch_size,
-                                 input_len=opt.max_obs)
+                                 input_len=opt.max_obs,
+                                 balanced=True,
+                                 finetuning=opt.finetuning)
     valid_batches = load_records(os.path.join(opt.data, 'val'),
                                  opt.batch_size,
-                                 input_len=opt.max_obs)
+                                 input_len=opt.max_obs,
+                                 balanced=True,
+                                 finetuning=opt.finetuning)
     test_batches = load_records(os.path.join(opt.data, 'test'),
                                  opt.batch_size,
-                                 input_len=opt.max_obs)
+                                 input_len=opt.max_obs,
+                                 finetuning=opt.finetuning)
 
-    # Optimizer
-    learning_rate = 1e-3#CustomSchedule(opt.head_dim)
-    optimizer = tf.keras.optimizers.Adam(learning_rate,
-                                         beta_1=0.9,
-                                         beta_2=0.98,
-                                         epsilon=1e-9)
-    # Model Instance
-    transformer = ASTROMER(num_layers=opt.layers,
-                           d_model=opt.head_dim,
-                           num_heads=opt.heads,
-                           dff=opt.dff,
-                           rate=opt.dropout,
-                           base=opt.base,
-                           mask_frac=0.15)
-    # Compile
-    transformer.compile(optimizer=optimizer,
-                        loss=ASTROMERLoss(),
-                        metrics=[CustomMSE(), CustomBCE(), CustomACC()])
-    # Create graph
-    transformer.model(opt.batch_size).summary()
+    # get_model
+    astromer = get_ASTROMER(num_layers=opt.layers,
+                            d_model=opt.head_dim,
+                            num_heads=opt.heads,
+                            dff=opt.dff,
+                            base=opt.base,
+                            dropout=opt.dropout,
+                            maxlen=opt.max_len)
 
+    os.makedirs(opt.p, exist_ok=True)
+    tf.keras.utils.plot_model(astromer,
+                              to_file='{}/model.png'.format(opt.p),
+                              show_shapes=True)
 
-    # Training
-    transformer.fit(train_batches,
-                    epochs=opt.epochs,
-                    verbose=1,
-                    validation_data=valid_batches,
-                    callbacks=get_callbacks(opt.p))
-    # Testing
-    metrics = transformer.evaluate(test_batches)
-
-    # Saving metrics and setup file
-    os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
-    test_file = os.path.join(opt.p, 'test/test_metrics.json')
-    with open(test_file, 'w') as json_file:
-        json.dump({'loss': metrics[0],
-                   'rmse':metrics[1],
-                   'accuracy':metrics[2]}, json_file, indent=4)
+    # Training ASTROMER
+    train(astromer, train_batches, valid_batches,
+          patience=opt.patience,
+          exp_path=opt.p,
+          epochs=opt.epochs)
 
     conf_file = os.path.join(opt.p, 'conf.json')
     with open(conf_file, 'w') as json_file:
@@ -84,6 +66,10 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--epochs', default=2000, type=int,
                         help='Number of epochs')
+    parser.add_argument('--patience', default=20, type=int,
+                        help='batch size')
+    parser.add_argument('--finetuning',default=False, action='store_true',
+                        help='Finetune a pretrained model')
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=2, type=int,
                         help='Number of encoder layers')
@@ -95,6 +81,8 @@ if __name__ == '__main__':
                         help='Dimensionality of the middle  dense layer at the end of the encoder')
     parser.add_argument('--dropout', default=0.1 , type=float,
                         help='dropout_rate for the encoder')
+    parser.add_argument('--max-len', default=100, type=int,
+                        help='Max lightcurve length to build the input')
     parser.add_argument('--base', default=10000, type=int,
                         help='base of embedding')
     parser.add_argument('--lr', default=1e-3, type=float,
@@ -102,4 +90,4 @@ if __name__ == '__main__':
 
     opt = parser.parse_args()
     opt.head_dim = (opt.max_obs + 3)*opt.heads
-    train(opt)
+    run(opt)
