@@ -15,11 +15,13 @@ def run(opt):
     train_batches = load_records(os.path.join(opt.data, 'train'),
                                  opt.batch_size,
                                  input_len=opt.max_obs,
+                                 repeat=opt.repeat,
                                  balanced=True,
                                  finetuning=opt.finetuning)
     valid_batches = load_records(os.path.join(opt.data, 'val'),
                                  opt.batch_size,
                                  input_len=opt.max_obs,
+                                 repeat=opt.repeat,
                                  balanced=True,
                                  finetuning=opt.finetuning)
     test_batches = load_records(os.path.join(opt.data, 'test'),
@@ -70,6 +72,8 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--finetuning',default=False, action='store_true',
                         help='Finetune a pretrained model')
+    parser.add_argument('--repeat', default=1, type=int,
+                        help='number of times to repeat the training and validation dataset')
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=2, type=int,
                         help='Number of encoder layers')
