@@ -23,6 +23,7 @@ def get_ASTROMER(num_layers=2,
                  maxlen=100,
                  batch_size=None):
 
+    print(maxlen)
     serie = Input(shape=(maxlen+3, 1),
                   batch_size=batch_size,
                   name='values')

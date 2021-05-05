@@ -34,7 +34,7 @@ def run(opt):
                             dff=opt.dff,
                             base=opt.base,
                             dropout=opt.dropout,
-                            maxlen=opt.max_len)
+                            maxlen=opt.max_obs)
 
     os.makedirs(opt.p, exist_ok=True)
     tf.keras.utils.plot_model(astromer,
@@ -60,7 +60,7 @@ if __name__ == '__main__':
     # TRAINING PAREMETERS
     parser.add_argument('--data', default='./data/records/macho', type=str,
                         help='Dataset folder containing the records files')
-    parser.add_argument('--p', default="./experiments/macho", type=str,
+    parser.add_argument('--p', default="./experiments/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
