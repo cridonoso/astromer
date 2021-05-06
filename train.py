@@ -24,11 +24,6 @@ def run(opt):
                                  repeat=opt.repeat,
                                  balanced=True,
                                  finetuning=opt.finetuning)
-    test_batches = load_records(os.path.join(opt.data, 'test'),
-                                 opt.batch_size,
-                                 input_len=opt.max_obs,
-                                 finetuning=opt.finetuning)
-
     # get_model
     astromer = get_ASTROMER(num_layers=opt.layers,
                             d_model=opt.head_dim,

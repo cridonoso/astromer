@@ -23,7 +23,6 @@ def get_ASTROMER(num_layers=2,
                  maxlen=100,
                  batch_size=None):
 
-    print(maxlen)
     serie = Input(shape=(maxlen+3, 1),
                   batch_size=batch_size,
                   name='values')
@@ -51,8 +50,8 @@ def get_ASTROMER(num_layers=2,
                  name="ASTROMER")
 
 @tf.function
-def train_step(model, batch, opt, num_cls=2):
-    inputs, target = input_format(batch)
+def train_step(model, batch, opt, num_cls=2, use_random=True, finetuning=False):
+    inputs, target = input_format(batch, use_random=use_random, finetuning=finetuning)
 
     x_true = tf.slice(target['x_true'], [0,0,1], [-1,-1,1])
     y_true = tf.slice(target['y_true'], [0,0,0], [-1,-1,1])
@@ -78,8 +77,8 @@ def train_step(model, batch, opt, num_cls=2):
     return loss, acc, bce, mse
 
 @tf.function
-def valid_step(model, batch, num_cls=2):
-    inputs, target = input_format(batch)
+def valid_step(model, batch, num_cls=2, return_pred=False, use_random=True, finetuning=False):
+    inputs, target = input_format(batch, use_random=use_random, finetuning=finetuning)
 
     x_true = tf.slice(target['x_true'], [0,0,1], [-1,-1,1])
     y_true = tf.slice(target['y_true'], [0,0,0], [-1,-1,1])
@@ -98,6 +97,8 @@ def valid_step(model, batch, num_cls=2):
 
         loss = bce + mse
         acc = custom_acc(y_true, y_pred)
+    if return_pred:
+        return loss, acc, bce, mse, x_pred, y_pred, x_true, y_true
     return loss, acc, bce, mse
 
 def save_scalar(writer, value, step, name=''):
@@ -109,7 +110,11 @@ def train(model,
           valid_dataset,
           patience=20,
           exp_path='./experiments/test',
-          epochs=1):
+          epochs=1,
+          finetuning=False,
+          use_random=True,
+          num_cls=2,
+          verbose=1):
 
     os.makedirs(exp_path, exist_ok=True)
 
@@ -140,19 +145,21 @@ def train(model,
     es_count = 0
     for epoch in range(epochs):
         for step, train_batch in tqdm(enumerate(train_dataset), desc='train'):
-            num_cls = train_batch['num_cls'][0]
 
             loss, acc, bce, mse = train_step(model, train_batch, optimizer,
-                                   num_cls=num_cls)
+                                   num_cls=num_cls,
+                                   use_random=use_random,
+                                   finetuning=finetuning)
             train_loss.update_state(loss)
             train_acc.update_state(acc)
             train_bce.update_state(bce)
             train_mse.update_state(mse)
 
         for valid_batch in tqdm(valid_dataset, desc='validation'):
-            num_cls = valid_batch['num_cls'][0]
             loss, acc, bce, mse = valid_step(model, valid_batch,
-                                   num_cls=num_cls)
+                                   num_cls=num_cls,
+                                   use_random=use_random,
+                                   finetuning=finetuning)
             valid_loss.update_state(loss)
             valid_acc.update_state(acc)
             valid_bce.update_state(bce)
@@ -166,7 +173,19 @@ def train(model,
         save_scalar(valid_writter, valid_mse, epoch, name='mse')
         save_scalar(train_writter, train_bce, epoch, name='bce')
         save_scalar(valid_writter, valid_bce, epoch, name='bce')
-
+        
+        if verbose == 0:
+            print('EPOCH {} - ES COUNT: {}'.format(epoch, es_count))
+            print('train loss: {:.2f} - train acc: {:.2f} - train ce: {:.2f}, train mse: {:.2f}'.format(train_loss.result(),
+                                                                                                        train_acc.result(),
+                                                                                                        train_bce.result(),
+                                                                                                        train_mse.result(),
+                                                                                                        ))
+            print('train loss: {:.2f} - train acc: {:.2f} - train ce: {:.2f}, train mse: {:.2f}'.format(valid_loss.result(),
+                                                                                                        valid_acc.result(),
+                                                                                                        valid_bce.result(),
+                                                                                                        valid_mse.result(),
+                                                                                                        ))
         if valid_loss.result() < best_loss:
             best_loss = valid_loss.result()
             es_count = 0.
@@ -182,6 +201,40 @@ def train(model,
         train_acc.reset_states()
         valid_acc.reset_states()
 
+def predict(model, dataset, conf, predic_proba=False, use_random=True, finetuning=False):
+    preds, reconstructions = [], []
+    true_cls, true_x = [],[]
+    total_loss, total_acc, total_bce, total_mse = [], [], [], []
+    for step, batch in tqdm(enumerate(dataset), desc='prediction'):
+        num_cls = batch['num_cls'][0]
+        loss, acc, bce, mse, \
+        x_pred, y_pred, \
+        x_true, y_true = valid_step(model, batch, num_cls,
+                                    return_pred=True,
+                                    use_random=use_random,
+                                    finetuning=finetuning)
+        total_loss.append(loss)
+        total_acc.append(acc)
+        total_bce.append(bce)
+        total_mse.append(mse)
+        true_cls.append(tf.squeeze(y_true))
+        true_x.append(x_true)
+        preds.append(tf.squeeze(y_pred))
+        reconstructions.append(x_pred)
+
+    y_pred = tf.concat(preds, 0)
+    if not predic_proba:
+        y_pred = tf.argmax(y_pred, 1)
+
+    res = {'loss':tf.reduce_mean(total_loss).numpy(),
+           'acc':tf.reduce_mean(total_acc).numpy(),
+           'bce':tf.reduce_mean(total_bce).numpy(),
+           'mse':tf.reduce_mean(total_mse).numpy(),
+           'y_pred':y_pred,
+           'x_pred': tf.concat(reconstructions, 0),
+           'y_true':tf.concat(true_cls, 0),
+           'x_true': tf.concat(true_x, 0)}
+    return res
 
 def get_FINETUNING(astromer, num_cls=2):
     encoder = astromer.get_layer('encoder')

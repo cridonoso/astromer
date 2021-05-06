@@ -11,7 +11,9 @@ def input_format(data,
 				 samefrac=0.1,
 				 nppfrac=0.5,
 				 sep_token=102.,
-				 cls_token=101.):
+				 cls_token=101.,
+				 use_random=True,
+				 finetuning=False):
 	"""
 	This function creates a BERT-like input for ASTROMER.
 	i.e.,
@@ -51,6 +53,9 @@ def input_format(data,
 	indices      = tf.random.categorical(tf.math.log([[1-nppfrac, nppfrac]]), batch_size)[0]
 	indices      = tf.reshape(indices, [-1, 1, 1])
 
+	if not use_random:
+		indices = tf.zeros_like(indices)
+
 	# concat values and mask to shufle them
 	serie_mask = tf.concat([serie_1, tf.expand_dims(tf.cast(mask_1, tf.float32), 2)], 2)
 	serie_mask_shuffled = tf.random.shuffle(serie_mask)
@@ -80,8 +85,12 @@ def input_format(data,
 							  sep_tokn], 1)
 
 	# =============================== TARGET ===============================
+	if finetuning:
+		indices = tf.reshape(data['label'], [-1, 1, 1])
+
 	cls_label = tf.tile(indices, [1, 1, inp_dim]) # True NPP label
 	cls_label = tf.cast(cls_label, tf.float32)
+
 	target 	  = tf.concat([serie_1,
 						   sep_tokn,
 						   next_portion,
@@ -137,6 +146,7 @@ def input_format(data,
 	inp_dict = {'values': inputs,
 				'mask':inp_mask,
 				'times': times}
+
 	tar_dict = {'x_true': target,
 		    	'y_true': cls_label,
 				'x_mask':tar_mask,
