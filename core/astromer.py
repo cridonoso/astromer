@@ -173,7 +173,7 @@ def train(model,
         save_scalar(valid_writter, valid_mse, epoch, name='mse')
         save_scalar(train_writter, train_bce, epoch, name='bce')
         save_scalar(valid_writter, valid_bce, epoch, name='bce')
-        
+
         if verbose == 0:
             print('EPOCH {} - ES COUNT: {}'.format(epoch, es_count))
             print('train loss: {:.2f} - train acc: {:.2f} - train ce: {:.2f}, train mse: {:.2f}'.format(train_loss.result(),
@@ -243,4 +243,10 @@ def get_FINETUNING(astromer, num_cls=2):
 
     return Model(inputs=encoder.input,
                  outputs=[x_reg, x_clf],
+                 name="FINETUNING")
+
+def get_attention(model, num_cls=2):
+    encoder = model.get_layer('encoder')
+    return Model(inputs=encoder.input,
+                 outputs=[encoder],
                  name="FINETUNING")
