@@ -1,27 +1,12 @@
-import tensorflow as tf 
+import tensorflow as tf
 
-class CustomACC(tf.keras.metrics.Metric):
-    def __init__(self, name="Accuracy", **kwargs):
-        super(CustomACC, self).__init__(name=name, **kwargs)
+def custom_acc(y_true, y_pred):
+    y_true = tf.reshape(y_true, [-1, 1])
+    y_true = tf.cast(y_true, tf.int64)
+    y_pred = tf.argmax(y_pred, 2)
 
+    res = tf.math.equal(y_true, y_pred)
 
-        self.object = tf.keras.metrics.Accuracy(name='accuracy')
+    res = tf.cast(res, tf.float32)
 
-        self.acc_value = tf.constant(0.)
-
-    def update_state(self, y_true, y_pred, sample_weight=None):     
-
-
-        cls_pred = tf.slice(y_pred, [0,0,0], [-1, 2, 1])
-        cls_true = tf.slice(y_true, [0,0,0], [-1, 1, 1])
-
-        cls_pred = tf.argmax(tf.squeeze(cls_pred), 1)
-
-        value = self.object(tf.squeeze(cls_true), cls_pred)
-        self.acc_value = value
-
-
-    def result(self):
-        return self.acc_value
-
-
+    return tf.reduce_mean(res)
