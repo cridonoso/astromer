@@ -41,7 +41,7 @@ def set_random(tensor, mask, n_masked, frac=0.10):
         mask (binary tensor): [MASK] values
         frac (float, optional): percentage of the total to change by random
     """
-    with tf.name_scope("MASKByRandom") as scope:
+    with tf.name_scope("set_random") as scope:
         if n_masked is None:
             n_masked = tf.reduce_sum(tf.cast(mask, tf.int32), 1)
 
@@ -82,7 +82,7 @@ def set_same(mask, n_masked=None, frac=0.10):
         mask (TYPE): Description
         frac (float, optional): Description
     """
-    with tf.name_scope("MASKBySame") as scope:
+    with tf.name_scope("set_same") as scope:
         if n_masked is None:
             n_masked = tf.reduce_sum(tf.cast(mask, tf.int32), 1)
 
@@ -91,7 +91,8 @@ def set_same(mask, n_masked=None, frac=0.10):
             n_same = tf.multiply(size, frac)
             n_same = tf.cast(n_same, dtype=tf.int32)
             single_m = tf.cast(single_m, tf.float32)
-            indices = tf.random.shuffle(tf.where(single_m == 1), name='ShuffleMaskedIndices')
+            indices = tf.random.shuffle(tf.where(single_m == 1),
+                                        name='ShuffleMaskedIndices')
             selected = tf.slice(indices, [0, 0], [n_same, -1])
             shape = tf.cast(tf.shape(single_m), tf.int64)
             partial_mask = tf.scatter_nd(selected, tf.ones(tf.shape(selected)[0], 1), shape=shape)
