@@ -114,39 +114,40 @@ def create_dataset(source='data/raw_data/macho/MACHO/LCs',
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs)
 
 def standardize(tensor, only_magn=False):
-    if only_magn:
-        rest_0 = tf.slice(tensor, [0, 0, 0], [-1, -1, 1])
-        rest_1 = tf.slice(tensor, [0, 0, 2], [-1, -1, 1])
-        tensor = tf.slice(tensor, [0, 0, 1], [-1, -1, 1])
+    with tf.name_scope("Standardize") as scope:
+        if only_magn:
+            rest = tf.slice(tensor, [0, 0, 1], [-1, -1, 1])
+            tensor = tf.slice(tensor, [0, 0, 0], [-1, -1, 1])
 
-    mean_value = tf.expand_dims(tf.reduce_mean(tensor, 1), 1, name='mean_value')
-    std_value = tf.expand_dims(tf.math.reduce_std(tensor, 1), 1, name='std_value')
+        mean_value = tf.expand_dims(tf.reduce_mean(tensor, 1), 1, name='mean_value')
+        std_value = tf.expand_dims(tf.math.reduce_std(tensor, 1), 1, name='std_value')
 
-    normed = tf.where(std_value == 0.,
-                     (tensor - mean_value),
-                     (tensor - mean_value)/std_value)
-    if only_magn:
-        normed = tf.concat([rest_0, normed, rest_1], 2)
+        normed = tf.where(std_value == 0.,
+                         (tensor - mean_value),
+                         (tensor - mean_value)/std_value)
+        if only_magn:
+            normed = tf.concat([normed, rest], 2)
 
-    return normed
+        return normed
 
 def normalize(tensor, only_time=False, min_value=None, max_value=None):
-    if only_time:
-        rest = tf.slice(tensor, [0, 0, 1], [-1, -1, 2])
-        tensor = tf.slice(tensor, [0, 0, 0], [-1, -1, 1])
+    with tf.name_scope("Normalize") as scope:
+        if only_time:
+            rest = tf.slice(tensor, [0, 0, 1], [-1, -1, 2])
+            tensor = tf.slice(tensor, [0, 0, 0], [-1, -1, 1])
 
-    if min_value is None or max_value is None:
-        min_value = tf.expand_dims(tf.reduce_min(tensor, 1), 1, name='min_value')
-        max_value = tf.expand_dims(tf.reduce_max(tensor, 1), 1, name='max_value')
+        if min_value is None or max_value is None:
+            min_value = tf.expand_dims(tf.reduce_min(tensor, 1), 1, name='min_value')
+            max_value = tf.expand_dims(tf.reduce_max(tensor, 1), 1, name='max_value')
 
-    den = (max_value - min_value)
-    normed = tf.where(den== 0.,
-                     (tensor - min_value),
-                     (tensor - min_value)/den)
+        den = (max_value - min_value)
+        normed = tf.where(den== 0.,
+                         (tensor - min_value),
+                         (tensor - min_value)/den)
 
-    if only_time:
-        normed = tf.concat([normed, rest], 2)
-    return normed
+        if only_time:
+            normed = tf.concat([normed, rest], 2)
+        return normed
 
 def get_delta(tensor, name='TensorDelta'):
     times0 = tf.concat([[tensor[0]] , tensor[:-1]], axis=0,

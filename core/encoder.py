@@ -53,9 +53,6 @@ class Encoder(tf.keras.layers.Layer):
 
 
     def call(self, data, training=False):
-        batch_size = tf.shape(data['values'])[0]
-        seq_len = tf.shape(data['values'])[1]
-
         # adding embedding and position encoding.
         x_pe = positional_encoding(data['times'], self.d_model, base=self.base, mjd=True)
         x_transformed = self.inp_transform(data['values'])
@@ -63,6 +60,6 @@ class Encoder(tf.keras.layers.Layer):
         x = self.dropout(data['values'], training=training)
 
         for i in range(self.num_layers):
-            x = self.enc_layers[i](data['values'], training, data['mask'])
+            x = self.enc_layers[i](x, training, data['mask'])
 
         return x  # (batch_size, input_seq_len, d_model)

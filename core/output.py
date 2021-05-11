@@ -9,10 +9,7 @@ class RegLayer(Layer):
 		self.reg_layer = Dense(1, name='RegressionLayer')
 
 	def call(self, inputs):
-		logist_rec = tf.slice(inputs, [0,1,0], [-1, -1, -1],
-							  name='z_rec')
-
-		reconstruction = self.reg_layer(logist_rec)
+		reconstruction = self.reg_layer(inputs)
 
 		return reconstruction
 
@@ -22,9 +19,19 @@ class ClfLayer(Layer):
 		self.cls_layer = Dense(num_cls, name='ClassificationLayer')
 
 	def call(self, inputs):
-		logist_cls = tf.slice(inputs, [0,0,0], [-1, 1, -1],
-							  name='z_npp')
-
-		cls_prob = self.cls_layer(logist_cls)
+		cls_prob = self.cls_layer(inputs)
 
 		return cls_prob
+
+
+class SplitLayer(Layer):
+	def __init__(self, num_cls=2, **kwargs):
+		super().__init__(**kwargs)
+
+	def call(self, inputs):
+		logist_cls = tf.slice(inputs, [0,0,0], [-1, 1, -1],
+							  name='z_npp')
+		logist_rec = tf.slice(inputs, [0,1,0], [-1, -1, -1],
+							  name='z_rec')
+
+		return logist_cls, logist_rec
