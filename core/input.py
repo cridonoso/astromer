@@ -31,15 +31,21 @@ def input_format(data,
 	"""
 	# First serie
 	with tf.name_scope("InputFormat") as scope:
-		batch_size      = tf.shape(data['serie_1'])[0]
-		inp_dim 	    = tf.shape(data['serie_1'])[-1] -1 # we removed times
-		with tf.name_scope("Serie_1") as scope:
+		with tf.name_scope("Separate_Vectors") as scope:
+			batch_size      = tf.shape(data['serie_1'])[0]
+			inp_dim 	    = tf.shape(data['serie_1'])[-1] -1 # we removed times
 			times_1 = tf.slice(data['serie_1'], [0,0,0], [-1,-1, 1], 'times_1')
 			magns_1 = tf.slice(data['serie_1'], [0,0,1], [-1,-1, 2], 'magns_1')
+			times_2 = tf.slice(data['serie_2'], [0,0,0], [-1,-1, 1], 'times_2')
+			magns_2 = tf.slice(data['serie_2'], [0,0,1], [-1,-1, 2], 'magns_2')
+
+		with tf.name_scope("Serie_1") as scope:
 			mask_1          = create_MASK_token(magns_1, frac=maskfrac)
-			n_masked        = tf.reduce_sum(tf.cast(mask_1, tf.float32), 1)
-			serie_1, mask_1 = set_random(magns_1, mask_1, n_masked, frac=randfrac)
-			mask_1          = set_same(mask_1, n_masked, frac=samefrac)
+			n_masked_1      = tf.reduce_sum(tf.cast(mask_1, tf.float32), 1,
+											name='num_masked_1')
+			serie_1, mask_1 = set_random(magns_1, mask_1, n_masked_1,
+										 frac=randfrac)
+			mask_1          = set_same(mask_1, n_masked_1, frac=samefrac)
 			padd_mask       = create_padding_mask(magns_1, data['steps_1'])
 			mask_1          = tf.math.logical_or(tf.squeeze(mask_1),
 												 padd_mask,
@@ -47,13 +53,12 @@ def input_format(data,
 			mask_1			= tf.cast(mask_1, tf.float32, 'BoolToFloat')
 
 		with tf.name_scope("Serie_2") as scope:
-			times_2 = tf.slice(data['serie_2'], [0,0,0], [-1,-1, 1], 'times_2')
-			magns_2 = tf.slice(data['serie_2'], [0,0,1], [-1,-1, 2], 'magns_2')
-
 			mask_2          = create_MASK_token(magns_2, frac=maskfrac)
-			n_masked        = tf.reduce_sum(tf.cast(mask_2, tf.float32), 1)
-			serie_2, mask_2 = set_random(magns_2, mask_2, n_masked, frac=randfrac)
-			mask_2          = set_same(mask_2, n_masked, frac=samefrac)
+			n_masked_2      = tf.reduce_sum(tf.cast(mask_2, tf.float32), 1,
+							   name='num_masked_2')
+			serie_2, mask_2 = set_random(magns_2, mask_2, n_masked_2,
+									     frac=randfrac)
+			mask_2          = set_same(mask_2, n_masked_2, frac=samefrac)
 			padd_mask       = create_padding_mask(magns_2, data['steps_2'])
 			mask_2          = tf.math.logical_or(tf.squeeze(mask_2),
 												 padd_mask,
