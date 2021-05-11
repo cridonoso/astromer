@@ -2,8 +2,9 @@ import tensorflow as tf
 from tqdm import tqdm
 import os
 
+from core.output  import RegLayer, ClfLayer, SplitLayer
+from core.tboard  import save_scalar, draw_graph
 from core.losses  import custom_mse, custom_bce
-from core.output  import RegLayer, ClfLayer
 from core.input   import input_format
 from core.metrics import custom_acc
 from core.encoder import Encoder
@@ -41,12 +42,13 @@ def get_ASTROMER(num_layers=2,
                 base=base,
                 rate=dropout,
                 name='encoder')(placeholder)
-
-    x_reg = RegLayer(name='regression')(x)
-    x_clf = ClfLayer(name='classification')(x)
+    x_cls, \
+    x_reg = SplitLayer(name='split_z')(x)
+    x_reg = RegLayer(name='regression')(x_reg)
+    x_cls = ClfLayer(name='classification')(x_cls)
 
     return Model(inputs=placeholder,
-                 outputs=(x_reg, x_clf),
+                 outputs=(x_reg, x_cls),
                  name="ASTROMER")
 
 @tf.function
@@ -101,10 +103,6 @@ def valid_step(model, batch, num_cls=2, return_pred=False, use_random=True, fine
         return loss, acc, bce, mse, x_pred, y_pred, x_true, y_true
     return loss, acc, bce, mse
 
-def save_scalar(writer, value, step, name=''):
-    with writer.as_default():
-        tf.summary.scalar(name, value.result(), step=step)
-
 def train(model,
           train_dataset,
           valid_dataset,
@@ -123,6 +121,9 @@ def train(model,
                                     os.path.join(exp_path, 'logs', 'train'))
     valid_writter = tf.summary.create_file_writer(
                                     os.path.join(exp_path, 'logs', 'valid'))
+
+    batch = [t for t in train_dataset.take(1)][0]
+    draw_graph(model, batch, train_writter, exp_path)
 
     # Optimizer
     learning_rate = 1e-3
