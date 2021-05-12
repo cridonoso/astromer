@@ -132,21 +132,15 @@ def standardize(tensor, only_magn=False):
 
 def normalize(tensor, only_time=False, min_value=None, max_value=None):
     with tf.name_scope("Normalize") as scope:
-        if only_time:
-            rest = tf.slice(tensor, [0, 0, 1], [-1, -1, 2])
-            tensor = tf.slice(tensor, [0, 0, 0], [-1, -1, 1])
-
-        if min_value is None or max_value is None:
-            min_value = tf.expand_dims(tf.reduce_min(tensor, 1), 1, name='min_value')
-            max_value = tf.expand_dims(tf.reduce_max(tensor, 1), 1, name='max_value')
+        min_value = tf.expand_dims(tf.reduce_min(tensor, 1), 1,
+                                    name='min_value')
+        max_value = tf.expand_dims(tf.reduce_max(tensor, 1), 1,
+                                    name='max_value')
 
         den = (max_value - min_value)
         normed = tf.where(den== 0.,
                          (tensor - min_value),
                          (tensor - min_value)/den)
-
-        if only_time:
-            normed = tf.concat([normed, rest], 2)
         return normed
 
 def get_delta(tensor, name='TensorDelta'):

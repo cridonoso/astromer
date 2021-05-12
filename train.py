@@ -39,10 +39,11 @@ def run(opt):
                               show_shapes=True)
 
     # Training ASTROMER
-    train(astromer, train_batches, valid_batches,
+    train(astromer, train_batches.take(1), valid_batches.take(1),
           patience=opt.patience,
           exp_path=opt.p,
-          epochs=opt.epochs)
+          epochs=opt.epochs,
+          verbose=0)
 
     conf_file = os.path.join(opt.p, 'conf.json')
     with open(conf_file, 'w') as json_file:
