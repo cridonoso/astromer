@@ -62,9 +62,15 @@ def run(opt):
           num_cls=num_cls,
           verbose=0)
 
+    # Save hyperparameters
+    opt_dic = vars(opt)
+    for key, value in conf.items():
+        if key not in opt_dic.keys():
+            opt_dic[key] = value
+
     conf_file = os.path.join(opt.p, 'conf.json')
     with open(conf_file, 'w') as json_file:
-        json.dump(vars(opt), json_file, indent=4)
+        json.dump(opt_dic, json_file, indent=4)
 
 
 if __name__ == '__main__':

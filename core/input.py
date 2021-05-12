@@ -121,7 +121,7 @@ def input_format(data,
 								   sep_tokn], 1)
 
 		with tf.name_scope("CreateInputMask") as scope:
-			tokn_mask  = tf.zeros([batch_size, 1], dtype=tf.float32)
+			tokn_mask  = tf.ones([batch_size, 1], dtype=tf.float32)
 			inp_mask  = tf.concat([tokn_mask,
 					               mask_1,
 								   tokn_mask,
@@ -137,9 +137,9 @@ def input_format(data,
 
 		with tf.name_scope("CreateTargetMask") as scope:
 			tar_mask  = tf.concat([tf.cast(mask_1, tf.float32),
-								   tokn_mask,
+								   tokn_mask-1,
 								   tf.cast(next_mask, tf.float32),
-								   tokn_mask], 1)
+								   tokn_mask-1], 1)
 
 		with tf.name_scope("GetTimes") as scope:
 			min_t1  = tf.expand_dims(tf.reduce_min(times_1, 1), 2, name='min_t1')
@@ -159,8 +159,10 @@ def input_format(data,
 							    tokn_mask], 1)
 			times = tf.expand_dims(times, 2)
 
-		std     = tf.slice(inputs, [0,1,1], [-1, -1, 1], name='GetSTD')
+		std = tf.slice(inputs, [0,1,1], [-1, -1, 1], name='GetSTD')
 		weigths = tf.math.reciprocal_no_nan(std, 'loss_weights')
+		weigths = normalize(weigths)
+
 		inputs  = tf.slice(inputs, [0,0,0], [-1, -1, 1], name='GetMagns')
 
 

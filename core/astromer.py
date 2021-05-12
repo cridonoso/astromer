@@ -202,7 +202,13 @@ def train(model,
         train_acc.reset_states()
         valid_acc.reset_states()
 
-def predict(model, dataset, conf, predic_proba=False, use_random=True, finetuning=False):
+def predict(model,
+            dataset,
+            conf,
+            num_cls=2,
+            predic_proba=False,
+            use_random=True,
+            finetuning=False):
     preds, reconstructions = [], []
     true_cls, true_x = [],[]
     total_loss, total_acc, total_bce, total_mse = [], [], [], []
