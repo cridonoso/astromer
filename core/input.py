@@ -10,8 +10,8 @@ def input_format(data,
 				 randfrac=0.1,
 				 samefrac=0.1,
 				 nppfrac=0.5,
-				 sep_token=102.,
-				 cls_token=101.,
+				 sep_token=-99.,
+				 cls_token=-98.,
 				 use_random=True,
 				 finetuning=False):
 	"""
@@ -121,7 +121,7 @@ def input_format(data,
 								   sep_tokn], 1)
 
 		with tf.name_scope("CreateInputMask") as scope:
-			tokn_mask  = tf.ones([batch_size, 1], dtype=tf.float32)
+			tokn_mask  = tf.zeros([batch_size, 1], dtype=tf.float32)
 			inp_mask  = tf.concat([tokn_mask,
 					               mask_1,
 								   tokn_mask,
@@ -137,9 +137,9 @@ def input_format(data,
 
 		with tf.name_scope("CreateTargetMask") as scope:
 			tar_mask  = tf.concat([tf.cast(mask_1, tf.float32),
-								   tokn_mask-1,
+								   tokn_mask,
 								   tf.cast(next_mask, tf.float32),
-								   tokn_mask-1], 1)
+								   tokn_mask], 1)
 
 		with tf.name_scope("GetTimes") as scope:
 			min_t1  = tf.expand_dims(tf.reduce_min(times_1, 1), 2, name='min_t1')
@@ -152,11 +152,11 @@ def input_format(data,
 			times_2 = tf.math.add(times_2, [[[1.]]], name='shift_t2_a_day')
 			times_2 = tf.math.add(times_2, last, name='shift_t2_after_t1')
 
-			times  = tf.concat([tokn_mask,
+			times  = tf.concat([tokn_mask+cls_token,
 							    tf.squeeze(times_1),
-							    tokn_mask,
+							    tokn_mask+sep_token,
 							    tf.squeeze(times_2),
-							    tokn_mask], 1)
+							    tokn_mask+sep_token], 1)
 			times = tf.expand_dims(times, 2)
 
 		std = tf.slice(inputs, [0,1,1], [-1, -1, 1], name='GetSTD')
