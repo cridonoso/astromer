@@ -39,7 +39,7 @@ def run(opt):
                               show_shapes=True)
 
     # Training ASTROMER
-    train(astromer, train_batches.take(1), valid_batches.take(1),
+    train(astromer, train_batches, valid_batches,
           patience=opt.patience,
           exp_path=opt.p,
           epochs=opt.epochs,
@@ -64,7 +64,7 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--epochs', default=2000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=20, type=int,
+    parser.add_argument('--patience', default=200, type=int,
                         help='batch size')
     parser.add_argument('--finetuning',default=False, action='store_true',
                         help='Finetune a pretrained model')
@@ -81,9 +81,7 @@ if __name__ == '__main__':
                         help='Dimensionality of the middle  dense layer at the end of the encoder')
     parser.add_argument('--dropout', default=0.1 , type=float,
                         help='dropout_rate for the encoder')
-    parser.add_argument('--max-len', default=100, type=int,
-                        help='Max lightcurve length to build the input')
-    parser.add_argument('--base', default=10000, type=int,
+    parser.add_argument('--base', default=1000, type=int,
                         help='base of embedding')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')

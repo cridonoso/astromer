@@ -71,7 +71,6 @@ def train_step(model, batch, opt, num_cls=2, use_random=True, finetuning=False):
                          num_cls=num_cls)
 
         loss = bce + mse
-
         acc = custom_acc(y_true, y_pred)
 
     grads = tape.gradient(loss, model.trainable_weights)
@@ -182,7 +181,7 @@ def train(model,
                                                                                                         train_bce.result(),
                                                                                                         train_mse.result(),
                                                                                                         ))
-            print('train loss: {:.2f} - train acc: {:.2f} - train ce: {:.2f}, train mse: {:.2f}'.format(valid_loss.result(),
+            print('val loss: {:.2f} - val acc: {:.2f} - val ce: {:.2f}, val mse: {:.2f}'.format(valid_loss.result(),
                                                                                                         valid_acc.result(),
                                                                                                         valid_bce.result(),
                                                                                                         valid_mse.result(),
