@@ -2,14 +2,11 @@ import tensorflow as tf
 
 @tf.function
 def custom_acc(y_true, y_pred):
+    y_pred  = tf.nn.softmax(tf.squeeze(y_pred))
     y_true = tf.reshape(y_true, [-1, 1])
-    y_true = tf.cast(y_true, tf.int64)
+    y_onehot = tf.one_hot(tf.cast(y_true, tf.int32), tf.shape(y_pred)[-1])
+    y_onehot = tf.squeeze(y_onehot)
 
-    y_pred = tf.argmax(y_pred, 2)
+    acc = tf.keras.metrics.categorical_accuracy(y_onehot, y_pred)
 
-
-    res = tf.math.equal(y_true, y_pred)
-
-    res = tf.cast(res, tf.float32)
-
-    return tf.reduce_mean(res)
+    return tf.reduce_mean(acc)

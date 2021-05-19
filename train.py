@@ -24,6 +24,8 @@ def run(opt):
                                  repeat=opt.repeat,
                                  balanced=True,
                                  finetuning=opt.finetuning)
+    # train_batches = train_batches.take(1)
+    # valid_batches = valid_batches.take(1)
     # get_model
     astromer = get_ASTROMER(num_layers=opt.layers,
                             d_model=opt.head_dim,
@@ -53,7 +55,7 @@ def run(opt):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # DATA
-    parser.add_argument('--max-obs', default=100, type=int,
+    parser.add_argument('--max-obs', default=50, type=int,
                     help='Max number of observations')
     # TRAINING PAREMETERS
     parser.add_argument('--data', default='./data/records/macho', type=str,
@@ -71,13 +73,13 @@ if __name__ == '__main__':
     parser.add_argument('--repeat', default=1, type=int,
                         help='number of times to repeat the training and validation dataset')
     # ASTROMER HIPERPARAMETERS
-    parser.add_argument('--layers', default=2, type=int,
+    parser.add_argument('--layers', default=1, type=int,
                         help='Number of encoder layers')
-    parser.add_argument('--heads', default=4, type=int,
+    parser.add_argument('--heads', default=2, type=int,
                         help='Number of self-attention heads')
     parser.add_argument('--head-dim', default=812, type=int,
                         help='Head-attention Dimensionality ')
-    parser.add_argument('--dff', default=1024, type=int,
+    parser.add_argument('--dff', default=256, type=int,
                         help='Dimensionality of the middle  dense layer at the end of the encoder')
     parser.add_argument('--dropout', default=0.1 , type=float,
                         help='dropout_rate for the encoder')

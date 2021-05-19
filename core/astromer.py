@@ -44,6 +44,41 @@ def get_ASTROMER(num_layers=2,
                 name='encoder')(placeholder)
     x_cls, \
     x_reg = SplitLayer(name='split_z')(x)
+    x_cls = ClfLayer(name='classification')(x_cls)
+
+    return Model(inputs=placeholder,
+                 outputs=(x_reg, x_cls),
+                 name="ASTROMER")
+
+def get_ASTROMER(num_layers=2,
+                 d_model=200,
+                 num_heads=2,
+                 dff=256,
+                 base=10000,
+                 dropout=0.1,
+                 maxlen=100,
+                 batch_size=None):
+
+    serie = Input(shape=(maxlen+3, 1),
+                  batch_size=batch_size,
+                  name='values')
+    times = Input(shape=(maxlen+3,1),
+                  batch_size=batch_size,
+                  name='times')
+    mask  = Input(shape=(1, maxlen+3,maxlen+3),
+                  batch_size=batch_size,
+                  name='mask')
+    placeholder = {'values':serie, 'mask':mask, 'times':times}
+
+    x = Encoder(num_layers,
+                d_model,
+                num_heads,
+                dff,
+                base=base,
+                rate=dropout,
+                name='encoder')(placeholder)
+    x_cls, \
+    x_reg = SplitLayer(name='split_z')(x)
     x_reg = RegLayer(name='regression')(x_reg)
     x_cls = ClfLayer(name='classification')(x_cls)
 
@@ -61,16 +96,15 @@ def train_step(model, batch, opt, num_cls=2, use_random=True, finetuning=False):
     with tf.GradientTape() as tape:
         x_pred, y_pred = model(inputs)
 
-        mse = custom_mse(y_true=x_true,
-                         y_pred=x_pred,
-                         sample_weight=target['weigths'],
-                         mask=target['x_mask'])
+        # mse = custom_mse(y_true=x_true,
+        #                  y_pred=x_pred,
+        #                  sample_weight=target['weigths'],
+        #                  mask=target['x_mask'])
 
         bce = custom_bce(y_true=y_true,
-                         y_pred=y_pred,
-                         num_cls=num_cls)
-
-        loss = bce + mse
+                         y_pred=y_pred)
+        mse = 0.
+        loss = bce #+ mse
         acc = custom_acc(y_true, y_pred)
 
     grads = tape.gradient(loss, model.trainable_weights)
@@ -87,16 +121,15 @@ def valid_step(model, batch, num_cls=2, return_pred=False, use_random=True, fine
     with tf.GradientTape() as tape:
         x_pred, y_pred = model(inputs)
 
-        mse = custom_mse(y_true=x_true,
-                         y_pred=x_pred,
-                         sample_weight=target['weigths'],
-                         mask=target['x_mask'])
-
+        # mse = custom_mse(y_true=x_true,
+        #                  y_pred=x_pred,
+        #                  sample_weight=target['weigths'],
+        #                  mask=target['x_mask'])
+        mse = 0.
         bce = custom_bce(y_true=y_true,
-                         y_pred=y_pred,
-                         num_cls = num_cls)
+                         y_pred=y_pred)
 
-        loss = bce + mse
+        loss = bce #+ mse
         acc = custom_acc(y_true, y_pred)
     if return_pred:
         return loss, acc, bce, mse, x_pred, y_pred, x_true, y_true
@@ -125,7 +158,7 @@ def train(model,
     draw_graph(model, batch, train_writter, exp_path)
 
     # Optimizer
-    learning_rate = 1e-3
+    learning_rate = 1e-2
     optimizer = tf.keras.optimizers.Adam(learning_rate,
                                          beta_1=0.9,
                                          beta_2=0.98,

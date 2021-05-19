@@ -16,10 +16,11 @@ def custom_mse(y_true, y_pred, sample_weight=None, mask=None):
     return tf.reduce_mean(mse)
 
 @tf.function
-def custom_bce(y_true, y_pred, num_cls=2, sample_weight=None):
-    y_true = tf.cast(tf.squeeze(y_true), dtype=tf.int32)
-    y_one = tf.one_hot(y_true, num_cls)
+def custom_bce(y_true, y_pred, sample_weight=None):
     y_pred = tf.squeeze(y_pred)
+    y_true = tf.cast(tf.squeeze(y_true), dtype=tf.int32)
+    y_one = tf.one_hot(y_true, tf.shape(y_pred)[-1])
+
     bce = tf.nn.softmax_cross_entropy_with_logits(y_one, y_pred)
 
     return tf.reduce_mean(bce)

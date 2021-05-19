@@ -100,8 +100,8 @@ def input_format(data,
 		cls_tokn = tf.tile(cls_tokn, [batch_size, 1, inp_dim], name='ClsTokens')
 
 		with tf.name_scope("CreateInput") as scope:
-			serie_1      = standardize(serie_1, only_magn=True)
-			next_portion = standardize(next_portion, only_magn=True)
+			# serie_1      = standardize(serie_1, only_magn=True)
+			# next_portion = standardize(next_portion, only_magn=True)
 			inputs       = tf.concat([cls_tokn,
 									  serie_1,
 									  sep_tokn,
