@@ -35,9 +35,9 @@ def run(opt):
                             maxlen=opt.max_obs)
 
     os.makedirs(opt.p, exist_ok=True)
-    tf.keras.utils.plot_model(astromer,
-                              to_file='{}/model.png'.format(opt.p),
-                              show_shapes=True)
+    # tf.keras.utils.plot_model(astromer,
+    #                           to_file='{}/model.png'.format(opt.p),
+    #                           show_shapes=True)
 
     # Training ASTROMER
     train(astromer, train_batches, valid_batches,
