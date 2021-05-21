@@ -24,8 +24,7 @@ def run(opt):
                                  repeat=opt.repeat,
                                  balanced=True,
                                  finetuning=opt.finetuning)
-    # train_batches = train_batches.take(1)
-    # valid_batches = valid_batches.take(1)
+
     # get_model
     astromer = get_ASTROMER(num_layers=opt.layers,
                             d_model=opt.head_dim,

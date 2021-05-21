@@ -33,7 +33,7 @@ def input_format(data,
 	with tf.name_scope("InputFormat") as scope:
 		with tf.name_scope("Separate_Vectors") as scope:
 			batch_size      = tf.shape(data['serie_1'])[0]
-			inp_dim 	    = tf.shape(data['serie_1'])[-1] -1 # we removed times
+			inp_dim 	    = tf.shape(data['serie_1'])[-1]-1 # we removed times
 			times_1 = tf.slice(data['serie_1'], [0,0,0], [-1,-1, 1], 'times_1')
 			magns_1 = tf.slice(data['serie_1'], [0,0,1], [-1,-1, 2], 'magns_1')
 			times_2 = tf.slice(data['serie_2'], [0,0,0], [-1,-1, 1], 'times_2')

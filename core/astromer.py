@@ -96,15 +96,14 @@ def train_step(model, batch, opt, num_cls=2, use_random=True, finetuning=False):
     with tf.GradientTape() as tape:
         x_pred, y_pred = model(inputs)
 
-        # mse = custom_mse(y_true=x_true,
-        #                  y_pred=x_pred,
-        #                  sample_weight=target['weigths'],
-        #                  mask=target['x_mask'])
+        mse = custom_mse(y_true=x_true,
+                         y_pred=x_pred,
+                         sample_weight=target['weigths'],
+                         mask=target['x_mask'])
 
         bce = custom_bce(y_true=y_true,
                          y_pred=y_pred)
-        mse = 0.
-        loss = bce #+ mse
+        loss = bce + mse
         acc = custom_acc(y_true, y_pred)
 
     grads = tape.gradient(loss, model.trainable_weights)
@@ -121,15 +120,14 @@ def valid_step(model, batch, num_cls=2, return_pred=False, use_random=True, fine
     with tf.GradientTape() as tape:
         x_pred, y_pred = model(inputs)
 
-        # mse = custom_mse(y_true=x_true,
-        #                  y_pred=x_pred,
-        #                  sample_weight=target['weigths'],
-        #                  mask=target['x_mask'])
-        mse = 0.
+        mse = custom_mse(y_true=x_true,
+                         y_pred=x_pred,
+                         sample_weight=target['weigths'],
+                         mask=target['x_mask'])
         bce = custom_bce(y_true=y_true,
                          y_pred=y_pred)
 
-        loss = bce #+ mse
+        loss = bce + mse
         acc = custom_acc(y_true, y_pred)
     if return_pred:
         return loss, acc, bce, mse, x_pred, y_pred, x_true, y_true
