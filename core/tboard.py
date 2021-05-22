@@ -1,5 +1,4 @@
 import tensorflow as tf
-from core.input import input_format
 
 
 def draw_graph(model, dataset, writer, logdir=''):
@@ -7,8 +6,7 @@ def draw_graph(model, dataset, writer, logdir=''):
 
     @tf.function
     def fn(x):
-        inputs, target = input_format(x)
-        x = model(inputs)
+        x = model(x)
 
     tf.summary.trace_on(graph=True, profiler=False)
     fn(dataset)

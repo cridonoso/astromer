@@ -5,25 +5,20 @@ import json
 import time
 import os
 
-from core.data  import load_records
+from core.data import pretraining_records
 from core.astromer import get_ASTROMER, get_FINETUNING, train
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 def run(opt):
     # Loading data
-    train_batches = load_records(os.path.join(opt.data, 'train'),
-                                 opt.batch_size,
-                                 input_len=opt.max_obs,
-                                 repeat=opt.repeat,
-                                 balanced=True,
-                                 finetuning=opt.finetuning)
-    valid_batches = load_records(os.path.join(opt.data, 'val'),
-                                 opt.batch_size,
-                                 input_len=opt.max_obs,
-                                 repeat=opt.repeat,
-                                 balanced=True,
-                                 finetuning=opt.finetuning)
+    train_batches = pretraining_records(os.path.join(opt.data, 'train'),
+                                        opt.batch_size,
+                                        max_obs=opt.max_obs)
+    valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
+                                        opt.batch_size,
+                                        max_obs=opt.max_obs)
+
     # get_model
     astromer = get_ASTROMER(num_layers=opt.layers,
                             d_model=opt.head_dim,
@@ -34,12 +29,9 @@ def run(opt):
                             maxlen=opt.max_obs)
 
     os.makedirs(opt.p, exist_ok=True)
-    tf.keras.utils.plot_model(astromer,
-                              to_file='{}/model.png'.format(opt.p),
-                              show_shapes=True)
 
     # Training ASTROMER
-    train(astromer, train_batches.take(1), valid_batches.take(1),
+    train(astromer, train_batches, valid_batches,
           patience=opt.patience,
           exp_path=opt.p,
           epochs=opt.epochs,
@@ -53,7 +45,7 @@ def run(opt):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # DATA
-    parser.add_argument('--max-obs', default=100, type=int,
+    parser.add_argument('--max-obs', default=50, type=int,
                     help='Max number of observations')
     # TRAINING PAREMETERS
     parser.add_argument('--data', default='./data/records/macho', type=str,
@@ -64,26 +56,24 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--epochs', default=2000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=20, type=int,
+    parser.add_argument('--patience', default=200, type=int,
                         help='batch size')
     parser.add_argument('--finetuning',default=False, action='store_true',
                         help='Finetune a pretrained model')
     parser.add_argument('--repeat', default=1, type=int,
                         help='number of times to repeat the training and validation dataset')
     # ASTROMER HIPERPARAMETERS
-    parser.add_argument('--layers', default=2, type=int,
+    parser.add_argument('--layers', default=1, type=int,
                         help='Number of encoder layers')
-    parser.add_argument('--heads', default=4, type=int,
+    parser.add_argument('--heads', default=2, type=int,
                         help='Number of self-attention heads')
     parser.add_argument('--head-dim', default=812, type=int,
                         help='Head-attention Dimensionality ')
-    parser.add_argument('--dff', default=1024, type=int,
+    parser.add_argument('--dff', default=256, type=int,
                         help='Dimensionality of the middle  dense layer at the end of the encoder')
     parser.add_argument('--dropout', default=0.1 , type=float,
                         help='dropout_rate for the encoder')
-    parser.add_argument('--max-len', default=100, type=int,
-                        help='Max lightcurve length to build the input')
-    parser.add_argument('--base', default=10000, type=int,
+    parser.add_argument('--base', default=1000, type=int,
                         help='base of embedding')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')

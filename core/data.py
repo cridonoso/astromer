@@ -5,6 +5,7 @@ import numpy as np
 import logging
 import os
 
+from core.masking import get_masked, set_random
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
@@ -58,8 +59,9 @@ def divide_training_subset(frame, train, val):
 def process_lc(row, source, lc_index, unique_classes, writer):
     path  = row['Path'].split('/')[-1]
     label = list(unique_classes).index(row['Class'])
-    lc_path = os.path.join(source,'LCs', path)
+    lc_path = os.path.join(source, path)
     observations = pd.read_csv(lc_path)
+    observations.columns = ['mjd', 'mag', 'errmag']
     observations = observations.dropna()
     observations.sort_values('mjd')
     observations = observations.drop_duplicates(keep='last')
@@ -79,15 +81,13 @@ def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None):
                                     for k, row in subframe.iterrows())
 
 
-def create_dataset(source='data/raw_data/macho/MACHO/LCs',
-                   metadata='data/raw_data/macho/MACHO/MACHO_dataset.dat',
+def create_dataset(meta_df,
+                   source='data/raw_data/macho/MACHO/LCs',
                    target='data/records/macho/',
                    n_jobs=None,
                    subsets_frac=(0.5, 0.25),
                    max_lcs_per_record=100):
     os.makedirs(target, exist_ok=True)
-
-    meta_df = pd.read_csv(metadata)
 
     bands = meta_df['Band'].unique()
     if len(bands) > 1:
@@ -113,21 +113,20 @@ def create_dataset(source='data/raw_data/macho/MACHO/LCs',
             os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs)
 
-def standardize(tensor, only_magn=False):
+def standardize_mag(tensor):
     with tf.name_scope("Standardize") as scope:
-        if only_magn:
-            rest = tf.slice(tensor, [0, 0, 1], [-1, -1, 1])
-            tensor = tf.slice(tensor, [0, 0, 0], [-1, -1, 1])
+        times = tf.slice(tensor, [0, 0], [-1, 1])
+        std = tf.slice(tensor, [0, 2], [-1, 1])
+        tensor = tf.slice(tensor, [0, 1], [-1, 1])
 
-        mean_value = tf.expand_dims(tf.reduce_mean(tensor, 1), 1, name='mean_value')
-        std_value = tf.expand_dims(tf.math.reduce_std(tensor, 1), 1, name='std_value')
+        mean_value = tf.reduce_mean(tensor, 0, name='mean_value')
+        std_value = tf.math.reduce_std(tensor, 0, name='std_value')
 
         normed = tf.where(std_value == 0.,
                          (tensor - mean_value),
                          (tensor - mean_value)/std_value)
-        if only_magn:
-            normed = tf.concat([normed, rest], 2)
 
+        normed = tf.concat([times, normed, std], 1)
         return normed
 
 def normalize(tensor, only_time=False, min_value=None, max_value=None):
@@ -142,12 +141,6 @@ def normalize(tensor, only_time=False, min_value=None, max_value=None):
                          (tensor - min_value),
                          (tensor - min_value)/den)
         return normed
-
-def get_delta(tensor, name='TensorDelta'):
-    times0 = tf.concat([[tensor[0]] , tensor[:-1]], axis=0,
-             name=name)
-    dt = tensor - times0
-    return dt
 
 def _parse(sample):
 
@@ -180,87 +173,90 @@ def _parse(sample):
     input_dict['input'] = tf.stack(casted_inp_parameters, axis=2)
     return input_dict
 
-def parse_2(sample, input_size, num_cls=None):
-    param_dim = tf.cast(tf.shape(sample['input'])[-1], tf.int32)
 
-    single_len = tf.cast(tf.math.floordiv(input_size, 2), tf.int32)
+def pretrain_input(seq_1, seq_2, nsp_prob, msk_frac, rnd_frac, same_frac,
+                    max_obs, clstkn=-99, septkn=-98):
 
-    steps_1 = steps_2 = 0
-    if tf.math.less_equal(sample['length'], single_len):
-        # masking needed
-        serie_1 = sample['input'][0]
-        filler  = tf.zeros([single_len - sample['length'], param_dim])
-        serie_1 = tf.concat([serie_1, filler], axis=0)
-        serie_2 = tf.zeros_like(serie_1)
-        steps_1 = sample['length']
+    inp_dim = tf.shape(seq_1['input'], name='inp_dim')
+    clstkn = tf.tile(tf.cast([[clstkn]], tf.float32), [1, inp_dim[-1]], name='cls_tkn')
+    septkn = tf.tile(tf.cast([[septkn]], tf.float32), [1, inp_dim[-1]], name='sep_tkn')
+    msktkn = tf.zeros([1], name='msk_tkn')
+    half_obs = max_obs//2
 
-    elif tf.math.greater(sample['length'], input_size):
-        # no masking needed
-        pivot = tf.random.uniform(shape=[1],
-                                  minval=0,
-                                  maxval=int(sample['length']-input_size),
-                                  dtype=tf.dtypes.int32)[0]
+    with tf.name_scope('Split'):
+        pivot_1 = tf.random.uniform(shape=[1],
+                                    minval=0,
+                                    maxval=int(seq_1['length']-max_obs),
+                                    dtype=tf.dtypes.int32)[0]
 
-        serie_1 = sample['input'][:, pivot:(pivot+single_len), :][0]
-        serie_2 = sample['input'][:, (pivot+single_len):(pivot+2*single_len), :][0]
-        steps_1 = steps_2 = single_len
-    else:
-        # masking needed
-        serie_1 = sample['input'][:, :single_len , :][0]
-        serie_2 = sample['input'][:, single_len: , :][0]
-        step_s2 = tf.cast(tf.shape(serie_2)[0], tf.int32)
-        filler  = tf.zeros([single_len - step_s2, param_dim])
-        serie_2 = tf.concat([serie_2, filler], axis=0)
-        steps_1 = single_len
-        steps_2 = step_s2
+        serie_1 = seq_1['input'][:, pivot_1:(pivot_1+half_obs), :][0]
+        serie_1 = standardize_mag(serie_1)
+        serie_2 = seq_1['input'][:, (pivot_1+half_obs):(pivot_1+max_obs), :][0]
+        serie_2 = standardize_mag(serie_2)
+        original = tf.concat([clstkn, serie_1, septkn, serie_2, septkn], 0,
+                             name='original')
+         # just to plot it
 
-    # input dictionary
-    inp_dict = dict()
-    inp_dict['serie_1'] = serie_1
-    inp_dict['serie_2'] = serie_2
+        is_random = tf.random.categorical(tf.math.log([[1-nsp_prob, nsp_prob]]), 1)
+        is_random = tf.cast(is_random, tf.bool, name='isRandom')
+        if is_random:
+            pivot_2 = tf.random.uniform(shape=[1],
+                                        minval=0,
+                                        maxval=int(seq_2['length']-half_obs),
+                                        dtype=tf.dtypes.int32)[0]
 
-    inp_dict['steps_2'] = steps_2
-    inp_dict['steps_1'] = steps_1
+            serie_2 = seq_2['input'][:, pivot_2:(pivot_2+half_obs), :][0]
+            serie_2 = standardize_mag(serie_2)
 
-    inp_dict['label'] = sample['label']
-    inp_dict['lcid']  = sample['lcid']
-    inp_dict['num_cls']  = num_cls if num_cls is not None else 2
+    mask_1 = get_masked(serie_1, msk_frac)
+    mask_2 = get_masked(serie_1, msk_frac)
 
-    return inp_dict
+    serie_1, mask_1 = set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random')
+    serie_2, mask_2 = set_random(serie_2, mask_2, serie_1, rnd_frac, name='set_random')
 
-def adjust_length(func, input_len, num_cls):
+    serie_1, mask_1 = set_random(serie_1, mask_1, serie_1, same_frac, name='set_same')
+    serie_2, mask_2 = set_random(serie_2, mask_2, serie_2, same_frac, name='set_same')
+
+
+    serie = tf.concat([clstkn, serie_1, septkn, serie_2, septkn], 0)
+    times = tf.slice(serie, [0, 0], [-1, 1], name='times')
+    input = tf.slice(serie, [0, 1], [-1, 1], name='input')
+    mask  = tf.concat([msktkn, mask_1, msktkn, mask_2, msktkn], 0,
+                      name='inp_mask')
+
+    input_dic = {
+        'input': input,
+        'times': times,
+        'mask' : tf.expand_dims(mask, 1),
+        'label': tf.squeeze(tf.cast(is_random, tf.int32))
+    }
+
+    return input_dic
+
+def adjust_fn(func, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs):
     def wrap(*args, **kwargs):
-        result = func(*args, input_len, num_cls)
+        result = func(*args, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs)
         return result
     return wrap
 
-def load_records(source, batch_size, repeat=1, input_len=100, balanced=False,
-                finetuning=False):
-    num_cls = len(os.listdir(source)) if finetuning else None
-    parse_2_adjusted = adjust_length(parse_2, input_len, num_cls)
+def pretraining_records(source, batch_size, max_obs=100, nsp_prob=0.5, msk_prob=0.2, rnd_prob=0.1, same_prob=0.1):
 
-    if balanced:
-        datasets = [tf.data.TFRecordDataset(os.path.join(source, folder, x)) \
-                    for folder in os.listdir(source) for x in os.listdir(os.path.join(source, folder))]
+    datasets = [os.path.join(source, folder, x) for folder in os.listdir(source) \
+                for x in os.listdir(os.path.join(source, folder))]
 
-        op = lambda x: tf.data.Dataset.from_tensors(x).cache().repeat(repeat).map(_parse).map(parse_2_adjusted)
-        datasets = [dataset.interleave(op,
-                                       cycle_length = 25,
-                                       block_length=1,
-                                       deterministic=False,
-                                       num_parallel_calls=tf.data.experimental.AUTOTUNE) \
-                    for dataset in datasets]
+    dataset_1 = tf.data.TFRecordDataset(datasets)
+    dataset_2 = tf.data.TFRecordDataset(datasets)
 
-        datasets = [dataset.shuffle(1000, reshuffle_each_iteration=True) for dataset in datasets]
-        dataset  = tf.data.experimental.sample_from_datasets(datasets)
-    else:
-        datasets = [os.path.join(source, folder, x) for folder in os.listdir(source) \
-                    for x in os.listdir(os.path.join(source, folder))]
+    dataset_1 = dataset_1.map(_parse)
+    dataset_2 = dataset_2.map(_parse).shuffle(1000)
 
-        dataset = tf.data.TFRecordDataset(datasets)
-        dataset = dataset.cache()
-        dataset = dataset.map(_parse).map(parse_2_adjusted)
+    dataset = tf.data.Dataset.zip((dataset_1, dataset_2))
 
+    fn = adjust_fn(pretrain_input, nsp_prob,
+                   msk_prob, rnd_prob, same_prob, max_obs)
+
+    dataset = dataset.map(fn).cache()
     dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+
     return dataset
