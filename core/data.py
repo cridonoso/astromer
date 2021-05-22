@@ -59,8 +59,9 @@ def divide_training_subset(frame, train, val):
 def process_lc(row, source, lc_index, unique_classes, writer):
     path  = row['Path'].split('/')[-1]
     label = list(unique_classes).index(row['Class'])
-    lc_path = os.path.join(source,'LCs', path)
+    lc_path = os.path.join(source, path)
     observations = pd.read_csv(lc_path)
+    observations.columns = ['mjd', 'mag', 'errmag']
     observations = observations.dropna()
     observations.sort_values('mjd')
     observations = observations.drop_duplicates(keep='last')
