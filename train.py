@@ -5,25 +5,19 @@ import json
 import time
 import os
 
-from core.data  import load_records
+from core.data import pretraining_records
 from core.astromer import get_ASTROMER, get_FINETUNING, train
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 def run(opt):
     # Loading data
-    train_batches = load_records(os.path.join(opt.data, 'train'),
-                                 opt.batch_size,
-                                 input_len=opt.max_obs,
-                                 repeat=opt.repeat,
-                                 balanced=True,
-                                 finetuning=opt.finetuning)
-    valid_batches = load_records(os.path.join(opt.data, 'val'),
-                                 opt.batch_size,
-                                 input_len=opt.max_obs,
-                                 repeat=opt.repeat,
-                                 balanced=True,
-                                 finetuning=opt.finetuning)
+    train_batches = pretraining_records(os.path.join(opt.data, 'train'),
+                                        opt.batch_size,
+                                        max_obs=opt.max_obs)
+    valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
+                                        opt.batch_size,
+                                        max_obs=opt.max_obs)
 
     # get_model
     astromer = get_ASTROMER(num_layers=opt.layers,
@@ -35,9 +29,6 @@ def run(opt):
                             maxlen=opt.max_obs)
 
     os.makedirs(opt.p, exist_ok=True)
-    # tf.keras.utils.plot_model(astromer,
-    #                           to_file='{}/model.png'.format(opt.p),
-    #                           show_shapes=True)
 
     # Training ASTROMER
     train(astromer, train_batches, valid_batches,

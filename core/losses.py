@@ -3,14 +3,15 @@ from tensorflow.keras.losses import BinaryCrossentropy
 
 @tf.function
 def custom_mse(y_true, y_pred, sample_weight=None, mask=None):
+    y_true = tf.slice(y_true, [0,1,0],[-1,-1,-1])
     mse = tf.square(tf.square(y_true - y_pred))
 
     if sample_weight is not None:
         mse = tf.multiply(mse, sample_weight)
 
     if mask is not None:
-        d = tf.boolean_mask(mse[0], mask[0])
-        mse = tf.multiply(tf.squeeze(mse), mask)
+        mask = tf.slice(mask, [0,1,0],[-1,-1,-1])
+        mse = tf.multiply(mse, mask)
 
     mse = tf.reduce_sum(mse, 1)
     return tf.reduce_mean(mse)

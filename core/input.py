@@ -30,14 +30,27 @@ def input_format(data,
 	    dictonary: a dictionary containing the new input format
 	"""
 	# First serie
-	with tf.name_scope("InputFormat") as scope:
-		with tf.name_scope("Separate_Vectors") as scope:
-			batch_size      = tf.shape(data['serie_1'])[0]
-			inp_dim 	    = tf.shape(data['serie_1'])[-1]-1 # we removed times
-			times_1 = tf.slice(data['serie_1'], [0,0,0], [-1,-1, 1], 'times_1')
-			magns_1 = tf.slice(data['serie_1'], [0,0,1], [-1,-1, 2], 'magns_1')
-			times_2 = tf.slice(data['serie_2'], [0,0,0], [-1,-1, 1], 'times_2')
-			magns_2 = tf.slice(data['serie_2'], [0,0,1], [-1,-1, 2], 'magns_2')
+	with tf.name_scope("InputLayer") as scope:
+		# with tf.name_scope("Separate_Vectors") as scope:
+		inp_shape  = tf.shape(data['serie_1'], name='inp_shape')
+		batch_size = inp_shape[0]
+		inp_dim    = tf.math.subtract(inp_shape[-1], 1, name='inp_dim') # -1 bcause we dont use times in the input
+
+		# Get input vectors
+		times_1 = tf.slice(data['serie_1'], [0,0,0], [-1,-1, 1], 'times_1')
+		magns_1 = tf.slice(data['serie_1'], [0,0,1], [-1,-1, 2], 'magns_1')
+		n_obs_1 = tf.cast(data['steps_1'], tf.int32, name='length_1')
+		times_2 = tf.slice(data['serie_2'], [0,0,0], [-1,-1, 1], 'times_2')
+		magns_2 = tf.slice(data['serie_2'], [0,0,1], [-1,-1, 2], 'magns_2')
+		n_obs_2 = tf.cast(data['steps_2'], tf.int32, name='length_2')
+
+		# Create input tokens
+		sep_tokn  = tf.tile([[[sep_token]]], [batch_size, 1, inp_dim],
+							name='SepTokens')
+		cls_tokn  = tf.tile([[[cls_token]]], [batch_size, 1, inp_dim],
+							name='ClsTokens')
+		tokn_mask = tf.zeros([batch_size, 1], dtype=tf.float32,
+							name='MaskToken')
 
 		with tf.name_scope("Serie_1") as scope:
 			mask_1          = create_MASK_token(magns_1, frac=maskfrac)
@@ -45,10 +58,11 @@ def input_format(data,
 											name='num_masked_1')
 			serie_1, mask_1 = set_random(magns_1, mask_1, n_masked_1,
 										 frac=randfrac)
+			serie_1         = standardize(serie_1, only_magn=True)
 			mask_1          = set_same(mask_1, n_masked_1, frac=samefrac)
-			padd_mask       = create_padding_mask(magns_1, data['steps_1'])
+			padd_mask_1     = create_padding_mask(magns_1, n_obs_1)
 			mask_1          = tf.math.logical_or(tf.squeeze(mask_1),
-												 padd_mask,
+												 padd_mask_1,
 												 name='LogicalOR')
 			mask_1			= tf.cast(mask_1, tf.float32, 'BoolToFloat')
 
@@ -59,13 +73,13 @@ def input_format(data,
 			serie_2, mask_2 = set_random(magns_2, mask_2, n_masked_2,
 									     frac=randfrac)
 			mask_2          = set_same(mask_2, n_masked_2, frac=samefrac)
-			padd_mask       = create_padding_mask(magns_2, data['steps_2'])
+			padd_mask_2     = create_padding_mask(magns_2, n_obs_2)
 			mask_2          = tf.math.logical_or(tf.squeeze(mask_2),
-												 padd_mask,
+												 padd_mask_2,
 												 name='LogicalOR2')
 			mask_2			= tf.cast(mask_2, tf.float32, 'BoolToFloat2')
 
-		with tf.name_scope("NSP") as scope:
+		with tf.name_scope("Concat12") as scope:
 			indices      = tf.random.categorical(
 								tf.math.log([[1-nppfrac, nppfrac]]),
 								batch_size,
@@ -88,40 +102,30 @@ def input_format(data,
 			with tf.name_scope("BuildNewSerie") as scope:
 				next_portion = tf.where(indices==1, rand_samples, serie_2,
 									    name='RandomizedSerie')
+				next_portion = standardize(next_portion, only_magn=True)
 				next_mask    = tf.where(indices==1, rand_masks,
 										tf.expand_dims(mask_2, 2),
 										name='RandomizedMask')
 				next_mask    = tf.squeeze(next_mask)
 
-		# Create input tokens
-		sep_tokn = [[[sep_token]]]
-		sep_tokn = tf.tile(sep_tokn, [batch_size, 1, inp_dim], name='SepTokens')
-		cls_tokn = [[[cls_token]]]
-		cls_tokn = tf.tile(cls_tokn, [batch_size, 1, inp_dim], name='ClsTokens')
 
-		with tf.name_scope("CreateInput") as scope:
-			# serie_1      = standardize(serie_1, only_magn=True)
-			# next_portion = standardize(next_portion, only_magn=True)
-			inputs       = tf.concat([cls_tokn,
-									  serie_1,
-									  sep_tokn,
-									  next_portion,
-									  sep_tokn], 1)
+		with tf.name_scope("GetInput") as scope:
+			inputs = tf.concat([cls_tokn,
+				                serie_1,
+								sep_tokn,
+								next_portion,
+								sep_tokn], 1)
 
-		with tf.name_scope("CreateTarget") as scope:
-			if finetuning:
-				indices = tf.reshape(data['label'], [-1, 1, 1])
-
+		with tf.name_scope("GetTarget") as scope:
+			if finetuning: indices = tf.reshape(data['label'], [-1, 1, 1])
 			cls_label = tf.tile(indices, [1, 1, inp_dim]) # True NPP label
-			cls_label = tf.cast(cls_label, tf.float32)
-
+			cls_label = tf.cast(cls_label, tf.float32, name='TrueLabels')
 			target 	  = tf.concat([serie_1,
 								   sep_tokn,
 								   next_portion,
 								   sep_tokn], 1)
 
-		with tf.name_scope("CreateInputMask") as scope:
-			tokn_mask  = tf.zeros([batch_size, 1], dtype=tf.float32)
+		with tf.name_scope("GetInpMask") as scope:
 			inp_mask  = tf.concat([tokn_mask,
 					               mask_1,
 								   tokn_mask,
@@ -135,7 +139,7 @@ def input_format(data,
 												  len_mask])
 				inp_mask  = tf.expand_dims(inp_mask, 1)
 
-		with tf.name_scope("CreateTargetMask") as scope:
+		with tf.name_scope("GetTarMask") as scope:
 			tar_mask  = tf.concat([tf.cast(mask_1, tf.float32),
 								   tokn_mask,
 								   tf.cast(next_mask, tf.float32),
@@ -159,11 +163,11 @@ def input_format(data,
 							    tokn_mask+sep_token], 1)
 			times = tf.expand_dims(times, 2)
 
-		std = tf.slice(inputs, [0,1,1], [-1, -1, 1], name='GetSTD')
-		weigths = tf.math.reciprocal_no_nan(std, 'loss_weights')
-		weigths = normalize(weigths)
-
-		inputs  = tf.slice(inputs, [0,0,0], [-1, -1, 1], name='GetMagns')
+		with tf.name_scope("DropSTD") as scope:
+			std = tf.slice(inputs, [0,1,1], [-1, -1, 1], name='GetSTD')
+			weigths = tf.math.reciprocal_no_nan(std, 'loss_weights')
+			weigths = normalize(weigths)
+			inputs  = tf.slice(inputs, [0,0,0], [-1, -1, 1], name='Magnitudes')
 
 
 		inp_dict = {'values': inputs,

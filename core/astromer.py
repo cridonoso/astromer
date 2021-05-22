@@ -5,7 +5,6 @@ import os
 from core.output  import RegLayer, ClfLayer, SplitLayer
 from core.tboard  import save_scalar, draw_graph
 from core.losses  import custom_mse, custom_bce
-from core.input   import input_format
 from core.metrics import custom_acc
 from core.encoder import Encoder
 from core.decoder import Decoder
@@ -30,7 +29,7 @@ def get_ASTROMER(num_layers=2,
     times = Input(shape=(maxlen+3,1),
                   batch_size=batch_size,
                   name='times')
-    mask  = Input(shape=(1, maxlen+3,maxlen+3),
+    mask  = Input(shape=(1, maxlen+3),
                   batch_size=batch_size,
                   name='mask')
     placeholder = {'values':serie, 'mask':mask, 'times':times}
@@ -61,14 +60,14 @@ def get_ASTROMER(num_layers=2,
 
     serie = Input(shape=(maxlen+3, 1),
                   batch_size=batch_size,
-                  name='values')
-    times = Input(shape=(maxlen+3,1),
+                  name='input')
+    times = Input(shape=(maxlen+3, 1),
                   batch_size=batch_size,
                   name='times')
-    mask  = Input(shape=(1, maxlen+3,maxlen+3),
+    mask  = Input(shape=(maxlen+3, 1),
                   batch_size=batch_size,
                   name='mask')
-    placeholder = {'values':serie, 'mask':mask, 'times':times}
+    placeholder = {'input':serie, 'mask':mask, 'times':times}
 
     x = Encoder(num_layers,
                 d_model,
@@ -87,48 +86,35 @@ def get_ASTROMER(num_layers=2,
                  name="ASTROMER")
 
 @tf.function
-def train_step(model, batch, opt, num_cls=2, use_random=True, finetuning=False):
-    inputs, target = input_format(batch, use_random=use_random, finetuning=finetuning)
-
-    x_true = tf.slice(target['x_true'], [0,0,1], [-1,-1,1])
-    y_true = tf.slice(target['y_true'], [0,0,0], [-1,-1,1])
-
+def train_step(model, batch, opt):
     with tf.GradientTape() as tape:
-        x_pred, y_pred = model(inputs)
-
-        mse = custom_mse(y_true=x_true,
+        x_pred, y_pred = model(batch)
+        mse = custom_mse(y_true=batch['input'],
                          y_pred=x_pred,
-                         sample_weight=target['weigths'],
-                         mask=target['x_mask'])
+                         mask=batch['mask'])
 
-        bce = custom_bce(y_true=y_true,
+        bce = custom_bce(y_true=batch['label'],
                          y_pred=y_pred)
         loss = bce + mse
-        acc = custom_acc(y_true, y_pred)
+        acc = custom_acc(batch['label'], y_pred)
 
     grads = tape.gradient(loss, model.trainable_weights)
     opt.apply_gradients(zip(grads, model.trainable_weights))
     return loss, acc, bce, mse
 
 @tf.function
-def valid_step(model, batch, num_cls=2, return_pred=False, use_random=True, finetuning=False):
-    inputs, target = input_format(batch, use_random=use_random, finetuning=finetuning)
-
-    x_true = tf.slice(target['x_true'], [0,0,1], [-1,-1,1])
-    y_true = tf.slice(target['y_true'], [0,0,0], [-1,-1,1])
-
+def valid_step(model, batch, return_pred=False):
     with tf.GradientTape() as tape:
-        x_pred, y_pred = model(inputs)
+        x_pred, y_pred = model(batch)
 
-        mse = custom_mse(y_true=x_true,
+        mse = custom_mse(y_true=batch['input'],
                          y_pred=x_pred,
-                         sample_weight=target['weigths'],
-                         mask=target['x_mask'])
-        bce = custom_bce(y_true=y_true,
+                         mask=batch['mask'])
+        bce = custom_bce(y_true=batch['label'],
                          y_pred=y_pred)
 
         loss = bce + mse
-        acc = custom_acc(y_true, y_pred)
+        acc = custom_acc(batch['label'], y_pred)
     if return_pred:
         return loss, acc, bce, mse, x_pred, y_pred, x_true, y_true
     return loss, acc, bce, mse
@@ -177,20 +163,14 @@ def train(model,
     for epoch in range(epochs):
         for step, train_batch in tqdm(enumerate(train_dataset), desc='train'):
 
-            loss, acc, bce, mse = train_step(model, train_batch, optimizer,
-                                   num_cls=num_cls,
-                                   use_random=use_random,
-                                   finetuning=finetuning)
+            loss, acc, bce, mse = train_step(model, train_batch, optimizer)
             train_loss.update_state(loss)
             train_acc.update_state(acc)
             train_bce.update_state(bce)
             train_mse.update_state(mse)
 
         for valid_batch in tqdm(valid_dataset, desc='validation'):
-            loss, acc, bce, mse = valid_step(model, valid_batch,
-                                   num_cls=num_cls,
-                                   use_random=use_random,
-                                   finetuning=finetuning)
+            loss, acc, bce, mse = valid_step(model, valid_batch)
             valid_loss.update_state(loss)
             valid_acc.update_state(acc)
             valid_bce.update_state(bce)
