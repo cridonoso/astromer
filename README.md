@@ -1,2 +1,2 @@
-# ASTRONOMER: Light Curves Embedding using Transfomers
+# ASTROMER: Light Curves Embedding using Transfomers
 
