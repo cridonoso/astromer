@@ -10,15 +10,16 @@ from core.astromer import get_ASTROMER, get_FINETUNING, train
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
-def run(opt):
-    # Loading data
-    train_batches = pretraining_records(os.path.join(opt.data, 'train'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs)
-    valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs)
+def get_folder_name(path, prefix='model'):
+    folders = [f for f in os.listdir(path)]
+    if not folders:
+        path = os.path.join(path, '{}_0'.format(prefix))
+    else:
+        n = sorted([int(f.split('_')[-1]) for f in folders])[-1]
+        path = os.path.join(path, '{}_{}'.format(prefix, n+1))
+    return path
 
+def run(opt):
     # get_model
     astromer = get_ASTROMER(num_layers=opt.layers,
                             d_model=opt.head_dim,
@@ -28,7 +29,40 @@ def run(opt):
                             dropout=opt.dropout,
                             maxlen=opt.max_obs)
 
+
+    # Check for pretrained weigths
+    if os.path.isfile(os.path.join(opt.p, 'checkpoint')):
+        print('[INFO] Pretrained model detected! - Finetuning...')
+        conf_file = os.path.join(opt.p, 'conf.json')
+        with open(conf_file, 'r') as handle:
+            conf = json.load(handle)
+        # Loading hyperparameters of the pretrained model
+        astromer = get_ASTROMER(num_layers=conf['layers'],
+                                d_model=conf['head_dim'],
+                                num_heads=conf['heads'],
+                                dff=conf['dff'],
+                                base=conf['base'],
+                                dropout=conf['dropout'],
+                                maxlen=conf['max_obs'])
+        # Loading pretrained weights
+        weights_path = '{}/weights'.format(opt.p)
+        astromer.load_weights(weights_path)
+        # Defining a new ()--p)roject folder
+        opt.p = os.path.join(opt.p, 'finetuning')
+        os.makedirs(opt.p, exist_ok=True)
+        # Make sure we don't overwrite a previous training
+        opt.p = get_folder_name(opt.p, prefix='model')
+
+    # Creating (--p)royect directory
     os.makedirs(opt.p, exist_ok=True)
+
+    # Loading data
+    train_batches = pretraining_records(os.path.join(opt.data, 'train'),
+                                        opt.batch_size,
+                                        max_obs=opt.max_obs)
+    valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
+                                        opt.batch_size,
+                                        max_obs=opt.max_obs)
 
     # Training ASTROMER
     train(astromer, train_batches, valid_batches,

@@ -116,7 +116,7 @@ def valid_step(model, batch, return_pred=False):
         loss = bce + mse
         acc = custom_acc(batch['label'], y_pred)
     if return_pred:
-        return loss, acc, bce, mse, x_pred, y_pred, x_true, y_true
+        return loss, acc, bce, mse, x_pred, y_pred, batch['input'], batch['label']
     return loss, acc, bce, mse
 
 def train(model,
@@ -215,21 +215,15 @@ def train(model,
 def predict(model,
             dataset,
             conf,
-            num_cls=2,
-            predic_proba=False,
-            use_random=True,
-            finetuning=False):
+            predic_proba=False):
     preds, reconstructions = [], []
     true_cls, true_x = [],[]
     total_loss, total_acc, total_bce, total_mse = [], [], [], []
     for step, batch in tqdm(enumerate(dataset), desc='prediction'):
-        num_cls = batch['num_cls'][0]
         loss, acc, bce, mse, \
         x_pred, y_pred, \
-        x_true, y_true = valid_step(model, batch, num_cls,
-                                    return_pred=True,
-                                    use_random=use_random,
-                                    finetuning=finetuning)
+        x_true, y_true = valid_step(model, batch,
+                                    return_pred=True)
         total_loss.append(loss)
         total_acc.append(acc)
         total_bce.append(bce)

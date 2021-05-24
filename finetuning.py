@@ -41,6 +41,7 @@ def run(opt):
                             base=conf['base'],
                             dropout=conf['dropout'],
                             maxlen=conf['max_obs'])
+
     weights_path = '{}/weights'.format(conf['p'])
     astromer.load_weights(weights_path)
 
