@@ -20,7 +20,7 @@ def get_folder_name(path, prefix='model'):
     return path
 
 def run(opt):
-    # get_model
+    # Get model
     astromer = get_ASTROMER(num_layers=opt.layers,
                             d_model=opt.head_dim,
                             num_heads=opt.heads,
