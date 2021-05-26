@@ -69,9 +69,9 @@ def run(opt):
               epochs=opt.epochs, patience=opt.patience,
               verbose=0)
 
-        # conf_file = os.path.join(opt.p, 'conf.json')
-        # with open(conf_file, 'w') as json_file:
-        #     json.dump(vars(opt), json_file, indent=4)
+        conf_file = os.path.join(opt.p, 'conf.json')
+        with open(conf_file, 'w') as json_file:
+            json.dump(vars(opt), json_file, indent=4)
 
 
 if __name__ == '__main__':
