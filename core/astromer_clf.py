@@ -16,6 +16,7 @@ from tensorflow.keras import Model
 
 def get_CLASSIFIER(astromer, units, dropout=0.25, num_cls=2):
     encoder = astromer.get_layer('encoder')
+    encoder.trainable=False
     x_rnn = LSTM(units, dropout=dropout, return_sequences=True)(encoder.output)
     x_rnn = LSTM(units, dropout=dropout)(x_rnn)
     x_cls = ClfLayer(name='classification', num_cls=num_cls)(x_rnn)
