@@ -304,8 +304,8 @@ def classification_records(source, batch_size, max_obs=100, take=1):
                         for x in os.listdir(os.path.join(source, folder))]
     datasets = [dataset.map(_parse) for dataset in datasets]
     datasets = [dataset.map(lambda x: clf_input(x, max_obs)) for dataset in datasets]
-    datasets = [dataset.cache().repeat() for dataset in datasets]
+    datasets = [dataset.take(take).cache().repeat() for dataset in datasets]
     datasets = [dataset.shuffle(100, reshuffle_each_iteration=True) for dataset in datasets]
     dataset = tf.data.experimental.sample_from_datasets(datasets)
     dataset = dataset.padded_batch(batch_size).prefetch(250)
-    return dataset.take(take)
+    return dataset
