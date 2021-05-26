@@ -6,7 +6,7 @@ import time
 import os
 
 from core.data import pretraining_records
-from core.astromer import get_ASTROMER, get_FINETUNING, train
+from core.astromer import get_ASTROMER, train
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 

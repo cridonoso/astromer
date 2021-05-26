@@ -25,41 +25,6 @@ def get_ASTROMER(num_layers=2,
 
     serie = Input(shape=(maxlen+3, 1),
                   batch_size=batch_size,
-                  name='values')
-    times = Input(shape=(maxlen+3,1),
-                  batch_size=batch_size,
-                  name='times')
-    mask  = Input(shape=(1, maxlen+3),
-                  batch_size=batch_size,
-                  name='mask')
-    placeholder = {'values':serie, 'mask':mask, 'times':times}
-
-    x = Encoder(num_layers,
-                d_model,
-                num_heads,
-                dff,
-                base=base,
-                rate=dropout,
-                name='encoder')(placeholder)
-    x_cls, \
-    x_reg = SplitLayer(name='split_z')(x)
-    x_cls = ClfLayer(name='classification')(x_cls)
-
-    return Model(inputs=placeholder,
-                 outputs=(x_reg, x_cls),
-                 name="ASTROMER")
-
-def get_ASTROMER(num_layers=2,
-                 d_model=200,
-                 num_heads=2,
-                 dff=256,
-                 base=10000,
-                 dropout=0.1,
-                 maxlen=100,
-                 batch_size=None):
-
-    serie = Input(shape=(maxlen+3, 1),
-                  batch_size=batch_size,
                   name='input')
     times = Input(shape=(maxlen+3, 1),
                   batch_size=batch_size,
@@ -246,15 +211,6 @@ def predict(model,
            'y_true':tf.concat(true_cls, 0),
            'x_true': tf.concat(true_x, 0)}
     return res
-
-def get_FINETUNING(astromer, num_cls=2):
-    encoder = astromer.get_layer('encoder')
-    x_reg = astromer.get_layer('regression')(encoder.output)
-    x_clf = ClfLayer(num_cls=num_cls, name='NewClf')(encoder.output)
-
-    return Model(inputs=encoder.input,
-                 outputs=[x_reg, x_clf],
-                 name="FINETUNING")
 
 def get_attention(model, num_cls=2):
     encoder = model.get_layer('encoder')
