@@ -58,11 +58,11 @@ def run(opt):
         # Loading data
         train_batches = classification_records(os.path.join(opt.data, 'train'),
                                                opt.batch_size,
-                                               max_obs=opt.max_obs,
+                                               max_obs=conf['max_obs'],
                                                take=opt.take)
         valid_batches = classification_records(os.path.join(opt.data, 'val'),
                                                opt.batch_size,
-                                               max_obs=opt.max_obs,
+                                               max_obs=conf['max_obs'],
                                                take=opt.take)
 
         train(clf, train_batches, valid_batches,
