@@ -32,7 +32,10 @@ def get_ASTROMER(num_layers=2,
     mask  = Input(shape=(maxlen+3, 1),
                   batch_size=batch_size,
                   name='mask')
-    placeholder = {'input':serie, 'mask':mask, 'times':times}
+    segsep = Input(shape=(),
+                  batch_size=batch_size,
+                  name='segsep')
+    placeholder = {'input':serie, 'mask':mask, 'times':times, 'segsep':segsep}
 
     x = Encoder(num_layers,
                 d_model,
@@ -127,7 +130,6 @@ def train(model,
     es_count = 0
     for epoch in range(epochs):
         for step, train_batch in tqdm(enumerate(train_dataset), desc='train'):
-
             loss, acc, bce, mse = train_step(model, train_batch, optimizer)
             train_loss.update_state(loss)
             train_acc.update_state(acc)
@@ -176,6 +178,10 @@ def train(model,
         train_loss.reset_states()
         train_acc.reset_states()
         valid_acc.reset_states()
+        train_bce.reset_states()
+        valid_bce.reset_states()
+        train_mse.reset_states()
+        valid_mse.reset_states()
 
 def predict(model,
             dataset,

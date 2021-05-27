@@ -227,6 +227,7 @@ def pretrain_input(seq_1, seq_2, nsp_prob, msk_frac, rnd_frac, same_frac,
     input_dic = {
         'input': input,
         'times': times,
+        'segsep': half_obs+2, #segment separator position
         'mask' : tf.expand_dims(mask, 1),
         'label': tf.squeeze(tf.cast(is_random, tf.int32))
     }

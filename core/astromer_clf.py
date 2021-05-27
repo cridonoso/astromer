@@ -37,7 +37,7 @@ def train_step(model, batch, opt):
 @tf.function
 def valid_step(model, batch, return_pred=False):
     with tf.GradientTape() as tape:
-        y_pred = model(batch)
+        y_pred = model(batch, training=False)
         ce = custom_bce(y_true=batch['label'],
                          y_pred=y_pred)
         acc = custom_acc(batch['label'], y_pred)
