@@ -258,7 +258,7 @@ def pretraining_records(source, batch_size, max_obs=100, nsp_prob=0.5, msk_prob=
 
     dataset = dataset.map(fn)
     dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
     return dataset
 
