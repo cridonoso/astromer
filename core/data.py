@@ -256,8 +256,8 @@ def pretraining_records(source, batch_size, max_obs=100, nsp_prob=0.5, msk_prob=
     fn = adjust_fn(pretrain_input, nsp_prob,
                    msk_prob, rnd_prob, same_prob, max_obs)
 
-    dataset = dataset.map(fn).cache()
-    dataset = dataset.batch(batch_size)
+    dataset = dataset.map(fn)
+    dataset = dataset.batch(batch_size).cache()
     dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
     return dataset
