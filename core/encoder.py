@@ -70,7 +70,7 @@ class Encoder(tf.keras.layers.Layer):
         # adding embedding and position encoding.
         x_pe = positional_encoding(data['times'], self.d_model, base=self.base, mjd=True)
         x_transformed = self.inp_transform(data['input'])
-        x_transformed = segment_embedding(x_transformed, data['segsep'])
+        # x_transformed = segment_embedding(x_transformed, data['segsep'])
 
         transformed_input = x_transformed + x_pe
         x = self.dropout(transformed_input, training=training)
