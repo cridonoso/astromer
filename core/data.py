@@ -249,7 +249,7 @@ def pretraining_records(source, batch_size, max_obs=100, nsp_prob=0.5, msk_prob=
     dataset_2 = tf.data.TFRecordDataset(datasets)
 
     dataset_1 = dataset_1.map(_parse)
-    dataset_2 = dataset_2.map(_parse).shuffle(100)
+    dataset_2 = dataset_2.map(_parse).shuffle(1000)
 
     dataset = tf.data.Dataset.zip((dataset_1, dataset_2))
 
