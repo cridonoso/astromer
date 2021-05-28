@@ -68,7 +68,7 @@ class Encoder(tf.keras.layers.Layer):
         # Reshape MASK
         mask = reshape_mask(data['mask']) # batch x 1 x seq_len x seq_len
         # adding embedding and position encoding.
-        x_pe = positional_encoding(data['times'], self.d_model, base=self.base, mjd=True)
+        x_pe = positional_encoding(data['times'], self.d_model, mjd=True)
         x_transformed = self.inp_transform(data['input'])
         # x_transformed = segment_embedding(x_transformed, data['segsep'])
 
