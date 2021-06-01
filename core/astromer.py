@@ -110,7 +110,7 @@ def train(model,
     draw_graph(model, batch, train_writter, exp_path)
 
     # Optimizer
-    learning_rate = 1e-2
+    learning_rate = 1e-3
     optimizer = tf.keras.optimizers.Adam(learning_rate,
                                          beta_1=0.9,
                                          beta_2=0.98,
@@ -154,12 +154,12 @@ def train(model,
 
         if verbose == 0:
             print('EPOCH {} - ES COUNT: {}'.format(epoch, es_count))
-            print('train loss: {:.2f} - train acc: {:.2f} - train ce: {:.2f}, train mse: {:.2f}'.format(train_loss.result(),
+            print('train loss: {:.2f} - train acc: {:.2f} - train ce: {:.2f}, train mse: {:.4f}'.format(train_loss.result(),
                                                                                                         train_acc.result(),
                                                                                                         train_bce.result(),
                                                                                                         train_mse.result(),
                                                                                                         ))
-            print('val loss: {:.2f} - val acc: {:.2f} - val ce: {:.2f}, val mse: {:.2f}'.format(valid_loss.result(),
+            print('val loss: {:.2f} - val acc: {:.2f} - val ce: {:.2f}, val mse: {:.4f}'.format(valid_loss.result(),
                                                                                                         valid_acc.result(),
                                                                                                         valid_bce.result(),
                                                                                                         valid_mse.result(),
@@ -176,10 +176,13 @@ def train(model,
 
         valid_loss.reset_states()
         train_loss.reset_states()
+
         train_acc.reset_states()
         valid_acc.reset_states()
+
         train_bce.reset_states()
         valid_bce.reset_states()
+
         train_mse.reset_states()
         valid_mse.reset_states()
 
