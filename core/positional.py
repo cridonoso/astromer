@@ -38,7 +38,7 @@ def positional_encoding(times, d_model, base=10000, mjd=False):
             indices = tf.tile(indices, [tf.shape(times)[0], 1])
             indices = tf.expand_dims(indices, 2)
 
-        angle_rads = get_angles(indices, d_model)
+        angle_rads = get_angles_original(indices, d_model)
 
         # SIN AND COS
         def fn(x):
