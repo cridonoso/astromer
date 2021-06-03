@@ -268,7 +268,8 @@ def clf_input(seq_1, max_obs, clstkn=-99, septkn=-98):
     clstkn = tf.tile(tf.cast([[clstkn]], tf.float32), [1, inp_dim[-1]], name='cls_tkn')
     septkn = tf.tile(tf.cast([[septkn]], tf.float32), [1, inp_dim[-1]], name='sep_tkn')
     msktkn = tf.zeros([1], name='msk_tkn')
-
+    half_obs = max_obs//2
+    
     with tf.name_scope('Split'):
         pivot_1 = tf.random.uniform(shape=[1],
                                     minval=0,
@@ -293,6 +294,7 @@ def clf_input(seq_1, max_obs, clstkn=-99, septkn=-98):
         'input': input,
         'times': times,
         'mask': mask,
+        'segsep': half_obs+2, #segment separator position
         'length': tf.shape(serie)[0],
         'label': tf.cast(seq_1['label'], tf.int32)
     }

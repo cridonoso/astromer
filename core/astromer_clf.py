@@ -65,7 +65,7 @@ def train(model,
     draw_graph(model, batch, train_writter, exp_path)
 
     # Optimizer
-    learning_rate = 1e-2
+    learning_rate = 1e-3
     optimizer = tf.keras.optimizers.Adam(learning_rate,
                                          beta_1=0.9,
                                          beta_2=0.98,
