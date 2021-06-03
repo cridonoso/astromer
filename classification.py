@@ -67,7 +67,7 @@ def run(opt):
 
         train(clf, train_batches, valid_batches,
               epochs=opt.epochs, patience=opt.patience,
-              verbose=0)
+              exp_path=opt.p, verbose=0)
 
         conf_file = os.path.join(opt.p, 'conf.json')
         with open(conf_file, 'w') as json_file:
