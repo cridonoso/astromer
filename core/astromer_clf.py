@@ -42,7 +42,7 @@ def valid_step(model, batch, return_pred=False):
                          y_pred=y_pred)
         acc = custom_acc(batch['label'], y_pred)
     if return_pred:
-        return acc, ce, x_pred, y_pred, batch['input'], batch['label']
+        return acc, ce, y_pred, batch['label']
     return acc, ce
 
 def train(model,
@@ -117,3 +117,39 @@ def train(model,
         train_bce.reset_states()
         train_acc.reset_states()
         valid_acc.reset_states()
+
+def predict(model,
+            dataset,
+            conf,
+            predic_proba=False):
+    preds = []
+    true_cls, true_x = [],[]
+    total_acc, total_bce = [], []
+
+    for step, batch in tqdm(enumerate(dataset), desc='prediction'):
+
+        acc, bce, y_pred, y_true = valid_step(model, batch,
+                                              return_pred=True)
+
+        total_acc.append(acc)
+        total_bce.append(bce)
+
+        true_cls.append(tf.squeeze(y_true))
+        preds.append(tf.squeeze(y_pred))
+
+
+    y_pred = tf.concat(preds, 0)
+    if not predic_proba:
+        y_pred = tf.argmax(y_pred, 1)
+
+    res = {'acc':tf.reduce_mean(total_acc).numpy(),
+           'bce':tf.reduce_mean(total_bce).numpy(),
+           'y_pred':y_pred,
+           'y_true':tf.concat(true_cls, 0)}
+    return res
+
+def get_attention(model, num_cls=2):
+    encoder = model.get_layer('encoder')
+    return Model(inputs=encoder.input,
+                 outputs=[encoder],
+                 name="FINETUNING")

@@ -51,10 +51,6 @@ def run(opt):
         num_cls = pd.read_csv(os.path.join(opt.data, 'objects.csv'))['label'].shape[0]
         clf = get_CLASSIFIER(astromer, opt.units, opt.dropout, num_cls)
 
-        # tf.keras.utils.plot_model(
-        #     clf, to_file='model.png', show_shapes=True
-        # )
-
         # Loading data
         train_batches = classification_records(os.path.join(opt.data, 'train'),
                                                opt.batch_size,
@@ -70,8 +66,9 @@ def run(opt):
               exp_path=opt.p, verbose=0)
 
         conf_file = os.path.join(opt.p, 'conf.json')
+        final = {**conf, **vars(opt)}
         with open(conf_file, 'w') as json_file:
-            json.dump(vars(opt), json_file, indent=4)
+            json.dump(final, json_file, indent=4)
 
 
 if __name__ == '__main__':
