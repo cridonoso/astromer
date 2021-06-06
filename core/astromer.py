@@ -1,6 +1,8 @@
 import tensorflow as tf
 from tqdm import tqdm
-import os
+import os, sys
+
+sys.path.append('./astromer')
 
 from core.output  import RegLayer, ClfLayer, SplitLayer
 from core.tboard  import save_scalar, draw_graph
@@ -220,9 +222,3 @@ def predict(model,
            'y_true':tf.concat(true_cls, 0),
            'x_true': tf.concat(true_x, 0)}
     return res
-
-def get_attention(model, num_cls=2):
-    encoder = model.get_layer('encoder')
-    return Model(inputs=encoder.input,
-                 outputs=[encoder],
-                 name="FINETUNING")

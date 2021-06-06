@@ -269,7 +269,7 @@ def clf_input(seq_1, max_obs, clstkn=-99, septkn=-98):
     septkn = tf.tile(tf.cast([[septkn]], tf.float32), [1, inp_dim[-1]], name='sep_tkn')
     msktkn = tf.zeros([1], name='msk_tkn')
     half_obs = max_obs//2
-    
+
     with tf.name_scope('Split'):
         pivot_1 = tf.random.uniform(shape=[1],
                                     minval=0,
@@ -280,20 +280,23 @@ def clf_input(seq_1, max_obs, clstkn=-99, septkn=-98):
         serie_1 = standardize_mag(serie_1)
 
         mask_1 = tf.sequence_mask(tf.shape(serie_1)[0], max_obs+1)
-        mask_1 = tf.cast(tf.logical_not(mask_1), tf.float32)
+        mask_inp = tf.cast(tf.logical_not(mask_1), tf.float32)
+        mask_tar = tf.cast(mask_1, tf.float32)
 
         serie = tf.concat([clstkn, serie_1, septkn], 0, name='input')
         input = tf.slice(serie, [0, 1], [-1, 1], name='input')
         times = tf.slice(serie, [0, 0], [-1, 1], name='times')
 
 
-        mask  = tf.concat([msktkn, mask_1, msktkn], 0,
+        inpmask  = tf.concat([msktkn, mask_inp, msktkn], 0,
                           name='inp_mask')
-
+        tarmask  = tf.concat([msktkn, mask_tar, msktkn], 0,
+                          name='tar_mask')
     input_dic = {
         'input': input,
         'times': times,
-        'mask': mask,
+        'mask': inpmask,
+        'tar_mask': tarmask,
         'segsep': half_obs+2, #segment separator position
         'length': tf.shape(serie)[0],
         'label': tf.cast(seq_1['label'], tf.int32)

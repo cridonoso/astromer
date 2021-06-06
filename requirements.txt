@@ -3,3 +3,5 @@ joblib
 tqdm
 graphviz
 pydot
+scikit-learn
+seaborn
