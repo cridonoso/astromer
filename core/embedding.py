@@ -18,7 +18,7 @@ def standardize_mag(tensor):
 
 class BASE_ASTROMER(object):
     """docstring for BASE_ASTROMER. Only Magnitudes"""
-    def __init__(self, weigths='./astromer/runs/macho_old_pe/finetuning/model_1'):
+    def __init__(self, weigths='./astromer/runs/macho/finetuning/model_1'):
         super(BASE_ASTROMER, self).__init__()
         self.weights_path = weigths
 
