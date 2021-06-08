@@ -23,35 +23,56 @@ def run(opt):
                             dropout=opt.dropout,
                             maxlen=opt.max_obs)
 
-    # Make sure we don't overwrite a previous training
-    opt.p = get_folder_name(opt.p, prefix='')
 
-    # Creating (--p)royect directory
-    os.makedirs(opt.p, exist_ok=True)
+    # Check for pretrained weigths
+    if os.path.isfile(os.path.join(opt.p, 'checkpoint')):
+        print('[INFO] Pretrained model detected! - Finetuning...')
+        conf_file = os.path.join(opt.p, 'conf.json')
+        with open(conf_file, 'r') as handle:
+            conf = json.load(handle)
+        # Loading hyperparameters of the pretrained model
+        astromer = get_ASTROMER(num_layers=conf['layers'],
+                                d_model=conf['head_dim'],
+                                num_heads=conf['heads'],
+                                dff=conf['dff'],
+                                base=conf['base'],
+                                dropout=conf['dropout'],
+                                maxlen=conf['max_obs'])
+        # Loading pretrained weights
+        weights_path = '{}/weights'.format(opt.p)
+        astromer.load_weights(weights_path)
+        # Defining a new ()--p)roject folder
+        opt.p = os.path.join(opt.p, 'finetuning')
+        os.makedirs(opt.p, exist_ok=True)
+        # Make sure we don't overwrite a previous training
+        opt.p = get_folder_name(opt.p, prefix='model')
 
-    # Save Hyperparameters
-    conf_file = os.path.join(opt.p, 'conf.json')
-    varsdic = vars(opt)
-    varsdic['exp_date'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-    with open(conf_file, 'w') as json_file:
-        json.dump(varsdic, json_file, indent=4)
+        # Creating (--p)royect directory
+        os.makedirs(opt.p, exist_ok=True)
 
-    # Loading data
-    train_batches = pretraining_records(os.path.join(opt.data, 'train'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs)
-    valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs)
+        # Save Hyperparameters
+        conf_file = os.path.join(opt.p, 'conf.json')
+        varsdic = vars(opt)
+        varsdic['exp_date'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
+        with open(conf_file, 'w') as json_file:
+            json.dump(varsdic, json_file, indent=4)
 
-    # Training ASTROMER
-    train(astromer, train_batches, valid_batches,
-          patience=opt.patience,
-          exp_path=opt.p,
-          epochs=opt.epochs,
-          verbose=0)
+        # Loading data
+        train_batches = pretraining_records(os.path.join(opt.data, 'train'),
+                                            opt.batch_size,
+                                            max_obs=opt.max_obs)
+        valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
+                                            opt.batch_size,
+                                            max_obs=opt.max_obs)
 
-
+        # Training ASTROMER
+        train(astromer, train_batches, valid_batches,
+              patience=opt.patience,
+              exp_path=opt.p,
+              epochs=opt.epochs,
+              verbose=0)
+    else:
+        print('[ERROR] No weights found to finetune')
 
 
 if __name__ == '__main__':

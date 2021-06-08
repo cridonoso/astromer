@@ -7,4 +7,3 @@ RUN pip install -r requirements.txt
 RUN  apt update && apt install -y graphviz
 EXPOSE 8888
 EXPOSE 6006
-ADD . /tf/astromer/
