@@ -5,19 +5,13 @@ import json
 import time
 import os
 
-from core.data import pretraining_records
 from core.astromer import get_ASTROMER, train
+from core.data  import pretraining_records
+from core.utils import get_folder_name
+from time import gmtime, strftime
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
-def get_folder_name(path, prefix='model'):
-    folders = [f for f in os.listdir(path)]
-    if not folders:
-        path = os.path.join(path, '{}_0'.format(prefix))
-    else:
-        n = sorted([int(f.split('_')[-1]) for f in folders])[-1]
-        path = os.path.join(path, '{}_{}'.format(prefix, n+1))
-    return path
 
 def run(opt):
     # Get model
@@ -56,6 +50,13 @@ def run(opt):
     # Creating (--p)royect directory
     os.makedirs(opt.p, exist_ok=True)
 
+    # Save Hyperparameters
+    conf_file = os.path.join(opt.p, 'conf.json')
+    varsdic = vars(opt)
+    varsdic['exp_date'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
+    with open(conf_file, 'w') as json_file:
+        json.dump(varsdic, json_file, indent=4)
+
     # Loading data
     train_batches = pretraining_records(os.path.join(opt.data, 'train'),
                                         opt.batch_size,
@@ -71,9 +72,7 @@ def run(opt):
           epochs=opt.epochs,
           verbose=0)
 
-    conf_file = os.path.join(opt.p, 'conf.json')
-    with open(conf_file, 'w') as json_file:
-        json.dump(vars(opt), json_file, indent=4)
+
 
 
 if __name__ == '__main__':
@@ -84,7 +83,7 @@ if __name__ == '__main__':
     # TRAINING PAREMETERS
     parser.add_argument('--data', default='./data/records/macho', type=str,
                         help='Dataset folder containing the records files')
-    parser.add_argument('--p', default="./experiments/debug", type=str,
+    parser.add_argument('--p', default="./runs/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
