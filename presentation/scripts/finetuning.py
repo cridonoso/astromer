@@ -5,11 +5,13 @@ import json
 import time
 import os
 
-from core.data import pretraining_records
 from core.astromer import get_ASTROMER, train
+from core.data  import pretraining_records
 from core.utils import get_folder_name
+from time import gmtime, strftime
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
+
 
 def run(opt):
     # Get model
@@ -45,27 +47,32 @@ def run(opt):
         # Make sure we don't overwrite a previous training
         opt.p = get_folder_name(opt.p, prefix='model')
 
-    # Creating (--p)royect directory
-    os.makedirs(opt.p, exist_ok=True)
+        # Creating (--p)royect directory
+        os.makedirs(opt.p, exist_ok=True)
 
-    # Loading data
-    train_batches = pretraining_records(os.path.join(opt.data, 'train'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs)
-    valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs)
+        # Save Hyperparameters
+        conf_file = os.path.join(opt.p, 'conf.json')
+        varsdic = vars(opt)
+        varsdic['exp_date'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
+        with open(conf_file, 'w') as json_file:
+            json.dump(varsdic, json_file, indent=4)
 
-    # Training ASTROMER
-    train(astromer, train_batches, valid_batches,
-          patience=opt.patience,
-          exp_path=opt.p,
-          epochs=opt.epochs,
-          verbose=0)
+        # Loading data
+        train_batches = pretraining_records(os.path.join(opt.data, 'train'),
+                                            opt.batch_size,
+                                            max_obs=opt.max_obs)
+        valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
+                                            opt.batch_size,
+                                            max_obs=opt.max_obs)
 
-    conf_file = os.path.join(opt.p, 'conf.json')
-    with open(conf_file, 'w') as json_file:
-        json.dump(vars(opt), json_file, indent=4)
+        # Training ASTROMER
+        train(astromer, train_batches, valid_batches,
+              patience=opt.patience,
+              exp_path=opt.p,
+              epochs=opt.epochs,
+              verbose=0)
+    else:
+        print('[ERROR] No weights found to finetune')
 
 
 if __name__ == '__main__':
@@ -76,7 +83,7 @@ if __name__ == '__main__':
     # TRAINING PAREMETERS
     parser.add_argument('--data', default='./data/records/macho', type=str,
                         help='Dataset folder containing the records files')
-    parser.add_argument('--p', default="./experiments/debug", type=str,
+    parser.add_argument('--p', default="./runs/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')

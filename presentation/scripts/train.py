@@ -5,11 +5,13 @@ import json
 import time
 import os
 
-from core.data import pretraining_records
 from core.astromer import get_ASTROMER, train
+from core.data  import pretraining_records
 from core.utils import get_folder_name
+from time import gmtime, strftime
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
+
 
 def run(opt):
     # Get model
@@ -21,32 +23,18 @@ def run(opt):
                             dropout=opt.dropout,
                             maxlen=opt.max_obs)
 
-
-    # Check for pretrained weigths
-    if os.path.isfile(os.path.join(opt.p, 'checkpoint')):
-        print('[INFO] Pretrained model detected! - Finetuning...')
-        conf_file = os.path.join(opt.p, 'conf.json')
-        with open(conf_file, 'r') as handle:
-            conf = json.load(handle)
-        # Loading hyperparameters of the pretrained model
-        astromer = get_ASTROMER(num_layers=conf['layers'],
-                                d_model=conf['head_dim'],
-                                num_heads=conf['heads'],
-                                dff=conf['dff'],
-                                base=conf['base'],
-                                dropout=conf['dropout'],
-                                maxlen=conf['max_obs'])
-        # Loading pretrained weights
-        weights_path = '{}/weights'.format(opt.p)
-        astromer.load_weights(weights_path)
-        # Defining a new ()--p)roject folder
-        opt.p = os.path.join(opt.p, 'finetuning')
-        os.makedirs(opt.p, exist_ok=True)
-        # Make sure we don't overwrite a previous training
-        opt.p = get_folder_name(opt.p, prefix='model')
+    # Make sure we don't overwrite a previous training
+    opt.p = get_folder_name(opt.p, prefix='')
 
     # Creating (--p)royect directory
     os.makedirs(opt.p, exist_ok=True)
+
+    # Save Hyperparameters
+    conf_file = os.path.join(opt.p, 'conf.json')
+    varsdic = vars(opt)
+    varsdic['exp_date'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
+    with open(conf_file, 'w') as json_file:
+        json.dump(varsdic, json_file, indent=4)
 
     # Loading data
     train_batches = pretraining_records(os.path.join(opt.data, 'train'),
@@ -63,9 +51,7 @@ def run(opt):
           epochs=opt.epochs,
           verbose=0)
 
-    conf_file = os.path.join(opt.p, 'conf.json')
-    with open(conf_file, 'w') as json_file:
-        json.dump(vars(opt), json_file, indent=4)
+
 
 
 if __name__ == '__main__':
@@ -76,7 +62,7 @@ if __name__ == '__main__':
     # TRAINING PAREMETERS
     parser.add_argument('--data', default='./data/records/macho', type=str,
                         help='Dataset folder containing the records files')
-    parser.add_argument('--p', default="./experiments/debug", type=str,
+    parser.add_argument('--p', default="./runs/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')

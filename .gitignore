@@ -5,3 +5,4 @@ docker-compose-cpu.yml
 data/raw_data
 data/records
 .ipynb_checkpoints/
+runs
