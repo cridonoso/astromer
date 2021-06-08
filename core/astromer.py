@@ -1,6 +1,8 @@
 import tensorflow as tf
 from tqdm import tqdm
-import os
+import os, sys
+
+sys.path.append('./astromer')
 
 from core.output  import RegLayer, ClfLayer, SplitLayer
 from core.tboard  import save_scalar, draw_graph
@@ -25,41 +27,6 @@ def get_ASTROMER(num_layers=2,
 
     serie = Input(shape=(maxlen+3, 1),
                   batch_size=batch_size,
-                  name='values')
-    times = Input(shape=(maxlen+3,1),
-                  batch_size=batch_size,
-                  name='times')
-    mask  = Input(shape=(1, maxlen+3),
-                  batch_size=batch_size,
-                  name='mask')
-    placeholder = {'values':serie, 'mask':mask, 'times':times}
-
-    x = Encoder(num_layers,
-                d_model,
-                num_heads,
-                dff,
-                base=base,
-                rate=dropout,
-                name='encoder')(placeholder)
-    x_cls, \
-    x_reg = SplitLayer(name='split_z')(x)
-    x_cls = ClfLayer(name='classification')(x_cls)
-
-    return Model(inputs=placeholder,
-                 outputs=(x_reg, x_cls),
-                 name="ASTROMER")
-
-def get_ASTROMER(num_layers=2,
-                 d_model=200,
-                 num_heads=2,
-                 dff=256,
-                 base=10000,
-                 dropout=0.1,
-                 maxlen=100,
-                 batch_size=None):
-
-    serie = Input(shape=(maxlen+3, 1),
-                  batch_size=batch_size,
                   name='input')
     times = Input(shape=(maxlen+3, 1),
                   batch_size=batch_size,
@@ -67,7 +34,10 @@ def get_ASTROMER(num_layers=2,
     mask  = Input(shape=(maxlen+3, 1),
                   batch_size=batch_size,
                   name='mask')
-    placeholder = {'input':serie, 'mask':mask, 'times':times}
+    segsep = Input(shape=(),
+                  batch_size=batch_size,
+                  name='segsep')
+    placeholder = {'input':serie, 'mask':mask, 'times':times, 'segsep':segsep}
 
     x = Encoder(num_layers,
                 d_model,
@@ -116,7 +86,7 @@ def valid_step(model, batch, return_pred=False):
         loss = bce + mse
         acc = custom_acc(batch['label'], y_pred)
     if return_pred:
-        return loss, acc, bce, mse, x_pred, y_pred, x_true, y_true
+        return loss, acc, bce, mse, x_pred, y_pred, batch['input'], batch['label']
     return loss, acc, bce, mse
 
 def train(model,
@@ -142,7 +112,7 @@ def train(model,
     draw_graph(model, batch, train_writter, exp_path)
 
     # Optimizer
-    learning_rate = 1e-2
+    learning_rate = 1e-3
     optimizer = tf.keras.optimizers.Adam(learning_rate,
                                          beta_1=0.9,
                                          beta_2=0.98,
@@ -162,7 +132,6 @@ def train(model,
     es_count = 0
     for epoch in range(epochs):
         for step, train_batch in tqdm(enumerate(train_dataset), desc='train'):
-
             loss, acc, bce, mse = train_step(model, train_batch, optimizer)
             train_loss.update_state(loss)
             train_acc.update_state(acc)
@@ -187,12 +156,12 @@ def train(model,
 
         if verbose == 0:
             print('EPOCH {} - ES COUNT: {}'.format(epoch, es_count))
-            print('train loss: {:.2f} - train acc: {:.2f} - train ce: {:.2f}, train mse: {:.2f}'.format(train_loss.result(),
+            print('train loss: {:.2f} - train acc: {:.2f} - train ce: {:.2f}, train mse: {:.4f}'.format(train_loss.result(),
                                                                                                         train_acc.result(),
                                                                                                         train_bce.result(),
                                                                                                         train_mse.result(),
                                                                                                         ))
-            print('val loss: {:.2f} - val acc: {:.2f} - val ce: {:.2f}, val mse: {:.2f}'.format(valid_loss.result(),
+            print('val loss: {:.2f} - val acc: {:.2f} - val ce: {:.2f}, val mse: {:.4f}'.format(valid_loss.result(),
                                                                                                         valid_acc.result(),
                                                                                                         valid_bce.result(),
                                                                                                         valid_mse.result(),
@@ -209,27 +178,28 @@ def train(model,
 
         valid_loss.reset_states()
         train_loss.reset_states()
+
         train_acc.reset_states()
         valid_acc.reset_states()
+
+        train_bce.reset_states()
+        valid_bce.reset_states()
+
+        train_mse.reset_states()
+        valid_mse.reset_states()
 
 def predict(model,
             dataset,
             conf,
-            num_cls=2,
-            predic_proba=False,
-            use_random=True,
-            finetuning=False):
+            predic_proba=False):
     preds, reconstructions = [], []
     true_cls, true_x = [],[]
     total_loss, total_acc, total_bce, total_mse = [], [], [], []
     for step, batch in tqdm(enumerate(dataset), desc='prediction'):
-        num_cls = batch['num_cls'][0]
         loss, acc, bce, mse, \
         x_pred, y_pred, \
-        x_true, y_true = valid_step(model, batch, num_cls,
-                                    return_pred=True,
-                                    use_random=use_random,
-                                    finetuning=finetuning)
+        x_true, y_true = valid_step(model, batch,
+                                    return_pred=True)
         total_loss.append(loss)
         total_acc.append(acc)
         total_bce.append(bce)
@@ -252,18 +222,3 @@ def predict(model,
            'y_true':tf.concat(true_cls, 0),
            'x_true': tf.concat(true_x, 0)}
     return res
-
-def get_FINETUNING(astromer, num_cls=2):
-    encoder = astromer.get_layer('encoder')
-    x_reg = astromer.get_layer('regression')(encoder.output)
-    x_clf = ClfLayer(num_cls=num_cls, name='NewClf')(encoder.output)
-
-    return Model(inputs=encoder.input,
-                 outputs=[x_reg, x_clf],
-                 name="FINETUNING")
-
-def get_attention(model, num_cls=2):
-    encoder = model.get_layer('encoder')
-    return Model(inputs=encoder.input,
-                 outputs=[encoder],
-                 name="FINETUNING")

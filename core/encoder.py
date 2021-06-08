@@ -37,6 +37,19 @@ class EncoderLayer(tf.keras.layers.Layer):
 
         return out2
 
+
+def segment_embedding(x_transformed, seplim):
+    tensor_shape = tf.shape(x_transformed)
+    def fn(x):
+        seplim = tf.cast(x, tf.int32)
+        zeros = tf.zeros([tensor_shape[1]-seplim, tensor_shape[-1]])
+        ones = tf.ones([seplim, tensor_shape[-1]])
+        pe = tf.concat([zeros, ones], 0)
+        return pe
+    input_pe = tf.map_fn(lambda x: fn(x), seplim)
+    x_transformed+=input_pe
+    return x_transformed
+
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, num_layers, d_model, num_heads, dff,
                  base=10000, rate=0.1, **kwargs):
@@ -48,7 +61,6 @@ class Encoder(tf.keras.layers.Layer):
         self.inp_transform = tf.keras.layers.Dense(d_model)
         self.enc_layers = [EncoderLayer(d_model, num_heads, dff, rate)
                             for _ in range(num_layers)]
-
         self.dropout = tf.keras.layers.Dropout(rate)
 
 
@@ -56,13 +68,14 @@ class Encoder(tf.keras.layers.Layer):
         # Reshape MASK
         mask = reshape_mask(data['mask']) # batch x 1 x seq_len x seq_len
         # adding embedding and position encoding.
-        x_pe = positional_encoding(data['times'], self.d_model, base=self.base, mjd=True)
+        x_pe = positional_encoding(data['times'], self.d_model, mjd=True)
         x_transformed = self.inp_transform(data['input'])
+        # x_transformed = segment_embedding(x_transformed, data['segsep'])
+
         transformed_input = x_transformed + x_pe
         x = self.dropout(transformed_input, training=training)
 
         for i in range(self.num_layers):
             x = self.enc_layers[i](x, training, mask)
-
 
         return x  # (batch_size, input_seq_len, d_model)

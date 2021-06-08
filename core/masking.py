@@ -7,6 +7,7 @@ def create_look_ahead_mask(size):
                 name='LookaHeadMask')
     return mask  # (seq_len, seq_len)
 
+
 def get_padding_mask(tensor, lengths):
     ''' Create mask given a tensor and true length '''
     with tf.name_scope("get_padding_mask") as scope:
