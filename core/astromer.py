@@ -2,8 +2,6 @@ import tensorflow as tf
 from tqdm import tqdm
 import os, sys
 
-sys.path.append('./astromer')
-
 from core.output  import RegLayer, ClfLayer, SplitLayer
 from core.tboard  import save_scalar, draw_graph
 from core.losses  import custom_mse, custom_bce
