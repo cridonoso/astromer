@@ -77,11 +77,11 @@ if __name__ == '__main__':
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=1, type=int,
                         help='Number of encoder layers')
-    parser.add_argument('--heads', default=2, type=int,
+    parser.add_argument('--heads', default=4, type=int,
                         help='Number of self-attention heads')
-    parser.add_argument('--head-dim', default=128, type=int,
+    parser.add_argument('--head-dim', default=64, type=int,
                         help='Head-attention Dimensionality ')
-    parser.add_argument('--dff', default=512, type=int,
+    parser.add_argument('--dff', default=128, type=int,
                         help='Dimensionality of the middle  dense layer at the end of the encoder')
     parser.add_argument('--dropout', default=0.1 , type=float,
                         help='dropout_rate for the encoder')
@@ -91,5 +91,5 @@ if __name__ == '__main__':
                         help='optimizer initial learning rate')
 
     opt = parser.parse_args()
-    opt.head_dim = (opt.max_obs + 3)*opt.heads
+    # opt.head_dim = (opt.max_obs + 3)*opt.heads
     run(opt)

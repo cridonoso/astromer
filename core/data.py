@@ -165,9 +165,49 @@ def _parse(sample):
         seq_dim = tf.cast(seq_dim, tf.float32)
         casted_inp_parameters.append(seq_dim)
 
-    input_dict['input'] = tf.stack(casted_inp_parameters, axis=2)
+    input_dict['input'] = tf.stack(casted_inp_parameters, axis=2)[0]
     return input_dict
 
+def split_serie(serie):
+    len_serie = tf.shape(serie)[0]
+    padding = tf.zeros([len_serie, 1])
+    if len_serie % 2 != 0:
+        serie = tf.concat([serie,
+                           tf.zeros([1, tf.shape(serie)[-1]])
+                          ], 0)
+
+        padding = tf.concat([tf.zeros([len_serie, 1]),
+                             tf.ones([1, 1])
+                            ], 0)
+
+    serie_1, serie_2 = tf.split(serie, 2)
+    mask_1, mask_2   = tf.split(padding, 2)
+
+    return serie_1, serie_2, mask_1, mask_2
+
+def cut_serie(serie, max_obs, random_pivot=False):
+    size = tf.shape(serie)
+    if tf.less(max_obs, size[0]):
+        pivot = 0
+        if random_pivot:
+            pivot = tf.random.uniform(shape=[1],
+                                      minval=0,
+                                      maxval=int(size[0]-max_obs),
+                                      dtype=tf.dtypes.int32)[0]
+
+        serie = tf.slice(serie, [pivot,0], [max_obs,-1])
+        mask = tf.zeros([tf.shape(serie)[0], 1])
+    else:
+        serie = tf.concat([
+            serie,
+            tf.zeros([max_obs-size[0], size[-1]], dtype=tf.float32)
+        ], 0)
+        mask = tf.concat([
+            tf.zeros([size[0], 1]),
+            tf.ones([max_obs-size[0], 1])
+        ], 0)
+
+    return serie, mask
 
 def pretrain_input(seq_1, seq_2, nsp_prob, msk_frac, rnd_frac, same_frac,
                     max_obs, clstkn=-99, septkn=-98):
@@ -179,34 +219,26 @@ def pretrain_input(seq_1, seq_2, nsp_prob, msk_frac, rnd_frac, same_frac,
 
     half_obs = max_obs//2
 
+    # here we may filter an element from the even-padding
+    serie_1, serie_2, _, _ = split_serie(seq_1['input'])
+    serie_1, pad_mask_1 = cut_serie(serie_1, half_obs)
+    serie_2, pad_mask_2 = cut_serie(serie_2, half_obs)
 
-
-    pivot_1 = tf.random.uniform(shape=[1],
-                                minval=0,
-                                maxval=int(seq_1['length']-max_obs),
-                                dtype=tf.dtypes.int32)[0]
-
-    serie_1 = seq_1['input'][:, pivot_1:(pivot_1+half_obs), :][0]
     serie_1 = standardize(serie_1)
-    serie_2 = seq_1['input'][:, (pivot_1+half_obs):(pivot_1+max_obs), :][0]
     serie_2 = standardize(serie_2)
+
     original = tf.concat([clstkn, serie_1, septkn, serie_2, septkn], 0,
                          name='original')
-
 
     is_random = tf.random.categorical(tf.math.log([[1-nsp_prob, nsp_prob]]), 1)
     is_random = tf.cast(is_random, tf.bool, name='isRandom')
     if is_random:
-        pivot_2 = tf.random.uniform(shape=[1],
-                                    minval=0,
-                                    maxval=int(seq_2['length']-half_obs),
-                                    dtype=tf.dtypes.int32)[0]
-
-        serie_2 = seq_2['input'][:, pivot_2:(pivot_2+half_obs), :][0]
+        delta_obs = max_obs - tf.shape(serie_1)[0]
+        serie_2, pad_mask_2 = cut_serie(seq_2['input'], delta_obs, random_pivot=True)
         serie_2 = standardize(serie_2)
 
     mask_1 = get_masked(serie_1, msk_frac)
-    mask_2 = get_masked(serie_1, msk_frac)
+    mask_2 = get_masked(serie_2, msk_frac)
 
     serie_1, mask_1 = set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random')
     serie_2, mask_2 = set_random(serie_2, mask_2, serie_1, rnd_frac, name='set_random')
@@ -214,22 +246,25 @@ def pretrain_input(seq_1, seq_2, nsp_prob, msk_frac, rnd_frac, same_frac,
     serie_1, mask_1 = set_random(serie_1, mask_1, serie_1, same_frac, name='set_same')
     serie_2, mask_2 = set_random(serie_2, mask_2, serie_2, same_frac, name='set_same')
 
+    mask_1 = tf.maximum(tf.expand_dims(mask_1, 1), pad_mask_1)
+    mask_2 = tf.maximum(tf.expand_dims(mask_2, 1), pad_mask_2)
+
 
     serie = tf.concat([clstkn, serie_1, septkn, serie_2, septkn], 0)
     times = tf.slice(serie, [0, 0], [-1, 1], name='times')
     input = tf.slice(serie, [0, 1], [-1, 1], name='input')
-    mask  = tf.concat([msktkn, mask_1, msktkn, mask_2, msktkn], 0,
+    mask  = tf.concat([msktkn, tf.squeeze(mask_1), msktkn, tf.squeeze(mask_2), msktkn], 0,
                       name='inp_mask')
 
     input_dic = {
         'input': input,
         'times': times,
-        'segsep': half_obs+2, #segment separator position
         'mask' : tf.expand_dims(mask, 1),
         'label': tf.squeeze(tf.cast(is_random, tf.int32))
     }
 
     return input_dic
+
 
 def adjust_fn(func, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs):
     def wrap(*args, **kwargs):
