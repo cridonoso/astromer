@@ -113,34 +113,29 @@ def create_dataset(meta_df,
             os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs)
 
-def standardize_mag(tensor):
-    with tf.name_scope("Standardize") as scope:
-        times = tf.slice(tensor, [0, 0], [-1, 1])
-        std = tf.slice(tensor, [0, 2], [-1, 1])
-        tensor = tf.slice(tensor, [0, 1], [-1, 1])
+def standardize(tensor, axis=0):
+    mean_value = tf.reduce_mean(tensor, axis, name='mean_value')
+    std_value = tf.math.reduce_std(tensor, axis, name='std_value')
 
-        mean_value = tf.reduce_mean(tensor, 0, name='mean_value')
-        std_value = tf.math.reduce_std(tensor, 0, name='std_value')
+    if len(tf.shape(tensor))>2:
+        mean_value = tf.expand_dims(mean_value, axis)
+        std_value = tf.expand_dims(std_value, axis)
 
-        normed = tf.where(std_value == 0.,
-                         (tensor - mean_value),
-                         (tensor - mean_value)/std_value)
+    normed = tf.math.divide_no_nan(tensor - mean_value,
+                                   std_value)
+    return normed
 
-        normed = tf.concat([times, normed, std], 1)
-        return normed
+def normalize(tensor, axis=0):
+    min_value = tf.reduce_min(tensor, axis, name='min_value')
+    max_value = tf.reduce_max(tensor, axis, name='max_value')
 
-def normalize(tensor, only_time=False, min_value=None, max_value=None):
-    with tf.name_scope("Normalize") as scope:
-        min_value = tf.expand_dims(tf.reduce_min(tensor, 1), 1,
-                                    name='min_value')
-        max_value = tf.expand_dims(tf.reduce_max(tensor, 1), 1,
-                                    name='max_value')
+    if len(tf.shape(tensor))>2:
+        min_value = tf.expand_dims(min_value, axis)
+        max_value = tf.expand_dims(max_value, axis)
 
-        den = (max_value - min_value)
-        normed = tf.where(den== 0.,
-                         (tensor - min_value),
-                         (tensor - min_value)/den)
-        return normed
+    normed = tf.math.divide_no_nan(tensor - min_value,
+                                   max_value - min_value)
+    return normed
 
 def _parse(sample):
 
@@ -177,36 +172,38 @@ def _parse(sample):
 def pretrain_input(seq_1, seq_2, nsp_prob, msk_frac, rnd_frac, same_frac,
                     max_obs, clstkn=-99, septkn=-98):
 
-    inp_dim = tf.shape(seq_1['input'], name='inp_dim')
+    inp_dim = tf.shape(seq_1['input'])
     clstkn = tf.tile(tf.cast([[clstkn]], tf.float32), [1, inp_dim[-1]], name='cls_tkn')
     septkn = tf.tile(tf.cast([[septkn]], tf.float32), [1, inp_dim[-1]], name='sep_tkn')
     msktkn = tf.zeros([1], name='msk_tkn')
+
     half_obs = max_obs//2
 
-    with tf.name_scope('Split'):
-        pivot_1 = tf.random.uniform(shape=[1],
+
+
+    pivot_1 = tf.random.uniform(shape=[1],
+                                minval=0,
+                                maxval=int(seq_1['length']-max_obs),
+                                dtype=tf.dtypes.int32)[0]
+
+    serie_1 = seq_1['input'][:, pivot_1:(pivot_1+half_obs), :][0]
+    serie_1 = standardize(serie_1)
+    serie_2 = seq_1['input'][:, (pivot_1+half_obs):(pivot_1+max_obs), :][0]
+    serie_2 = standardize(serie_2)
+    original = tf.concat([clstkn, serie_1, septkn, serie_2, septkn], 0,
+                         name='original')
+
+
+    is_random = tf.random.categorical(tf.math.log([[1-nsp_prob, nsp_prob]]), 1)
+    is_random = tf.cast(is_random, tf.bool, name='isRandom')
+    if is_random:
+        pivot_2 = tf.random.uniform(shape=[1],
                                     minval=0,
-                                    maxval=int(seq_1['length']-max_obs),
+                                    maxval=int(seq_2['length']-half_obs),
                                     dtype=tf.dtypes.int32)[0]
 
-        serie_1 = seq_1['input'][:, pivot_1:(pivot_1+half_obs), :][0]
-        serie_1 = standardize_mag(serie_1)
-        serie_2 = seq_1['input'][:, (pivot_1+half_obs):(pivot_1+max_obs), :][0]
-        serie_2 = standardize_mag(serie_2)
-        original = tf.concat([clstkn, serie_1, septkn, serie_2, septkn], 0,
-                             name='original')
-         # just to plot it
-
-        is_random = tf.random.categorical(tf.math.log([[1-nsp_prob, nsp_prob]]), 1)
-        is_random = tf.cast(is_random, tf.bool, name='isRandom')
-        if is_random:
-            pivot_2 = tf.random.uniform(shape=[1],
-                                        minval=0,
-                                        maxval=int(seq_2['length']-half_obs),
-                                        dtype=tf.dtypes.int32)[0]
-
-            serie_2 = seq_2['input'][:, pivot_2:(pivot_2+half_obs), :][0]
-            serie_2 = standardize_mag(serie_2)
+        serie_2 = seq_2['input'][:, pivot_2:(pivot_2+half_obs), :][0]
+        serie_2 = standardize(serie_2)
 
     mask_1 = get_masked(serie_1, msk_frac)
     mask_2 = get_masked(serie_1, msk_frac)

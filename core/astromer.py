@@ -2,12 +2,13 @@ import tensorflow as tf
 from tqdm import tqdm
 import os, sys
 
-from core.output  import RegLayer, ClfLayer, SplitLayer
-from core.tboard  import save_scalar, draw_graph
-from core.losses  import custom_mse, custom_bce
-from core.metrics import custom_acc
-from core.encoder import Encoder
-from core.decoder import Decoder
+from core.output    import RegLayer, ClfLayer, SplitLayer
+from core.tboard    import save_scalar, draw_graph
+from core.losses    import custom_mse, custom_bce
+from core.scheduler import CustomSchedule
+from core.metrics   import custom_acc
+from core.encoder   import Encoder
+from core.decoder   import Decoder
 
 from tensorflow.keras.layers import Input, Dense
 from tensorflow.keras.optimizers import Adam
@@ -32,10 +33,7 @@ def get_ASTROMER(num_layers=2,
     mask  = Input(shape=(maxlen+3, 1),
                   batch_size=batch_size,
                   name='mask')
-    segsep = Input(shape=(),
-                  batch_size=batch_size,
-                  name='segsep')
-    placeholder = {'input':serie, 'mask':mask, 'times':times, 'segsep':segsep}
+    placeholder = {'input':serie, 'mask':mask, 'times':times}
 
     x = Encoder(num_layers,
                 d_model,
@@ -47,6 +45,7 @@ def get_ASTROMER(num_layers=2,
     x_cls, \
     x_reg = SplitLayer(name='split_z')(x)
     x_reg = RegLayer(name='regression')(x_reg)
+    x_cls = tf.reshape(x_cls, [-1, d_model])
     x_cls = ClfLayer(name='classification')(x_cls)
 
     return Model(inputs=placeholder,
@@ -110,7 +109,8 @@ def train(model,
     draw_graph(model, batch, train_writter, exp_path)
 
     # Optimizer
-    learning_rate = 1e-3
+    dim_model = model.get_layer('encoder').output.shape[-1]
+    learning_rate = CustomSchedule(dim_model)
     optimizer = tf.keras.optimizers.Adam(learning_rate,
                                          beta_1=0.9,
                                          beta_2=0.98,
@@ -118,10 +118,10 @@ def train(model,
     # To save metrics
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     valid_loss = tf.keras.metrics.Mean(name='valid_loss')
-    train_mse = tf.keras.metrics.Mean(name='train_mse')
-    valid_mse = tf.keras.metrics.Mean(name='valid_mse')
-    train_bce = tf.keras.metrics.Mean(name='train_bce')
-    valid_bce = tf.keras.metrics.Mean(name='valid_bce')
+    train_mse  = tf.keras.metrics.Mean(name='train_mse')
+    valid_mse  = tf.keras.metrics.Mean(name='valid_mse')
+    train_bce  = tf.keras.metrics.Mean(name='train_bce')
+    valid_bce  = tf.keras.metrics.Mean(name='valid_bce')
     train_acc  = tf.keras.metrics.Mean(name='train_acc')
     valid_acc  = tf.keras.metrics.Mean(name='valid_acc')
 
