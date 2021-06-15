@@ -95,6 +95,7 @@ def train(model,
           finetuning=False,
           use_random=True,
           num_cls=2,
+          lr=1e-3,
           verbose=1):
 
     os.makedirs(exp_path, exist_ok=True)
@@ -109,9 +110,9 @@ def train(model,
     draw_graph(model, batch, train_writter, exp_path)
 
     # Optimizer
-    dim_model = model.get_layer('encoder').output.shape[-1]
-    learning_rate = CustomSchedule(dim_model)
-    optimizer = tf.keras.optimizers.Adam(learning_rate,
+    # dim_model = model.get_layer('encoder').output.shape[-1]
+    # learning_rate = CustomSchedule(dim_model)
+    optimizer = tf.keras.optimizers.Adam(lr,
                                          beta_1=0.9,
                                          beta_2=0.98,
                                          epsilon=1e-9)

@@ -49,6 +49,7 @@ def run(opt):
           patience=opt.patience,
           exp_path=opt.p,
           epochs=opt.epochs,
+          lr=opt.lr,
           verbose=0)
 
 
