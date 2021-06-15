@@ -48,7 +48,7 @@ def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
     """
     with tf.name_scope(name) as scope:
         nmasked = tf.reduce_sum(mask_1)
-        nrandom = tf.multiply(nmasked, rnd_frac)
+        nrandom = tf.multiply(nmasked, rnd_frac, name='mulscalar')
         nrandom = tf.cast(tf.math.ceil(nrandom), tf.int32)
 
         mask_indices = tf.where(mask_1)
@@ -62,12 +62,21 @@ def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
         rand_mask = tf.expand_dims(rand_mask, 1)
         rand_mask = tf.tile(rand_mask, [1, tf.shape(serie_2)[-1]])
 
-        rand_vals = tf.multiply(serie_2, rand_mask)
+        len_s1 = tf.minimum(tf.shape(serie_2)[0],
+                            tf.shape(rand_mask)[0])
+
+        serie_2 = tf.slice(serie_2, [0,0], [len_s1, -1])
+
+        rand_vals = tf.multiply(serie_2, rand_mask, name='randvalsmul')
+
         keep_mask = tf.math.floor(tf.math.cos(rand_mask))
-        serie_1 = tf.multiply(serie_1, keep_mask)
+
+        serie_1 = tf.multiply(serie_1, keep_mask, name='seriemul')
+
         keep_mask = tf.slice(keep_mask, [0,0], [-1,1])
-        mask_1  = tf.multiply(mask_1, tf.squeeze(keep_mask))
+        mask_1  = tf.multiply(mask_1, tf.squeeze(keep_mask), name='maskmul2')
         serie_1 = tf.add(serie_1, rand_vals)
+
         return serie_1, mask_1
 
 def reshape_mask(mask):

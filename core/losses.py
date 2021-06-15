@@ -6,7 +6,7 @@ from tensorflow.nn import (sigmoid_cross_entropy_with_logits,
 @tf.function
 def custom_mse(y_true, y_pred, sample_weight=None, mask=None):
     y_true = tf.slice(y_true, [0,1,0],[-1,-1,-1])
-    mse = tf.square(tf.square(y_true - y_pred))
+    mse = tf.square(y_true - y_pred)
 
     if sample_weight is not None:
         mse = tf.multiply(mse, sample_weight)
@@ -16,7 +16,7 @@ def custom_mse(y_true, y_pred, sample_weight=None, mask=None):
         mse = tf.multiply(mse, mask)
 
     mse = tf.reduce_sum(mse, 1)
-    return tf.reduce_mean(mse)
+    return tf.math.sqrt(tf.reduce_mean(mse))
 
 @tf.function
 def custom_bce(y_true, y_pred, sample_weight=None):
@@ -25,4 +25,4 @@ def custom_bce(y_true, y_pred, sample_weight=None):
     y_one = tf.one_hot(y_true, tf.shape(y_pred)[-1])
 
     bce = sigmoid_cross_entropy_with_logits(y_one, y_pred)
-    return tf.reduce_mean(bce)
+    return tf.reduce_mean(bce)*2
