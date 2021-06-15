@@ -70,8 +70,6 @@ if __name__ == '__main__':
                         help='Number of epochs')
     parser.add_argument('--patience', default=200, type=int,
                         help='batch size')
-    parser.add_argument('--finetuning',default=False, action='store_true',
-                        help='Finetune a pretrained model')
     parser.add_argument('--repeat', default=1, type=int,
                         help='number of times to repeat the training and validation dataset')
     # ASTROMER HIPERPARAMETERS

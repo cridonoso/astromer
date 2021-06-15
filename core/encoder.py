@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from core.attention import MultiHeadAttention
-from core.positional import positional_encoding
+from core.positional import positional_encoding, ShuklaEmbedding
 from core.masking import reshape_mask
 
 def point_wise_feed_forward_network(d_model, dff):
@@ -26,6 +26,8 @@ class EncoderLayer(tf.keras.layers.Layer):
         self.dropout1 = tf.keras.layers.Dropout(rate)
         self.dropout2 = tf.keras.layers.Dropout(rate)
 
+
+
     def call(self, x, training, mask):
         attn_output, _ = self.mha(x, mask)  # (batch_size, input_seq_len, d_model)
         attn_output = self.dropout1(attn_output, training=training)
@@ -36,7 +38,6 @@ class EncoderLayer(tf.keras.layers.Layer):
         out2 = self.layernorm2(self.reshape_leak_2(out1) + ffn_output)  # (batch_size, input_seq_len, d_model)
 
         return out2
-
 
 def segment_embedding(x_transformed, seplim):
     tensor_shape = tf.shape(x_transformed)
@@ -63,12 +64,14 @@ class Encoder(tf.keras.layers.Layer):
                             for _ in range(num_layers)]
         self.dropout = tf.keras.layers.Dropout(rate)
 
-
+        self.pe_emb = ShuklaEmbedding(dim_model=d_model)
     def call(self, data, training=False):
         # Reshape MASK
         mask = reshape_mask(data['mask']) # batch x 1 x seq_len x seq_len
         # adding embedding and position encoding.
-        x_pe = positional_encoding(data['times'], self.d_model, mjd=True)
+        # x_pe = positional_encoding(data['times'], self.d_model, mjd=True)
+        x_pe = self.pe_emb(data['times'])
+
         x_transformed = self.inp_transform(data['input'])
         # x_transformed = segment_embedding(x_transformed, data['segsep'])
 

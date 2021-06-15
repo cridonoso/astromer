@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
+from tensorflow.keras.layers import Layer
 
 def get_angles(times, d_model):
     with tf.name_scope("Get_Angles") as scope:
@@ -52,3 +53,27 @@ def positional_encoding(times, d_model, base=10000, mjd=False):
         x_transpose = tf.map_fn(lambda x: fn(x),  (x_transpose, indices))[0]
         pos_encoding = tf.transpose(x_transpose, [2, 1, 0])
         return tf.cast(pos_encoding, dtype=tf.float32)
+
+
+class ShuklaEmbedding(Layer):
+    """
+    Positional embedding for irregular time series.
+    https://arxiv.org/pdf/2101.10318.pdf
+    """
+    def __init__(self, dim_model=32):
+        super(ShuklaEmbedding, self).__init__()
+        self.dim_model = dim_model
+        self.periodic_layer = tf.keras.layers.Dense(dim_model,
+                                                    activation=tf.math.sin)
+        self.phase_layer    = tf.keras.layers.Dense(dim_model)
+
+    def call(self, inputs):
+        nonperiod = tf.slice(inputs, [0,0,0], [-1, 1,-1])
+        periodic  = tf.slice(inputs, [0,1,0], [-1,-1,-1])
+
+        p = self.periodic_layer(periodic)
+        np = self.phase_layer(nonperiod)
+
+        embedding = tf.concat([p, np], 1)
+
+        return embedding
