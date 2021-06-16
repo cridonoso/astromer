@@ -64,13 +64,13 @@ class Encoder(tf.keras.layers.Layer):
                             for _ in range(num_layers)]
         self.dropout = tf.keras.layers.Dropout(rate)
 
-        self.pe_emb = ShuklaEmbedding(dim_model=d_model)
+        # self.pe_emb = ShuklaEmbedding(dim_model=d_model)
     def call(self, data, training=False):
         # Reshape MASK
         mask = reshape_mask(data['mask']) # batch x 1 x seq_len x seq_len
         # adding embedding and position encoding.
-        # x_pe = positional_encoding(data['times'], self.d_model, mjd=True)
-        x_pe = self.pe_emb(data['times'])
+        x_pe = positional_encoding(data['times'], self.d_model, mjd=True)
+        # x_pe = self.pe_emb(data['times'])
 
         x_transformed = self.inp_transform(data['input'])
         # x_transformed = segment_embedding(x_transformed, data['segsep'])

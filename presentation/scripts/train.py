@@ -67,18 +67,18 @@ if __name__ == '__main__':
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
-    parser.add_argument('--epochs', default=2000, type=int,
+    parser.add_argument('--epochs', default=10000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=200, type=int,
+    parser.add_argument('--patience', default=1000, type=int,
                         help='batch size')
     parser.add_argument('--repeat', default=1, type=int,
                         help='number of times to repeat the training and validation dataset')
     # ASTROMER HIPERPARAMETERS
-    parser.add_argument('--layers', default=1, type=int,
+    parser.add_argument('--layers', default=2, type=int,
                         help='Number of encoder layers')
     parser.add_argument('--heads', default=4, type=int,
                         help='Number of self-attention heads')
-    parser.add_argument('--head-dim', default=64, type=int,
+    parser.add_argument('--head-dim', default=128, type=int,
                         help='Head-attention Dimensionality ')
     parser.add_argument('--dff', default=128, type=int,
                         help='Dimensionality of the middle  dense layer at the end of the encoder')
