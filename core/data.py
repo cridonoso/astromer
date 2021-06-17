@@ -137,9 +137,10 @@ def normalize(tensor, axis=0):
                                    max_value - min_value)
     return normed
 
-def _parse(sample):
-
-
+def _parse_pt(sample, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs):
+    '''
+    Pretraining parser
+    '''
     context_features = {'label': tf.io.FixedLenFeature([],dtype=tf.int64),
                         'length': tf.io.FixedLenFeature([],dtype=tf.int64),
                         'id': tf.io.FixedLenFeature([], dtype=tf.string)}
@@ -165,114 +166,56 @@ def _parse(sample):
         seq_dim = tf.cast(seq_dim, tf.float32)
         casted_inp_parameters.append(seq_dim)
 
-    input_dict['input'] = tf.stack(casted_inp_parameters, axis=2)[0]
-    return input_dict
 
-def split_serie(serie):
-    len_serie = tf.shape(serie)[0]
-    padding = tf.zeros([len_serie, 1])
-    if len_serie % 2 != 0:
-        serie = tf.concat([serie,
-                           tf.zeros([1, tf.shape(serie)[-1]])
-                          ], 0)
+    sequence = tf.stack(casted_inp_parameters, axis=2)[0]
 
-        padding = tf.concat([tf.zeros([len_serie, 1]),
-                             tf.ones([1, 1])
-                            ], 0)
+    curr_max_obs = tf.minimum(input_dict['length'], max_obs)
 
-    serie_1, serie_2 = tf.split(serie, 2)
-    mask_1, mask_2   = tf.split(padding, 2)
+    seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
+    seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
+    seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
 
-    return serie_1, serie_2, mask_1, mask_2
+    seq1, seq2   = tf.split(seq_magn, 2, axis=0)
+    time1, time2 = tf.split(seq_time, 2, axis=0)
 
-def cut_serie(serie, max_obs, random_pivot=False):
-    size = tf.shape(serie)
-    if tf.less(max_obs, size[0]):
-        pivot = 0
-        if random_pivot:
-            pivot = tf.random.uniform(shape=[1],
-                                      minval=0,
-                                      maxval=int(size[0]-max_obs),
-                                      dtype=tf.dtypes.int32)[0]
+    # [MASK] values
+    mask_1 = get_masked(seq1, msk_prob)
+    mask_2 = get_masked(seq2, msk_prob)
 
-        serie = tf.slice(serie, [pivot,0], [max_obs,-1])
-        mask = tf.zeros([tf.shape(serie)[0], 1])
-    else:
-        serie = tf.concat([
-            serie,
-            tf.zeros([max_obs-size[0], size[-1]], dtype=tf.float32)
-        ], 0)
-        mask = tf.concat([
-            tf.zeros([size[0], 1]),
-            tf.ones([max_obs-size[0], 1])
-        ], 0)
+    # [MASK] -> Random value
+    seq1, mask_1 = set_random(seq1, mask_1, seq2, rnd_prob, name='set_random_1')
+    seq2, mask_2 = set_random(seq2, mask_2, seq1, rnd_prob, name='set_random_2')
 
-    return serie, mask
+    # [MASK] -> Same values
+    seq1, mask_1 = set_random(seq1, mask_1, seq1, same_prob, name='set_same_1')
+    seq2, mask_2 = set_random(seq2, mask_2, seq2, same_prob, name='set_same_2')
 
-def pretrain_input(seq_1, seq_2, nsp_prob, msk_frac, rnd_frac, same_frac,
-                    max_obs, clstkn=-99, septkn=-98):
-
-    inp_dim    = tf.shape(seq_1['input'])[-1]
-    clstkn     = tf.tile(tf.cast([[clstkn]], tf.float32), [1, inp_dim], name='cls_tkn')
-    septkn     = tf.tile(tf.cast([[septkn]], tf.float32), [1, inp_dim], name='sep_tkn')
-    msktkn     = tf.zeros([1], name='msk_tkn')
-    half_obs   = tf.math.ceil(tf.cast(max_obs, tf.int32)/2)
-    half_obs   = tf.cast(half_obs, tf.int32)
-    use_random = tf.random.categorical(tf.math.log([[1-nsp_prob, nsp_prob]]), 1)
-
-    serie_0, serie_1, m0, m1 = split_serie(seq_1['input'])
-    serie_0, pad_mask_0 = cut_serie(serie_0, half_obs)
-    m0 = tf.slice(m0, [0,0],[half_obs, -1])
-    serie_1, pad_mask_1 = cut_serie(serie_1, half_obs)
-    m1 = tf.slice(m1, [0,0],[half_obs, -1])
-    pad_mask_0 = tf.maximum(m0, pad_mask_0)
-    pad_mask_1 = tf.maximum(m1, pad_mask_1)
-
-    serie_2, pad_mask_2 = cut_serie(seq_2['input'], half_obs)
-
-    serie_0   = standardize(serie_0)
-    serie_1   = standardize(serie_1) # positive case
-    candidate = standardize(serie_2) # negative case
-
+    # Next Sentence Prediction
     is_random = tf.random.categorical(tf.math.log([[1-nsp_prob, nsp_prob]]), 1)
     is_random = tf.cast(is_random, tf.bool, name='isRandom')
+    original  = tf.concat([seq1, seq2], 0)
     if is_random:
-        serie_1 = candidate
+        noise = tf.random.normal(tf.shape(seq2),
+                                 mean=tf.reduce_mean(seq2),
+                                 stddev=tf.math.reduce_std(seq2))
+        serie = tf.concat([seq1, tf.random.shuffle(seq2) + noise], 0)
+    else:
+        serie  = tf.concat([seq1, seq2], 0)
 
-    mask_0 = get_masked(serie_0, msk_frac)
-    mask_1 = get_masked(serie_1, msk_frac)
+    time_steps = tf.shape(serie)[0]
+    times = tf.concat([time1, time2], 0)
 
-    serie_1, mask_1 = set_random(serie_0, mask_0, serie_1, rnd_frac, name='set_random')
-    serie_2, mask_2 = set_random(serie_1, mask_1, serie_0, rnd_frac, name='set_random')
+    mask = tf.concat([mask_1, mask_2], 0)
+    mask = tf.reshape(mask, [time_steps, 1])
 
-    serie_0, mask_0 = set_random(serie_0, mask_0, serie_0, same_frac, name='set_same')
-    serie_1, mask_1 = set_random(serie_1, mask_1, serie_1, same_frac, name='set_same')
+    input_dict['input']  = serie
+    input_dict['original']  = original
+    input_dict['times']  = times
+    input_dict['mask']   = mask
+    input_dict['length'] = time_steps
+    input_dict['label']  = tf.squeeze(tf.cast(is_random, tf.int32))
 
-    mask_0 = tf.maximum(tf.expand_dims(mask_0, 1), pad_mask_0)
-    mask_1 = tf.maximum(tf.expand_dims(mask_1, 1), pad_mask_1)
-
-    steps0      = tf.shape(serie_0)[0]
-    steps1      = tf.shape(serie_1)[0]
-    total_steps = steps0 + steps1
-    if  total_steps > max_obs:
-        rest = total_steps - max_obs
-        serie_1 = tf.slice(serie_1, [0,0],[steps1-rest, -1])
-        mask_1 = tf.slice(mask_1, [0,0],[steps1-rest, -1])
-
-    serie  = tf.concat([clstkn, serie_0, septkn, serie_1, septkn], 0)
-    mask   = tf.concat([[msktkn], mask_0, [msktkn], mask_1, [msktkn]], 0, name='inp_mask')
-    times = tf.slice(serie, [0, 0], [-1, 1], name='times')
-    input = tf.slice(serie, [0, 1], [-1, 1], name='input')
-
-    input_dic = {
-        'input': input,
-        'times': times,
-        'mask' : mask,
-        'label': tf.squeeze(tf.cast(is_random, tf.int32))
-    }
-
-    return input_dic
-
+    return input_dict
 
 def adjust_fn(func, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs):
     def wrap(*args, **kwargs):
@@ -285,19 +228,12 @@ def pretraining_records(source, batch_size, max_obs=100, nsp_prob=0.5, msk_prob=
     datasets = [os.path.join(source, folder, x) for folder in os.listdir(source) \
                 for x in os.listdir(os.path.join(source, folder))]
 
-    dataset_1 = tf.data.TFRecordDataset(datasets)
-    dataset_2 = tf.data.TFRecordDataset(datasets)
-
-    dataset_1 = dataset_1.map(_parse)
-    dataset_2 = dataset_2.map(_parse).shuffle(1000)
-
-    dataset = tf.data.Dataset.zip((dataset_1, dataset_2))
-
-    fn = adjust_fn(pretrain_input, nsp_prob,
+    dataset = tf.data.TFRecordDataset(datasets)
+    fn = adjust_fn(_parse_pt, nsp_prob,
                    msk_prob, rnd_prob, same_prob, max_obs)
 
-    dataset = dataset.map(fn)
-    dataset = dataset.batch(batch_size)
+    dataset = dataset.map(fn).cache()
+    dataset = dataset.padded_batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
     return dataset

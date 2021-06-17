@@ -10,6 +10,7 @@ from core.metrics   import custom_acc
 from core.encoder   import Encoder
 from core.decoder   import Decoder
 
+
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
 from tensorflow.keras.layers import Input, Dense
 from tensorflow.keras.optimizers import Adam
@@ -24,16 +25,24 @@ def get_ASTROMER(num_layers=2,
                  maxlen=100,
                  batch_size=None):
 
-    serie = Input(shape=(maxlen+3, 1),
-                  batch_size=batch_size,
+    serie  = Input(shape=(maxlen, 1),
+                  batch_size=None,
                   name='input')
-    times = Input(shape=(maxlen+3, 1),
-                  batch_size=batch_size,
+    times  = Input(shape=(maxlen, 1),
+                  batch_size=None,
                   name='times')
-    mask  = Input(shape=(maxlen+3, 1),
-                  batch_size=batch_size,
+    mask   = Input(shape=(maxlen, 1),
+                  batch_size=None,
                   name='mask')
-    placeholder = {'input':serie, 'mask':mask, 'times':times}
+    length = Input(shape=(maxlen,),
+                  batch_size=None,
+                  dtype=tf.int32,
+                  name='length')
+
+    placeholder = {'input':serie,
+                   'mask':mask,
+                   'times':times,
+                   'length':length}
 
     x = Encoder(num_layers,
                 d_model,
@@ -42,6 +51,7 @@ def get_ASTROMER(num_layers=2,
                 base=base,
                 rate=dropout,
                 name='encoder')(placeholder)
+
     x_cls, \
     x_reg = SplitLayer(name='split_z')(x)
     x_reg = RegLayer(name='regression')(x_reg)

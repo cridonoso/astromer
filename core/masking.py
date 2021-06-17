@@ -1,22 +1,22 @@
 import tensorflow as tf
 
-
+@tf.function
 def create_look_ahead_mask(size):
     mask = tf.math.subtract(1.,
                 tf.linalg.band_part(tf.ones((size, size)), -1, 0, name='LowerTriangular'),
                 name='LookaHeadMask')
     return mask  # (seq_len, seq_len)
 
-
-def get_padding_mask(tensor, lengths):
+@tf.function
+def get_padding_mask(steps, lengths):
     ''' Create mask given a tensor and true length '''
     with tf.name_scope("get_padding_mask") as scope:
         lengths_transposed = tf.expand_dims(lengths, 1, name='Lengths')
-        range_row = tf.expand_dims(tf.range(0, tf.shape(tensor)[1], 1), 0, name='Indices')
+        range_row = tf.expand_dims(tf.range(0, steps, 1), 0, name='Indices')
         # Use the logical operations to create a mask
         mask = tf.greater(range_row, lengths_transposed)
-        return tf.cast(mask, tf.bool, name='LengthMask')
-
+        return tf.cast(mask, tf.float32, name='LengthMask')
+@tf.function
 def get_masked(tensor, frac=0.15):
     """ Add [MASK] values to be predicted
     Args:
@@ -33,7 +33,7 @@ def get_masked(tensor, frac=0.15):
         mask = tf.reduce_sum(tf.one_hot(index, steps), 0)
         mask = tf.minimum(mask, tf.ones_like(mask))
         return mask
-
+@tf.function
 def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
     """ Add Random values in serie_1
     Note that if serie_2 == serie_1 then it replaces the true value
@@ -78,7 +78,7 @@ def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
         serie_1 = tf.add(serie_1, rand_vals)
 
         return serie_1, mask_1
-
+@tf.function
 def reshape_mask(mask):
     ''' Reshape Mask to match attention dimensionality '''
     with tf.name_scope("reshape_mask") as scope:

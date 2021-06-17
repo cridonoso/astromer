@@ -8,7 +8,6 @@ class RegLayer(Layer):
 		super().__init__(**kwargs)
 		self.reg_layer_0 = Dense(64, name='RegLayer_0')
 		self.reg_layer_1 = Dense(1, name='RegLayer_1')
-
 		self.bn_0 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 
 	def call(self, inputs):
