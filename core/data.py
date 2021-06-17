@@ -177,7 +177,7 @@ def _parse_pt(sample, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs):
 
     seq1, seq2   = tf.split(seq_magn, 2, axis=0)
     time1, time2 = tf.split(seq_time, 2, axis=0)
-
+    original  = tf.concat([seq1, seq2], 0)
     # [MASK] values
     mask_1 = get_masked(seq1, msk_prob)
     mask_2 = get_masked(seq2, msk_prob)
@@ -193,7 +193,7 @@ def _parse_pt(sample, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs):
     # Next Sentence Prediction
     is_random = tf.random.categorical(tf.math.log([[1-nsp_prob, nsp_prob]]), 1)
     is_random = tf.cast(is_random, tf.bool, name='isRandom')
-    original  = tf.concat([seq1, seq2], 0)
+
     if is_random:
         noise = tf.random.normal(tf.shape(seq2),
                                  mean=tf.reduce_mean(seq2),

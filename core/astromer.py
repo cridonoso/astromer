@@ -123,14 +123,14 @@ def train(model,
     # dim_model = model.get_layer('encoder').output.shape[-1]
     # learning_rate = CustomSchedule(dim_model)
 
-    lr_schedule = ExponentialDecay(lr,
-                                   decay_steps=epochs,
-                                   decay_rate=0.96)
-    optimizer = tf.keras.optimizers.SGD(lr_schedule)
-    # optimizer = tf.keras.optimizers.Adam(lr_schedule,
-    #                                      beta_1=0.9,
-    #                                      beta_2=0.98,
-    #                                      epsilon=1e-9)
+    # lr_schedule = ExponentialDecay(lr,
+    #                                decay_steps=epochs,
+    #                                decay_rate=0.96)
+    # optimizer = tf.keras.optimizers.SGD(lr_schedule)
+    optimizer = tf.keras.optimizers.Adam(lr,
+                                         beta_1=0.9,
+                                         beta_2=0.98,
+                                         epsilon=1e-9)
     # To save metrics
     train_loss = tf.keras.metrics.Mean(name='train_loss')
     valid_loss = tf.keras.metrics.Mean(name='valid_loss')
