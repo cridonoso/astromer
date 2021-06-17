@@ -73,7 +73,6 @@ class Encoder(tf.keras.layers.Layer):
         # x_pe = self.pe_emb(data['times'])
 
         x_transformed = self.inp_transform(data['input'])
-        # x_transformed = segment_embedding(x_transformed, data['segsep'])
 
         transformed_input = x_transformed + x_pe
         x = self.dropout(transformed_input, training=training)

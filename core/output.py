@@ -7,7 +7,7 @@ class RegLayer(Layer):
 	def __init__(self, **kwargs):
 		super().__init__(**kwargs)
 		self.reg_layer_0 = Dense(64, name='RegLayer_0')
-		self.reg_layer_1 = Dense(1, activation='tanh', name='RegLayer_1')
+		self.reg_layer_1 = Dense(1, name='RegLayer_1')
 
 		self.bn_0 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 
@@ -27,7 +27,7 @@ class ClfLayer(Layer):
 		self.bn_1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 
 		self.cls_layer_0 = Dense(64, name='CLFLayer_0')
-		self.cls_layer_1 = Dense(num_cls, activation='sigmoid', name='CLFLayer_1')
+		self.cls_layer_1 = Dense(num_cls, name='CLFLayer_1')
 
 	def call(self, inputs):
 		cls_prob = self.cls_layer_0(inputs)
