@@ -172,48 +172,37 @@ def _parse_pt(sample, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs):
     curr_max_obs = tf.minimum(input_dict['length'], max_obs)
 
     seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
+    seq_time = seq_time - tf.reduce_min(seq_time)
+
     seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
-    seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
+    seq_magn = standardize(seq_magn)
+    input_dict['original']  = seq_magn
+    # seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
 
-    seq1, seq2   = tf.split(seq_magn, 2, axis=0)
-    time1, time2 = tf.split(seq_time, 2, axis=0)
-    original  = tf.concat([seq1, seq2], 0)
     # [MASK] values
-    mask_1 = get_masked(seq1, msk_prob)
-    mask_2 = get_masked(seq2, msk_prob)
-
-    # [MASK] -> Random value
-    seq1, mask_1 = set_random(seq1, mask_1, seq2, rnd_prob, name='set_random_1')
-    seq2, mask_2 = set_random(seq2, mask_2, seq1, rnd_prob, name='set_random_2')
+    mask = get_masked(seq_magn, msk_prob)
 
     # [MASK] -> Same values
-    seq1, mask_1 = set_random(seq1, mask_1, seq1, same_prob, name='set_same_1')
-    seq2, mask_2 = set_random(seq2, mask_2, seq2, same_prob, name='set_same_2')
+    seq_magn, mask = set_random(seq_magn,
+                                mask,
+                                seq_magn,
+                                same_prob,
+                                name='set_same')
 
-    # Next Sentence Prediction
-    is_random = tf.random.categorical(tf.math.log([[1-nsp_prob, nsp_prob]]), 1)
-    is_random = tf.cast(is_random, tf.bool, name='isRandom')
+    # [MASK] -> Random value
+    seq_magn, mask = set_random(seq_magn,
+                                mask,
+                                tf.random.shuffle(seq_magn),
+                                rnd_prob,
+                                name='set_random')
 
-    if is_random:
-        noise = tf.random.normal(tf.shape(seq2),
-                                 mean=tf.reduce_mean(seq2),
-                                 stddev=tf.math.reduce_std(seq2))
-        serie = tf.concat([seq1, tf.random.shuffle(seq2) + noise], 0)
-    else:
-        serie  = tf.concat([seq1, seq2], 0)
+    time_steps = tf.shape(seq_magn)[0]
 
-    time_steps = tf.shape(serie)[0]
-    times = tf.concat([time1, time2], 0)
+    input_dict['input']  = seq_magn
 
-    mask = tf.concat([mask_1, mask_2], 0)
-    mask = tf.reshape(mask, [time_steps, 1])
-
-    input_dict['input']  = serie
-    input_dict['original']  = original
-    input_dict['times']  = times
-    input_dict['mask']   = mask
+    input_dict['times']  = seq_time
+    input_dict['mask']   = tf.reshape(mask, [time_steps, 1])
     input_dict['length'] = time_steps
-    input_dict['label']  = tf.squeeze(tf.cast(is_random, tf.int32))
 
     return input_dict
 

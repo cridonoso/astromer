@@ -52,49 +52,36 @@ def get_ASTROMER(num_layers=2,
                 rate=dropout,
                 name='encoder')(placeholder)
 
-    x_cls, \
-    x_reg = SplitLayer(name='split_z')(x)
-    x_reg = RegLayer(name='regression')(x_reg)
-    x_cls = tf.reshape(x_cls, [-1, d_model])
-    x_cls = ClfLayer(name='classification')(x_cls)
+    x = RegLayer(name='regression')(x)
 
     return Model(inputs=placeholder,
-                 outputs=(x_reg, x_cls),
+                 outputs=x,
                  name="ASTROMER")
 
 @tf.function
 def train_step(model, batch, opt):
     with tf.GradientTape() as tape:
-        x_pred, y_pred = model(batch)
+        x_pred = model(batch)
         mse = custom_mse(y_true=batch['input'],
                          y_pred=x_pred,
                          mask=batch['mask'])
 
-        bce = custom_bce(y_true=batch['label'],
-                         y_pred=y_pred)
-        loss = bce + mse
-        acc = custom_acc(batch['label'], y_pred)
 
-    grads = tape.gradient(loss, model.trainable_weights)
+    grads = tape.gradient(mse, model.trainable_weights)
     opt.apply_gradients(zip(grads, model.trainable_weights))
-    return loss, acc, bce, mse
+    return mse
 
 @tf.function
 def valid_step(model, batch, return_pred=False):
     with tf.GradientTape() as tape:
-        x_pred, y_pred = model(batch)
+        x_pred = model(batch)
 
         mse = custom_mse(y_true=batch['input'],
                          y_pred=x_pred,
                          mask=batch['mask'])
-        bce = custom_bce(y_true=batch['label'],
-                         y_pred=y_pred)
-
-        loss = bce + mse
-        acc = custom_acc(batch['label'], y_pred)
     if return_pred:
-        return loss, acc, bce, mse, x_pred, y_pred, batch['input'], batch['label']
-    return loss, acc, bce, mse
+        return 0, 0, 0, mse, x_pred, 0, batch['input'], 0
+    return mse
 
 def train(model,
           train_dataset,
@@ -120,68 +107,37 @@ def train(model,
     draw_graph(model, batch, train_writter, exp_path)
 
     # Optimizer
-    # dim_model = model.get_layer('encoder').output.shape[-1]
-    # learning_rate = CustomSchedule(dim_model)
-
-    # lr_schedule = ExponentialDecay(lr,
-    #                                decay_steps=epochs,
-    #                                decay_rate=0.96)
-    # optimizer = tf.keras.optimizers.SGD(lr_schedule)
     optimizer = tf.keras.optimizers.Adam(lr,
                                          beta_1=0.9,
                                          beta_2=0.98,
                                          epsilon=1e-9)
     # To save metrics
-    train_loss = tf.keras.metrics.Mean(name='train_loss')
-    valid_loss = tf.keras.metrics.Mean(name='valid_loss')
     train_mse  = tf.keras.metrics.Mean(name='train_mse')
     valid_mse  = tf.keras.metrics.Mean(name='valid_mse')
-    train_bce  = tf.keras.metrics.Mean(name='train_bce')
-    valid_bce  = tf.keras.metrics.Mean(name='valid_bce')
-    train_acc  = tf.keras.metrics.Mean(name='train_acc')
-    valid_acc  = tf.keras.metrics.Mean(name='valid_acc')
 
     # Training Loop
     best_loss = 999999.
     es_count = 0
     for epoch in range(epochs):
         for step, train_batch in tqdm(enumerate(train_dataset), desc='train'):
-            loss, acc, bce, mse = train_step(model, train_batch, optimizer)
-            train_loss.update_state(loss)
-            train_acc.update_state(acc)
-            train_bce.update_state(bce)
+            mse = train_step(model, train_batch, optimizer)
             train_mse.update_state(mse)
 
         for valid_batch in tqdm(valid_dataset, desc='validation'):
-            loss, acc, bce, mse = valid_step(model, valid_batch)
-            valid_loss.update_state(loss)
-            valid_acc.update_state(acc)
-            valid_bce.update_state(bce)
+            mse = valid_step(model, valid_batch)
             valid_mse.update_state(mse)
 
-        save_scalar(train_writter, train_loss, epoch, name='loss')
-        save_scalar(valid_writter, valid_loss, epoch, name='loss')
-        save_scalar(train_writter, train_acc, epoch, name='accuracy')
-        save_scalar(valid_writter, valid_acc, epoch, name='accuracy')
         save_scalar(train_writter, train_mse, epoch, name='mse')
         save_scalar(valid_writter, valid_mse, epoch, name='mse')
-        save_scalar(train_writter, train_bce, epoch, name='bce')
-        save_scalar(valid_writter, valid_bce, epoch, name='bce')
+
 
         if verbose == 0:
             print('EPOCH {} - ES COUNT: {}'.format(epoch, es_count))
-            print('train loss: {:.2f} - train acc: {:.2f} - train ce: {:.2f}, train mse: {:.4f}'.format(train_loss.result(),
-                                                                                                        train_acc.result(),
-                                                                                                        train_bce.result(),
-                                                                                                        train_mse.result(),
-                                                                                                        ))
-            print('val loss: {:.2f} - val acc: {:.2f} - val ce: {:.2f}, val mse: {:.4f}'.format(valid_loss.result(),
-                                                                                                        valid_acc.result(),
-                                                                                                        valid_bce.result(),
-                                                                                                        valid_mse.result(),
-                                                                                                        ))
-        if valid_loss.result() < best_loss:
-            best_loss = valid_loss.result()
+            print('train mse: {:.2f} - val mse: {:.2f}'.format(train_mse.result(),
+                                                               valid_mse.result()))
+
+        if valid_mse.result() < best_loss:
+            best_loss = valid_mse.result()
             es_count = 0.
             model.save_weights(exp_path+'/weights')
         else:
@@ -189,15 +145,6 @@ def train(model,
         if es_count == patience:
             print('[INFO] Early Stopping Triggered')
             break
-
-        valid_loss.reset_states()
-        train_loss.reset_states()
-
-        train_acc.reset_states()
-        valid_acc.reset_states()
-
-        train_bce.reset_states()
-        valid_bce.reset_states()
 
         train_mse.reset_states()
         valid_mse.reset_states()

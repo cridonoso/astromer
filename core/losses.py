@@ -6,22 +6,12 @@ from tensorflow.nn import (sigmoid_cross_entropy_with_logits,
 @tf.function
 def custom_mse(y_true, y_pred, septkn=-98, sample_weight=None, mask=None):
     inp_shp = tf.shape(y_true)
-    sep_tkn = tf.cast([[[septkn]]], dtype=tf.float32)
-    sep_tkn = tf.tile(sep_tkn, [inp_shp[0], 1, inp_shp[-1]])
-    mask_tkn = tf.cast([[[1.]]], dtype=tf.float32)
-    mask_tkn = tf.tile(mask_tkn, [inp_shp[0], 1, 1])
-
-    yt1, yt2 = tf.split(y_true, 2, 1)
-    y_true = tf.concat([yt1, sep_tkn, yt2, sep_tkn], 1)
-
     mse = tf.square(y_true - y_pred)
 
     if sample_weight is not None:
         mse = tf.multiply(mse, sample_weight)
 
     if mask is not None:
-        m1, m2 = tf.split(mask, 2, 1)
-        mask = tf.concat([m1, mask_tkn, m2, mask_tkn], 1)
         mse = tf.multiply(mse, mask)
 
     mse = tf.reduce_sum(mse, 1)

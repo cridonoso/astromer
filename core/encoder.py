@@ -67,14 +67,13 @@ class Encoder(tf.keras.layers.Layer):
 
         # self.pe_emb = ShuklaEmbedding(dim_model=d_model)
     def call(self, data, training=False):
-        input, times, inp_mask = input_format(data)
         # Reshape MASK
-        mask = reshape_mask(inp_mask) # batch x 1 x seq_len x seq_len
+        mask = reshape_mask(data['mask']) # batch x 1 x seq_len x seq_len
         # adding embedding and position encoding.
-        x_pe = positional_encoding(times, self.d_model, mjd=True)
+        x_pe = positional_encoding(data['times'], self.d_model, mjd=True)
         # x_pe = self.pe_emb(data['times'])
 
-        x_transformed = self.inp_transform(input)
+        x_transformed = self.inp_transform(data['input'])
 
         transformed_input = x_transformed + x_pe
         x = self.dropout(transformed_input, training=training)
