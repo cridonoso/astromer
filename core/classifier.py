@@ -2,6 +2,7 @@ import tensorflow as tf
 import json
 import os
 
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 from tensorflow.keras.layers import LSTM, Dense, LayerNormalization
 from tensorflow.keras.layers import Input, Dense
 from tensorflow.keras import Model
@@ -164,3 +165,39 @@ def train(model,
         train_bce.reset_states()
         train_acc.reset_states()
         valid_acc.reset_states()
+
+def predict(model, test_batches):
+    predictions = []
+    true_labels = []
+    for batch in tqdm(test_batches, desc='test'):
+        acc, ce, y_pred, y_true = valid_step(model, batch, return_pred=True)
+        if len(y_pred.shape)>2:
+            predictions.append(y_pred[:, -1, :])
+        else:
+            predictions.append(y_pred)
+
+        true_labels.append(y_true)
+
+    y_pred = tf.concat(predictions, 0)
+    y_true = tf.concat(true_labels, 0)
+    pred_labels = tf.argmax(y_pred, 1)
+
+    precision, \
+    recall, \
+    f1, _ = precision_recall_fscore_support(y_true,
+                                            pred_labels,
+                                            average='macro')
+    acc = accuracy_score(y_true, pred_labels)
+    results = {'f1': f1,
+               'recall': recall,
+               'precision': precision,
+               'accuracy':acc}
+
+    # os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
+    # results_file = os.path.join(opt.p, 'test', 'test_results.json')
+    # with open(results_file, 'w') as json_file:
+    #     json.dump(results, json_file, indent=4)
+    #
+    # h5f = h5py.File(os.path.join(opt.p, 'test', 'predictions.h5'), 'w')
+    # h5f.create_dataset('y_pred', data=y_pred.numpy())
+    # h5f.create_dataset('y_true', data=y_true.numpy())
