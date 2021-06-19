@@ -137,6 +137,63 @@ def normalize(tensor, axis=0):
                                    max_value - min_value)
     return normed
 
+def get_delta(tensor):
+    tensor = tensor[1:] - tensor[:-1]
+    tensor = tf.concat([tf.expand_dims([0.], 1), tensor], 0)
+    return tensor
+    
+def _parse_normal(sample, max_obs):
+    '''
+    Pretraining parser
+    '''
+    context_features = {'label': tf.io.FixedLenFeature([],dtype=tf.int64),
+                        'length': tf.io.FixedLenFeature([],dtype=tf.int64),
+                        'id': tf.io.FixedLenFeature([], dtype=tf.string)}
+    sequence_features = dict()
+    for i in range(3):
+        sequence_features['dim_{}'.format(i)] = tf.io.VarLenFeature(dtype=tf.float32)
+
+    context, sequence = tf.io.parse_single_sequence_example(
+                            serialized=sample,
+                            context_features=context_features,
+                            sequence_features=sequence_features
+                            )
+
+    input_dict = dict()
+    input_dict['lcid']   = tf.cast(context['id'], tf.string)
+    input_dict['length'] = tf.cast(context['length'], tf.int32)
+    input_dict['label']  = tf.cast(context['label'], tf.int32)
+
+    casted_inp_parameters = []
+    for i in range(3):
+        seq_dim = sequence['dim_{}'.format(i)]
+        seq_dim = tf.sparse.to_dense(seq_dim)
+        seq_dim = tf.cast(seq_dim, tf.float32)
+        casted_inp_parameters.append(seq_dim)
+
+
+    sequence = tf.stack(casted_inp_parameters, axis=2)[0]
+
+    curr_max_obs = tf.minimum(input_dict['length'], max_obs)
+
+    seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
+    seq_time = seq_time - tf.reduce_min(seq_time)
+
+    seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
+    seq_magn = standardize(seq_magn)
+
+    # seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
+
+    time_steps = tf.shape(seq_magn)[0]
+    mask = get_padding_mask(max_obs, tf.expand_dims(input_dict['length'], 0))
+
+    input_dict['input']  = seq_magn
+    input_dict['times']  = seq_time
+    input_dict['mask']   = tf.transpose(mask)
+    input_dict['length'] = time_steps
+
+    return input_dict
+
 def _parse_pt(sample, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs):
     '''
     Pretraining parser
@@ -199,7 +256,6 @@ def _parse_pt(sample, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs):
     time_steps = tf.shape(seq_magn)[0]
 
     input_dict['input']  = seq_magn
-
     input_dict['times']  = seq_time
     input_dict['mask']   = tf.reshape(mask, [time_steps, 1])
     input_dict['length'] = time_steps
@@ -212,6 +268,12 @@ def adjust_fn(func, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs):
         return result
     return wrap
 
+def adjust_fn_clf(func, max_obs):
+    def wrap(*args, **kwargs):
+        result = func(*args, max_obs)
+        return result
+    return wrap
+
 def pretraining_records(source, batch_size, max_obs=100, nsp_prob=0.5, msk_prob=0.2, rnd_prob=0.1, same_prob=0.1):
 
     datasets = [os.path.join(source, folder, x) for folder in os.listdir(source) \
@@ -220,6 +282,20 @@ def pretraining_records(source, batch_size, max_obs=100, nsp_prob=0.5, msk_prob=
     dataset = tf.data.TFRecordDataset(datasets)
     fn = adjust_fn(_parse_pt, nsp_prob,
                    msk_prob, rnd_prob, same_prob, max_obs)
+
+    dataset = dataset.map(fn).cache()
+    dataset = dataset.padded_batch(batch_size)
+    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+
+    return dataset
+
+def clf_records(source, batch_size, max_obs=100):
+
+    datasets = [os.path.join(source, folder, x) for folder in os.listdir(source) \
+                for x in os.listdir(os.path.join(source, folder))]
+
+    dataset = tf.data.TFRecordDataset(datasets)
+    fn = adjust_fn_clf(_parse_normal, max_obs)
 
     dataset = dataset.map(fn).cache()
     dataset = dataset.padded_batch(batch_size)
