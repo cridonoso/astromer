@@ -39,7 +39,8 @@ def run(opt):
     # Loading data
     train_batches = pretraining_records(os.path.join(opt.data, 'train'),
                                         opt.batch_size,
-                                        max_obs=opt.max_obs)
+                                        max_obs=opt.max_obs,
+                                        repeat=opt.repeat)
     valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
                                         opt.batch_size,
                                         max_obs=opt.max_obs)

@@ -192,6 +192,8 @@ def predict(model, test_batches):
                'recall': recall,
                'precision': precision,
                'accuracy':acc}
+               
+    return results, y_true, pred_labels
 
     # os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
     # results_file = os.path.join(opt.p, 'test', 'test_results.json')

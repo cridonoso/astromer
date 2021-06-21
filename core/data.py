@@ -141,7 +141,7 @@ def get_delta(tensor):
     tensor = tensor[1:] - tensor[:-1]
     tensor = tf.concat([tf.expand_dims([0.], 1), tensor], 0)
     return tensor
-    
+
 def _parse_normal(sample, max_obs):
     '''
     Pretraining parser
@@ -174,11 +174,23 @@ def _parse_normal(sample, max_obs):
 
     sequence = tf.stack(casted_inp_parameters, axis=2)[0]
 
-    curr_max_obs = tf.minimum(input_dict['length'], max_obs)
+    serie_len = tf.shape(input_serie)[0]
+    curr_max_obs = tf.minimum(serie_len, max_obs)
+    pivot = 0
+    if tf.greater(serie_len, max_obs):
+        pivot = tf.random.uniform([],
+                                  minval=0,
+                                  maxval=serie_len-curr_max_obs,
+                                  dtype=tf.int32)
+
+        sequence = tf.slice(sequence, [pivot,0], [curr_max_obs, -1])
+        input_dict['length'] = curr_max_obs
+    else:
+        sequence = tf.slice(sequence, [0,0], [curr_max_obs, -1])
+        input_dict['length'] = curr_max_obs
+
 
     seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
-    seq_time = seq_time - tf.reduce_min(seq_time)
-
     seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
     seq_magn = standardize(seq_magn)
 
@@ -274,7 +286,7 @@ def adjust_fn_clf(func, max_obs):
         return result
     return wrap
 
-def pretraining_records(source, batch_size, max_obs=100, nsp_prob=0.5, msk_prob=0.2, rnd_prob=0.1, same_prob=0.1):
+def pretraining_records(source, batch_size, repeat=1, max_obs=100, nsp_prob=0.5, msk_prob=0.2, rnd_prob=0.1, same_prob=0.1):
 
     datasets = [os.path.join(source, folder, x) for folder in os.listdir(source) \
                 for x in os.listdir(os.path.join(source, folder))]
@@ -283,13 +295,13 @@ def pretraining_records(source, batch_size, max_obs=100, nsp_prob=0.5, msk_prob=
     fn = adjust_fn(_parse_pt, nsp_prob,
                    msk_prob, rnd_prob, same_prob, max_obs)
 
-    dataset = dataset.map(fn).cache()
+    dataset = dataset.repeat(repeat).map(fn).cache()
     dataset = dataset.padded_batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
     return dataset
 
-def clf_records(source, batch_size, max_obs=100):
+def clf_records(source, batch_size, max_obs=100, repeat=1):
 
     datasets = [os.path.join(source, folder, x) for folder in os.listdir(source) \
                 for x in os.listdir(os.path.join(source, folder))]
@@ -297,7 +309,7 @@ def clf_records(source, batch_size, max_obs=100):
     dataset = tf.data.TFRecordDataset(datasets)
     fn = adjust_fn_clf(_parse_normal, max_obs)
 
-    dataset = dataset.map(fn).cache()
+    dataset = dataset.repeat(repeat).map(fn).cache()
     dataset = dataset.padded_batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
