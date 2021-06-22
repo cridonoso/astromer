@@ -191,7 +191,7 @@ def _parse_normal(sample, max_obs):
 
     seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
     seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
-    seq_magn = standardize(seq_magn)
+    # seq_magn = standardize(seq_magn)
 
     # seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
 
@@ -255,7 +255,7 @@ def _parse_pt(sample, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs):
 
     seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
     seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
-    seq_magn = standardize(seq_magn)
+    # seq_magn = standardize(seq_magn)
     # seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
 
     # [MASK] values
@@ -296,14 +296,14 @@ def adjust_fn_clf(func, max_obs):
         return result
     return wrap
 
-def pretraining_records(source, batch_size, repeat=1, max_obs=100, nsp_prob=0.5, msk_prob=0.2, rnd_prob=0.1, same_prob=0.1):
+def pretraining_records(source, batch_size, repeat=1, max_obs=100, nsp_prob=0.5, msk_frac=0.2, rnd_frac=0.1, same_frac=0.1):
 
     datasets = [os.path.join(source, folder, x) for folder in os.listdir(source) \
                 for x in os.listdir(os.path.join(source, folder))]
 
     dataset = tf.data.TFRecordDataset(datasets)
     fn = adjust_fn(_parse_pt, nsp_prob,
-                   msk_prob, rnd_prob, same_prob, max_obs)
+                   msk_frac, rnd_frac, same_frac, max_obs)
 
     dataset = dataset.repeat(repeat).map(fn).cache()
     dataset = dataset.padded_batch(batch_size)

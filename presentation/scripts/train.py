@@ -40,10 +40,16 @@ def run(opt):
     train_batches = pretraining_records(os.path.join(opt.data, 'train'),
                                         opt.batch_size,
                                         max_obs=opt.max_obs,
-                                        repeat=opt.repeat)
+                                        repeat=opt.repeat,
+                                        msk_frac=opt.msk_frac,
+                                        rnd_frac=opt.rnd_frac,
+                                        same_frac=opt.same_frac)
     valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
                                         opt.batch_size,
-                                        max_obs=opt.max_obs)
+                                        max_obs=opt.max_obs,
+                                        msk_frac=opt.msk_frac,
+                                        rnd_frac=opt.rnd_frac,
+                                        same_frac=opt.same_frac)
 
     # Training ASTROMER
     train(astromer, train_batches, valid_batches,
@@ -61,6 +67,13 @@ if __name__ == '__main__':
     # DATA
     parser.add_argument('--max-obs', default=50, type=int,
                     help='Max number of observations')
+    parser.add_argument('--msk-frac', default=0.2, type=float,
+                        help='[MASKED] fraction')
+    parser.add_argument('--rnd-frac', default=0.15, type=float,
+                        help='Fraction of [MASKED] to be replaced by random values')
+    parser.add_argument('--same-frac', default=0.15, type=float,
+                        help='Fraction of [MASKED] to be replaced by same values')
+
     # TRAINING PAREMETERS
     parser.add_argument('--data', default='./data/records/macho', type=str,
                         help='Dataset folder containing the records files')
@@ -91,5 +104,4 @@ if __name__ == '__main__':
                         help='optimizer initial learning rate')
 
     opt = parser.parse_args()
-    # opt.head_dim = (opt.max_obs + 3)*opt.heads
     run(opt)
