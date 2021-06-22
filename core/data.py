@@ -171,10 +171,9 @@ def _parse_normal(sample, max_obs):
         seq_dim = tf.cast(seq_dim, tf.float32)
         casted_inp_parameters.append(seq_dim)
 
-
     sequence = tf.stack(casted_inp_parameters, axis=2)[0]
 
-    serie_len = tf.shape(input_serie)[0]
+    serie_len = tf.shape(sequence)[0]
     curr_max_obs = tf.minimum(serie_len, max_obs)
     pivot = 0
     if tf.greater(serie_len, max_obs):
@@ -238,14 +237,25 @@ def _parse_pt(sample, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs):
 
     sequence = tf.stack(casted_inp_parameters, axis=2)[0]
 
-    curr_max_obs = tf.minimum(input_dict['length'], max_obs)
+    serie_len = tf.shape(sequence)[0]
+    curr_max_obs = tf.minimum(serie_len, max_obs)
+    pivot = 0
+    if tf.greater(serie_len, max_obs):
+        pivot = tf.random.uniform([],
+                                  minval=0,
+                                  maxval=serie_len-curr_max_obs,
+                                  dtype=tf.int32)
+
+        sequence = tf.slice(sequence, [pivot,0], [curr_max_obs, -1])
+        input_dict['length'] = curr_max_obs
+    else:
+        sequence = tf.slice(sequence, [0,0], [curr_max_obs, -1])
+        input_dict['length'] = curr_max_obs
+
 
     seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
-    seq_time = seq_time - tf.reduce_min(seq_time)
-
     seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
     seq_magn = standardize(seq_magn)
-    input_dict['original']  = seq_magn
     # seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
 
     # [MASK] values

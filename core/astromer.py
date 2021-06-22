@@ -171,8 +171,6 @@ def predict(model,
         reconstructions.append(x_pred)
 
     y_pred = tf.concat(preds, 0)
-    if not predic_proba:
-        y_pred = tf.argmax(y_pred, 1)
 
     res = {'loss':tf.reduce_mean(total_loss).numpy(),
            'acc':tf.reduce_mean(total_acc).numpy(),
