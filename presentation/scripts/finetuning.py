@@ -53,12 +53,12 @@ def run(opt):
         # Save Hyperparameters
         conf_file = os.path.join(opt.p, 'conf.json')
         varsdic = vars(opt)
-        print(varsdic)
+
         for key in conf.keys():
             if key in ['batch_size', 'p', 'repeat', 'data']:
                 continue
             varsdic[key] = conf[key]
-        print(varsdic)
+
         varsdic['exp_date'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
         with open(conf_file, 'w') as json_file:
             json.dump(varsdic, json_file, indent=4)
