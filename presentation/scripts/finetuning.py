@@ -53,6 +53,12 @@ def run(opt):
         # Save Hyperparameters
         conf_file = os.path.join(opt.p, 'conf.json')
         varsdic = vars(opt)
+        print(varsdic)
+        for key in conf.keys():
+            if key in ['batch_size', 'p', 'repeat', 'data']:
+                continue
+            varsdic[key] = conf[key]
+        print(varsdic)
         varsdic['exp_date'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
         with open(conf_file, 'w') as json_file:
             json.dump(varsdic, json_file, indent=4)
@@ -60,17 +66,17 @@ def run(opt):
         # Loading data
         train_batches = pretraining_records(os.path.join(opt.data, 'train'),
                                             opt.batch_size,
-                                            max_obs=opt.max_obs,
+                                            max_obs=conf['max_obs'],
                                             repeat=opt.repeat,
-                                            msk_frac=opt.msk_frac,
-                                            rnd_frac=opt.rnd_frac,
-                                            same_frac=opt.same_frac)
+                                            msk_frac=conf['msk_frac'],
+                                            rnd_frac=conf['rnd_frac'],
+                                            same_frac=conf['same_frac'])
         valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
                                             opt.batch_size,
-                                            max_obs=opt.max_obs,
-                                            msk_frac=opt.msk_frac,
-                                            rnd_frac=opt.rnd_frac,
-                                            same_frac=opt.same_frac)
+                                            max_obs=conf['max_obs'],
+                                            msk_frac=conf['msk_frac'],
+                                            rnd_frac=conf['rnd_frac'],
+                                            same_frac=conf['same_frac'])
         # Training ASTROMER
         train(astromer, train_batches, valid_batches,
               patience=opt.patience,
