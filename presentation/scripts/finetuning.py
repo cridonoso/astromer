@@ -60,11 +60,17 @@ def run(opt):
         # Loading data
         train_batches = pretraining_records(os.path.join(opt.data, 'train'),
                                             opt.batch_size,
-                                            max_obs=opt.max_obs)
+                                            max_obs=opt.max_obs,
+                                            repeat=opt.repeat,
+                                            msk_frac=opt.msk_frac,
+                                            rnd_frac=opt.rnd_frac,
+                                            same_frac=opt.same_frac)
         valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
                                             opt.batch_size,
-                                            max_obs=opt.max_obs)
-
+                                            max_obs=opt.max_obs,
+                                            msk_frac=opt.msk_frac,
+                                            rnd_frac=opt.rnd_frac,
+                                            same_frac=opt.same_frac)
         # Training ASTROMER
         train(astromer, train_batches, valid_batches,
               patience=opt.patience,
