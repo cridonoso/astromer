@@ -121,8 +121,10 @@ def standardize(tensor, axis=0):
         mean_value = tf.expand_dims(mean_value, axis)
         std_value = tf.expand_dims(std_value, axis)
 
-    normed = tf.math.divide_no_nan(tensor - mean_value,
-                                   std_value)
+    # normed = tf.math.divide_no_nan(tensor - mean_value,
+    #                                std_value)
+    normed = tensor - mean_value
+
     return normed
 
 def normalize(tensor, axis=0):

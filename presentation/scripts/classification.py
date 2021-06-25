@@ -19,6 +19,7 @@ def run(opt):
     # Loading data
     train_batches = clf_records(os.path.join(opt.data, 'train'),
                                 opt.batch_size,
+                                repeat=opt.repeat,
                                 max_obs=opt.max_obs)
     valid_batches = clf_records(os.path.join(opt.data, 'val'),
                                 opt.batch_size,
@@ -52,6 +53,7 @@ def run(opt):
     with open(conf_file, 'w') as json_file:
         json.dump(varsdic, json_file, indent=4)
 
+
     # Training ASTROMER
     train(clf, train_batches, valid_batches,
           patience=opt.patience,
@@ -64,7 +66,7 @@ def run(opt):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # DATA
-    parser.add_argument('--max-obs', default=50, type=int,
+    parser.add_argument('--max-obs', default=200, type=int,
                     help='Max number of observations')
     # ASTROMER
     parser.add_argument('--w', default="./runs/lr_1e-5", type=str,
@@ -86,11 +88,10 @@ if __name__ == '__main__':
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
     # RNN HIPERPARAMETERS
-    parser.add_argument('--units', default=32, type=int,
+    parser.add_argument('--units', default=128, type=int,
                         help='number of units for the RNN')
-    parser.add_argument('--dropout', default=0.1 , type=float,
+    parser.add_argument('--dropout', default=0.5 , type=float,
                         help='dropout_rate for the encoder')
-
     parser.add_argument('--use-att', default=False, action='store_true',
                         help='Use attention as the RNN input')
 
