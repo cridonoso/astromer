@@ -193,7 +193,6 @@ def sample_lc(sequence, max_obs):
     else:
         sequence = tf.slice(sequence, [0,0], [curr_max_obs, -1])
 
-    sequence = standardize(sequence, 1)
     return sequence, curr_max_obs
 
 def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
@@ -204,6 +203,7 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
     input_dict = get_sample(sample)
 
     sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
+    sequence = standardize(sequence)
 
     seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
     seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
@@ -246,7 +246,8 @@ def _parse_normal(sample, max_obs):
     input_dict = get_sample(sample)
 
     sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
-
+    sequence = standardize(sequence)
+    
     seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
     seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
     seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
