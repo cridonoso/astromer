@@ -192,6 +192,8 @@ def sample_lc(sequence, max_obs):
         sequence = tf.slice(sequence, [pivot,0], [curr_max_obs, -1])
     else:
         sequence = tf.slice(sequence, [0,0], [curr_max_obs, -1])
+
+    sequence = standardize(sequence, 1)
     return sequence, curr_max_obs
 
 def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
