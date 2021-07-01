@@ -117,7 +117,7 @@ def standardize(tensor, axis=0):
     mean_value = tf.reduce_mean(tensor, axis, name='mean_value')
     std_value = tf.math.reduce_std(tensor, axis, name='std_value')
 
-    if len(tf.shape(tensor))>2:
+    if axis == 1:
         mean_value = tf.expand_dims(mean_value, axis)
         std_value = tf.expand_dims(std_value, axis)
 
