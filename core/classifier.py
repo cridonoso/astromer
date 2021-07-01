@@ -42,7 +42,7 @@ def get_lstm_no_attention(units, num_classes, maxlen, dropout=0.5):
 
     x = tf.concat([placeholder['times'], placeholder['input']], 2)
 
-    x = standardize(x, axis=1)
+    # x = standardize(x, axis=1)
 
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(x, mask=bool_mask)
@@ -75,7 +75,7 @@ def get_lstm_attention(units, num_classes, weigths, dropout=0.5):
     bool_mask = tf.logical_not(tf.cast(encoder.input['mask'], tf.bool))
 
     x = encoder(encoder.input)
-    x = standardize(x, axis=1)
+    # x = standardize(x, axis=1)
 
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(x, mask=bool_mask)

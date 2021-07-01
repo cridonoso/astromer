@@ -40,7 +40,7 @@ def get_ASTROMER(num_layers=2,
                   name='length')
 
     placeholder = {'input':serie,
-                   'mask':mask,
+                   'mask_in':mask,
                    'times':times,
                    'length':length}
 
@@ -64,7 +64,7 @@ def train_step(model, batch, opt):
         x_pred = model(batch)
         mse = custom_mse(y_true=batch['input'],
                          y_pred=x_pred,
-                         mask=batch['mask'])
+                         mask=batch['mask_out'])
 
 
     grads = tape.gradient(mse, model.trainable_weights)
@@ -78,7 +78,7 @@ def valid_step(model, batch, return_pred=False):
 
         mse = custom_mse(y_true=batch['input'],
                          y_pred=x_pred,
-                         mask=batch['mask'])
+                         mask=batch['mask_out'])
     if return_pred:
         return 0, 0, 0, mse, x_pred, 0, batch['input'], 0
     return mse

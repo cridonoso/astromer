@@ -16,6 +16,7 @@ def get_padding_mask(steps, lengths):
         # Use the logical operations to create a mask
         mask = tf.greater(range_row, lengths_transposed)
         return tf.cast(mask, tf.float32, name='LengthMask')
+
 @tf.function
 def get_masked(tensor, frac=0.15):
     """ Add [MASK] values to be predicted
@@ -29,10 +30,14 @@ def get_masked(tensor, frac=0.15):
         steps = tf.shape(tensor)[0] # time steps
         nmask = tf.multiply(tf.cast(steps, tf.float32), frac)
         nmask = tf.cast(nmask, tf.int32, name='nmask')
-        index = tf.random.uniform([nmask], minval=0, maxval=steps, dtype=tf.int32)
+        if frac == 1.:
+            index = tf.range(nmask)
+        else:
+            index = tf.random.uniform([nmask], minval=0, maxval=steps, dtype=tf.int32)
         mask = tf.reduce_sum(tf.one_hot(index, steps), 0)
         mask = tf.minimum(mask, tf.ones_like(mask))
         return mask
+
 @tf.function
 def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
     """ Add Random values in serie_1
@@ -52,11 +57,11 @@ def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
         nrandom = tf.cast(tf.math.ceil(nrandom), tf.int32)
 
         mask_indices = tf.where(mask_1)
-        index = tf.random.uniform([nrandom],
-                                  minval=0,
-                                  maxval=tf.cast(nmasked, tf.int32),
-                                  dtype=tf.int32)
-        rand_mask = tf.one_hot(index, tf.shape(mask_1)[0])
+        mask_indices = tf.random.shuffle(mask_indices)
+        mask_indices = tf.reshape(mask_indices, [-1])
+        mask_indices = tf.slice(mask_indices, [0], [nrandom])
+
+        rand_mask = tf.one_hot(mask_indices, tf.shape(mask_1)[0])
         rand_mask = tf.reduce_sum(rand_mask, 0)
         rand_mask = tf.minimum(rand_mask, tf.ones_like(rand_mask))
         rand_mask = tf.expand_dims(rand_mask, 1)
@@ -78,6 +83,7 @@ def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
         serie_1 = tf.add(serie_1, rand_vals)
 
         return serie_1, mask_1
+
 @tf.function
 def reshape_mask(mask):
     ''' Reshape Mask to match attention dimensionality '''

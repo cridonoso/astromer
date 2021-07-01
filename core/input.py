@@ -27,7 +27,7 @@ def input_format(batch, clstkn=-99, septkn=-98):
 	mask_tkn = tf.cast([[[0]]], dtype=tf.float32)
 	mask_tkn = tf.tile(mask_tkn, [inp_shp[0], 1, 1])
 
-	mask = batch['mask'] + padd
+	mask = batch['mask_in'] + padd
 	m1, m2 = tf.split(mask, 2, 1)
 
 	inputs = tf.concat([cls_tkn, x1, sep_tkn, x2, sep_tkn], 1)
