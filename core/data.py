@@ -247,7 +247,7 @@ def _parse_normal(sample, max_obs):
 
     sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
     sequence = standardize(sequence)
-    
+
     seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
     seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
     seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
@@ -258,7 +258,8 @@ def _parse_normal(sample, max_obs):
     input_dict['input']  = seq_magn
     input_dict['times']  = seq_time
     input_dict['obserr']  = seq_errs
-    input_dict['mask']   = tf.transpose(mask)
+    input_dict['mask_in']   = tf.transpose(mask)
+    input_dict['mask_out']   = tf.transpose(mask)
     input_dict['length'] = time_steps
     return input_dict
 

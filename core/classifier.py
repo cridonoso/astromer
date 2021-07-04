@@ -34,15 +34,13 @@ def get_lstm_no_attention(units, num_classes, maxlen, dropout=0.5):
                   name='length')
 
     placeholder = {'input':serie,
-                   'mask':mask,
+                   'mask_in':mask,
                    'times':times,
                    'length':length}
 
-    bool_mask = tf.logical_not(tf.cast(placeholder['mask'], tf.bool))
+    bool_mask = tf.logical_not(tf.cast(placeholder['mask_in'], tf.bool))
 
     x = tf.concat([placeholder['times'], placeholder['input']], 2)
-
-    # x = standardize(x, axis=1)
 
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(x, mask=bool_mask)
@@ -72,10 +70,10 @@ def get_lstm_attention(units, num_classes, weigths, dropout=0.5):
     encoder = model.get_layer('encoder')
     encoder.trainable = False
 
-    bool_mask = tf.logical_not(tf.cast(encoder.input['mask'], tf.bool))
+    bool_mask = tf.logical_not(tf.cast(encoder.input['mask_in'], tf.bool))
 
     x = encoder(encoder.input)
-    # x = standardize(x, axis=1)
+    x = standardize(x, axis=1)
 
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(x, mask=bool_mask)
