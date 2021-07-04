@@ -23,6 +23,7 @@ def run(opt):
                                 max_obs=opt.max_obs)
     valid_batches = clf_records(os.path.join(opt.data, 'val'),
                                 opt.batch_size,
+                                repeat=opt.repeat,
                                 max_obs=opt.max_obs)
 
     num_classes = pd.read_csv(os.path.join(opt.data, 'objects.csv')).shape[0]
@@ -83,12 +84,12 @@ if __name__ == '__main__':
                         help='Number of epochs')
     parser.add_argument('--patience', default=1000, type=int,
                         help='batch size')
-    parser.add_argument('--repeat', default=1, type=int,
+    parser.add_argument('--repeat', default=5, type=int,
                         help='number of times to repeat the training and validation dataset')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
     # RNN HIPERPARAMETERS
-    parser.add_argument('--units', default=128, type=int,
+    parser.add_argument('--units', default=256, type=int,
                         help='number of units for the RNN')
     parser.add_argument('--dropout', default=0.5 , type=float,
                         help='dropout_rate for the encoder')
@@ -96,5 +97,4 @@ if __name__ == '__main__':
                         help='Use attention as the RNN input')
 
     opt = parser.parse_args()
-    # opt.head_dim = (opt.max_obs + 3)*opt.heads
     run(opt)
