@@ -15,6 +15,33 @@ from tqdm import tqdm
 
 from core.data import standardize
 
+def get_fc_attention(units, num_classes, weigths):
+    ''' FC + ATT'''
+
+    conf_file = os.path.join(weigths, 'conf.json')
+    with open(conf_file, 'r') as handle:
+        conf = json.load(handle)
+
+    model = get_ASTROMER(num_layers=conf['layers'],
+                         d_model   =conf['head_dim'],
+                         num_heads =conf['heads'],
+                         dff       =conf['dff'],
+                         base      =conf['base'],
+                         dropout   =conf['dropout'],
+                         maxlen    =conf['max_obs'])
+    weights_path = '{}/weights'.format(weigths)
+    model.load_weights(weights_path)
+    encoder = model.get_layer('encoder')
+    encoder.trainable = False
+
+    x = encoder(encoder.input)
+    x = standardize(x, axis=1)
+    x = Dense(units, name='FCN1')(x)
+    x = LayerNormalization(axis=1)(x)
+    x = Dense(num_classes, name='FCN2')(x)
+
+    return Model(inputs=encoder.input, outputs=x, name="FCATT")
+
 def get_lstm_no_attention(units, num_classes, maxlen, dropout=0.5):
     ''' LSTM + LSTM + FC'''
 

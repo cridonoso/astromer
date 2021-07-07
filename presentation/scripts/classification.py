@@ -6,7 +6,7 @@ import json
 import time
 import os
 
-from core.classifier import get_lstm_attention, get_lstm_no_attention, train
+from core.classifier import get_lstm_attention, get_lstm_no_attention, get_fc_attention, train
 from core.data  import clf_records
 from core.utils import get_folder_name
 from time import gmtime, strftime
@@ -35,10 +35,11 @@ def run(opt):
                                  opt.w,
                                  dropout=opt.dropout)
     else:
-        clf = get_lstm_no_attention(opt.units,
-                                    num_classes,
-                                    maxlen=opt.max_obs,
-                                    dropout=opt.dropout)
+        # clf = get_lstm_no_attention(opt.units,
+        #                             num_classes,
+        #                             maxlen=opt.max_obs,
+        #                             dropout=opt.dropout)
+        clf = get_fc_attention(opt.units, num_classes, opt.w)
 
     # Make sure we don't overwrite a previous training
     opt.p = get_folder_name(opt.p, prefix='')
