@@ -35,11 +35,12 @@ def get_fc_attention(units, num_classes, weigths):
     encoder.trainable = False
 
     x = encoder(encoder.input)
+    x = tf.keras.layers.Flatten()(x)
     x = standardize(x, axis=1)
     x = Dense(units, name='FCN1')(x)
     x = LayerNormalization(axis=1)(x)
     x = Dense(num_classes, name='FCN2')(x)
-
+    print(x.shape)
     return Model(inputs=encoder.input, outputs=x, name="FCATT")
 
 def get_lstm_no_attention(units, num_classes, maxlen, dropout=0.5):
@@ -202,6 +203,7 @@ def predict(model, test_batches):
     true_labels = []
     for batch in tqdm(test_batches, desc='test'):
         acc, ce, y_pred, y_true = valid_step(model, batch, return_pred=True)
+        print(y_pred.shape)
         if len(y_pred.shape)>2:
             predictions.append(y_pred[:, -1, :])
         else:
