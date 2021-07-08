@@ -40,7 +40,6 @@ def get_fc_attention(units, num_classes, weigths):
     x = Dense(units, name='FCN1')(x)
     x = LayerNormalization(axis=1)(x)
     x = Dense(num_classes, name='FCN2')(x)
-    print(x.shape)
     return Model(inputs=encoder.input, outputs=x, name="FCATT")
 
 def get_lstm_no_attention(units, num_classes, maxlen, dropout=0.5):
