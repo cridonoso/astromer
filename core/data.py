@@ -203,6 +203,7 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
     input_dict = get_sample(sample)
 
     sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
+    print(curr_max_obs)
     sequence = standardize(sequence)
 
     seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
@@ -210,7 +211,7 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
     seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
 
     # Save the true values
-    input_dict['output'] = seq_magn
+    orig_magn = seq_magn
 
     # [MASK] values
     mask_out = get_masked(seq_magn, msk_prob)
@@ -231,10 +232,22 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
 
     time_steps = tf.shape(seq_magn)[0]
 
+    mask_out = tf.reshape(mask_out, [time_steps, 1])
+    mask_in = tf.reshape(mask_in, [time_steps, 1])
+
+    if curr_max_obs < max_obs:
+        filler    = tf.ones([max_obs-curr_max_obs, 1])
+        mask_in   = tf.concat([mask_in, filler], 0)
+        seq_magn  = tf.concat([seq_magn, 1.-filler], 0)
+        seq_time  = tf.concat([seq_time, 1.-filler], 0)
+        mask_out  = tf.concat([mask_out, 1.-filler], 0)
+        orig_magn = tf.concat([orig_magn, 1.-filler], 0)
+        
+    input_dict['output']   = orig_magn
     input_dict['input']    = seq_magn
     input_dict['times']    = seq_time
-    input_dict['mask_out'] = tf.reshape(mask_out, [time_steps, 1])
-    input_dict['mask_in']  = tf.reshape(mask_in, [time_steps, 1])
+    input_dict['mask_out'] = mask_out
+    input_dict['mask_in']  = mask_in
     input_dict['length']   = time_steps
 
     return input_dict
