@@ -202,7 +202,6 @@ def predict(model, test_batches):
     true_labels = []
     for batch in tqdm(test_batches, desc='test'):
         acc, ce, y_pred, y_true = valid_step(model, batch, return_pred=True)
-        print(y_pred.shape)
         if len(y_pred.shape)>2:
             predictions.append(y_pred[:, -1, :])
         else:

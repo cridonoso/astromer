@@ -203,7 +203,7 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
     input_dict = get_sample(sample)
 
     sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
-    print(curr_max_obs)
+
     sequence = standardize(sequence)
 
     seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
@@ -242,7 +242,7 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
         seq_time  = tf.concat([seq_time, 1.-filler], 0)
         mask_out  = tf.concat([mask_out, 1.-filler], 0)
         orig_magn = tf.concat([orig_magn, 1.-filler], 0)
-        
+
     input_dict['output']   = orig_magn
     input_dict['input']    = seq_magn
     input_dict['times']    = seq_time
