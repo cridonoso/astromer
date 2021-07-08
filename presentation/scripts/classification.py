@@ -30,16 +30,19 @@ def run(opt):
 
     # Get model
     if opt.use_att:
-        clf = get_lstm_attention(opt.units,
-                                 num_classes,
-                                 opt.w,
-                                 dropout=opt.dropout)
+        if opt.use_rnn:
+            clf = get_lstm_attention(opt.units,
+                                     num_classes,
+                                     opt.w,
+                                     dropout=opt.dropout)
+        else:
+            clf = get_fc_attention(opt.units, num_classes, opt.w)
     else:
-        # clf = get_lstm_no_attention(opt.units,
-        #                             num_classes,
-        #                             maxlen=opt.max_obs,
-        #                             dropout=opt.dropout)
-        clf = get_fc_attention(opt.units, num_classes, opt.w)
+        clf = get_lstm_no_attention(opt.units,
+                                    num_classes,
+                                    maxlen=opt.max_obs,
+                                    dropout=opt.dropout)
+
 
     # Make sure we don't overwrite a previous training
     opt.p = get_folder_name(opt.p, prefix='')
@@ -96,6 +99,9 @@ if __name__ == '__main__':
                         help='dropout_rate for the encoder')
     parser.add_argument('--use-att', default=False, action='store_true',
                         help='Use attention as the RNN input')
+    parser.add_argument('--use-rnn', default=False, action='store_true',
+                        help='Use attention as the RNN input')
+
 
     opt = parser.parse_args()
     run(opt)
