@@ -53,6 +53,12 @@ def run(opt):
         # Save Hyperparameters
         conf_file = os.path.join(opt.p, 'conf.json')
         varsdic = vars(opt)
+
+        for key in conf.keys():
+            if key in ['batch_size', 'p', 'repeat', 'data']:
+                continue
+            varsdic[key] = conf[key]
+
         varsdic['exp_date'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
         with open(conf_file, 'w') as json_file:
             json.dump(varsdic, json_file, indent=4)
@@ -60,11 +66,17 @@ def run(opt):
         # Loading data
         train_batches = pretraining_records(os.path.join(opt.data, 'train'),
                                             opt.batch_size,
-                                            max_obs=opt.max_obs)
+                                            max_obs=conf['max_obs'],
+                                            repeat=opt.repeat,
+                                            msk_frac=conf['msk_frac'],
+                                            rnd_frac=conf['rnd_frac'],
+                                            same_frac=conf['same_frac'])
         valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
                                             opt.batch_size,
-                                            max_obs=opt.max_obs)
-
+                                            max_obs=conf['max_obs'],
+                                            msk_frac=conf['msk_frac'],
+                                            rnd_frac=conf['rnd_frac'],
+                                            same_frac=conf['same_frac'])
         # Training ASTROMER
         train(astromer, train_batches, valid_batches,
               patience=opt.patience,
@@ -87,12 +99,10 @@ if __name__ == '__main__':
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
-    parser.add_argument('--epochs', default=2000, type=int,
+    parser.add_argument('--epochs', default=10000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=200, type=int,
+    parser.add_argument('--patience', default=1000, type=int,
                         help='batch size')
-    parser.add_argument('--finetuning',default=False, action='store_true',
-                        help='Finetune a pretrained model')
     parser.add_argument('--repeat', default=1, type=int,
                         help='number of times to repeat the training and validation dataset')
     # ASTROMER HIPERPARAMETERS
@@ -108,9 +118,8 @@ if __name__ == '__main__':
                         help='dropout_rate for the encoder')
     parser.add_argument('--base', default=1000, type=int,
                         help='base of embedding')
-    parser.add_argument('--lr', default=1e-3, type=float,
+    parser.add_argument('--lr', default=1e-5, type=float,
                         help='optimizer initial learning rate')
 
     opt = parser.parse_args()
-    opt.head_dim = (opt.max_obs + 3)*opt.heads
     run(opt)

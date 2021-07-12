@@ -113,38 +113,39 @@ def create_dataset(meta_df,
             os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs)
 
-def standardize_mag(tensor):
-    with tf.name_scope("Standardize") as scope:
-        times = tf.slice(tensor, [0, 0], [-1, 1])
-        std = tf.slice(tensor, [0, 2], [-1, 1])
-        tensor = tf.slice(tensor, [0, 1], [-1, 1])
+def standardize(tensor, axis=0):
+    mean_value = tf.reduce_mean(tensor, axis, name='mean_value')
+    std_value = tf.math.reduce_std(tensor, axis, name='std_value')
 
-        mean_value = tf.reduce_mean(tensor, 0, name='mean_value')
-        std_value = tf.math.reduce_std(tensor, 0, name='std_value')
+    if axis == 1:
+        mean_value = tf.expand_dims(mean_value, axis)
+        std_value = tf.expand_dims(std_value, axis)
 
-        normed = tf.where(std_value == 0.,
-                         (tensor - mean_value),
-                         (tensor - mean_value)/std_value)
+    normed = tensor - mean_value
 
-        normed = tf.concat([times, normed, std], 1)
-        return normed
+    return normed
 
-def normalize(tensor, only_time=False, min_value=None, max_value=None):
-    with tf.name_scope("Normalize") as scope:
-        min_value = tf.expand_dims(tf.reduce_min(tensor, 1), 1,
-                                    name='min_value')
-        max_value = tf.expand_dims(tf.reduce_max(tensor, 1), 1,
-                                    name='max_value')
+def normalize(tensor, axis=0):
+    min_value = tf.reduce_min(tensor, axis, name='min_value')
+    max_value = tf.reduce_max(tensor, axis, name='max_value')
 
-        den = (max_value - min_value)
-        normed = tf.where(den== 0.,
-                         (tensor - min_value),
-                         (tensor - min_value)/den)
-        return normed
+    if axis == 1:
+        min_value = tf.expand_dims(min_value, axis)
+        max_value = tf.expand_dims(max_value, axis)
 
-def _parse(sample):
+    normed = tf.math.divide_no_nan(tensor - min_value,
+                                   max_value - min_value)
+    return normed
 
+def get_delta(tensor):
+    tensor = tensor[1:] - tensor[:-1]
+    tensor = tf.concat([tf.expand_dims([0.], 1), tensor], 0)
+    return tensor
 
+def get_sample(sample):
+    '''
+    Read a serialized sample and convert it to tensor
+    '''
     context_features = {'label': tf.io.FixedLenFeature([],dtype=tf.int64),
                         'length': tf.io.FixedLenFeature([],dtype=tf.int64),
                         'id': tf.io.FixedLenFeature([], dtype=tf.string)}
@@ -170,94 +171,140 @@ def _parse(sample):
         seq_dim = tf.cast(seq_dim, tf.float32)
         casted_inp_parameters.append(seq_dim)
 
-    input_dict['input'] = tf.stack(casted_inp_parameters, axis=2)
+
+    sequence = tf.stack(casted_inp_parameters, axis=2)[0]
+    input_dict['input'] = sequence
     return input_dict
 
+def sample_lc(sequence, max_obs):
+    '''
+    Sample a random window of "max_obs" observations from the input sequence
+    '''
+    serie_len = tf.shape(sequence)[0]
+    curr_max_obs = tf.minimum(serie_len, max_obs)
+    pivot = 0
+    if tf.greater(serie_len, max_obs):
+        pivot = tf.random.uniform([],
+                                  minval=0,
+                                  maxval=serie_len-curr_max_obs,
+                                  dtype=tf.int32)
 
-def pretrain_input(seq_1, seq_2, nsp_prob, msk_frac, rnd_frac, same_frac,
-                    max_obs, clstkn=-99, septkn=-98):
+        sequence = tf.slice(sequence, [pivot,0], [curr_max_obs, -1])
+    else:
+        sequence = tf.slice(sequence, [0,0], [curr_max_obs, -1])
 
-    inp_dim = tf.shape(seq_1['input'], name='inp_dim')
-    clstkn = tf.tile(tf.cast([[clstkn]], tf.float32), [1, inp_dim[-1]], name='cls_tkn')
-    septkn = tf.tile(tf.cast([[septkn]], tf.float32), [1, inp_dim[-1]], name='sep_tkn')
-    msktkn = tf.zeros([1], name='msk_tkn')
-    half_obs = max_obs//2
+    return sequence, curr_max_obs
 
-    with tf.name_scope('Split'):
-        pivot_1 = tf.random.uniform(shape=[1],
-                                    minval=0,
-                                    maxval=int(seq_1['length']-max_obs),
-                                    dtype=tf.dtypes.int32)[0]
+def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
+    '''
+    Pretraining formater
+    '''
 
-        serie_1 = seq_1['input'][:, pivot_1:(pivot_1+half_obs), :][0]
-        serie_1 = standardize_mag(serie_1)
-        serie_2 = seq_1['input'][:, (pivot_1+half_obs):(pivot_1+max_obs), :][0]
-        serie_2 = standardize_mag(serie_2)
-        original = tf.concat([clstkn, serie_1, septkn, serie_2, septkn], 0,
-                             name='original')
-         # just to plot it
+    input_dict = get_sample(sample)
 
-        is_random = tf.random.categorical(tf.math.log([[1-nsp_prob, nsp_prob]]), 1)
-        is_random = tf.cast(is_random, tf.bool, name='isRandom')
-        if is_random:
-            pivot_2 = tf.random.uniform(shape=[1],
-                                        minval=0,
-                                        maxval=int(seq_2['length']-half_obs),
-                                        dtype=tf.dtypes.int32)[0]
+    sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
 
-            serie_2 = seq_2['input'][:, pivot_2:(pivot_2+half_obs), :][0]
-            serie_2 = standardize_mag(serie_2)
+    sequence = standardize(sequence)
 
-    mask_1 = get_masked(serie_1, msk_frac)
-    mask_2 = get_masked(serie_1, msk_frac)
+    seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
+    seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
+    seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
 
-    serie_1, mask_1 = set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random')
-    serie_2, mask_2 = set_random(serie_2, mask_2, serie_1, rnd_frac, name='set_random')
+    # Save the true values
+    orig_magn = seq_magn
 
-    serie_1, mask_1 = set_random(serie_1, mask_1, serie_1, same_frac, name='set_same')
-    serie_2, mask_2 = set_random(serie_2, mask_2, serie_2, same_frac, name='set_same')
+    # [MASK] values
+    mask_out = get_masked(seq_magn, msk_prob)
 
+    # [MASK] -> Same values
+    seq_magn, mask_in = set_random(seq_magn,
+                                   mask_out,
+                                   seq_magn,
+                                   same_prob,
+                                   name='set_same')
 
-    serie = tf.concat([clstkn, serie_1, septkn, serie_2, septkn], 0)
-    times = tf.slice(serie, [0, 0], [-1, 1], name='times')
-    input = tf.slice(serie, [0, 1], [-1, 1], name='input')
-    mask  = tf.concat([msktkn, mask_1, msktkn, mask_2, msktkn], 0,
-                      name='inp_mask')
+    # [MASK] -> Random value
+    seq_magn, mask_in = set_random(seq_magn,
+                                   mask_in,
+                                   tf.random.shuffle(seq_magn),
+                                   rnd_prob,
+                                   name='set_random')
 
-    input_dic = {
-        'input': input,
-        'times': times,
-        'segsep': half_obs+2, #segment separator position
-        'mask' : tf.expand_dims(mask, 1),
-        'label': tf.squeeze(tf.cast(is_random, tf.int32))
-    }
+    time_steps = tf.shape(seq_magn)[0]
 
-    return input_dic
+    mask_out = tf.reshape(mask_out, [time_steps, 1])
+    mask_in = tf.reshape(mask_in, [time_steps, 1])
 
-def adjust_fn(func, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs):
+    if curr_max_obs < max_obs:
+        filler    = tf.ones([max_obs-curr_max_obs, 1])
+        mask_in   = tf.concat([mask_in, filler], 0)
+        seq_magn  = tf.concat([seq_magn, 1.-filler], 0)
+        seq_time  = tf.concat([seq_time, 1.-filler], 0)
+        mask_out  = tf.concat([mask_out, 1.-filler], 0)
+        orig_magn = tf.concat([orig_magn, 1.-filler], 0)
+
+    input_dict['output']   = orig_magn
+    input_dict['input']    = seq_magn
+    input_dict['times']    = seq_time
+    input_dict['mask_out'] = mask_out
+    input_dict['mask_in']  = mask_in
+    input_dict['length']   = time_steps
+
+    return input_dict
+
+def _parse_normal(sample, max_obs):
+    '''
+    Specific task formater
+    '''
+    input_dict = get_sample(sample)
+
+    sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
+    sequence = standardize(sequence)
+
+    seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
+    seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
+    seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
+
+    time_steps = tf.shape(seq_magn)[0]
+    mask = get_padding_mask(max_obs, tf.expand_dims(input_dict['length'], 0))
+
+    input_dict['input']  = seq_magn
+    input_dict['times']  = seq_time
+    input_dict['obserr']  = seq_errs
+    input_dict['mask_in']   = tf.transpose(mask)
+    input_dict['mask_out']   = tf.transpose(mask)
+    input_dict['length'] = time_steps
+    return input_dict
+
+def adjust_fn(func, msk_prob, rnd_prob, same_prob, max_obs):
     def wrap(*args, **kwargs):
-        result = func(*args, nsp_prob, msk_prob, rnd_prob, same_prob, max_obs)
+        result = func(*args, msk_prob, rnd_prob, same_prob, max_obs)
         return result
     return wrap
 
-def pretraining_records(source, batch_size, max_obs=100, nsp_prob=0.5, msk_prob=0.2, rnd_prob=0.1, same_prob=0.1):
+def adjust_fn_clf(func, max_obs):
+    def wrap(*args, **kwargs):
+        result = func(*args, max_obs)
+        return result
+    return wrap
 
+def pretraining_records(source, batch_size, repeat=1, max_obs=100, msk_frac=0.2, rnd_frac=0.1, same_frac=0.1):
     datasets = [os.path.join(source, folder, x) for folder in os.listdir(source) \
                 for x in os.listdir(os.path.join(source, folder))]
+    dataset = tf.data.TFRecordDataset(datasets)
+    fn = adjust_fn(_parse_pt, msk_frac, rnd_frac, same_frac, max_obs)
+    dataset = dataset.repeat(repeat).map(fn).cache()
+    dataset = dataset.padded_batch(batch_size)
+    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+    return dataset
 
-    dataset_1 = tf.data.TFRecordDataset(datasets)
-    dataset_2 = tf.data.TFRecordDataset(datasets)
-
-    dataset_1 = dataset_1.map(_parse)
-    dataset_2 = dataset_2.map(_parse).shuffle(1000)
-
-    dataset = tf.data.Dataset.zip((dataset_1, dataset_2))
-
-    fn = adjust_fn(pretrain_input, nsp_prob,
-                   msk_prob, rnd_prob, same_prob, max_obs)
-
-    dataset = dataset.map(fn)
-    dataset = dataset.batch(batch_size)
+def clf_records(source, batch_size, max_obs=100, repeat=1):
+    datasets = [os.path.join(source, folder, x) for folder in os.listdir(source) \
+                for x in os.listdir(os.path.join(source, folder))]
+    dataset = tf.data.TFRecordDataset(datasets)
+    fn = adjust_fn_clf(_parse_normal, max_obs)
+    dataset = dataset.repeat(repeat).map(fn).cache()
+    dataset = dataset.padded_batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
     return dataset

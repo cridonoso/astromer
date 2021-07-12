@@ -39,16 +39,24 @@ def run(opt):
     # Loading data
     train_batches = pretraining_records(os.path.join(opt.data, 'train'),
                                         opt.batch_size,
-                                        max_obs=opt.max_obs)
+                                        max_obs=opt.max_obs,
+                                        repeat=opt.repeat,
+                                        msk_frac=opt.msk_frac,
+                                        rnd_frac=opt.rnd_frac,
+                                        same_frac=opt.same_frac)
     valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
                                         opt.batch_size,
-                                        max_obs=opt.max_obs)
+                                        max_obs=opt.max_obs,
+                                        msk_frac=opt.msk_frac,
+                                        rnd_frac=opt.rnd_frac,
+                                        same_frac=opt.same_frac)
 
     # Training ASTROMER
     train(astromer, train_batches, valid_batches,
           patience=opt.patience,
           exp_path=opt.p,
           epochs=opt.epochs,
+          lr=opt.lr,
           verbose=0)
 
 
@@ -59,6 +67,13 @@ if __name__ == '__main__':
     # DATA
     parser.add_argument('--max-obs', default=50, type=int,
                     help='Max number of observations')
+    parser.add_argument('--msk-frac', default=0.2, type=float,
+                        help='[MASKED] fraction')
+    parser.add_argument('--rnd-frac', default=0.15, type=float,
+                        help='Fraction of [MASKED] to be replaced by random values')
+    parser.add_argument('--same-frac', default=0.15, type=float,
+                        help='Fraction of [MASKED] to be replaced by same values')
+
     # TRAINING PAREMETERS
     parser.add_argument('--data', default='./data/records/macho', type=str,
                         help='Dataset folder containing the records files')
@@ -66,22 +81,20 @@ if __name__ == '__main__':
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
-    parser.add_argument('--epochs', default=2000, type=int,
+    parser.add_argument('--epochs', default=10000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=200, type=int,
+    parser.add_argument('--patience', default=1000, type=int,
                         help='batch size')
-    parser.add_argument('--finetuning',default=False, action='store_true',
-                        help='Finetune a pretrained model')
     parser.add_argument('--repeat', default=1, type=int,
                         help='number of times to repeat the training and validation dataset')
     # ASTROMER HIPERPARAMETERS
-    parser.add_argument('--layers', default=1, type=int,
+    parser.add_argument('--layers', default=2, type=int,
                         help='Number of encoder layers')
-    parser.add_argument('--heads', default=2, type=int,
+    parser.add_argument('--heads', default=4, type=int,
                         help='Number of self-attention heads')
     parser.add_argument('--head-dim', default=128, type=int,
                         help='Head-attention Dimensionality ')
-    parser.add_argument('--dff', default=512, type=int,
+    parser.add_argument('--dff', default=128, type=int,
                         help='Dimensionality of the middle  dense layer at the end of the encoder')
     parser.add_argument('--dropout', default=0.1 , type=float,
                         help='dropout_rate for the encoder')
@@ -91,5 +104,4 @@ if __name__ == '__main__':
                         help='optimizer initial learning rate')
 
     opt = parser.parse_args()
-    opt.head_dim = (opt.max_obs + 3)*opt.heads
     run(opt)
