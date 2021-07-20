@@ -62,6 +62,7 @@ def get_ASTROMER(num_layers=2,
 def train_step(model, batch, opt):
     with tf.GradientTape() as tape:
         x_pred = model(batch)
+        print(x_pred.shape)
         mse = custom_mse(y_true=batch['input'],
                          y_pred=x_pred,
                          mask=batch['mask_out'])

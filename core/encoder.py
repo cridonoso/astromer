@@ -66,7 +66,6 @@ class Encoder(tf.keras.layers.Layer):
         self.dropout = tf.keras.layers.Dropout(rate)
 
     def call(self, data, training=False):
-        print()
         # Reshape MASK
         mask = reshape_mask(data['mask_in']) # batch x 1 x seq_len x seq_len
         # adding embedding and position encoding.

@@ -30,11 +30,12 @@ def get_masked(tensor, frac=0.15):
         steps = tf.shape(tensor)[0] # time steps
         nmask = tf.multiply(tf.cast(steps, tf.float32), frac)
         nmask = tf.cast(nmask, tf.int32, name='nmask')
-        if frac == 1.:
-            index = tf.range(nmask)
-        else:
-            index = tf.random.uniform([nmask], minval=0, maxval=steps, dtype=tf.int32)
-        mask = tf.reduce_sum(tf.one_hot(index, steps), 0)
+
+        indices = tf.range(steps)
+        indices = tf.random.shuffle(indices)
+        indices = tf.slice(indices, [0], [nmask])
+
+        mask = tf.reduce_sum(tf.one_hot(indices, steps), 0)
         mask = tf.minimum(mask, tf.ones_like(mask))
         return mask
 
@@ -88,6 +89,7 @@ def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
 def reshape_mask(mask):
     ''' Reshape Mask to match attention dimensionality '''
     with tf.name_scope("reshape_mask") as scope:
+        # return mask[:, tf.newaxis, tf.newaxis, :, 0]
         dim_mask = tf.shape(mask)[1]
         mask = tf.tile(mask, [1, dim_mask, 1])
         mask = tf.reshape(mask, [tf.shape(mask)[0], dim_mask, dim_mask])
