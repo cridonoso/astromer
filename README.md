@@ -1,5 +1,7 @@
 # ASTROMER: Building Light Curves Embeddings using Transfomers
 
+![](https://github.com/cridonoso/astromer/blob/main/presentation/figures/banner.png?raw=true)
+
 ASTROMER is a deep learning model trained on million of stars. It is inspired by NLP architecture BERT which combine different tasks to create a useful representation of the input. This representation corresponds to the **attention vector** which we can then use to train another models.
 
 ## About the design pattern
