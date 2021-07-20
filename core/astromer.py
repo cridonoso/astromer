@@ -4,7 +4,7 @@ import os, sys
 
 from core.output    import RegLayer, ClfLayer, SplitLayer
 from core.tboard    import save_scalar, draw_graph
-from core.losses    import custom_mse, custom_bce
+from core.losses    import custom_rmse, custom_bce
 from core.scheduler import CustomSchedule
 from core.metrics   import custom_acc
 from core.encoder   import Encoder
@@ -62,7 +62,7 @@ def get_ASTROMER(num_layers=2,
 def train_step(model, batch, opt):
     with tf.GradientTape() as tape:
         x_pred = model(batch)
-        mse = custom_mse(y_true=batch['input'],
+        mse = custom_rmse(y_true=batch['input'],
                          y_pred=x_pred,
                          mask=batch['mask_out'])
 
@@ -75,12 +75,11 @@ def train_step(model, batch, opt):
 def valid_step(model, batch, return_pred=False):
     with tf.GradientTape() as tape:
         x_pred = model(batch)
-
-        mse = custom_mse(y_true=batch['input'],
+        mse = custom_rmse(y_true=batch['input'],
                          y_pred=x_pred,
                          mask=batch['mask_out'])
     if return_pred:
-        return 0, 0, 0, mse, x_pred, 0, batch['input'], 0
+        return mse, x_pred, batch['input']
     return mse
 
 def train(model,
@@ -153,31 +152,17 @@ def predict(model,
             dataset,
             conf,
             predic_proba=False):
-    preds, reconstructions = [], []
-    true_cls, true_x = [],[]
-    total_loss, total_acc, total_bce, total_mse = [], [], [], []
+
+    total_mse, inputs, reconstructions = [], [], []
+
     for step, batch in tqdm(enumerate(dataset), desc='prediction'):
-        loss, acc, bce, mse, \
-        x_pred, y_pred, \
-        x_true, y_true = valid_step(model, batch,
-                                    return_pred=True)
-        total_loss.append(loss)
-        total_acc.append(acc)
-        total_bce.append(bce)
+        mse, x_pred, x_true = valid_step(model, batch, return_pred=True)
         total_mse.append(mse)
-        true_cls.append(tf.squeeze(y_true))
-        true_x.append(x_true)
-        preds.append(tf.squeeze(y_pred))
+        inputs.append(x_true)
         reconstructions.append(x_pred)
 
-    y_pred = tf.concat(preds, 0)
-
-    res = {'loss':tf.reduce_mean(total_loss).numpy(),
-           'acc':tf.reduce_mean(total_acc).numpy(),
-           'bce':tf.reduce_mean(total_bce).numpy(),
-           'mse':tf.reduce_mean(total_mse).numpy(),
-           'y_pred':y_pred,
+    res = {'mse':tf.reduce_mean(total_mse).numpy(),
            'x_pred': tf.concat(reconstructions, 0),
-           'y_true':tf.concat(true_cls, 0),
-           'x_true': tf.concat(true_x, 0)}
+           'x_true': tf.concat(inputs, 0)}
+
     return res

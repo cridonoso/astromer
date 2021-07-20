@@ -30,11 +30,12 @@ def get_masked(tensor, frac=0.15):
         steps = tf.shape(tensor)[0] # time steps
         nmask = tf.multiply(tf.cast(steps, tf.float32), frac)
         nmask = tf.cast(nmask, tf.int32, name='nmask')
-        if frac == 1.:
-            index = tf.range(nmask)
-        else:
-            index = tf.random.uniform([nmask], minval=0, maxval=steps, dtype=tf.int32)
-        mask = tf.reduce_sum(tf.one_hot(index, steps), 0)
+
+        indices = tf.range(steps)
+        indices = tf.random.shuffle(indices)
+        indices = tf.slice(indices, [0], [nmask])
+
+        mask = tf.reduce_sum(tf.one_hot(indices, steps), 0)
         mask = tf.minimum(mask, tf.ones_like(mask))
         return mask
 
