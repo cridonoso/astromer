@@ -89,7 +89,6 @@ def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
 def reshape_mask(mask):
     ''' Reshape Mask to match attention dimensionality '''
     with tf.name_scope("reshape_mask") as scope:
-        # return mask[:, tf.newaxis, tf.newaxis, :, 0]
         dim_mask = tf.shape(mask)[1]
         mask = tf.tile(mask, [1, dim_mask, 1])
         mask = tf.reshape(mask, [tf.shape(mask)[0], dim_mask, dim_mask])

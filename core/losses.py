@@ -4,10 +4,7 @@ from tensorflow.nn import (sigmoid_cross_entropy_with_logits,
                            softmax_cross_entropy_with_logits)
 
 @tf.function
-def custom_mse(y_true, y_pred, sample_weight=None, mask=None):
-    '''
-    Actually is RMSE
-    '''
+def custom_rmse(y_true, y_pred, sample_weight=None, mask=None):
     inp_shp = tf.shape(y_true)
     mse = tf.square(y_true - y_pred)
 

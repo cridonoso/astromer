@@ -77,7 +77,7 @@ def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None):
     # Iterate over subset
     for counter, subframe in enumerate(collection):
         with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
-            Parallel(n_jobs=n_jobs)(delayed(process_lc)(row, source, k, unique, writer) \
+            Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(process_lc)(row, source, k, unique, writer) \
                                     for k, row in subframe.iterrows())
 
 
