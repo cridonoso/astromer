@@ -17,11 +17,12 @@ class TestStringMethods(unittest.TestCase):
         mha = MultiHeadAttention(model_dim, 4)
         att, w = mha(x, mask_rshp)
 
-        pos_w_zeros = tf.where(w==0.)
-        pos_m_zeros = tf.where(mask_rshp==1.)
+        pos_w_zeros = tf.where(w[0][0][0]==0.)
+        pos_m_zeros = tf.where(mask_rshp[0][0]==1.)
 
-        self.assertEqual(pos_m_zeros.shape[0]*pos_w_zeros.shape[1],
-                         pos_w_zeros.shape[0])
+
+        self.assertListEqual(list(pos_w_zeros.numpy()[:,0]),
+                             list(pos_m_zeros.numpy()[:,1]))
 
 
 if __name__ == '__main__':
