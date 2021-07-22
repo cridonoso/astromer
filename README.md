@@ -15,7 +15,7 @@ We use an extention of the "clean architecture" pattern. This technique allows t
 ##### Container building
 All the commands mentioned must be executed in the root directory (i.e., where `docker-compose.yml` and `Dockerfile` are located)
 1. To build the container use: `docker-compose build`
-2. TO start the container in detached mode (`-d`) using: `docker-compose up -d`
+2. To start the container in detached mode (`-d`): `docker-compose up -d`
 3. Check that the container is already runing by typing: `docker container ls`
 
 ### Interactive Session
