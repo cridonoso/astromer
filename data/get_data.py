@@ -23,6 +23,7 @@ dataset_id = {
 		'gaia': '1EgLYoqHLlFHxAvXKXM7KsMwvRfMwIQiK',
 		'css': '1f-3tJojGQoI6dyq_teCr2OOa19uGmMgO',
 		'asas': '1RJjYcMePgVT2mC2x3T7p_B5l23pFEM_C',
+		'large_macho':'1Bzi9U30BZVHuwimn2KAATARlRffH8iGP',
 	}
 }
 
