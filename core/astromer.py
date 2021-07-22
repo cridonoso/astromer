@@ -154,15 +154,17 @@ def predict(model,
             predic_proba=False):
 
     total_mse, inputs, reconstructions = [], [], []
-
+    masks = []
     for step, batch in tqdm(enumerate(dataset), desc='prediction'):
         mse, x_pred, x_true = valid_step(model, batch, return_pred=True)
         total_mse.append(mse)
         inputs.append(x_true)
         reconstructions.append(x_pred)
+        masks.append(batch['mask_out'])
 
     res = {'mse':tf.reduce_mean(total_mse).numpy(),
            'x_pred': tf.concat(reconstructions, 0),
-           'x_true': tf.concat(inputs, 0)}
+           'x_true': tf.concat(inputs, 0),
+           'mask': tf.concat(masks, 0)}
 
     return res
