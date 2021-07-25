@@ -21,8 +21,8 @@ class EncoderLayer(tf.keras.layers.Layer):
         self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
         self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 
-        self.reshape_leak_1 = tf.keras.layers.Dense(d_model)
-        self.reshape_leak_2 = tf.keras.layers.Dense(d_model)
+        # self.reshape_leak_1 = tf.keras.layers.Dense(d_model)
+        # self.reshape_leak_2 = tf.keras.layers.Dense(d_model)
 
         self.dropout1 = tf.keras.layers.Dropout(rate)
         self.dropout2 = tf.keras.layers.Dropout(rate)
@@ -30,11 +30,12 @@ class EncoderLayer(tf.keras.layers.Layer):
     def call(self, x, training, mask):
         attn_output, _ = self.mha(x, mask)  # (batch_size, input_seq_len, d_model)
         attn_output = self.dropout1(attn_output, training=training)
-        out1 = self.layernorm1(self.reshape_leak_1(x) + attn_output)  # (batch_size, input_seq_len, d_model)
-
+        # out1 = self.layernorm1(self.reshape_leak_1(x) + attn_output)  # (batch_size, input_seq_len, d_model)
+        out1 = self.layernorm1(attn_output)
         ffn_output = self.ffn(out1)  # (batch_size, input_seq_len, d_model)
         ffn_output = self.dropout2(ffn_output, training=training)
-        out2 = self.layernorm2(self.reshape_leak_2(out1) + ffn_output)  # (batch_size, input_seq_len, d_model)
+        # out2 = self.layernorm2(self.reshape_leak_2(out1) + ffn_output) # (batch_size, input_seq_len, d_model)
+        out2 = self.layernorm2(ffn_output)
 
         return out2
 
