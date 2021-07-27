@@ -28,7 +28,8 @@ def get_fc_attention(units, num_classes, weigths):
                          dff       =conf['dff'],
                          base      =conf['base'],
                          dropout   =conf['dropout'],
-                         maxlen    =conf['max_obs'])
+                         maxlen    =conf['max_obs'],
+                         use_leak  =conf['use_leak'])
     weights_path = '{}/weights'.format(weigths)
     model.load_weights(weights_path)
     encoder = model.get_layer('encoder')
@@ -91,7 +92,8 @@ def get_lstm_attention(units, num_classes, weigths, dropout=0.5):
                          dff       =conf['dff'],
                          base      =conf['base'],
                          dropout   =conf['dropout'],
-                         maxlen    =conf['max_obs'])
+                         maxlen    =conf['max_obs'],
+                         use_leak  =conf['use_leak'])
     weights_path = '{}/weights'.format(weigths)
     model.load_weights(weights_path)
     encoder = model.get_layer('encoder')
