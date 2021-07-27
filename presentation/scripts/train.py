@@ -21,7 +21,8 @@ def run(opt):
                             dff=opt.dff,
                             base=opt.base,
                             dropout=opt.dropout,
-                            maxlen=opt.max_obs)
+                            maxlen=opt.max_obs,
+                            use_leak=opt.use_leak)
 
     # Make sure we don't overwrite a previous training
     opt.p = get_folder_name(opt.p, prefix='')
@@ -87,6 +88,7 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--repeat', default=1, type=int,
                         help='number of times to repeat the training and validation dataset')
+
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=2, type=int,
                         help='Number of encoder layers')
@@ -103,5 +105,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
 
+    parser.add_argument('--use-leak', default=False, action='store_true',
+                        help='Add the input to the attention vector')
     opt = parser.parse_args()
     run(opt)

@@ -22,6 +22,7 @@ def get_ASTROMER(num_layers=2,
                  dff=256,
                  base=10000,
                  dropout=0.1,
+                 use_leak=False,
                  maxlen=100,
                  batch_size=None):
 
@@ -50,6 +51,7 @@ def get_ASTROMER(num_layers=2,
                 dff,
                 base=base,
                 rate=dropout,
+                use_leak=use_leak,
                 name='encoder')(placeholder)
 
     x = RegLayer(name='regression')(x)

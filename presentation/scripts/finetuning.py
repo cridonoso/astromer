@@ -37,7 +37,8 @@ def run(opt):
                                 dff=conf['dff'],
                                 base=conf['base'],
                                 dropout=conf['dropout'],
-                                maxlen=conf['max_obs'])
+                                maxlen=conf['max_obs'],
+                                use_leak=conf['use_leak'])
         # Loading pretrained weights
         weights_path = '{}/weights'.format(opt.p)
         astromer.load_weights(weights_path)
