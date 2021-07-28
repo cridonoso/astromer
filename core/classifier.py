@@ -36,10 +36,10 @@ def get_fc_attention(units, num_classes, weigths):
     encoder.trainable = False
 
     x = encoder(encoder.input)
-    x = tf.keras.layers.Flatten()(x)
-    x = standardize(x, axis=1)
+    x = tf.reshape(x, [-1, conf['max_obs']*encoder.output.shape[-1]])
+    x = LayerNormalization()(x)
     x = Dense(units, name='FCN1')(x)
-    x = LayerNormalization(axis=1)(x)
+    x = LayerNormalization()(x)
     x = Dense(num_classes, name='FCN2')(x)
     return Model(inputs=encoder.input, outputs=x, name="FCATT")
 
@@ -102,7 +102,8 @@ def get_lstm_attention(units, num_classes, weigths, dropout=0.5):
     bool_mask = tf.logical_not(tf.cast(encoder.input['mask_in'], tf.bool))
 
     x = encoder(encoder.input)
-    x = standardize(x, axis=1)
+    x = tf.reshape(x, [-1, conf['max_obs'], encoder.output.shape[-1]])
+    x = LayerNormalization(axis=1)(x)
 
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(x, mask=bool_mask)
