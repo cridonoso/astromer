@@ -303,7 +303,7 @@ def clf_records(source, batch_size, max_obs=100, repeat=1):
                 for x in os.listdir(os.path.join(source, folder))]
     dataset = tf.data.TFRecordDataset(datasets)
     fn = adjust_fn_clf(_parse_normal, max_obs)
-    dataset = dataset.repeat(repeat).map(fn).cache()
+    dataset = dataset.repeat(repeat).shuffle(10000).map(fn).cache()
     dataset = dataset.padded_batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
