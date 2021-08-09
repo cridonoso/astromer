@@ -13,8 +13,8 @@ def custom_rmse(y_true, y_pred, sample_weight=None, mask=None):
 
     if mask is not None:
         mse = tf.multiply(mse, mask)
-
-    mse = tf.reduce_sum(mse, 1)
+    #
+    # mse = tf.reduce_sum(mse, 1)
     return tf.math.sqrt(tf.reduce_mean(mse))
 
 @tf.function

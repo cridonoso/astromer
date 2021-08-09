@@ -200,6 +200,17 @@ def train(model,
         train_acc.reset_states()
         valid_acc.reset_states()
 
+def get_conf(path):
+    conf_file = os.path.join(path, 'conf.json')
+    with open(conf_file, 'r') as handle:
+        conf = json.load(handle)
+        return conf
+
+def load_weights(model, weigths):
+    weights_path = '{}/weights'.format(weigths)
+    model.load_weights(weights_path)
+    return model
+
 def predict(model, test_batches):
     predictions = []
     true_labels = []
@@ -225,9 +236,11 @@ def predict(model, test_batches):
     results = {'f1': f1,
                'recall': recall,
                'precision': precision,
-               'accuracy':acc}
+               'accuracy':acc,
+               'y_true':y_true,
+               'y_pred':pred_labels}
 
-    return results, y_true, pred_labels
+    return results
 
     # os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
     # results_file = os.path.join(opt.p, 'test', 'test_results.json')
@@ -237,3 +250,31 @@ def predict(model, test_batches):
     # h5f = h5py.File(os.path.join(opt.p, 'test', 'predictions.h5'), 'w')
     # h5f.create_dataset('y_pred', data=y_pred.numpy())
     # h5f.create_dataset('y_true', data=y_true.numpy())
+
+def predict_from_path(path, test_batches, use_att=True, use_fc=False, save=False):
+    conf_rnn = get_conf(path)
+.
+
+    if use_att:
+        if use_fc:
+            clf = get_fc_attention(conf_rnn['units'],
+                                   conf_rnn['num_classes'],
+                                   conf_rnn['w'])
+        else:
+            clf = get_lstm_attention(conf_rnn['units'],
+                                     conf_rnn['num_classes'],
+                                     conf_rnn['w'],
+                                     conf_rnn['dropout'])
+    else:
+        clf = get_lstm_no_attention(conf_rnn['units'],
+                                    conf_rnn['num_classes'],
+                                    conf_rnn['max_obs'],
+                                    conf_rnn['dropout'])
+
+    clf = load_weights(clf, path)
+    results = predict(clf, test_batches)
+
+    if save:
+        pass
+
+    return results
