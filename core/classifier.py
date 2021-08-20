@@ -253,7 +253,6 @@ def predict(model, test_batches):
 
 def predict_from_path(path, test_batches, use_att=True, use_fc=False, save=False):
     conf_rnn = get_conf(path)
-.
 
     if use_att:
         if use_fc:

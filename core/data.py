@@ -113,7 +113,7 @@ def create_dataset(meta_df,
             os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs)
 
-def standardize(tensor, axis=0):
+def standardize(tensor, axis=0, return_mean=False):
     mean_value = tf.reduce_mean(tensor, axis, name='mean_value')
     std_value = tf.math.reduce_std(tensor, axis, name='std_value')
 
@@ -123,7 +123,10 @@ def standardize(tensor, axis=0):
 
     normed = tensor - mean_value
 
-    return normed
+    if return_mean:
+        return normed, mean_value
+    else:
+        return normed
 
 def normalize(tensor, axis=0):
     min_value = tf.reduce_min(tensor, axis, name='min_value')
@@ -182,6 +185,7 @@ def sample_lc(sequence, max_obs):
     '''
     serie_len = tf.shape(sequence)[0]
     curr_max_obs = tf.minimum(serie_len, max_obs)
+
     pivot = 0
     if tf.greater(serie_len, max_obs):
         pivot = tf.random.uniform([],
@@ -204,11 +208,12 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
 
     sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
 
-    sequence = standardize(sequence)
+    sequence, mean = standardize(sequence, return_mean=True)
 
     seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
     seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
     seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
+
 
     # Save the true values
     orig_magn = seq_magn
@@ -249,7 +254,8 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
     input_dict['mask_out'] = mask_out
     input_dict['mask_in']  = mask_in
     input_dict['length']   = time_steps
-
+    input_dict['mean']     = mean
+    input_dict['obserr']   = seq_errs
     return input_dict
 
 def _parse_normal(sample, max_obs):
@@ -274,6 +280,7 @@ def _parse_normal(sample, max_obs):
     input_dict['mask_in']   = tf.transpose(mask)
     input_dict['mask_out']   = tf.transpose(mask)
     input_dict['length'] = time_steps
+
     return input_dict
 
 def adjust_fn(func, msk_prob, rnd_prob, same_prob, max_obs):
@@ -293,7 +300,7 @@ def pretraining_records(source, batch_size, repeat=1, max_obs=100, msk_frac=0.2,
                 for x in os.listdir(os.path.join(source, folder))]
     dataset = tf.data.TFRecordDataset(datasets)
     fn = adjust_fn(_parse_pt, msk_frac, rnd_frac, same_frac, max_obs)
-    dataset = dataset.repeat(repeat).map(fn).cache()
+    dataset = dataset.repeat(repeat).shuffle(10000).map(fn).cache()
     dataset = dataset.padded_batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset

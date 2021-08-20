@@ -37,6 +37,7 @@ class EncoderLayer(tf.keras.layers.Layer):
             out1 = self.layernorm1(self.reshape_leak_1(x) + attn_output)  # (batch_size, input_seq_len, d_model)
         else:
             out1 = self.layernorm1(attn_output)
+
         ffn_output = self.ffn(out1)  # (batch_size, input_seq_len, d_model)
         ffn_output = self.dropout2(ffn_output, training=training)
 
@@ -47,17 +48,6 @@ class EncoderLayer(tf.keras.layers.Layer):
 
         return out2
 
-def segment_embedding(x_transformed, seplim):
-    tensor_shape = tf.shape(x_transformed)
-    def fn(x):
-        seplim = tf.cast(x, tf.int32)
-        zeros = tf.zeros([tensor_shape[1]-seplim, tensor_shape[-1]])
-        ones = tf.ones([seplim, tensor_shape[-1]])
-        pe = tf.concat([zeros, ones], 0)
-        return pe
-    input_pe = tf.map_fn(lambda x: fn(x), seplim)
-    x_transformed+=input_pe
-    return x_transformed
 
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, num_layers, d_model, num_heads, dff,

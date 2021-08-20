@@ -22,7 +22,7 @@ class TestStringMethods(unittest.TestCase):
 
         expected = ['lcid', 'length', 'label',
                     'input', 'output', 'times',
-                    'mask_out', 'mask_in']
+                    'mask_out', 'mask_in', 'mean']
 
         self.assertListEqual(expected, batch_keys)
 

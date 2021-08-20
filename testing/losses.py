@@ -1,20 +1,28 @@
 import tensorflow as tf
 import unittest
-from core.losses import custom_mse
+from core.losses import custom_rmse
 from core.data import pretraining_records
+from core.astromer import get_ASTROMER
 
 class TestStringMethods(unittest.TestCase):
 
-    def test_load(self):
+    def test_dimensions(self):
+        path_record = './data/records/macho/train'
+        dataset = pretraining_records(path_record,
+                                      batch_size=16,
+                                      max_obs=100,
+                                      repeat=1,
+                                      msk_frac=0.5,
+                                      rnd_frac=0.2,
+                                      same_frac=0.2)
 
-        x_true = tf.ones([1, 10, 1])
-        x_pred = tf.ones([1, 10, 1])-0.5
-        mask = tf.convert_to_tensor([[0.,0.,0.,0.,1.,0.,0.,0.,0.,0.]])[..., tf.newaxis]
 
-        # rmse_1 = custom_mse(x_true, x_pred)
-        rmse_2 = custom_mse(x_true, x_pred, mask)
+        # model = get_ASTROMER()
+        for batch in dataset:
+            print(batch['obserr'])
+            # x_pred = model(batch)
 
-        self.assertEqual(rmse_2, 0.5)
+            break
 
 if __name__ == '__main__':
     unittest.main()

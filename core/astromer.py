@@ -74,14 +74,25 @@ def train_step(model, batch, opt):
     return mse
 
 @tf.function
-def valid_step(model, batch, return_pred=False):
+def valid_step(model, batch, return_pred=False, normed=False):
     with tf.GradientTape() as tape:
         x_pred = model(batch)
-        mse = custom_rmse(y_true=batch['input'],
-                         y_pred=x_pred,
-                         mask=batch['mask_out'])
+        if normed:
+            mean_x = tf.reshape(batch['mean'][:, 1], [-1, 1, 1])
+            x_true = batch['input'] + mean_x
+            x_pred = x_pred + mean_x
+
+            mse = custom_rmse(y_true=x_true,
+                              y_pred=x_pred,
+                              mask=batch['mask_out'])
+        else:
+            x_true = batch['input']
+            mse = custom_rmse(y_true=x_true,
+                              y_pred=x_pred,
+                              mask=batch['mask_out'])
+                              
     if return_pred:
-        return mse, x_pred, batch['input']
+        return mse, x_pred, x_true
     return mse
 
 def train(model,
@@ -158,7 +169,11 @@ def predict(model,
     total_mse, inputs, reconstructions = [], [], []
     masks = []
     for step, batch in tqdm(enumerate(dataset), desc='prediction'):
-        mse, x_pred, x_true = valid_step(model, batch, return_pred=True)
+        mse, x_pred, x_true = valid_step(model,
+                                         batch,
+                                         return_pred=True,
+                                         normed=True)
+
         total_mse.append(mse)
         inputs.append(x_true)
         reconstructions.append(x_pred)
