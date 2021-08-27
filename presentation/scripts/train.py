@@ -84,7 +84,7 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--epochs', default=10000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=1000, type=int,
+    parser.add_argument('--patience', default=200, type=int,
                         help='batch size')
     parser.add_argument('--repeat', default=1, type=int,
                         help='number of times to repeat the training and validation dataset')
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=2, type=int,
                         help='Number of encoder layers')
-    parser.add_argument('--heads', default=4, type=int,
+    parser.add_argument('--heads', default=2, type=int,
                         help='Number of self-attention heads')
     parser.add_argument('--head-dim', default=128, type=int,
                         help='Head-attention Dimensionality ')
