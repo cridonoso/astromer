@@ -2,19 +2,19 @@ import tensorflow as tf
 from tqdm import tqdm
 import os, sys
 
-from core.output    import RegLayer, ClfLayer, SplitLayer
+from core.output    import RegLayer
 from core.tboard    import save_scalar, draw_graph
 from core.losses    import custom_rmse, custom_bce
-from core.scheduler import CustomSchedule
 from core.metrics   import custom_acc
 from core.encoder   import Encoder
 from core.decoder   import Decoder
 
 
-from tensorflow.keras.optimizers.schedules import ExponentialDecay
 from tensorflow.keras.layers import Input, Dense
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import Model
+
+os.system('clear')
 
 def get_ASTROMER(num_layers=2,
                  d_model=200,
@@ -77,19 +77,19 @@ def train_step(model, batch, opt):
 def valid_step(model, batch, return_pred=False, normed=False):
     with tf.GradientTape() as tape:
         x_pred = model(batch)
-        if normed:
-            mean_x = tf.reshape(batch['mean'][:, 1], [-1, 1, 1])
-            x_true = batch['output'] + mean_x
-            x_pred = x_pred + mean_x
-
-            mse = custom_rmse(y_true=x_true,
-                              y_pred=x_pred,
-                              mask=batch['mask_out'])
-        else:
-            x_true = batch['output']
-            mse = custom_rmse(y_true=x_true,
-                              y_pred=x_pred,
-                              mask=batch['mask_out'])
+        # if normed:
+        #     mean_x = tf.reshape(batch['mean'][:, 1], [-1, 1, 1])
+        #     x_true = batch['output'] + mean_x
+        #     x_pred = x_pred + mean_x
+        #
+        #     mse = custom_rmse(y_true=x_true,
+        #                       y_pred=x_pred,
+        #                       mask=batch['mask_out'])
+        # else:
+        x_true = batch['output']
+        mse = custom_rmse(y_true=x_true,
+                          y_pred=x_pred,
+                          mask=batch['mask_out'])
 
     if return_pred:
         return mse, x_pred, x_true
@@ -130,23 +130,27 @@ def train(model,
     # Training Loop
     best_loss = 999999.
     es_count = 0
-    for epoch in range(epochs):
-        for step, train_batch in tqdm(enumerate(train_dataset), desc='train'):
+    pbar = tqdm(range(epochs), desc='epoch')
+    for epoch in pbar:
+        for train_batch in train_dataset:
             mse = train_step(model, train_batch, optimizer)
             train_mse.update_state(mse)
 
-        for valid_batch in tqdm(valid_dataset, desc='validation'):
+        for valid_batch in valid_dataset:
             mse = valid_step(model, valid_batch)
             valid_mse.update_state(mse)
+
+        msg = 'EPOCH {} - ES COUNT: {}/{} train mse: {:.4f} - val mse: {:.4f}'.format(epoch,
+                                                                                      es_count,
+                                                                                      patience,
+                                                                                      train_mse.result(),
+                                                                                      valid_mse.result())
+
+        pbar.set_description(msg)
 
         save_scalar(train_writter, train_mse, epoch, name='mse')
         save_scalar(valid_writter, valid_mse, epoch, name='mse')
 
-
-        if verbose == 0:
-            print('EPOCH {} - ES COUNT: {}'.format(epoch, es_count))
-            print('train mse: {:.2f} - val mse: {:.2f}'.format(train_mse.result(),
-                                                               valid_mse.result()))
 
         if valid_mse.result() < best_loss:
             best_loss = valid_mse.result()
@@ -167,7 +171,7 @@ def predict(model,
             predic_proba=False):
 
     total_mse, inputs, reconstructions = [], [], []
-    masks = []
+    masks, times = [], []
     for step, batch in tqdm(enumerate(dataset), desc='prediction'):
         mse, x_pred, x_true = valid_step(model,
                                          batch,
@@ -175,6 +179,7 @@ def predict(model,
                                          normed=True)
 
         total_mse.append(mse)
+        times.append(batch['times'])
         inputs.append(x_true)
         reconstructions.append(x_pred)
         masks.append(batch['mask_out'])
@@ -182,6 +187,7 @@ def predict(model,
     res = {'mse':tf.reduce_mean(total_mse).numpy(),
            'x_pred': tf.concat(reconstructions, 0),
            'x_true': tf.concat(inputs, 0),
-           'mask': tf.concat(masks, 0)}
+           'mask': tf.concat(masks, 0),
+           'time': tf.concat(times, 0)}
 
     return res

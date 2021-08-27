@@ -2,42 +2,41 @@ import tensorflow as tf
 
 
 def scaled_dot_product_attention(q, k, v, mask):
-  """Calculate the attention weights.
-  q, k, v must have matching leading dimensions.
-  k, v must have matching penultimate dimension, i.e.: seq_len_k = seq_len_v.
-  The mask has different shapes depending on its type(padding or look ahead)
-  but it must be broadcastable for addition.
+    """Calculate the attention weights.
+    q, k, v must have matching leading dimensions.
+    k, v must have matching penultimate dimension, i.e.: seq_len_k = seq_len_v.
+    The mask has different shapes depending on its type(padding or look ahead)
+    but it must be broadcastable for addition.
 
-  Args:
+    Args:
     q: query shape == (..., seq_len_q, depth)
     k: key shape == (..., seq_len_k, depth)
     v: value shape == (..., seq_len_v, depth_v)
     mask: Float tensor with shape broadcastable
           to (..., seq_len_q, seq_len_k). Defaults to None.
 
-  Returns:
+    Returns:
     output, attention_weights
-  """
+    """
 
-  matmul_qk = tf.matmul(q, k, transpose_b=True)  # (..., seq_len_q, seq_len_k)
+    matmul_qk = tf.matmul(q, k, transpose_b=True)  # (..., seq_len_q, seq_len_k)
 
-  # scale matmul_qk
-  dk = tf.cast(tf.shape(k)[-1], tf.float32)
-  scaled_attention_logits = matmul_qk / tf.math.sqrt(dk)
+    # scale matmul_qk
+    dk = tf.cast(tf.shape(k)[-1], tf.float32)
+    scaled_attention_logits = matmul_qk / tf.math.sqrt(dk)
 
-  def apply_mask(x, mask):
-      mask = tf.expand_dims(mask, 0) * -1e9
-      x = x + mask
-      x = tf.transpose(x, [0,2,1]) + mask
-      return x, mask
-  # add the mask to the scaled tensor.
-  masked_att, _ = tf.map_fn(lambda x: apply_mask(x[0], x[1]), (scaled_attention_logits, mask))
+    steps = tf.shape(scaled_attention_logits)[2]
+    mask_rshp = tf.tile(mask, [1,1,steps])
+    mask_rshp += tf.transpose(mask_rshp, [0,2,1])
+    mask_rshp = tf.minimum(1., mask_rshp)
+    mask_rshp = tf.expand_dims(mask_rshp, 1)
+    scaled_attention_logits += mask_rshp
 
-  # softmax is normalized on the last axis (seq_len_k) so that the scores add up to 1.
-  attention_weights = tf.nn.softmax(masked_att, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
-  output = tf.matmul(attention_weights, v, name='Z')  # (..., seq_len_q, depth_v)
+    # softmax is normalized on the last axis (seq_len_k) so that the scores add up to 1.
+    attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
+    output = tf.matmul(attention_weights, v, name='Z')  # (..., seq_len_q, depth_v)
 
-  return output, attention_weights
+    return output, attention_weights
 
 class MultiHeadAttention(tf.keras.layers.Layer):
     def __init__(self, d_model, num_heads):
