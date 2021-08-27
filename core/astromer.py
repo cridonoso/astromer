@@ -79,18 +79,18 @@ def valid_step(model, batch, return_pred=False, normed=False):
         x_pred = model(batch)
         if normed:
             mean_x = tf.reshape(batch['mean'][:, 1], [-1, 1, 1])
-            x_true = batch['input'] + mean_x
+            x_true = batch['output'] + mean_x
             x_pred = x_pred + mean_x
 
             mse = custom_rmse(y_true=x_true,
                               y_pred=x_pred,
                               mask=batch['mask_out'])
         else:
-            x_true = batch['input']
+            x_true = batch['output']
             mse = custom_rmse(y_true=x_true,
                               y_pred=x_pred,
                               mask=batch['mask_out'])
-                              
+
     if return_pred:
         return mse, x_pred, x_true
     return mse
