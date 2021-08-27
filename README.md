@@ -41,7 +41,6 @@ For example:
 ```
 http://127.0.0.1:8888/?token=9f09b7fa0937e8fb25cc3095837b42063a4fa88b3920e6df
 ``` 
-and change the port to `8889`.
 
 Note that if you are running the container remotely you have to change the **ip address** (i.e., `127.0.0.1` by `my_server.cl`)
 
@@ -49,6 +48,7 @@ Note that if you are running the container remotely you have to change the **ip 
 To create records, go to the notebook `presentation/notebooks/Records.ipynb`. (Tutorial in progress...)
 
 ### Testing cases
+[CURRENTLY NOT WORKING]
 To run testing case use: 
 ```
 python -m testing.data
