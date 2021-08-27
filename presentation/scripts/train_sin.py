@@ -6,7 +6,8 @@ import time
 import os
 
 from core.astromer import get_ASTROMER, train
-from core.data  import pretraining_records
+from core.scheduler import CustomSchedule
+from core.data  import from_generator
 from core.utils import get_folder_name
 from time import gmtime, strftime
 
@@ -22,8 +23,7 @@ def run(opt):
                             base=opt.base,
                             dropout=opt.dropout,
                             maxlen=opt.max_obs,
-                            use_leak=opt.use_leak,
-                            no_train=opt.no_train)
+                            use_leak=opt.use_leak)
 
     # Make sure we don't overwrite a previous training
     opt.p = get_folder_name(opt.p, prefix='')
@@ -39,26 +39,17 @@ def run(opt):
         json.dump(varsdic, json_file, indent=4)
 
     # Loading data
-    train_batches = pretraining_records(os.path.join(opt.data, 'train'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs,
-                                        repeat=opt.repeat,
-                                        msk_frac=opt.msk_frac,
-                                        rnd_frac=opt.rnd_frac,
-                                        same_frac=opt.same_frac)
-    valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs,
-                                        msk_frac=opt.msk_frac,
-                                        rnd_frac=opt.rnd_frac,
-                                        same_frac=opt.same_frac)
+    train_batches = from_generator(opt.max_obs, 100, opt.batch_size)
+    valid_batches = from_generator(opt.max_obs, 100, opt.batch_size)
 
     # Training ASTROMER
+    lr = CustomSchedule(opt.head_dim)
+
     train(astromer, train_batches, valid_batches,
           patience=opt.patience,
           exp_path=opt.p,
           epochs=opt.epochs,
-          lr=opt.lr,
+          lr=lr,
           verbose=0)
 
 
@@ -97,7 +88,7 @@ if __name__ == '__main__':
                         help='Number of self-attention heads')
     parser.add_argument('--head-dim', default=128, type=int,
                         help='Head-attention Dimensionality ')
-    parser.add_argument('--dff', default=128, type=int,
+    parser.add_argument('--dff', default=256, type=int,
                         help='Dimensionality of the middle  dense layer at the end of the encoder')
     parser.add_argument('--dropout', default=0.1 , type=float,
                         help='dropout_rate for the encoder')
@@ -108,9 +99,5 @@ if __name__ == '__main__':
 
     parser.add_argument('--use-leak', default=False, action='store_true',
                         help='Add the input to the attention vector')
-
-    parser.add_argument('--no-train', default=False, action='store_true',
-                        help='Train self-attention layer')
-
     opt = parser.parse_args()
     run(opt)
