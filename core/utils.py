@@ -1,7 +1,19 @@
+import tensorflow as tf
 import os
 
 
 def get_folder_name(path, prefix=''):
+    """
+    Look at the current path and change the name of the experiment
+    if it is repeated
+
+    Args:
+        path (string): folder path
+        prefix (string): prefix to add
+
+    Returns:
+        string: unique path to save the experiment
+"""
 
     if prefix == '':
         prefix = path.split('/')[-1]
@@ -18,3 +30,23 @@ def get_folder_name(path, prefix=''):
         path = os.path.join(path, '{}_{}'.format(prefix, n+1))
 
     return path
+
+def standardize(tensor, axis=0, return_mean=False):
+    """
+    Standardize a tensor subtracting the mean
+
+    Args:
+        tensor (1-dim tensorflow tensor): values
+        axis (int): axis on which we calculate the mean
+        return_mean (bool): output the mean of the tensor
+                            turning on the original scale
+    Returns:
+        tensor (1-dim tensorflow tensor): standardize tensor
+    """
+    mean_value = tf.reduce_mean(tensor, axis, name='mean_value')
+    z = tensor - tf.expand_dims(mean_value, axis)
+
+    if return_mean:
+        return z, mean_value
+    else:
+        return z

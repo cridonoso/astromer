@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tqdm import tqdm
+import logging
 import os, sys
 
 from core.output    import RegLayer
@@ -7,13 +7,13 @@ from core.tboard    import save_scalar, draw_graph
 from core.losses    import custom_rmse, custom_bce
 from core.metrics   import custom_acc
 from core.encoder   import Encoder
-from core.decoder   import Decoder
-
 
 from tensorflow.keras.layers import Input, Dense
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import Model
+from tqdm import tqdm
 
+logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 os.system('clear')
 
 def get_ASTROMER(num_layers=2,

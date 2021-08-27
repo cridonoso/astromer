@@ -21,8 +21,9 @@ def run(opt):
                             dff=opt.dff,
                             base=opt.base,
                             dropout=opt.dropout,
-                            maxlen=opt.max_obs)
-
+                            maxlen=opt.max_obs,
+                            use_leak=opt.use_leak,
+                            no_train=opt.no_train)
 
     # Check for pretrained weigths
     if os.path.isfile(os.path.join(opt.p, 'checkpoint')):
@@ -38,7 +39,9 @@ def run(opt):
                                 base=conf['base'],
                                 dropout=conf['dropout'],
                                 maxlen=conf['max_obs'],
-                                use_leak=conf['use_leak'])
+                                use_leak=conf['use_leak'],
+                                no_train=conf['no_train'])
+
         # Loading pretrained weights
         weights_path = '{}/weights'.format(opt.p)
         astromer.load_weights(weights_path)
@@ -68,13 +71,14 @@ def run(opt):
         train_batches = pretraining_records(os.path.join(opt.data, 'train'),
                                             opt.batch_size,
                                             max_obs=conf['max_obs'],
-                                            repeat=opt.repeat,
+                                            no_shuffle=opt.no_shuffle,
                                             msk_frac=conf['msk_frac'],
                                             rnd_frac=conf['rnd_frac'],
                                             same_frac=conf['same_frac'])
         valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
                                             opt.batch_size,
                                             max_obs=conf['max_obs'],
+                                            no_shuffle=opt.no_shuffle,
                                             msk_frac=conf['msk_frac'],
                                             rnd_frac=conf['rnd_frac'],
                                             same_frac=conf['same_frac'])
@@ -91,8 +95,9 @@ def run(opt):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # DATA
-    parser.add_argument('--max-obs', default=50, type=int,
+    parser.add_argument('--max-obs', default=200, type=int,
                     help='Max number of observations')
+
     # TRAINING PAREMETERS
     parser.add_argument('--data', default='./data/records/macho', type=str,
                         help='Dataset folder containing the records files')
@@ -102,16 +107,15 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--epochs', default=10000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=1000, type=int,
+    parser.add_argument('--patience', default=200, type=int,
                         help='batch size')
-    parser.add_argument('--repeat', default=1, type=int,
-                        help='number of times to repeat the training and validation dataset')
+
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=1, type=int,
                         help='Number of encoder layers')
     parser.add_argument('--heads', default=2, type=int,
                         help='Number of self-attention heads')
-    parser.add_argument('--head-dim', default=128, type=int,
+    parser.add_argument('--head-dim', default=256, type=int,
                         help='Head-attention Dimensionality ')
     parser.add_argument('--dff', default=512, type=int,
                         help='Dimensionality of the middle  dense layer at the end of the encoder')
@@ -119,8 +123,15 @@ if __name__ == '__main__':
                         help='dropout_rate for the encoder')
     parser.add_argument('--base', default=1000, type=int,
                         help='base of embedding')
-    parser.add_argument('--lr', default=1e-5, type=float,
+    parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
+
+    parser.add_argument('--use-leak', default=False, action='store_true',
+                        help='Add the input to the attention vector')
+    parser.add_argument('--no-train', default=False, action='store_true',
+                        help='Train self-attention layer')
+    parser.add_argument('--no-shuffle', default=False, action='store_true',
+                        help='Do not shuffle training datasets')
 
     opt = parser.parse_args()
     run(opt)

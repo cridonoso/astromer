@@ -6,6 +6,7 @@ import logging
 import os
 
 from core.masking import get_masked, set_random, get_padding_mask
+from core.utils import standardize
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
@@ -24,6 +25,18 @@ def _int64_feature(value):
     return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
 def get_example(lcid, label, lightcurve):
+    """
+    Create a record example from numpy values.
+
+    Args:
+        lcid (string): object id
+        label (int): class code
+        lightcurve (numpy array): time, magnitudes and observational error
+
+    Returns:
+        tensorflow record
+    """
+
     f = dict()
 
     dict_features={
@@ -45,6 +58,20 @@ def get_example(lcid, label, lightcurve):
     return ex
 
 def divide_training_subset(frame, train, val):
+    """
+    Divide the dataset into train, validation and test subsets.
+    Notice that:
+        test = 1 - (train + val)
+
+    Args:
+        frame (Dataframe): Dataframe following the astro-standard format
+        dest (string): Record destination.
+        train (float): train fraction
+        val (float): validation fraction
+    Returns:
+        tuple x3 : (name of subset, subframe with metadata)
+    """
+
     frame = frame.sample(frac=1)
     n_samples = frame.shape[0]
     n_train = int(n_samples*train)
@@ -56,7 +83,20 @@ def divide_training_subset(frame, train, val):
 
     return ('train', sub_train), ('val', sub_val), ('test', sub_test)
 
-def process_lc(row, source, lc_index, unique_classes, writer):
+def process_lc(row, source, unique_classes, writer):
+    """
+    Filter a sample according to our astronomical criteria and write
+    example in the corresponding record.
+
+    Args:
+        row (Pandas serie): Dataframe row containing information about
+                            a particular sample
+        source (string):  Lightcurves folder path
+        unique_classes (list): list with unique classes
+        writer (tf.writer) : record writer
+
+    """
+
     path  = row['Path'].split('/')[-1]
     label = list(unique_classes).index(row['Class'])
     lc_path = os.path.join(source, path)
@@ -70,6 +110,20 @@ def process_lc(row, source, lc_index, unique_classes, writer):
     writer.write(ex.SerializeToString())
 
 def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None):
+    """
+    Write records from a Dataframe with lightcurve IDs.
+
+    Args:
+        frame (Pandas DataFrame): Dataframe following the astro-standard format
+        dest (string): Record destination.
+        max_lcs_per_record (int): Maximum number of lightcurves
+                                  to be stored on the record file.
+        source (string): Lightcurves folder path
+        unique (list): Unique classes
+        n_jobs (int): Number of cores to distribute the function.
+
+    """
+
     n_jobs = mp.cpu_count() if n_jobs is not None else n_jobs
     # Get frames with fixed number of lightcurves
     collection = [frame.iloc[i:i+max_lcs_per_record] \
@@ -87,6 +141,25 @@ def create_dataset(meta_df,
                    n_jobs=None,
                    subsets_frac=(0.5, 0.25),
                    max_lcs_per_record=100):
+    """
+    Transform a csv dataset to tf.record files
+
+    The astro-standard format consists of two files:
+    - metadata csv with columns = [id, Class, Band, Path]
+      If 'Class' is unknown please label samples as UNK
+    - a folder containing lightcurves in csv.
+      Each lightcurve is a dataframe containing ['mjd', 'magnitude', 'error']
+
+    Args:
+        meta_df (Dataframe): Dataframe following the astro-standard format
+        source (string): Lightcurves folder path
+        target (string): Record folder destination
+        n_jobs (int): Number of cores to distribute the function.
+        subsets_frac (float tuple): Train and validation fractions
+        max_lcs_per_record (int): Maximum number of lightcurves
+                                  to be stored on the record file.
+    """
+
     os.makedirs(target, exist_ok=True)
 
     bands = meta_df['Band'].unique()
@@ -113,42 +186,16 @@ def create_dataset(meta_df,
             os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs)
 
-def standardize(tensor, axis=0, return_mean=False):
-    mean_value = tf.reduce_mean(tensor, axis, name='mean_value')
-    std_value = tf.math.reduce_std(tensor, axis, name='std_value')
-
-    if axis == 1:
-        mean_value = tf.expand_dims(mean_value, axis)
-        std_value = tf.expand_dims(std_value, axis)
-
-    normed = tensor - mean_value
-
-    if return_mean:
-        return normed, mean_value
-    else:
-        return normed
-
-def normalize(tensor, axis=0):
-    min_value = tf.reduce_min(tensor, axis, name='min_value')
-    max_value = tf.reduce_max(tensor, axis, name='max_value')
-
-    if axis == 1:
-        min_value = tf.expand_dims(min_value, axis)
-        max_value = tf.expand_dims(max_value, axis)
-
-    normed = tf.math.divide_no_nan(tensor - min_value,
-                                   max_value - min_value)
-    return normed
-
-def get_delta(tensor):
-    tensor = tensor[1:] - tensor[:-1]
-    tensor = tf.concat([tf.expand_dims([0.], 1), tensor], 0)
-    return tensor
-
 def get_sample(sample):
-    '''
+    """
     Read a serialized sample and convert it to tensor
-    '''
+    Context and sequence features should match with the name used when writing.
+    Args:
+        sample (binary): serialized sample
+
+    Returns:
+        type: decoded sample
+    """
     context_features = {'label': tf.io.FixedLenFeature([],dtype=tf.int64),
                         'length': tf.io.FixedLenFeature([],dtype=tf.int64),
                         'id': tf.io.FixedLenFeature([], dtype=tf.string)}
@@ -290,32 +337,85 @@ def adjust_fn(func, msk_prob, rnd_prob, same_prob, max_obs):
         return result
     return wrap
 
+def pretraining_records(source, batch_size, no_shuffle=False, max_obs=100,
+                        msk_frac=0.2, rnd_frac=0.1, same_frac=0.1):
+    """
+    Pretraining data loader.
+    This method build the ASTROMER input format.
+    ASTROMER format is based on the BERT masking strategy.
+
+    Args:
+        source (string): Record folder
+        batch_size (int): Batch size
+        no_shuffle (bool): Do not shuffle training and validation dataset
+        max_obs (int): Max. number of observation per serie
+        msk_frac (float): fraction of values to be predicted ([MASK])
+        rnd_frac (float): fraction of [MASKED] values to replace with random values
+        same_frac (float): fraction of [MASKED] values to replace with true values
+
+    Returns:
+        Tensorflow Dataset: Iterator withg preprocessed batches
+    """
+    fn = adjust_fn(_parse_pt, msk_frac, rnd_frac, same_frac, max_obs)
+
+    rec_paths = [os.path.join(source, folder, x) for folder in os.listdir(source) \
+                 for x in os.listdir(os.path.join(source, folder))]
+
+    dataset = tf.data.TFRecordDataset(rec_paths)
+    if no_shuffle:
+        print('[INFO] No shuffling')
+        dataset = dataset.shuffle(10000)
+    dataset = dataset.map(fn)
+    dataset = dataset.cache()
+    dataset = dataset.padded_batch(batch_size)
+    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+    return dataset
+
 def adjust_fn_clf(func, max_obs):
     def wrap(*args, **kwargs):
         result = func(*args, max_obs)
         return result
     return wrap
 
-def pretraining_records(source, batch_size, repeat=1, max_obs=100, msk_frac=0.2, rnd_frac=0.1, same_frac=0.1):
-    datasets = [os.path.join(source, folder, x) for folder in os.listdir(source) \
-                for x in os.listdir(os.path.join(source, folder))]
-    dataset = tf.data.TFRecordDataset(datasets)
-    fn = adjust_fn(_parse_pt, msk_frac, rnd_frac, same_frac, max_obs)
-    dataset = dataset.repeat(repeat).shuffle(10000).map(fn).cache()
-    dataset = dataset.padded_batch(batch_size)
-    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
-    return dataset
+def clf_records(source, batch_size, max_obs=100, take=1):
+    """
+    Classification data loader.
+    It creates ASTROMER-like input but without masking
 
-def clf_records(source, batch_size, max_obs=100, repeat=1):
-    datasets = [os.path.join(source, folder, x) for folder in os.listdir(source) \
-                for x in os.listdir(os.path.join(source, folder))]
-    dataset = tf.data.TFRecordDataset(datasets)
+    Args:
+        source (string): Record folder
+        batch_size (int): Batch size
+        max_obs (int): Max. number of observation per serie
+        take (int):  Number of batches.
+                     If 'take' is -1 then it returns the whole dataset without
+                     shuffle and oversampling (i.e., testing case)
+    Returns:
+        Tensorflow Dataset: Iterator withg preprocessed batches
+    """
+
     fn = adjust_fn_clf(_parse_normal, max_obs)
-    dataset = dataset.repeat(repeat).shuffle(10000).map(fn).cache()
-    dataset = dataset.padded_batch(batch_size)
-    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+    rec_paths = [os.path.join(source, folder, x) for folder in os.listdir(source) \
+                 for x in os.listdir(os.path.join(source, folder))]
 
-    return dataset
+    if take < 0:
+        print('[INFO] No shuffle No Oversampling'.format(take))
+        dataset = tf.data.TFRecordDataset(rec_paths)
+        dataset = dataset.map(fn).cache()
+        dataset = dataset.padded_batch(batch_size)
+        dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+        return dataset
+    else:
+        print('[INFO] Taking {} balanced batches'.format(take))
+        datasets = [tf.data.TFRecordDataset(x) for x in rec_paths]
+        datasets = [dataset.repeat() for dataset in datasets]
+        datasets = [dataset.map(fn) for dataset in datasets]
+        datasets = [dataset.shuffle(batch_size, reshuffle_each_iteration=True) for dataset in datasets]
+        dataset = tf.data.experimental.sample_from_datasets(datasets)
+        dataset = dataset.padded_batch(batch_size)
+        dataset = dataset.take(take)
+        dataset = dataset.cache()
+        dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+        return dataset
 
 # SINUSOIDAL DATA
 def count(stop):

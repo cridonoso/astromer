@@ -11,33 +11,34 @@ from core.data  import clf_records
 from core.utils import get_folder_name
 from time import gmtime, strftime
 
-
+os.system('clear')
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
-
 
 def run(opt):
     # Loading data
     train_batches = clf_records(os.path.join(opt.data, 'train'),
                                 opt.batch_size,
-                                repeat=opt.repeat,
-                                max_obs=opt.max_obs)
+                                max_obs=opt.max_obs,
+                                take=opt.take)
     valid_batches = clf_records(os.path.join(opt.data, 'val'),
                                 opt.batch_size,
-                                repeat=opt.repeat,
-                                max_obs=opt.max_obs)
+                                max_obs=opt.max_obs,
+                                take=opt.take)
 
     num_classes = pd.read_csv(os.path.join(opt.data, 'objects.csv')).shape[0]
 
-    # Get model
-    if opt.use_att:
-        if opt.use_rnn:
-            clf = get_lstm_attention(opt.units,
-                                     num_classes,
-                                     opt.w,
-                                     dropout=opt.dropout)
-        else:
-            clf = get_fc_attention(opt.units, num_classes, opt.w)
-    else:
+
+    if opt.mode == 0:
+        clf = get_lstm_attention(opt.units,
+                                 num_classes,
+                                 opt.w,
+                                 dropout=opt.dropout)
+    if opt.mode == 1:
+        clf = get_fc_attention(opt.units,
+                               num_classes,
+                               opt.w)
+
+    if opt.mode == 2:
         clf = get_lstm_no_attention(opt.units,
                                     num_classes,
                                     maxlen=opt.max_obs,
@@ -86,10 +87,10 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--epochs', default=10000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=1000, type=int,
+    parser.add_argument('--patience', default=200, type=int,
                         help='batch size')
-    parser.add_argument('--repeat', default=5, type=int,
-                        help='number of times to repeat the training and validation dataset')
+    parser.add_argument('--take', default=-1, type=int,
+                        help='Number of balanced batches for training. -1 do not balance')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
     # RNN HIPERPARAMETERS
@@ -97,10 +98,10 @@ if __name__ == '__main__':
                         help='number of units for the RNN')
     parser.add_argument('--dropout', default=0.5 , type=float,
                         help='dropout_rate for the encoder')
-    parser.add_argument('--use-att', default=False, action='store_true',
-                        help='Use attention as the RNN input')
-    parser.add_argument('--use-rnn', default=False, action='store_true',
-                        help='Use attention as the RNN input')
+
+    parser.add_argument('--mode', default=0, type=int,
+                        help='Classifier model: 0: LSTM + ATT - 1: MLP + ATT - 2 LSTM')
+
 
 
     opt = parser.parse_args()

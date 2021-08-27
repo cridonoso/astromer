@@ -1,4 +1,5 @@
 import tensorflow as tf
+import logging
 import json
 import os
 
@@ -12,8 +13,8 @@ from core.tboard import save_scalar
 from core.losses import custom_bce
 from tqdm import tqdm
 
-
 from core.data import standardize
+logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 def get_fc_attention(units, num_classes, weigths):
     ''' FC + ATT'''
@@ -162,13 +163,14 @@ def train(model,
     # ==============================
     best_loss = 999999.
     es_count = 0
-    for epoch in range(epochs):
-        for train_batch in tqdm(train_batches, desc='train'):
+    pbar = tqdm(range(epochs), desc='epoch')
+    for epoch in pbar:
+        for train_batch in train_batches:
             acc, bce = train_step(model, train_batch, optimizer)
             train_acc.update_state(acc)
             train_bce.update_state(bce)
 
-        for valid_batch in tqdm(valid_batches, desc='validation'):
+        for valid_batch in valid_batches:
             acc, bce = valid_step(model, valid_batch)
             valid_acc.update_state(acc)
             valid_bce.update_state(bce)
@@ -178,13 +180,6 @@ def train(model,
         save_scalar(train_writter, train_bce, epoch, name='xentropy')
         save_scalar(valid_writter, valid_bce, epoch, name='xentropy')
 
-        if verbose == 0:
-            print('EPOCH {} - ES COUNT: {}'.format(epoch, es_count))
-            print('train acc: {:.2f} - train ce: {:.2f}'.format(train_acc.result(),
-                                                                train_bce.result()))
-            print('val acc: {:.2f} - val ce: {:.2f}'.format(valid_acc.result(),
-                                                            valid_bce.result(),
-                                                            ))
         if valid_bce.result() < best_loss:
             best_loss = valid_bce.result()
             es_count = 0.
@@ -194,6 +189,18 @@ def train(model,
         if es_count == patience:
             print('[INFO] Early Stopping Triggered')
             break
+
+
+        msg = 'EPOCH {} - ES COUNT: {}/{} Train acc: {:.4f} - Val acc: {:.4f} - Train CE: {:.2f} - Val CE: {:.2f}'.format(
+                                                                                      epoch,
+                                                                                      es_count,
+                                                                                      patience,
+                                                                                      train_acc.result(),
+                                                                                      valid_acc.result(),
+                                                                                      train_bce.result(),
+                                                                                      valid_bce.result())
+
+        pbar.set_description(msg)
 
         valid_bce.reset_states()
         train_bce.reset_states()
@@ -242,29 +249,20 @@ def predict(model, test_batches):
 
     return results
 
-    # os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
-    # results_file = os.path.join(opt.p, 'test', 'test_results.json')
-    # with open(results_file, 'w') as json_file:
-    #     json.dump(results, json_file, indent=4)
-    #
-    # h5f = h5py.File(os.path.join(opt.p, 'test', 'predictions.h5'), 'w')
-    # h5f.create_dataset('y_pred', data=y_pred.numpy())
-    # h5f.create_dataset('y_true', data=y_true.numpy())
 
-def predict_from_path(path, test_batches, use_att=True, use_fc=False, save=False):
+def predict_from_path(path, test_batches, mode=0, save=False):
     conf_rnn = get_conf(path)
 
-    if use_att:
-        if use_fc:
-            clf = get_fc_attention(conf_rnn['units'],
-                                   conf_rnn['num_classes'],
-                                   conf_rnn['w'])
-        else:
-            clf = get_lstm_attention(conf_rnn['units'],
+    if mode == 0:
+        clf = get_fc_attention(conf_rnn['units'],
+                               conf_rnn['num_classes'],
+                               conf_rnn['w'])
+    if mode == 1:
+        clf = get_lstm_attention(conf_rnn['units'],
                                      conf_rnn['num_classes'],
                                      conf_rnn['w'],
                                      conf_rnn['dropout'])
-    else:
+    if mode == 2:
         clf = get_lstm_no_attention(conf_rnn['units'],
                                     conf_rnn['num_classes'],
                                     conf_rnn['max_obs'],
@@ -272,8 +270,5 @@ def predict_from_path(path, test_batches, use_att=True, use_fc=False, save=False
 
     clf = load_weights(clf, path)
     results = predict(clf, test_batches)
-
-    if save:
-        pass
 
     return results
