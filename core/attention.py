@@ -26,9 +26,9 @@ def scaled_dot_product_attention(q, k, v, mask):
   scaled_attention_logits = matmul_qk / tf.math.sqrt(dk)
 
   def apply_mask(x, mask):
-      mask = tf.expand_dims(mask, 0)
-      x = x * (1.-mask)
-      x = tf.transpose(x, [0,2,1]) * (1.-mask)
+      mask = tf.expand_dims(mask, 0) * -1e9
+      x = x + mask
+      x = tf.transpose(x, [0,2,1]) + mask
       return x, mask
   # add the mask to the scaled tensor.
   masked_att, _ = tf.map_fn(lambda x: apply_mask(x[0], x[1]), (scaled_attention_logits, mask))
