@@ -22,7 +22,8 @@ def run(opt):
                             base=opt.base,
                             dropout=opt.dropout,
                             maxlen=opt.max_obs,
-                            use_leak=opt.use_leak)
+                            use_leak=opt.use_leak,
+                            no_train=opt.no_train)
 
     # Make sure we don't overwrite a previous training
     opt.p = get_folder_name(opt.p, prefix='')
@@ -107,5 +108,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--use-leak', default=False, action='store_true',
                         help='Add the input to the attention vector')
+
+    parser.add_argument('--no-train', default=False, action='store_true',
+                        help='Train self-attention layer')
+
     opt = parser.parse_args()
     run(opt)

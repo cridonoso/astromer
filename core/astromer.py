@@ -23,6 +23,7 @@ def get_ASTROMER(num_layers=2,
                  base=10000,
                  dropout=0.1,
                  use_leak=False,
+                 no_train=True,
                  maxlen=100,
                  batch_size=None):
 
@@ -45,14 +46,19 @@ def get_ASTROMER(num_layers=2,
                    'times':times,
                    'length':length}
 
-    x = Encoder(num_layers,
+    encoder = Encoder(num_layers,
                 d_model,
                 num_heads,
                 dff,
                 base=base,
                 rate=dropout,
                 use_leak=use_leak,
-                name='encoder')(placeholder)
+                name='encoder')
+
+    if no_train:
+        encoder.trainable = False
+
+    x = encoder(placeholder)
 
     x = RegLayer(name='regression')(x)
 
