@@ -20,7 +20,7 @@ All the commands mentioned must be executed in the root directory (i.e., where `
 
 ### Interactive Session
 To train and run scripts, we need to access the container interactively. Please type:
-```docker run -it astromer bash``` 
+```docker exec -it astromer bash``` 
 where `-it` means (`i`)nteractive session on the (`t`)agged container. Notice we make the command line `bash` explicit.
 
 ### Scripts
