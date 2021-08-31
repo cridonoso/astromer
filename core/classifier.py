@@ -254,14 +254,14 @@ def predict_from_path(path, test_batches, mode=0, save=False):
     conf_rnn = get_conf(path)
 
     if mode == 0:
-        clf = get_fc_attention(conf_rnn['units'],
-                               conf_rnn['num_classes'],
-                               conf_rnn['w'])
-    if mode == 1:
         clf = get_lstm_attention(conf_rnn['units'],
-                                     conf_rnn['num_classes'],
-                                     conf_rnn['w'],
+                               conf_rnn['num_classes'],
+                               conf_rnn['w'],
                                      conf_rnn['dropout'])
+    if mode == 1:
+        clf = get_fc_attention(conf_rnn['units'],
+                                     conf_rnn['num_classes'],
+                                     conf_rnn['w'])
     if mode == 2:
         clf = get_lstm_no_attention(conf_rnn['units'],
                                     conf_rnn['num_classes'],

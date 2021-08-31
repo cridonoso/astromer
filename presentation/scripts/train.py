@@ -68,14 +68,14 @@ def run(opt):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # DATA
-    parser.add_argument('--max-obs', default=200, type=int,
+    parser.add_argument('--max-obs', default=50, type=int,
                     help='Max number of observations')
 
-    parser.add_argument('--msk-frac', default=0.2, type=float,
+    parser.add_argument('--msk-frac', default=0.5, type=float,
                         help='[MASKED] fraction')
-    parser.add_argument('--rnd-frac', default=0.15, type=float,
+    parser.add_argument('--rnd-frac', default=0.2, type=float,
                         help='Fraction of [MASKED] to be replaced by random values')
-    parser.add_argument('--same-frac', default=0.15, type=float,
+    parser.add_argument('--same-frac', default=0.2, type=float,
                         help='Fraction of [MASKED] to be replaced by same values')
 
     # TRAINING PAREMETERS

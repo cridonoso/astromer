@@ -44,12 +44,11 @@ def run(opt):
                                     maxlen=opt.max_obs,
                                     dropout=opt.dropout)
 
-
-    # Make sure we don't overwrite a previous training
-    opt.p = get_folder_name(opt.p, prefix='')
-
     # Creating (--p)royect directory
     os.makedirs(opt.p, exist_ok=True)
+    
+#     # Make sure we don't overwrite a previous training
+#     opt.p = get_folder_name(opt.p, prefix='')
 
     # Save Hyperparameters
     conf_file = os.path.join(opt.p, 'conf.json')
