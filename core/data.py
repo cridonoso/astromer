@@ -100,15 +100,19 @@ def process_lc(row, source, unique_classes, writer):
     path  = row['Path'].split('/')[-1]
     label = list(unique_classes).index(row['Class'])
     lc_path = os.path.join(source, path)
-    observations = pd.read_csv(lc_path)
-    observations.columns = ['mjd', 'mag', 'errmag']
-    observations = observations.dropna()
-    observations.sort_values('mjd')
-    observations = observations.drop_duplicates(keep='last')
-    numpy_lc = observations.values
-    ex = get_example(lc_index, label, numpy_lc)
-    writer.write(ex.SerializeToString())
-
+    try:
+        observations = pd.read_csv(lc_path)
+    
+        observations.columns = ['mjd', 'mag', 'errmag']
+        observations = observations.dropna()
+        observations.sort_values('mjd')
+        observations = observations.drop_duplicates(keep='last')
+        numpy_lc = observations.values
+        ex = get_example(row['ID'], label, numpy_lc)
+        writer.write(ex.SerializeToString())
+    except:
+        print('[ERROR] {} Lightcurve could not be processed.'.format(row['ID']))
+        
 def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None):
     """
     Write records from a Dataframe with lightcurve IDs.
@@ -131,7 +135,7 @@ def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None):
     # Iterate over subset
     for counter, subframe in enumerate(collection):
         with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
-            Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(process_lc)(row, source, k, unique, writer) \
+            Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(process_lc)(row, source, unique, writer) \
                                     for k, row in subframe.iterrows())
 
 

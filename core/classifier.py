@@ -37,7 +37,8 @@ def get_fc_attention(units, num_classes, weigths):
     encoder.trainable = False
 
     x = encoder(encoder.input)
-    x = tf.reshape(x, [-1, conf['max_obs']*encoder.output.shape[-1]])
+    x = tf.reduce_mean(x, 1)
+    
     x = LayerNormalization()(x)
     x = Dense(units, name='FCN1')(x)
     x = LayerNormalization()(x)

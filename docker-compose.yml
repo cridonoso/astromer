@@ -7,7 +7,7 @@ services:
             - ./:/tf/astromer/
         ports:
             - 6006:6006
-            - 8888:8888
-        # runtime: nvidia
+            - 8889:8888
+        runtime: nvidia
         environment:
             FLASK_DEBUG: 1
