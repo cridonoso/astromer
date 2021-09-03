@@ -102,7 +102,7 @@ def process_lc(row, source, unique_classes, writer):
     lc_path = os.path.join(source, path)
     try:
         observations = pd.read_csv(lc_path)
-    
+
         observations.columns = ['mjd', 'mag', 'errmag']
         observations = observations.dropna()
         observations.sort_values('mjd')
@@ -112,7 +112,7 @@ def process_lc(row, source, unique_classes, writer):
         writer.write(ex.SerializeToString())
     except:
         print('[ERROR] {} Lightcurve could not be processed.'.format(row['ID']))
-        
+
 def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None):
     """
     Write records from a Dataframe with lightcurve IDs.
@@ -366,9 +366,11 @@ def pretraining_records(source, batch_size, no_shuffle=False, max_obs=100,
                  for x in os.listdir(os.path.join(source, folder))]
 
     dataset = tf.data.TFRecordDataset(rec_paths)
-    if no_shuffle:
-        print('[INFO] No shuffling')
+    if not no_shuffle:
+        print('[INFO] Shuffling')
         dataset = dataset.shuffle(10000)
+        dataset = dataset.repeat(5)
+
     dataset = dataset.map(fn)
     dataset = dataset.cache()
     dataset = dataset.padded_batch(batch_size)
