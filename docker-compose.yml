@@ -5,9 +5,10 @@ services:
         container_name: astromer
         volumes:
             - ./:/tf/astromer/
+            - /media/ibecker/NVME1/Databases/MACHO/R/:/tf/Data/
         ports:
             - 6006:6006
             - 8889:8888
-        runtime: nvidia
+        # runtime: nvidia
         environment:
             FLASK_DEBUG: 1

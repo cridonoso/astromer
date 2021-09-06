@@ -10,6 +10,9 @@ from core.utils import standardize
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
+from time import time
+from joblib import wrap_non_picklable_objects
+
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 def _bytes_feature(value):
@@ -113,30 +116,43 @@ def process_lc(row, source, unique_classes, writer):
     except:
         print('[ERROR] {} Lightcurve could not be processed.'.format(row['ID']))
 
+@wrap_non_picklable_objects
+def process_lc2(row, source, lc_index, unique_classes):
+    path  = row['Path'].split('/')[-1]
+    label = list(unique_classes).index(row['Class'])
+    lc_path = os.path.join(source, path)
+    observations = pd.read_csv(lc_path)
+    observations.columns = ['mjd', 'mag', 'errmag']
+    observations = observations.dropna()
+    observations.sort_values('mjd')
+    observations = observations.drop_duplicates(keep='last')
+    numpy_lc = observations.values
+
+    return lc_index, label, numpy_lc
+
+def process_lc3(lc_index, label, numpy_lc, writer):
+    ex = get_example(lc_index, label, numpy_lc)
+    writer.write(ex.SerializeToString())
+    
 def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None):
-    """
-    Write records from a Dataframe with lightcurve IDs.
-
-    Args:
-        frame (Pandas DataFrame): Dataframe following the astro-standard format
-        dest (string): Record destination.
-        max_lcs_per_record (int): Maximum number of lightcurves
-                                  to be stored on the record file.
-        source (string): Lightcurves folder path
-        unique (list): Unique classes
-        n_jobs (int): Number of cores to distribute the function.
-
-    """
-
-    n_jobs = mp.cpu_count() if n_jobs is not None else n_jobs
+#     n_jobs = mp.cpu_count() if n_jobs is not None else n_jobs
     # Get frames with fixed number of lightcurves
     collection = [frame.iloc[i:i+max_lcs_per_record] \
                   for i in range(0, frame.shape[0], max_lcs_per_record)]
+
     # Iterate over subset
+    # First process and then serialize
     for counter, subframe in enumerate(collection):
+        t0 = time()
+        var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, k, unique) \
+                                    for k, row in subframe.iterrows())    
+        
         with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
-            Parallel(n_jobs=n_jobs, backend='multiprocessing')(delayed(process_lc)(row, source, unique, writer) \
-                                    for k, row in subframe.iterrows())
+            for counter2, data_lc in enumerate(var):
+                ex = process_lc3(*data_lc, writer)
+#                 writer.write(ex.SerializeToString())
+        t1 = time()
+        print(t1-t0)            
 
 
 def create_dataset(meta_df,
@@ -145,25 +161,6 @@ def create_dataset(meta_df,
                    n_jobs=None,
                    subsets_frac=(0.5, 0.25),
                    max_lcs_per_record=100):
-    """
-    Transform a csv dataset to tf.record files
-
-    The astro-standard format consists of two files:
-    - metadata csv with columns = [id, Class, Band, Path]
-      If 'Class' is unknown please label samples as UNK
-    - a folder containing lightcurves in csv.
-      Each lightcurve is a dataframe containing ['mjd', 'magnitude', 'error']
-
-    Args:
-        meta_df (Dataframe): Dataframe following the astro-standard format
-        source (string): Lightcurves folder path
-        target (string): Record folder destination
-        n_jobs (int): Number of cores to distribute the function.
-        subsets_frac (float tuple): Train and validation fractions
-        max_lcs_per_record (int): Maximum number of lightcurves
-                                  to be stored on the record file.
-    """
-
     os.makedirs(target, exist_ok=True)
 
     bands = meta_df['Band'].unique()
