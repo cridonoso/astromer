@@ -49,7 +49,7 @@ def run(opt):
         opt.p = os.path.join(opt.p, 'finetuning')
         os.makedirs(opt.p, exist_ok=True)
         # Make sure we don't overwrite a previous training
-        opt.p = get_folder_name(opt.p, prefix='model')
+        opt.p = get_folder_name(opt.p, prefix=opt.prefix)
 
         # Creating (--p)royect directory
         os.makedirs(opt.p, exist_ok=True)
@@ -103,6 +103,8 @@ if __name__ == '__main__':
                         help='Dataset folder containing the records files')
     parser.add_argument('--p', default="./runs/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
+    parser.add_argument('--prefix', default="model", type=str,
+                        help='prefix for the folder of the finetuned model')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
     parser.add_argument('--epochs', default=10000, type=int,
