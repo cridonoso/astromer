@@ -10,13 +10,15 @@ datasets = ['ogle_10',  'ogle_100',  'ogle_1000',  'ogle_2500',  'ogle_500']
 astroweights = './runs/machito_0/finetuning'
 root_exp = './clf_runs/'
 
-conf_file = os.path.join(astroweights, 'conf.json')
-with open(conf_file, 'r') as handle:
-    conf = json.load(handle)
 
 for dataset in datasets:
     for mode, name in enumerate(modes):
         path_w = os.path.join(astroweights, dataset)
+
+        conf_file = os.path.join(path_w, 'conf.json')
+        with open(conf_file, 'r') as handle:
+            conf = json.load(handle)
+
         print(path_w)
         start = time.time()
         command1 = 'python -m presentation.scripts.classification \
