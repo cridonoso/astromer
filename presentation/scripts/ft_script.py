@@ -5,8 +5,8 @@ import time
 import json
 import os
 
-datasets = ['alcock', 'ogle']
-astroweights = './runs/huge'
+datasets = ['ogle_10',  'ogle_100',  'ogle_1000',  'ogle_2500',  'ogle_500']
+astroweights = './runs/machito_0'
 
 conf_file = os.path.join(astroweights, 'conf.json')
 with open(conf_file, 'r') as handle:
