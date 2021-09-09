@@ -18,7 +18,7 @@ for dataset in datasets:
     for mode, name in enumerate(modes):
         path_w = os.path.join(astroweights, dataset)
         print(path_w)
-        start = time. time()
+        start = time.time()
         command1 = 'python -m presentation.scripts.classification \
                    --data ./data/records/{} \
                    --max-obs {} \
@@ -34,5 +34,5 @@ for dataset in datasets:
             subprocess.call(command1, shell=True)
         except Exception as e:
             print(e)
-        end = time. time()
+        end = time.time()
         print('{} using {} takes {:.2f} sec'.format(dataset, name, (end - start)))

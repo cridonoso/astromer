@@ -13,6 +13,7 @@ with open(conf_file, 'r') as handle:
     conf = json.load(handle)
 
 for dataset in datasets:
+    start = time.time()
 	command1 = 'python -m presentation.scripts.finetuning \
                --data ./data/records/{} \
                --p {}\
