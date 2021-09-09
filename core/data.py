@@ -117,7 +117,7 @@ def process_lc(row, source, unique_classes, writer):
         print('[ERROR] {} Lightcurve could not be processed.'.format(row['ID']))
 
 @wrap_non_picklable_objects
-def process_lc2(row, source, lc_index, unique_classes):
+def process_lc2(row, source, unique_classes):
     path  = row['Path'].split('/')[-1]
     label = list(unique_classes).index(row['Class'])
     lc_path = os.path.join(source, path)
@@ -128,14 +128,16 @@ def process_lc2(row, source, lc_index, unique_classes):
     observations = observations.drop_duplicates(keep='last')
     numpy_lc = observations.values
 
-    return lc_index, label, numpy_lc
+    return row['ID'], label, numpy_lc
 
 def process_lc3(lc_index, label, numpy_lc, writer):
-    ex = get_example(lc_index, label, numpy_lc)
-    writer.write(ex.SerializeToString())
+    try:
+        ex = get_example(lc_index, label, numpy_lc)
+        writer.write(ex.SerializeToString())
+    except:
+        print('[INFO] {} could not be processed'.format(lc_index))
     
 def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None):
-#     n_jobs = mp.cpu_count() if n_jobs is not None else n_jobs
     # Get frames with fixed number of lightcurves
     collection = [frame.iloc[i:i+max_lcs_per_record] \
                   for i in range(0, frame.shape[0], max_lcs_per_record)]
@@ -144,13 +146,13 @@ def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None):
     # First process and then serialize
     for counter, subframe in enumerate(collection):
         t0 = time()
-        var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, k, unique) \
+        var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique) \
                                     for k, row in subframe.iterrows())    
         
         with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
             for counter2, data_lc in enumerate(var):
-                ex = process_lc3(*data_lc, writer)
-#                 writer.write(ex.SerializeToString())
+                process_lc3(*data_lc, writer)
+
         t1 = time()
         print(t1-t0)            
 
