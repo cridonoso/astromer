@@ -14,15 +14,15 @@ with open(conf_file, 'r') as handle:
 
 for dataset in datasets:
     start = time.time()
-	command1 = 'python -m presentation.scripts.finetuning \
+    command1 = 'python -m presentation.scripts.finetuning \
                --data ./data/records/{} \
                --p {}\
-			   --prefix {}'.format(dataset,
+    		   --prefix {}'.format(dataset,
                                    astroweights,
-								   dataset)
-	try:
-	    subprocess.call(command1, shell=True)
-	except Exception as e:
-	    print(e)
-	end = time. time()
-	print('{} takes {:.2f} sec'.format(dataset, (end - start)))
+    							   dataset)
+    try:
+        subprocess.call(command1, shell=True)
+    except Exception as e:
+        print(e)
+    end = time. time()
+    print('{} takes {:.2f} sec'.format(dataset, (end - start)))
