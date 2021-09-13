@@ -87,7 +87,8 @@ def run(opt):
               patience=opt.patience,
               exp_path=opt.p,
               epochs=opt.epochs,
-              verbose=0)
+              verbose=0,
+              lr=opt.lr)
     else:
         print('[ERROR] No weights found to finetune')
 
