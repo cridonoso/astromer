@@ -323,14 +323,21 @@ def _parse_normal(sample, max_obs):
     seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
 
     time_steps = tf.shape(seq_magn)[0]
-    mask = get_padding_mask(max_obs, input_dict['length'])
+
+    if curr_max_obs < max_obs:
+        filler = tf.zeros([max_obs-curr_max_obs, 1])
+        mask   = tf.concat([tf.ones([curr_max_obs, 1]), filler], 0)
+        seq_magn  = tf.concat([seq_magn, 1.-filler], 0)
+        seq_time  = tf.concat([seq_time, 1.-filler], 0)
+        seq_errs  = tf.concat([seq_errs, 1.-filler], 0)
+
 
     input_dict['input']    = seq_magn
     input_dict['times']    = seq_time
     input_dict['obserr']   = seq_errs
-    input_dict['mask_in']  = tf.transpose(mask)
-    input_dict['mask_out'] = tf.transpose(mask)
-    input_dict['length']   = time_steps
+    input_dict['mask_in']  = mask
+    input_dict['mask_out'] = mask
+    input_dict['length']   = curr_max_obs
 
     return input_dict
 
