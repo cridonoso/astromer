@@ -36,10 +36,10 @@ def get_fc_attention(units, num_classes, weigths):
     model.load_weights(weights_path)
     encoder = model.get_layer('encoder')
     encoder.trainable = False
-
+    sc_layer = SauceLayer(shape=conf['max_obs'])
     x = encoder(encoder.input)
     # x = tf.reduce_mean(x, 1)
-    x = SauceLayer(shape=conf['max_obs'])(x)
+    x = sc_layer(x)
     x = LayerNormalization()(x)
     x = Dense(512, name='FCN1')(x)
     x = LayerNormalization()(x)
