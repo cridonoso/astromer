@@ -49,9 +49,7 @@ def run(opt):
     attention_vectors = []
     labels_vectors = []
     for batch in batches:
-        start = time.time()
         att = step(encoder, batch)
-        end = time.time()
         attention_vectors.append(att)
         labels_vectors.append(batch['label'])
 
@@ -79,7 +77,7 @@ if __name__ == '__main__':
                         help='Dataset folder containing the records files')
     parser.add_argument('--p', default="./runs/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
-                        
+
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
     parser.add_argument('--epochs', default=10000, type=int,
