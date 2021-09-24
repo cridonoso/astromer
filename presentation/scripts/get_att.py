@@ -10,6 +10,7 @@ from core.classifier import get_lstm_attention, get_lstm_no_attention, get_fc_at
 from core.data  import clf_records
 from core.utils import get_folder_name
 from time import gmtime, strftime
+from core.astromer import get_ASTROMER
 
 os.system('clear')
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
