@@ -62,7 +62,7 @@ def run(opt):
     for batch in train_batches:
         start = time.time()
         att = step(encoder, batch)
-        print(batch['labels'])
+        print(batch['label'])
         end = time.time()
         attention_vectors.append(att)
     att_train = tf.concat(attention_vectors, 0)
