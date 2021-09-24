@@ -4,6 +4,7 @@ import argparse
 import logging
 import json
 import time
+import h5py
 import os
 
 from core.classifier import get_lstm_attention, get_lstm_no_attention, get_fc_attention, train
@@ -63,22 +64,28 @@ def run(opt):
         att = step(encoder, batch)
         end = time.time()
         attention_vectors.append(att)
-    attention_vectors = tf.concat(attention_vectors, 0)
-    print(attention_vectors.shape)
-    # attention_vectors = []
-    # for batch in valid_batches:
-    #     start = time.time()
-    #     att = step(encoder, batch)
-    #     end = time.time()
-    #     attention_vectors.append(att)
-    #
-    # attention_vectors = []
-    # for batch in test_batches:
-    #     start = time.time()
-    #     att = step(encoder, batch)
-    #     end = time.time()
-    #     attention_vectors.append(att)
+    att_train = tf.concat(attention_vectors, 0)
 
+    attention_vectors = []
+    for batch in valid_batches:
+        start = time.time()
+        att = step(encoder, batch)
+        end = time.time()
+        attention_vectors.append(att)
+    att_val = tf.concat(attention_vectors, 0)
+
+    attention_vectors = []
+    for batch in test_batches:
+        start = time.time()
+        att = step(encoder, batch)
+        end = time.time()
+        attention_vectors.append(att)
+    att_test = tf.concat(attention_vectors, 0)
+
+    hf = h5py.File(os.path.join(opt.w, 'embedding.h5'), 'w')
+    hf.create_dataset('train', data=att_train)
+    hf.create_dataset('val', data=att_val)
+    hf.create_dataset('test', data=att_test)
     return
 
 
