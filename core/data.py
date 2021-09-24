@@ -331,7 +331,7 @@ def _parse_normal(sample, max_obs):
         seq_time  = tf.concat([seq_time, 1.-filler], 0)
         seq_errs  = tf.concat([seq_errs, 1.-filler], 0)
     else:
-        mask = tf.ones([max_obs, 1])
+        mask = tf.zeros([max_obs, 1])
 
     input_dict['input']    = seq_magn
     input_dict['times']    = seq_time
