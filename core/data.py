@@ -413,9 +413,10 @@ def clf_records(source, batch_size, max_obs=100, take=1):
         print('[INFO] Taking {} balanced batches'.format(take))
         datasets = [tf.data.TFRecordDataset(x) for x in rec_paths]
         datasets = [dataset.repeat() for dataset in datasets]
-        datasets = [dataset.map(fn) for dataset in datasets]
+        # datasets = [dataset.map(fn) for dataset in datasets]
         # datasets = [dataset.shuffle(batch_size, reshuffle_each_iteration=True) for dataset in datasets]
         dataset = tf.data.experimental.sample_from_datasets(datasets)
+        dataset = dataset.map(fn)
         dataset = dataset.padded_batch(batch_size)
         dataset = dataset.take(take)
         # dataset = dataset.cache()
