@@ -11,6 +11,7 @@ from core.astromer import get_ASTROMER
 from core.metrics import custom_acc
 from core.tboard import save_scalar
 from core.losses import custom_bce
+from core.output import SauceLayer
 from tqdm import tqdm
 
 from core.data import standardize
@@ -37,8 +38,8 @@ def get_fc_attention(units, num_classes, weigths):
     encoder.trainable = False
 
     x = encoder(encoder.input)
-    x = tf.reduce_mean(x, 1)
-    
+    # x = tf.reduce_mean(x, 1)
+    x = SauceLayer()(x)
     x = LayerNormalization()(x)
     x = Dense(units, name='FCN1')(x)
     x = LayerNormalization()(x)
