@@ -59,34 +59,49 @@ def run(opt):
     encoder = model.get_layer('encoder')
 
     attention_vectors = []
+    labels_vectors = []
     for batch in train_batches:
         start = time.time()
         att = step(encoder, batch)
-        print(batch['label'])
         end = time.time()
         attention_vectors.append(att)
-    att_train = tf.concat(attention_vectors, 0)
+        labels_vectors.append(batch['label'])
 
-    # attention_vectors = []
-    # for batch in valid_batches:
-    #     start = time.time()
-    #     att = step(encoder, batch)
-    #     end = time.time()
-    #     attention_vectors.append(att)
-    # att_val = tf.concat(attention_vectors, 0)
-    #
-    # attention_vectors = []
-    # for batch in test_batches:
-    #     start = time.time()
-    #     att = step(encoder, batch)
-    #     end = time.time()
-    #     attention_vectors.append(att)
-    # att_test = tf.concat(attention_vectors, 0)
-    #
-    # hf = h5py.File(os.path.join(opt.w, 'embedding.h5'), 'w')
-    # hf.create_dataset('train', data=att_train)
-    # hf.create_dataset('val', data=att_val)
-    # hf.create_dataset('test', data=att_test)
+    att_train = tf.concat(attention_vectors, 0)
+    lab_train = tf.concat(labels_vectors, 0)
+
+    attention_vectors = []
+    labels_vectors = []
+    for batch in valid_batches:
+        start = time.time()
+        att = step(encoder, batch)
+        end = time.time()
+        attention_vectors.append(att)
+        labels_vectors.append(batch['label'])
+
+    att_val = tf.concat(attention_vectors, 0)
+    lab_val = tf.concat(labels_vectors, 0)
+
+    attention_vectors = []
+    labels_vectors = []
+    for batch in test_batches:
+        start = time.time()
+        att = step(encoder, batch)
+        end = time.time()
+        attention_vectors.append(att)
+        labels_vectors.append(batch['label'])
+
+    att_test = tf.concat(attention_vectors, 0)
+    lab_test = tf.concat(labels_vectors, 0)
+
+
+    hf = h5py.File(os.path.join(opt.w, 'embedding.h5'), 'w')
+    hf.create_dataset('x_train', data=att_train)
+    hf.create_dataset('y_train', data=lab_train)
+    hf.create_dataset('x_val', data=att_val)
+    hf.create_dataset('y_val', data=lab_val)
+    hf.create_dataset('x_test', data=att_test)
+    hf.create_dataset('y_test', data=lab_test)
     return
 
 
