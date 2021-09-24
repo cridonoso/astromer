@@ -13,7 +13,8 @@ from core.utils import get_folder_name
 from time import gmtime, strftime
 from core.astromer import get_ASTROMER
 
-os.system('clear')
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 @tf.function
