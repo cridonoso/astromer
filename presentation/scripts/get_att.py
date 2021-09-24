@@ -18,7 +18,8 @@ logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 @tf.function
 def step(model, batch):
-    att = model(batch)
+    encoder = model.get_layer('encoder')
+    att = encoder(batch)
     return att
 
 def run(opt):
@@ -44,14 +45,14 @@ def run(opt):
 
     weights_path = '{}/weights'.format(opt.w)
     model.load_weights(weights_path)
-    encoder = model.get_layer('encoder')
+
 
     attention_vectors = []
     labels_vectors = []
     lens_vectors = []
     mask_vectors = []
     for batch in batches:
-        att = step(encoder, batch)
+        att = step(model, batch)
         attention_vectors.append(att)
         labels_vectors.append(batch['label'])
         mask_vectors.append(batch['mask_in'])
