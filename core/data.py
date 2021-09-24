@@ -136,7 +136,7 @@ def process_lc3(lc_index, label, numpy_lc, writer):
         writer.write(ex.SerializeToString())
     except:
         print('[INFO] {} could not be processed'.format(lc_index))
-    
+
 def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None):
     # Get frames with fixed number of lightcurves
     collection = [frame.iloc[i:i+max_lcs_per_record] \
@@ -147,14 +147,14 @@ def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None):
     for counter, subframe in enumerate(collection):
         t0 = time()
         var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique) \
-                                    for k, row in subframe.iterrows())    
-        
+                                    for k, row in subframe.iterrows())
+
         with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
             for counter2, data_lc in enumerate(var):
                 process_lc3(*data_lc, writer)
 
         t1 = time()
-        print(t1-t0)            
+        print(t1-t0)
 
 
 def create_dataset(meta_df,
@@ -414,11 +414,11 @@ def clf_records(source, batch_size, max_obs=100, take=1):
         datasets = [tf.data.TFRecordDataset(x) for x in rec_paths]
         datasets = [dataset.repeat() for dataset in datasets]
         datasets = [dataset.map(fn) for dataset in datasets]
-        datasets = [dataset.shuffle(batch_size, reshuffle_each_iteration=True) for dataset in datasets]
+        # datasets = [dataset.shuffle(batch_size, reshuffle_each_iteration=True) for dataset in datasets]
         dataset = tf.data.experimental.sample_from_datasets(datasets)
         dataset = dataset.padded_batch(batch_size)
         dataset = dataset.take(take)
-        dataset = dataset.cache()
+        # dataset = dataset.cache()
         dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
         return dataset
 
