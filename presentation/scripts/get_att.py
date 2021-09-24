@@ -62,30 +62,31 @@ def run(opt):
     for batch in train_batches:
         start = time.time()
         att = step(encoder, batch)
+        print(batch['labels'])
         end = time.time()
         attention_vectors.append(att)
     att_train = tf.concat(attention_vectors, 0)
 
-    attention_vectors = []
-    for batch in valid_batches:
-        start = time.time()
-        att = step(encoder, batch)
-        end = time.time()
-        attention_vectors.append(att)
-    att_val = tf.concat(attention_vectors, 0)
-
-    attention_vectors = []
-    for batch in test_batches:
-        start = time.time()
-        att = step(encoder, batch)
-        end = time.time()
-        attention_vectors.append(att)
-    att_test = tf.concat(attention_vectors, 0)
-
-    hf = h5py.File(os.path.join(opt.w, 'embedding.h5'), 'w')
-    hf.create_dataset('train', data=att_train)
-    hf.create_dataset('val', data=att_val)
-    hf.create_dataset('test', data=att_test)
+    # attention_vectors = []
+    # for batch in valid_batches:
+    #     start = time.time()
+    #     att = step(encoder, batch)
+    #     end = time.time()
+    #     attention_vectors.append(att)
+    # att_val = tf.concat(attention_vectors, 0)
+    #
+    # attention_vectors = []
+    # for batch in test_batches:
+    #     start = time.time()
+    #     att = step(encoder, batch)
+    #     end = time.time()
+    #     attention_vectors.append(att)
+    # att_test = tf.concat(attention_vectors, 0)
+    #
+    # hf = h5py.File(os.path.join(opt.w, 'embedding.h5'), 'w')
+    # hf.create_dataset('train', data=att_train)
+    # hf.create_dataset('val', data=att_val)
+    # hf.create_dataset('test', data=att_test)
     return
 
 
