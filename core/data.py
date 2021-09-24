@@ -414,7 +414,7 @@ def clf_records(source, batch_size, max_obs=100, take=1):
         print('[INFO] No shuffle No Oversampling'.format(take))
         dataset = tf.data.TFRecordDataset(rec_paths)
         dataset = dataset.map(fn).cache()
-        dataset = dataset.padded_batch(batch_size)
+        dataset = dataset.batch(batch_size)
         dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
         return dataset
     else:
@@ -425,7 +425,7 @@ def clf_records(source, batch_size, max_obs=100, take=1):
         # datasets = [dataset.shuffle(batch_size, reshuffle_each_iteration=True) for dataset in datasets]
         dataset = tf.data.experimental.sample_from_datasets(datasets)
         dataset = dataset.map(fn)
-        dataset = dataset.padded_batch(batch_size)
+        dataset = dataset.batch(batch_size)
         dataset = dataset.take(take)
         # dataset = dataset.cache()
         dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
