@@ -48,17 +48,21 @@ def run(opt):
 
     attention_vectors = []
     labels_vectors = []
+    lens_vectors = []
     for batch in batches:
         att = step(encoder, batch)
         attention_vectors.append(att)
         labels_vectors.append(batch['label'])
+        lens_vectors.append(batch['length'])
 
     att_train = tf.concat(attention_vectors, 0)
     lab_train = tf.concat(labels_vectors, 0)
+    len_train = tf.concat(lens_vectors, 0)
 
     hf = h5py.File(opt.p, 'w')
     hf.create_dataset('x', data=att_train)
     hf.create_dataset('y', data=lab_train)
+    hf.create_dataset('l', data=len_train)
 
     return
 
