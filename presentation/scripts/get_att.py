@@ -23,22 +23,10 @@ def step(model, batch):
 
 def run(opt):
     # Loading data
-    train_batches = clf_records(os.path.join(opt.data, 'train'),
-                                opt.batch_size,
-                                max_obs=opt.max_obs,
-                                take=opt.take)
-
-    valid_batches = clf_records(os.path.join(opt.data, 'val'),
-                                opt.batch_size,
-                                max_obs=opt.max_obs,
-                                take=opt.take)
-
-    test_batches = clf_records(os.path.join(opt.data, 'test'),
-                                opt.batch_size,
-                                max_obs=opt.max_obs,
-                                take=-1)
-
-    num_classes = pd.read_csv(os.path.join(opt.data, 'objects.csv')).shape[0]
+    batches = clf_records(opt.data,
+                          opt.batch_size,
+                          max_obs=opt.max_obs,
+                          take=opt.take)
 
 
     conf_file = os.path.join(opt.w, 'conf.json')
@@ -60,7 +48,7 @@ def run(opt):
 
     attention_vectors = []
     labels_vectors = []
-    for batch in train_batches:
+    for batch in batches:
         start = time.time()
         att = step(encoder, batch)
         end = time.time()
@@ -70,38 +58,10 @@ def run(opt):
     att_train = tf.concat(attention_vectors, 0)
     lab_train = tf.concat(labels_vectors, 0)
 
-    attention_vectors = []
-    labels_vectors = []
-    for batch in valid_batches:
-        start = time.time()
-        att = step(encoder, batch)
-        end = time.time()
-        attention_vectors.append(att)
-        labels_vectors.append(batch['label'])
+    hf = h5py.File(opt.p, 'w')
+    hf.create_dataset('x', data=att_train)
+    hf.create_dataset('y', data=lab_train)
 
-    att_val = tf.concat(attention_vectors, 0)
-    lab_val = tf.concat(labels_vectors, 0)
-
-    attention_vectors = []
-    labels_vectors = []
-    for batch in test_batches:
-        start = time.time()
-        att = step(encoder, batch)
-        end = time.time()
-        attention_vectors.append(att)
-        labels_vectors.append(batch['label'])
-
-    att_test = tf.concat(attention_vectors, 0)
-    lab_test = tf.concat(labels_vectors, 0)
-
-
-    hf = h5py.File(os.path.join(opt.w, 'embedding.h5'), 'w')
-    hf.create_dataset('x_train', data=att_train)
-    hf.create_dataset('y_train', data=lab_train)
-    hf.create_dataset('x_val', data=att_val)
-    hf.create_dataset('y_val', data=lab_val)
-    hf.create_dataset('x_test', data=att_test)
-    hf.create_dataset('y_test', data=lab_test)
     return
 
 
@@ -119,6 +79,7 @@ if __name__ == '__main__':
                         help='Dataset folder containing the records files')
     parser.add_argument('--p', default="./runs/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
+                        
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
     parser.add_argument('--epochs', default=10000, type=int,
