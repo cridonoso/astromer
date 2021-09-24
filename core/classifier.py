@@ -37,8 +37,11 @@ def get_fc_attention(units, num_classes, weigths):
     encoder = model.get_layer('encoder')
     encoder.trainable = False
 
+    mask = 1.-encoder.input['mask_in']
     x = encoder(encoder.input)
-    x = tf.reduce_mean(x, 1)
+    x = x * mask
+    x = tf.reduce_sum(x, 1)/tf.reduce_sum(mask, 1)
+
     x = Dense(1024, name='FCN1')(x)
     x = Dense(512, name='FCN2')(x)
     x = Dense(num_classes, name='FCN3')(x)
