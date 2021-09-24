@@ -53,7 +53,7 @@ def run(opt):
         att = step(encoder, batch)
         attention_vectors.append(att)
         labels_vectors.append(batch['label'])
-        lens_vectors.append(batch['length'])
+        lens_vectors.append(batch['mask_in'])
 
     att_train = tf.concat(attention_vectors, 0)
     lab_train = tf.concat(labels_vectors, 0)
