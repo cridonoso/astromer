@@ -325,8 +325,8 @@ def _parse_normal(sample, max_obs):
     time_steps = tf.shape(seq_magn)[0]
 
     if curr_max_obs < max_obs:
-        filler = tf.zeros([max_obs-curr_max_obs, 1])
-        mask   = tf.concat([tf.ones([curr_max_obs, 1]), filler], 0)
+        filler = tf.ones([max_obs-curr_max_obs, 1])
+        mask   = tf.concat([tf.zeros([curr_max_obs, 1]), filler], 0)
         seq_magn  = tf.concat([seq_magn, 1.-filler], 0)
         seq_time  = tf.concat([seq_time, 1.-filler], 0)
         seq_errs  = tf.concat([seq_errs, 1.-filler], 0)
