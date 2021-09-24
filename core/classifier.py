@@ -4,7 +4,7 @@ import json
 import os
 
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
-from tensorflow.keras.layers import LSTM, Dense, LayerNormalization
+from tensorflow.keras.layers import LSTM, Dense, BatchNormalization
 from tensorflow.keras.layers import Input, Dense
 from tensorflow.keras import Model
 from core.astromer import get_ASTROMER
@@ -38,15 +38,9 @@ def get_fc_attention(units, num_classes, weigths):
     encoder.trainable = False
 
     x = encoder(encoder.input)
-    x = SauceLayer(200)(x)
-    # x = tf.reduce_mean(x, 2)
-    # x = tf.reshape(x, [-1, conf['max_obs']])
-    print(x)
-    x = LayerNormalization()(x)
+    x = tf.reduce_mean(x, 1)
     x = Dense(1024, name='FCN1')(x)
-    x = LayerNormalization()(x)
     x = Dense(512, name='FCN2')(x)
-    x = LayerNormalization()(x)
     x = Dense(num_classes, name='FCN3')(x)
     return Model(inputs=encoder.input, outputs=x, name="FCATT")
 
