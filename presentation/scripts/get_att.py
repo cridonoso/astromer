@@ -36,7 +36,7 @@ def run(opt):
     test_batches = clf_records(os.path.join(opt.data, 'test'),
                                 opt.batch_size,
                                 max_obs=opt.max_obs,
-                                take=opt.take)
+                                take=-1)
 
     num_classes = pd.read_csv(os.path.join(opt.data, 'objects.csv')).shape[0]
 
