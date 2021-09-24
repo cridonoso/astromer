@@ -57,12 +57,28 @@ def run(opt):
     model.load_weights(weights_path)
     encoder = model.get_layer('encoder')
 
+    attention_vectors = []
     for batch in train_batches:
         start = time.time()
         att = step(encoder, batch)
         end = time.time()
-        print(end - start)
-        break
+        attention_vectors.append(att)
+    attention_vectors = tf.concat(attention_vectors, 0)
+    print(attention_vectors.shape)
+    # attention_vectors = []
+    # for batch in valid_batches:
+    #     start = time.time()
+    #     att = step(encoder, batch)
+    #     end = time.time()
+    #     attention_vectors.append(att)
+    #
+    # attention_vectors = []
+    # for batch in test_batches:
+    #     start = time.time()
+    #     att = step(encoder, batch)
+    #     end = time.time()
+    #     attention_vectors.append(att)
+
     return
 
 
