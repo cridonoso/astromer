@@ -39,7 +39,7 @@ def get_fc_attention(units, num_classes, weigths):
 
     x = encoder(encoder.input)
     # x = tf.reduce_mean(x, 1)
-    x = SauceLayer(conf['max_obs'])(x)
+    x = SauceLayer(shape=conf['max_obs'])(x)
     x = LayerNormalization()(x)
     x = Dense(512, name='FCN1')(x)
     x = LayerNormalization()(x)
