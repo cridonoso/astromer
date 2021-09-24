@@ -323,7 +323,7 @@ def _parse_normal(sample, max_obs):
     seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
 
     time_steps = tf.shape(seq_magn)[0]
-    mask = get_padding_mask(max_obs, tf.expand_dims(input_dict['length'], 0))
+    mask = get_padding_mask(max_obs, tf.expand_dims(time_steps, 0))
 
     input_dict['input']  = seq_magn
     input_dict['times']  = seq_time
