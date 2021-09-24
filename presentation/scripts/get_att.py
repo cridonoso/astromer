@@ -58,8 +58,10 @@ def run(opt):
     encoder = model.get_layer('encoder')
 
     for batch in train_batches:
+        start = time.time()
         att = step(encoder, batch)
-        print(att.shape)
+        end = time.time()
+        print(end - start)
         break
     return
 
