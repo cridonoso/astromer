@@ -11,11 +11,12 @@ from core.data  import clf_records
 from core.utils import get_folder_name
 from time import gmtime, strftime
 
-os.system('clear')
+# os.system('clear')
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 def run(opt):
     # Loading data
+    print(opt.p)
     train_batches = clf_records(os.path.join(opt.data, 'train'),
                                 opt.batch_size,
                                 max_obs=opt.max_obs,
@@ -37,7 +38,7 @@ def run(opt):
         clf = get_fc_attention(opt.units,
                                num_classes,
                                opt.w)
-
+        print(clf.summary())
     if opt.mode == 2:
         clf = get_lstm_no_attention(opt.units,
                                     num_classes,
@@ -88,7 +89,7 @@ if __name__ == '__main__':
                         help='Number of epochs')
     parser.add_argument('--patience', default=200, type=int,
                         help='batch size')
-    parser.add_argument('--take', default=-1, type=int,
+    parser.add_argument('--take', default=100, type=int,
                         help='Number of balanced batches for training. -1 do not balance')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
