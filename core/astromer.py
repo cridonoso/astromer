@@ -175,7 +175,6 @@ def predict(model,
             dataset,
             conf,
             predic_proba=False):
-
     total_mse, inputs, reconstructions = [], [], []
     masks, times = [], []
     for step, batch in tqdm(enumerate(dataset), desc='prediction'):

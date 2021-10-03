@@ -384,6 +384,42 @@ def pretraining_records(source, batch_size, no_shuffle=False, max_obs=100,
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
 
+def _parse_att_inference(sequence, masks):
+    '''
+    Specific task formater
+    '''
+    input_dict = dict()
+    sequence = standardize(sequence)
+
+    seq_time = tf.slice(sequence, [0, 0], [-1, 1])
+    seq_magn = tf.slice(sequence, [0, 1], [-1, 1])
+    time_steps = tf.shape(seq_magn)[0]
+
+
+    input_dict['input']    = seq_magn
+    input_dict['times']    = seq_time
+    input_dict['mask_in']  = masks
+
+    return input_dict
+
+def attention_loader(sequences, masks, batch_size):
+    """
+    Embedding data loader. Only used for attention inference
+
+    Args:
+        source (string): Record folder
+        batch_size (int): Batch size
+
+    Returns:
+        Tensorflow Dataset: Iterator withg preprocessed batches
+    """
+    dataset = tf.data.Dataset.from_tensor_slices((sequences, masks))
+    dataset = dataset.map(_parse_att_inference)
+    dataset = dataset.cache()
+    dataset = dataset.padded_batch(batch_size)
+    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+    return dataset
+
 def adjust_fn_clf(func, max_obs):
     def wrap(*args, **kwargs):
         result = func(*args, max_obs)
@@ -421,13 +457,11 @@ def clf_records(source, batch_size, max_obs=100, take=1):
         print('[INFO] Taking {} balanced batches'.format(take))
         datasets = [tf.data.TFRecordDataset(x) for x in rec_paths]
         datasets = [dataset.repeat() for dataset in datasets]
-        # datasets = [dataset.map(fn) for dataset in datasets]
-        # datasets = [dataset.shuffle(batch_size, reshuffle_each_iteration=True) for dataset in datasets]
         dataset = tf.data.experimental.sample_from_datasets(datasets)
         dataset = dataset.map(fn)
         dataset = dataset.batch(batch_size)
         dataset = dataset.take(take)
-        # dataset = dataset.cache()
+        dataset = dataset.cache()
         dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
         return dataset
 
