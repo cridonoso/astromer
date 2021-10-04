@@ -5,7 +5,7 @@ import os
 
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 from tensorflow.keras.layers import LSTM, Dense, BatchNormalization
-from tensorflow.keras.layers import Input, Dense
+from tensorflow.keras.layers import Input, Dense, Dropout
 from tensorflow.keras import Model
 from core.astromer import get_ASTROMER
 from core.metrics import custom_acc
@@ -17,35 +17,23 @@ from tqdm import tqdm
 from core.data import standardize
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
-def get_fc_attention(units, num_classes, weigths):
+def get_mlp(num_classes):
     ''' FC + ATT'''
+    serie  = Input(shape=(256),
+                  batch_size=None,
+                  name='input')
 
-    conf_file = os.path.join(weigths, 'conf.json')
-    with open(conf_file, 'r') as handle:
-        conf = json.load(handle)
+    placeholder = {'x':serie}
 
-    model = get_ASTROMER(num_layers=conf['layers'],
-                         d_model   =conf['head_dim'],
-                         num_heads =conf['heads'],
-                         dff       =conf['dff'],
-                         base      =conf['base'],
-                         dropout   =conf['dropout'],
-                         maxlen    =conf['max_obs'],
-                         use_leak  =conf['use_leak'])
-    weights_path = '{}/weights'.format(weigths)
-    model.load_weights(weights_path)
-    encoder = model.get_layer('encoder')
-    encoder.trainable = False
 
-    mask = 1.-encoder.input['mask_in']
-    x = encoder(encoder.input)
-    x = x * mask
-    x = tf.reduce_sum(x, 1)/tf.reduce_sum(mask, 1)
-
-    x = Dense(1024, name='FCN1')(x)
-    x = Dense(512, name='FCN2')(x)
-    x = Dense(num_classes, name='FCN3')(x)
-    return Model(inputs=encoder.input, outputs=x, name="FCATT")
+    x = Dense(512)(placeholder['x'])
+    x = BatchNormalization()(x)
+    x = Dense(256)(x)
+    x = BatchNormalization()(x)
+    x = Dense(128)(x)
+    x = BatchNormalization()(x)
+    x = Dense(num_classes)(x)
+    return Model(inputs=placeholder, outputs=x, name="MLP")
 
 def get_lstm_no_attention(units, num_classes, maxlen, dropout=0.5):
     ''' LSTM + LSTM + FC'''

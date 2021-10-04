@@ -134,7 +134,8 @@ def process_lc3(lc_index, label, numpy_lc, writer):
     try:
         ex = get_example(lc_index, label, numpy_lc)
         writer.write(ex.SerializeToString())
-    except:
+    except Excepetion as e:
+        print(e)
         print('[INFO] {} could not be processed'.format(lc_index))
 
 def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None):
@@ -189,7 +190,7 @@ def create_dataset(meta_df,
             os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs)
 
-def get_sample(sample):
+def get_sample(sample, ndims=3):
     """
     Read a serialized sample and convert it to tensor
     Context and sequence features should match with the name used when writing.
@@ -203,7 +204,7 @@ def get_sample(sample):
                         'length': tf.io.FixedLenFeature([],dtype=tf.int64),
                         'id': tf.io.FixedLenFeature([], dtype=tf.string)}
     sequence_features = dict()
-    for i in range(3):
+    for i in range(ndims):
         sequence_features['dim_{}'.format(i)] = tf.io.VarLenFeature(dtype=tf.float32)
 
     context, sequence = tf.io.parse_single_sequence_example(
@@ -218,7 +219,7 @@ def get_sample(sample):
     input_dict['label']  = tf.cast(context['label'], tf.int32)
 
     casted_inp_parameters = []
-    for i in range(3):
+    for i in range(ndims):
         seq_dim = sequence['dim_{}'.format(i)]
         seq_dim = tf.sparse.to_dense(seq_dim)
         seq_dim = tf.cast(seq_dim, tf.float32)
@@ -308,6 +309,23 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
     input_dict['obserr']   = seq_errs
 
     return input_dict
+
+def _parse_embedding(sample, max_obs, average=False):
+    '''
+    Specific task formater
+    '''
+    input_dict = get_sample(sample, ndims=256)
+
+    sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
+    sequence = standardize(sequence)
+    if average:
+        sequence = tf.reduce_mean(sequence, 0)
+
+    input_dict['x']  = sequence
+    input_dict['mask']   = tf.ones([tf.shape(sequence)[0], 1])
+    input_dict['length'] = curr_max_obs
+
+    return input_dict, input_dict['label']
 
 def _parse_normal(sample, max_obs):
     '''
@@ -420,11 +438,49 @@ def attention_loader(sequences, masks, batch_size):
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
 
-def adjust_fn_clf(func, max_obs):
+def adjust_fn_clf(func, *arguments):
     def wrap(*args, **kwargs):
-        result = func(*args, max_obs)
+        result = func(*args, *arguments)
         return result
     return wrap
+
+def emb_records(source, batch_size, max_obs=100, take=1, average=False):
+    """
+    Classification data loader.
+    It creates ASTROMER-like input but without masking
+
+    Args:
+        source (string): Record folder
+        batch_size (int): Batch size
+        max_obs (int): Max. number of observation per serie
+        take (int):  Number of batches.
+                     If 'take' is -1 then it returns the whole dataset without
+                     shuffle and oversampling (i.e., testing case)
+    Returns:
+        Tensorflow Dataset: Iterator withg preprocessed batches
+    """
+
+    fn = adjust_fn_clf(_parse_embedding, max_obs, average)
+    rec_paths = [os.path.join(source, x) for x in os.listdir(source)]
+
+    if take < 0:
+        print('[INFO] No shuffle No Oversampling'.format(take))
+        dataset = tf.data.TFRecordDataset(rec_paths)
+        dataset = dataset.map(fn).cache()
+        dataset = dataset.padded_batch(batch_size)
+        dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+        return dataset
+    else:
+        print('[INFO] Taking {} balanced batches'.format(take))
+        dataset = tf.data.TFRecordDataset(rec_paths)
+        dataset = dataset.shuffle(10000)
+        dataset = dataset.map(fn)
+        dataset = dataset.padded_batch(batch_size)
+        dataset = dataset.take(take)
+        dataset = dataset.cache()
+        dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+        return dataset
+
 
 def clf_records(source, batch_size, max_obs=100, take=1):
     """

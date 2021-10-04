@@ -4,7 +4,7 @@ import numpy as np
 import json
 import os
 
-from core.data import attention_loader
+from core.data import attention_loader, process_lc3, emb_records
 from core.astromer import get_ASTROMER
 from itertools import zip_longest
 
@@ -116,6 +116,25 @@ class ASTROMER(object):
             att_final.append(np.stack(x[:l]))
 
         return att_final
+
+    def to_record(self, embeddings, labels, dest='record', oids=None):
+        directory = '/'.join(dest.split('/')[:-1])
+        os.makedirs(directory, exist_ok=True)
+
+        if oids is None:
+         oids=list(range(len(embeddings)))
+
+        with tf.io.TFRecordWriter(dest) as writer:
+            for index in range(len(oids)):
+                process_lc3(oids[index],
+                            labels[index],
+                            embeddings[index],
+                            writer)
+
+    def load_record(self, folder, batch_size=16, max_obs=200, take=-1, average=False):
+        dataset = emb_records(folder, batch_size, max_obs, take, average=average)
+
+        return dataset
 
 class ASTROMER_v1(ASTROMER):
     """ ASTROMER pretrained model trained on reconstructions only.
