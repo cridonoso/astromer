@@ -61,13 +61,13 @@ class ASTROMER(object):
         new_ind = new_ind[indices]
 
         #Split time
-        times = np.vstack(np.split(times, 3, axis=1))
+        times = np.vstack(np.split(times, n_id, axis=1))
         times = times[indices]
         #Split magn
-        magns = np.vstack(np.split(magns, 3, axis=1))
+        magns = np.vstack(np.split(magns, n_id, axis=1))
         magns = magns[indices]
         #Split mask
-        masks = np.vstack(np.split(masks, 3, axis=1))
+        masks = np.vstack(np.split(masks, n_id, axis=1))
         masks = masks[indices]
 
         valid = [i for i, x in enumerate(magns) if np.sum(x)!=0]
