@@ -64,7 +64,8 @@ def run(opt):
                                                     no_shuffle=opt.no_shuffle,
                                                     msk_frac=conf['msk_frac'],
                                                     rnd_frac=conf['rnd_frac'],
-                                                    same_frac=conf['same_frac'])
+                                                    same_frac=conf['same_frac'],
+                                                    repeat=opt.repeat)
 
         # Training ASTROMER
         train(astromer, train_batches, valid_batches,
@@ -96,6 +97,8 @@ if __name__ == '__main__':
                         help='Number of epochs')
     parser.add_argument('--patience', default=200, type=int,
                         help='batch size')
+    parser.add_argument('--repeat', default=1, type=int,
+                        help='number of repetitions of the dataset')
 
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=1, type=int,
