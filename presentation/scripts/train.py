@@ -6,7 +6,7 @@ import time
 import os
 
 from core.astromer import get_ASTROMER, train
-from core.data  import pretraining_records
+from core.data  import load_records
 from core.utils import get_folder_name
 from time import gmtime, strftime
 
@@ -39,21 +39,14 @@ def run(opt):
         json.dump(varsdic, json_file, indent=4)
 
     # Loading data
-    train_batches = pretraining_records(os.path.join(opt.data, 'train'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs,
-                                        no_shuffle=opt.no_shuffle,
-                                        msk_frac=opt.msk_frac,
-                                        rnd_frac=opt.rnd_frac,
-                                        same_frac=opt.same_frac)
-    valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs,
-                                        no_shuffle=opt.no_shuffle,
-                                        msk_frac=opt.msk_frac,
-                                        rnd_frac=opt.rnd_frac,
-                                        same_frac=opt.same_frac)
-
+    train_batches, valid_batches = load_records(os.path.join(opt.data, 'train'),
+                                                opt.batch_size,
+                                                valptg=opt.valptg,
+                                                max_obs=opt.max_obs,
+                                                no_shuffle=opt.no_shuffle,
+                                                msk_frac=opt.msk_frac,
+                                                rnd_frac=opt.rnd_frac,
+                                                same_frac=opt.same_frac)
     # Training ASTROMER
     train(astromer, train_batches, valid_batches,
           patience=opt.patience,
@@ -105,6 +98,9 @@ if __name__ == '__main__':
                         help='base of embedding')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
+    parser.add_argument('--valptg', default=0.15, type=float,
+                        help='optimizer initial learning rate')
+
 
     parser.add_argument('--use-leak', default=False, action='store_true',
                         help='Add the input to the attention vector')

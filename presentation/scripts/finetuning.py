@@ -6,7 +6,7 @@ import time
 import os
 
 from core.astromer import get_ASTROMER, train
-from core.data  import pretraining_records
+from core.data  import load_records
 from core.utils import get_folder_name
 from time import gmtime, strftime
 
@@ -14,17 +14,6 @@ logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 
 def run(opt):
-    # Get model
-    astromer = get_ASTROMER(num_layers=opt.layers,
-                            d_model=opt.head_dim,
-                            num_heads=opt.heads,
-                            dff=opt.dff,
-                            base=opt.base,
-                            dropout=opt.dropout,
-                            maxlen=opt.max_obs,
-                            use_leak=opt.use_leak,
-                            no_train=opt.no_train)
-
     # Check for pretrained weigths
     if os.path.isfile(os.path.join(opt.p, 'checkpoint')):
         print('[INFO] Pretrained model detected! - Finetuning...')
@@ -68,20 +57,15 @@ def run(opt):
             json.dump(varsdic, json_file, indent=4)
 
         # Loading data
-        train_batches = pretraining_records(os.path.join(opt.data, 'train'),
-                                            opt.batch_size,
-                                            max_obs=conf['max_obs'],
-                                            no_shuffle=opt.no_shuffle,
-                                            msk_frac=conf['msk_frac'],
-                                            rnd_frac=conf['rnd_frac'],
-                                            same_frac=conf['same_frac'])
-        valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
-                                            opt.batch_size,
-                                            max_obs=conf['max_obs'],
-                                            no_shuffle=opt.no_shuffle,
-                                            msk_frac=conf['msk_frac'],
-                                            rnd_frac=conf['rnd_frac'],
-                                            same_frac=conf['same_frac'])
+        train_batches, valid_batches = load_records(os.path.join(opt.data, 'train'),
+                                                    opt.batch_size,
+                                                    val_data=opt.valptg,
+                                                    max_obs=conf['max_obs'],
+                                                    no_shuffle=opt.no_shuffle,
+                                                    msk_frac=conf['msk_frac'],
+                                                    rnd_frac=conf['rnd_frac'],
+                                                    same_frac=conf['same_frac'])
+
         # Training ASTROMER
         train(astromer, train_batches, valid_batches,
               patience=opt.patience,
@@ -127,6 +111,8 @@ if __name__ == '__main__':
     parser.add_argument('--base', default=1000, type=int,
                         help='base of embedding')
     parser.add_argument('--lr', default=1e-3, type=float,
+                        help='optimizer initial learning rate')
+    parser.add_argument('--valptg', default=0.15, type=float,
                         help='optimizer initial learning rate')
 
     parser.add_argument('--use-leak', default=False, action='store_true',

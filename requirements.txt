@@ -6,3 +6,4 @@ pydot
 scikit-learn
 seaborn
 googledrivedownloader
+dask[dataframe]
