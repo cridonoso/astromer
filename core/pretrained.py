@@ -192,13 +192,22 @@ class ASTROMER_v1:
                 batch_windows.append(embs)
 
             batch_emb = tf.concat(batch_windows, 1)
-            bool_mask = tf.logical_not(tf.cast(tf.squeeze(batch['mask_in']), tf.bool))
-            valid = tf.ragged.boolean_mask(batch_emb, bool_mask)
+            size = tf.shape(batch_emb)
+            batch_emb = tf.reshape(batch_emb, [size[0]*size[1], size[2]])
 
-            df = pd.DataFrame()
-            df['oid'] = batch['lcid'].numpy()
-            df['label'] = batch['label'].numpy()
-            df['embs'] = valid.numpy()
+            bool_mask = tf.logical_not(tf.cast(tf.squeeze(batch['mask_in']), tf.bool))
+            bool_mask = tf.reshape(bool_mask, [size[0]*size[1]])
+
+            oids = tf.tile(tf.expand_dims(batch['lcid'], 1), [1, size[1]])
+            oids = tf.reshape(oids, [size[0]*size[1]])
+
+            valid_emb = tf.boolean_mask(batch_emb, bool_mask)
+            valid_oids = tf.boolean_mask(oids, bool_mask)
+
+            df = pd.DataFrame(valid_emb.numpy())
+            df['oid'] = valid_oids.numpy()
+            df['oid'] = df['oid'].apply(lambda x: x.decode('utf-8'))
+
             df.to_csv(os.path.join(dest, 'batch_{}.csv'.format(index)), index=False)
             end = time.time()
             print('{:.2f}'.format(end-start))

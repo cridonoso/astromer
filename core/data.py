@@ -284,6 +284,39 @@ def adjust_fn(func, *arguments):
         return result
     return wrap
 
+def datasets_by_cls(source, val_data=0.1):
+    objects  = pd.read_csv(source+'_objs.csv')
+
+    cls_size = objects['class'].value_counts().reset_index()
+    if val_data > 1:
+        cls_size['class'] = [val_data] * cls_size.shape[0]
+    else:
+        cls_size['class'] = cls_size['class']*val_data
+
+    datasets = []
+    datasets_val = []
+    for folder in os.listdir(source):
+        cls_chunks = []
+        for file in os.listdir(os.path.join(source, folder)):
+            cls_chunks.append(os.path.join(source, folder, file))
+
+        ds = tf.data.TFRecordDataset(cls_chunks)
+
+        nval = cls_size[cls_size['index']==folder]['class'].astype(int).values[0]
+
+        if val_data > 1:
+            train_ds = ds.take(nval)
+            val_ds   = ds.skip(nval).take(nval)
+        else:
+            train_ds = ds.skip(nval)
+            val_ds   = ds.take(nval)
+
+        train_ds = train_ds.repeat(repeat)
+        datasets.append(train_ds)
+        datasets_val.append(val_ds)
+
+    return datasets, datasets_val
+
 def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
                         msk_frac=0.2, rnd_frac=0.1, same_frac=0.1, repeat=1):
     """
@@ -305,73 +338,29 @@ def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
     """
     fn = adjust_fn(_parse_pt, msk_frac, rnd_frac, same_frac, max_obs)
 
-    objects  = pd.read_csv(source+'_objs.csv')
+    if val_data == 0.:
+        chunks = [os.path.join(source, folder, file) \
+                    for folder in os.listdir(source) \
+                        for file in os.listdir(os.path.join(source, folder))]
+                        
+        dataset = tf.data.TFRecordDataset(chunks)
+        dataset = dataset.map(fn)
+        dataset = dataset.cache()
+        dataset = dataset.padded_batch(batch_size)
+        dataset = dataset.prefetch(1)
+        return dataset
+    else:
+        datasets, datasets_val = datasets_by_cls(source, val_data)
 
-    cls_size = objects['class'].value_counts().reset_index()
-    if val_data > 1:
-        cls_size['class'] = [val_data] * cls_size.shape[0]
+        dataset = tf.data.experimental.sample_from_datasets(datasets)
+        dataset = dataset.map(fn)
+        dataset = dataset.cache()
+        dataset = dataset.padded_batch(batch_size)
+        dataset = dataset.prefetch(1)
 
-    if val_data <= 1 and val_data > 0.:
-        cls_size['class'] = cls_size['class']*val_data
-
-    datasets = []
-    datasets_val = []
-    for folder in os.listdir(source):
-        cls_chunks = []
-        for file in os.listdir(os.path.join(source, folder)):
-            cls_chunks.append(os.path.join(source, folder, file))
-
-        ds = tf.data.TFRecordDataset(cls_chunks)
-
-        nval = cls_size[cls_size['index']==folder]['class'].astype(int).values[0]
-
-        if val_data > 1:
-            train_ds = ds.take(nval)
-            val_ds   = ds.skip(nval).take(nval)
-
-        if val_data <= 1 and val_data > 0.:
-            train_ds = ds.skip(nval)
-            val_ds   = ds.take(nval)
-
-        if val_data == 0.:
-            val_ds   = ds.take(nval)
-            train_ds = ds
-
-        train_ds = train_ds.repeat(repeat)
-
-        datasets.append(train_ds)
-        datasets_val.append(val_ds)
-
-    dataset = tf.data.experimental.sample_from_datasets(datasets)
-    dataset = dataset.map(fn)
-    dataset = dataset.cache()
-    dataset = dataset.padded_batch(batch_size)
-    dataset = dataset.prefetch(1)
-
-    if val_data > 0.:
         val_dataset = tf.data.experimental.sample_from_datasets(datasets_val)
         val_dataset = val_dataset.map(fn)
         val_dataset = val_dataset.cache()
         val_dataset = val_dataset.padded_batch(batch_size)
         val_dataset = val_dataset.prefetch(1)
         return dataset, val_dataset
-
-    return dataset
-
-def attention_loader(sequences, masks, batch_size):
-    """
-    Embedding data loader. Only used for attention inference
-
-    Args:
-        source (string): Record folder
-        batch_size (int): Batch size
-
-    Returns:
-        Tensorflow Dataset: Iterator withg preprocessed batches
-    """
-    dataset = tf.data.Dataset.from_tensor_slices((sequences, masks))
-    dataset = dataset.map(_parse_att_inference)
-    dataset = dataset.cache()
-    dataset = dataset.padded_batch(batch_size)
-    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
-    return dataset
