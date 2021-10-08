@@ -346,14 +346,14 @@ def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
     dataset = dataset.map(fn)
     dataset = dataset.cache()
     dataset = dataset.padded_batch(batch_size)
-    # dataset = dataset.prefetch(1)
+    dataset = dataset.prefetch(1)
 
     if val_data > 0.:
         val_dataset = tf.data.experimental.sample_from_datasets(datasets_val)
         val_dataset = val_dataset.map(fn)
         val_dataset = val_dataset.cache()
         val_dataset = val_dataset.padded_batch(batch_size)
-        # val_dataset = val_dataset.prefetch(1)
+        val_dataset = val_dataset.prefetch(1)
         return dataset, val_dataset
 
     return dataset
