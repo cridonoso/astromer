@@ -158,10 +158,8 @@ class ASTROMER_v1:
         self.model.load_weights(weights_path)
 
     def encode_from_records(self, records_dir, batch_size, dest='.', val_data=0):
-        root = '/'.join(records_dir.split('/')[:-1])
-
-        objects = pd.read_csv(os.path.join(root, 'train_objs.csv'))
-        astromer_size = 200
+        objects = pd.read_csv(records_dir+'_objs.csv')
+        astromer_size = self.conf['max_obs']
         maxobs = objects['nobs'].max()
         rest = maxobs%astromer_size
         maxobs = maxobs + astromer_size-rest
