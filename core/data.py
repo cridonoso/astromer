@@ -284,7 +284,7 @@ def adjust_fn(func, *arguments):
         return result
     return wrap
 
-def datasets_by_cls(source, val_data=0.1):
+def datasets_by_cls(source, val_data=0.1, repeat=1):
     objects  = pd.read_csv(source+'_objs.csv')
 
     cls_size = objects['class'].value_counts().reset_index()
@@ -342,7 +342,7 @@ def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
         chunks = [os.path.join(source, folder, file) \
                     for folder in os.listdir(source) \
                         for file in os.listdir(os.path.join(source, folder))]
-                        
+
         dataset = tf.data.TFRecordDataset(chunks)
         dataset = dataset.map(fn)
         dataset = dataset.cache()
@@ -350,7 +350,7 @@ def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
         dataset = dataset.prefetch(1)
         return dataset
     else:
-        datasets, datasets_val = datasets_by_cls(source, val_data)
+        datasets, datasets_val = datasets_by_cls(source, val_data, repeat)
 
         dataset = tf.data.experimental.sample_from_datasets(datasets)
         dataset = dataset.map(fn)
