@@ -165,15 +165,15 @@ class ASTROMER_v1:
         maxobs = maxobs + astromer_size-rest
         n_windows = maxobs//astromer_size
 
-        batches = load_records(records_dir,
-                               batch_size,
-                               val_data=val_data, # either fraction (0, 1) or number of samples per class
-                               no_shuffle=False,
-                               max_obs=maxobs,
-                               msk_frac=0.,
-                               rnd_frac=0.,
-                               same_frac=0.,
-                               repeat=1)
+        batches, val_data = load_records(records_dir,
+                                         batch_size,
+                                         val_data=20, # either fraction (0, 1) or number of samples per class
+                                         no_shuffle=False,
+                                         max_obs=maxobs,
+                                         msk_frac=0.,
+                                         rnd_frac=0.,
+                                         same_frac=0.,
+                                         repeat=1)
 
         os.makedirs(dest, exist_ok=True)
 
@@ -192,22 +192,22 @@ class ASTROMER_v1:
                 batch_windows.append(embs)
 
             batch_emb = tf.concat(batch_windows, 1)
-            size = tf.shape(batch_emb)
-            batch_emb = tf.reshape(batch_emb, [size[0]*size[1], size[2]])
-
             bool_mask = tf.logical_not(tf.cast(tf.squeeze(batch['mask_in']), tf.bool))
-            bool_mask = tf.reshape(bool_mask, [size[0]*size[1]])
+            valid_emb = tf.ragged.boolean_mask(batch_emb, bool_mask)
+            valid_t = tf.ragged.boolean_mask(batch['times'], bool_mask)
+            valid_x = tf.ragged.boolean_mask(batch['input'], bool_mask)
 
-            oids = tf.tile(tf.expand_dims(batch['lcid'], 1), [1, size[1]])
-            oids = tf.reshape(oids, [size[0]*size[1]])
+            dataset = tf.data.Dataset.from_tensor_slices((batch['lcid'],
+                                                          batch['label'],
+                                                          valid_x,
+                                                          valid_t,
+                                                          valid_emb))
 
-            valid_emb = tf.boolean_mask(batch_emb, bool_mask)
-            valid_oids = tf.boolean_mask(oids, bool_mask)
+            tf.data.experimental.save(dataset, dest+'/batch_{}'.format(index))
 
-            df = pd.DataFrame(valid_emb.numpy())
-            df['oid'] = valid_oids.numpy()
-            df['oid'] = df['oid'].apply(lambda x: x.decode('utf-8'))
-
-            df.to_csv(os.path.join(dest, 'batch_{}.csv'.format(index)), index=False)
             end = time.time()
             print('{:.2f}'.format(end-start))
+
+def save_emb(x, path):
+    df = pd.DataFrame(x.numpy())
+    df.to_csv(path, index=False)
