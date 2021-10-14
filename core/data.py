@@ -210,74 +210,6 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
 
     return input_dict
 
-def _parse_embedding(sample, max_obs, average=False):
-    '''
-    Specific task formater
-    '''
-    input_dict = get_sample(sample, ndims=256)
-
-    sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
-    sequence = standardize(sequence)
-    if average:
-        sequence = tf.reduce_mean(sequence, 0)
-
-    input_dict['x']  = sequence
-    input_dict['mask']   = tf.ones([tf.shape(sequence)[0], 1])
-    input_dict['length'] = curr_max_obs
-
-    return input_dict, input_dict['label']
-
-def _parse_normal(sample, max_obs):
-    '''
-    Specific task formater
-    '''
-    input_dict = get_sample(sample)
-
-    sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
-    sequence = standardize(sequence)
-
-    seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
-    seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
-    seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
-
-    time_steps = tf.shape(seq_magn)[0]
-
-    if curr_max_obs < max_obs:
-        filler = tf.ones([max_obs-curr_max_obs, 1])
-        mask   = tf.concat([tf.zeros([curr_max_obs, 1]), filler], 0)
-        seq_magn  = tf.concat([seq_magn, 1.-filler], 0)
-        seq_time  = tf.concat([seq_time, 1.-filler], 0)
-        seq_errs  = tf.concat([seq_errs, 1.-filler], 0)
-    else:
-        mask = tf.zeros([max_obs, 1])
-
-    input_dict['input']    = seq_magn
-    input_dict['times']    = seq_time
-    input_dict['obserr']   = seq_errs
-    input_dict['mask_in']  = mask
-    input_dict['mask_out'] = mask
-    input_dict['length']   = curr_max_obs
-
-    return input_dict
-
-def _parse_att_inference(sequence, masks):
-    '''
-    Specific task formater
-    '''
-    input_dict = dict()
-    sequence = standardize(sequence)
-
-    seq_time = tf.slice(sequence, [0, 0], [-1, 1])
-    seq_magn = tf.slice(sequence, [0, 1], [-1, 1])
-    time_steps = tf.shape(seq_magn)[0]
-
-
-    input_dict['input']    = seq_magn
-    input_dict['times']    = seq_time
-    input_dict['mask_in']  = masks
-
-    return input_dict
-
 def adjust_fn(func, *arguments):
     def wrap(*args, **kwargs):
         result = func(*args, *arguments)
@@ -364,3 +296,56 @@ def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
         val_dataset = val_dataset.padded_batch(batch_size)
         val_dataset = val_dataset.prefetch(1)
         return dataset, val_dataset
+
+def _parse_emb(oid, lab, input, times, embs, max_obs=200):
+    x = tf.concat([times, input, embs], 1)
+    sequence, curr_max_obs = sample_lc(x, max_obs)
+
+    seq_time = tf.slice(sequence, [0, 0],[-1, 1])
+    seq_magn = tf.slice(sequence, [0, 1],[-1, 1])
+    seq_embs = tf.slice(sequence, [0, 2],[-1, -1])
+    seq_mask = tf.ones([tf.shape(seq_time)[0]])
+
+
+    return {'oid'  : oid,
+            'label': lab,
+            'input': seq_magn,
+            'times': seq_time,
+            'mask': seq_mask,
+            'embs' : seq_embs}
+
+def load_embeddings(path, batch_size, max_obs=200, valptg=0.):
+    for index, x in enumerate(os.listdir(path)):
+        if index == 0:
+            dataset = tf.data.experimental.load(os.path.join(path, x))
+        else:
+            dataset = dataset.concatenate(
+                        tf.data.experimental.load(os.path.join(path, x)))
+
+    fn = adjust_fn(_parse_emb, max_obs)
+
+    dataset = dataset.map(fn)
+
+    if valptg != 0.:
+        n_samples = sum([1 for x in dataset])
+        n_val = int(n_samples * valptg)
+
+        dataset = dataset.shuffle(1000)
+        val_dataset   = dataset.take(n_val)
+        train_dataset = dataset.skip(n_val)
+
+        val_dataset   = val_dataset.padded_batch(batch_size)
+        train_dataset = train_dataset.padded_batch(batch_size)
+
+        val_dataset   = val_dataset.cache()
+        train_dataset = train_dataset.cache()
+
+        val_dataset   = val_dataset.prefetch(1)
+        train_dataset = train_dataset.prefetch(1)
+
+        return train_dataset, val_dataset
+
+    dataset = dataset.padded_batch(batch_size)
+    dataset = dataset.cache()
+    dataset = dataset.prefetch(1)
+    return dataset
