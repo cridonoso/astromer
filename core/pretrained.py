@@ -89,7 +89,9 @@ class ASTROMER_v1:
                                                           valid_t,
                                                           valid_emb))
 
-            tf.data.experimental.save(dataset, dest+'/batch_{}'.format(index))
+            tf.data.experimental.save(dataset,
+                            dest+'/batch_{}'.format(index),
+                            compression='GZIP')
 
             end = time.time()
             print('{:.2f}'.format(end-start))

@@ -315,19 +315,26 @@ def _parse_emb(oid, lab, input, times, embs, max_obs=200):
             'embs' : seq_embs}
 
 def load_embeddings(path, batch_size, max_obs=200, valptg=0.):
+
+    tensor_spec = (tf.TensorSpec(shape=(), dtype=tf.string),
+                   tf.TensorSpec(shape=(), dtype=tf.int32),
+                   tf.TensorSpec(shape=(None, 1), dtype=tf.float32),
+                   tf.TensorSpec(shape=(None, 1), dtype=tf.float32),
+                   tf.TensorSpec(shape=(None, 256), dtype=tf.float32))
+
     for index, x in enumerate(os.listdir(path)):
         if index == 0:
-            dataset = tf.data.experimental.load(os.path.join(path, x))
+            dataset = tf.data.experimental.load(os.path.join(path, x), tensor_spec)
         else:
             dataset = dataset.concatenate(
-                        tf.data.experimental.load(os.path.join(path, x)))
+                        tf.data.experimental.load(os.path.join(path, x)), tensor_spec)
 
     fn = adjust_fn(_parse_emb, max_obs)
 
     dataset = dataset.map(fn)
 
     if valptg != 0.:
-        n_samples = sum([1 for x in dataset])
+        n_samples = sum([1 for _ in dataset])
         n_val = int(n_samples * valptg)
 
         dataset = dataset.shuffle(1000)
