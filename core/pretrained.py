@@ -89,8 +89,57 @@ class ASTROMER_v1:
                                                           valid_t,
                                                           valid_emb))
 
-            tf.data.experimental.save(dataset,
-                            dest+'/batch_{}'.format(index))
+            dataset = dataset.map(tf_serialize_example)
+            filename = dest+'/batch_{}'.format(index)
+            writer = tf.data.experimental.TFRecordWriter(filename)
+            writer.write(dataset)
 
             end = time.time()
             print('{:.2f}'.format(end-start))
+
+def tf_serialize_example(f0,f1,f2,f3,f5):
+    tf_string = tf.py_function(
+        serialize_example,
+        (f0, f1, f2, f3, f5),  # Pass these args to the above function.
+        tf.string)      # The return type is `tf.string`.
+    return tf.reshape(tf_string, ()) # The result is a scalar.
+
+def _bytes_feature(value):
+  """Returns a bytes_list from a string / byte."""
+  if isinstance(value, type(tf.constant(0))):
+    value = value.numpy() # BytesList won't unpack a string from an EagerTensor.
+  return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+
+def _float_feature(value):
+  """Returns a float_list from a float / double."""
+  return tf.train.Feature(float_list=tf.train.FloatList(value=value))
+
+def _int64_feature(value):
+  """Returns an int64_list from a bool / enum / int / uint."""
+  return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+
+def serialize_example(feature0, feature1, feature2, feature3, feature4):
+    """
+    Creates a tf.train.Example message ready to be written to a file.
+    """
+    # Create a dictionary mapping the feature name to the tf.train.Example-compatible
+    # data type.
+    dict_features = {
+      'oid': _bytes_feature(feature0),
+      'label': _int64_feature(feature1),
+      'input':_float_feature(feature2),
+      'times':_float_feature(feature3)
+    }
+    element_context = tf.train.Features(feature = dict_features)
+
+    dict_sequence = {}
+    for col in range(feature4.shape[1]):
+      seqfeat = _float_feature(feature4[:, col])
+      seqfeat = tf.train.FeatureList(feature = [seqfeat])
+      dict_sequence['emb_{}'.format(col)] = seqfeat
+
+    # Create a Features message using tf.train.Example.
+    element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
+    ex = tf.train.SequenceExample(context = element_context,
+                              feature_lists= element_lists)
+    return ex.SerializeToString()
