@@ -84,7 +84,7 @@ def get_lstm_att(units, num_classes, encoder, maxlen=200, dropout=0.5):
     times  = Input(shape=(maxlen, 1),
                   batch_size=None,
                   name='times')
-    mask   = Input(shape=(maxlen),
+    mask   = Input(shape=(maxlen, 1),
                   batch_size=None,
                   name='mask')
     placeholder = {'input':serie,
