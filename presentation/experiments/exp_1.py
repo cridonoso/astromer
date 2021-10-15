@@ -178,7 +178,7 @@ def run(opt):
 
     if opt.mode == 'lstm_att':
         encoder = init_astromer(opt.emb)
-        model = get_lstm_att(256, num_classes, encoder, dropout=0.5)
+        model = get_lstm_att(256, num_classes, encoder=encoder, dropout=0.5)
         exp_path = os.path.join(opt.p, 'lstm_att')
 
     train_writter = tf.summary.create_file_writer(
