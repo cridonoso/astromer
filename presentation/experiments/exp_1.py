@@ -15,7 +15,7 @@ from tqdm import tqdm
 from core.metrics import custom_acc
 from core.losses import custom_bce
 from core.astromer import get_ASTROMER
-from core.data import load_embeddings, load_records
+from core.data import load_records
 from core.tboard import save_scalar
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
