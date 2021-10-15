@@ -11,7 +11,7 @@ from core.masking import get_masked, set_random, get_padding_mask
 from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
 from core.utils import standardize
-from core.astromer import get_ASTROMER
+
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
@@ -309,19 +309,3 @@ def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
         val_dataset = val_dataset.padded_batch(batch_size)
         val_dataset = val_dataset.prefetch(1)
         return dataset, val_dataset
-
-def load_embeddings(path, weights, batch_size=16, max_obs=200, valptg=0.):
-    conf_file = os.path.join(weights, 'conf.json')
-    with open(conf_file, 'r') as handle:
-        conf = json.load(handle)
-
-    train_dataset, val_dataset = load_records(path,
-                                              batch_size,
-                                              val_data=0.1,
-                                              no_shuffle=False,
-                                              max_obs=200,
-                                              msk_frac=0.,
-                                              rnd_frac=0.,
-                                              same_frac=0.,
-                                              repeat=1)
-    return train_dataset, val_dataset
