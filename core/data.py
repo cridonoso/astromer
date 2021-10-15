@@ -3,6 +3,7 @@ import dask.dataframe as dd
 import tensorflow as tf
 import pandas as pd
 import numpy as np
+import json
 import logging
 import os
 
@@ -10,6 +11,7 @@ from core.masking import get_masked, set_random, get_padding_mask
 from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
 from core.utils import standardize
+from core.astromer import get_ASTROMER
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
@@ -130,6 +132,15 @@ def get_sample(sample, ndims=3):
     input_dict['input'] = sequence
     return input_dict
 
+def get_first_k_obs(sequence, max_obs):
+    '''
+    Sample a random window of "max_obs" observations from the input sequence
+    '''
+    serie_len = tf.shape(sequence)[0]
+    curr_max_obs = tf.minimum(serie_len, max_obs)
+    sequence = tf.slice(sequence, [0,0], [curr_max_obs, -1])
+    return sequence, curr_max_obs
+
 def sample_lc(sequence, max_obs):
     '''
     Sample a random window of "max_obs" observations from the input sequence
@@ -157,7 +168,8 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
 
     input_dict = get_sample(sample)
 
-    sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
+    # sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
+    sequence, curr_max_obs = get_first_k_obs(input_dict['input'], max_obs)
 
     sequence, mean = standardize(sequence, return_mean=True)
 
@@ -200,7 +212,7 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
         orig_magn = tf.concat([orig_magn, 1.-filler], 0)
 
     input_dict['output']   = orig_magn
-    input_dict['input']    = seq_magn
+    input_dict['input'] = seq_magn
     input_dict['times']    = seq_time
     input_dict['mask_out'] = mask_out
     input_dict['mask_in']  = mask_in
@@ -250,7 +262,8 @@ def datasets_by_cls(source, val_data=0.1, repeat=1):
     return datasets, datasets_val
 
 def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
-                        msk_frac=0.2, rnd_frac=0.1, same_frac=0.1, repeat=1):
+                        msk_frac=0.2, rnd_frac=0.1, same_frac=0.1, repeat=1,
+                        embedding=None):
     """
     Pretraining data loader.
     This method build the ASTROMER input format.
@@ -297,62 +310,18 @@ def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
         val_dataset = val_dataset.prefetch(1)
         return dataset, val_dataset
 
-def _parse_emb(oid, lab, input, times, embs, max_obs=200):
-    x = tf.concat([times, input, embs], 1)
-    sequence, curr_max_obs = sample_lc(x, max_obs)
+def load_embeddings(path, weights, batch_size=16, max_obs=200, valptg=0.):
+    conf_file = os.path.join(weights, 'conf.json')
+    with open(conf_file, 'r') as handle:
+        conf = json.load(handle)
 
-    seq_time = tf.slice(sequence, [0, 0],[-1, 1])
-    seq_magn = tf.slice(sequence, [0, 1],[-1, 1])
-    seq_embs = tf.slice(sequence, [0, 2],[-1, -1])
-    seq_mask = tf.ones([tf.shape(seq_time)[0]])
-
-
-    return {'oid'  : oid,
-            'label': lab,
-            'input': seq_magn,
-            'times': seq_time,
-            'mask': seq_mask,
-            'embs' : seq_embs}
-
-def load_embeddings(path, batch_size, max_obs=200, valptg=0.):
-
-    tensor_spec = (tf.TensorSpec(shape=(), dtype=tf.string),
-                   tf.TensorSpec(shape=(), dtype=tf.int32),
-                   tf.TensorSpec(shape=(None, 1), dtype=tf.float32),
-                   tf.TensorSpec(shape=(None, 1), dtype=tf.float32),
-                   tf.TensorSpec(shape=(None, 256), dtype=tf.float32))
-
-    for index, x in enumerate(os.listdir(path)):
-        if index == 0:
-            dataset = tf.data.experimental.load(os.path.join(path, x), tensor_spec)
-        else:
-            dataset = dataset.concatenate(
-                        tf.data.experimental.load(os.path.join(path, x)), tensor_spec)
-
-    fn = adjust_fn(_parse_emb, max_obs)
-
-    dataset = dataset.map(fn)
-
-    if valptg != 0.:
-        n_samples = sum([1 for _ in dataset])
-        n_val = int(n_samples * valptg)
-
-        dataset = dataset.shuffle(1000)
-        val_dataset   = dataset.take(n_val)
-        train_dataset = dataset.skip(n_val)
-
-        val_dataset   = val_dataset.padded_batch(batch_size)
-        train_dataset = train_dataset.padded_batch(batch_size)
-
-        val_dataset   = val_dataset.cache()
-        train_dataset = train_dataset.cache()
-
-        val_dataset   = val_dataset.prefetch(1)
-        train_dataset = train_dataset.prefetch(1)
-
-        return train_dataset, val_dataset
-
-    dataset = dataset.padded_batch(batch_size)
-    dataset = dataset.cache()
-    dataset = dataset.prefetch(1)
-    return dataset
+    train_dataset, val_dataset = load_records(path,
+                                              batch_size,
+                                              val_data=0.1,
+                                              no_shuffle=False,
+                                              max_obs=200,
+                                              msk_frac=0.,
+                                              rnd_frac=0.,
+                                              same_frac=0.,
+                                              repeat=1)
+    return train_dataset, val_dataset

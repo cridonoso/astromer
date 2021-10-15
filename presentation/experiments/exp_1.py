@@ -14,20 +14,28 @@ from tensorflow.keras import Model
 from tqdm import tqdm
 from core.metrics import custom_acc
 from core.losses import custom_bce
-from core.data import load_embeddings
+from core.astromer import get_ASTROMER
+from core.data import load_embeddings, load_records
 from core.tboard import save_scalar
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
-def get_mlp(num_classes):
+def get_mlp(num_classes, encoder, maxlen=200):
     ''' FC + ATT'''
-    serie  = Input(shape=(200, 256),
+    serie  = Input(shape=(maxlen, 1),
                   batch_size=None,
                   name='input')
-
-    placeholder = {'embs': serie}
-
-    x = tf.reduce_mean(placeholder['embs'], 1)
+    times  = Input(shape=(maxlen, 1),
+                  batch_size=None,
+                  name='times')
+    mask   = Input(shape=(maxlen, 1),
+                  batch_size=None,
+                  name='mask')
+    placeholder = {'input':serie,
+                   'mask_in':mask,
+                   'times':times}
+    x = encoder(placeholder)
+    x = tf.reduce_mean(x, 1)
     x = Dense(512)(x)
     x = BatchNormalization()(x)
     x = Dense(256)(x)
@@ -50,10 +58,10 @@ def get_lstm(units, num_classes, maxlen, dropout=0.5):
                   batch_size=None,
                   name='mask')
     placeholder = {'input':serie,
-                   'mask':mask,
+                   'mask_in':mask,
                    'times':times}
 
-    bool_mask = tf.logical_not(tf.cast(placeholder['mask'], tf.bool))
+    bool_mask = tf.logical_not(tf.cast(placeholder['mask_in'], tf.bool))
 
     x = tf.concat([placeholder['times'], placeholder['input']], 2)
 
@@ -67,18 +75,24 @@ def get_lstm(units, num_classes, maxlen, dropout=0.5):
 
     return Model(inputs=placeholder, outputs=x, name="RNNCLF")
 
-def get_lstm_att(units, num_classes, maxlen=200, dropout=0.5):
+def get_lstm_att(units, num_classes, encoder, maxlen=200, dropout=0.5):
     ''' ATT + LSTM + LSTM + FC'''
 
-    serie  = Input(shape=(maxlen, 256),
+    serie  = Input(shape=(maxlen, 1),
                   batch_size=None,
                   name='input')
+    times  = Input(shape=(maxlen, 1),
+                  batch_size=None,
+                  name='times')
     mask   = Input(shape=(maxlen),
                   batch_size=None,
                   name='mask')
-    placeholder = {'embs':serie,
-                   'mask':mask}
-    bool_mask = tf.logical_not(tf.cast(placeholder['mask'], tf.bool))
+    placeholder = {'input':serie,
+                   'mask_in':mask,
+                   'times':times}
+    x = encoder(placeholder)
+
+    bool_mask = tf.logical_not(tf.cast(placeholder['mask_in'], tf.bool))
 
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(placeholder['embs'], mask=bool_mask)
@@ -111,31 +125,60 @@ def valid_step(model, batch, return_pred=False):
         return acc, ce, y_pred, batch['label']
     return acc, ce
 
+def init_astromer(path):
+    conf_file = os.path.join(path, 'conf.json')
+    with open(conf_file, 'r') as handle:
+        conf = json.load(handle)
+
+    model = get_ASTROMER(num_layers=conf['layers'],
+                         d_model   =conf['head_dim'],
+                         num_heads =conf['heads'],
+                         dff       =conf['dff'],
+                         base      =conf['base'],
+                         dropout   =conf['dropout'],
+                         maxlen    =conf['max_obs'],
+                         use_leak  =conf['use_leak'])
+
+    weights_path = '{}/weights'.format(path)
+    model.load_weights(weights_path)
+    model.trainable=False
+    encoder = model.get_layer('encoder')
+    return encoder
 
 def run(opt):
-    train_dataset, val_dataset = load_embeddings(opt.emb,
-                                                 valptg=opt.valptg,
-                                                 batch_size=opt.batch_size)
-
-    num_classes = 10
-    for x in train_dataset:
-        num_classes = np.unique(x['label']).shape[0]
-        break
-
     optimizer = tf.keras.optimizers.Adam(1e-3)
     train_cce  = tf.keras.metrics.Mean(name='train_bce')
     valid_cce  = tf.keras.metrics.Mean(name='valid_bce')
     train_acc  = tf.keras.metrics.Mean(name='train_acc')
     valid_acc  = tf.keras.metrics.Mean(name='valid_acc')
 
+    train_dataset, val_dataset = load_records('./data/records/ogle/train',
+                                              opt.batch_size,
+                                              val_data=0.1,
+                                              no_shuffle=False,
+                                              max_obs=200,
+                                              msk_frac=0.,
+                                              rnd_frac=0.,
+                                              same_frac=0.,
+                                              repeat=1)
+    num_classes = 10
+    for x in train_dataset:
+        num_classes = np.unique(x['label']).shape[0]
+        break
+
+    exp_path = opt.p
     if opt.mode == 'mlp_att':
-        model = get_mlp(num_classes)
+        encoder = init_astromer(opt.emb)
+        model = get_mlp(num_classes, encoder)
         exp_path = os.path.join(opt.p, 'mlp_att')
+
     if opt.mode == 'lstm':
         model = get_lstm(256, num_classes, 200, dropout=0.5)
         exp_path = os.path.join(opt.p, 'lstm')
+
     if opt.mode == 'lstm_att':
-        model = get_lstm_att(256, num_classes,dropout=0.5)
+        encoder = init_astromer(opt.emb)
+        model = get_lstm_att(256, num_classes, encoder, dropout=0.5)
         exp_path = os.path.join(opt.p, 'lstm_att')
 
     train_writter = tf.summary.create_file_writer(
@@ -147,7 +190,7 @@ def run(opt):
     es_count = 0
     pbar = tqdm(range(1000), desc='epoch')
     for epoch in pbar:
-        for batch in train_dataset:
+        for batch in tqdm(train_dataset, desc='iterations'):
             acc, cce = train_step(model, batch, optimizer)
             train_acc.update_state(acc)
             train_cce.update_state(cce)
@@ -199,7 +242,7 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--valptg', default=0.2, type=float,
                         help='validation subset fraction')
-    parser.add_argument('--patience', default=40, type=int,
+    parser.add_argument('--patience', default=20, type=int,
                         help='patience for early stopping')
 
     parser.add_argument('--mode', default='mlp', type=str,
