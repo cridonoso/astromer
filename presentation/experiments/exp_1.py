@@ -95,7 +95,7 @@ def get_lstm_att(units, num_classes, encoder, maxlen=200, dropout=0.5):
     bool_mask = tf.logical_not(tf.cast(placeholder['mask_in'], tf.bool))
 
     x = LSTM(units, return_sequences=True,
-             dropout=dropout, name='RNN_0')(placeholder['embs'], mask=bool_mask)
+             dropout=dropout, name='RNN_0')(x, mask=bool_mask)
     x = LayerNormalization(axis=1)(x)
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_1')(x, mask=bool_mask)
