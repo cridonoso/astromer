@@ -90,16 +90,17 @@ def get_lstm_att(units, num_classes, encoder, maxlen=200, dropout=0.5):
     placeholder = {'input':serie,
                    'mask_in':mask,
                    'times':times}
+
     x = encoder(placeholder)
 
     bool_mask = tf.logical_not(tf.cast(placeholder['mask_in'], tf.bool))
 
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(x, mask=bool_mask)
-    x = LayerNormalization(axis=1)(x)
+    x = LayerNormalization()(x)
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_1')(x, mask=bool_mask)
-    x = LayerNormalization(axis=1)(x)
+    x = LayerNormalization()(x)
     x = Dense(num_classes, name='FCN')(x)
 
     return Model(inputs=placeholder, outputs=x, name="RNNCLF")
