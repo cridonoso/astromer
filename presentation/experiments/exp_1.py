@@ -155,7 +155,7 @@ def run(opt):
 
     train_dataset, val_dataset = load_records(opt.data,
                                               opt.batch_size,
-                                              val_data=0.1,
+                                              val_data=0.25,
                                               no_shuffle=False,
                                               max_obs=200,
                                               msk_frac=0.,
