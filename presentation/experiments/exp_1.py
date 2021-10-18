@@ -161,7 +161,8 @@ def run(opt):
                                               msk_frac=0.,
                                               rnd_frac=0.,
                                               same_frac=0.,
-                                              repeat=opt.repeat)
+                                              repeat=opt.repeat,
+                                              is_train=True)
     num_classes = 0
     for x in train_dataset:
         num_classes = np.unique(x['label']).shape[0]

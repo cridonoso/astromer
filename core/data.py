@@ -161,15 +161,17 @@ def sample_lc(sequence, max_obs):
 
     return sequence, curr_max_obs
 
-def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
+def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs, is_train=False):
     '''
     Pretraining formater
     '''
 
     input_dict = get_sample(sample)
 
-    # sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
-    sequence, curr_max_obs = get_first_k_obs(input_dict['input'], max_obs)
+    if is_train:
+        sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
+    else:
+        sequence, curr_max_obs = get_first_k_obs(input_dict['input'], max_obs)
 
     sequence, mean = standardize(sequence, return_mean=True)
 
@@ -263,7 +265,7 @@ def datasets_by_cls(source, val_data=0.1, repeat=1):
 
 def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
                         msk_frac=0.2, rnd_frac=0.1, same_frac=0.1, `repeat`=1,
-                        embedding=None):
+                        embedding=None, is_train=False):
     """
     Pretraining data loader.
     This method build the ASTROMER input format.
@@ -281,7 +283,7 @@ def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
     Returns:
         Tensorflow Dataset: Iterator withg preprocessed batches
     """
-    fn = adjust_fn(_parse_pt, msk_frac, rnd_frac, same_frac, max_obs)
+    fn = adjust_fn(_parse_pt, msk_frac, rnd_frac, same_frac, max_obs, is_train)
 
     if val_data == 0.:
         chunks = [os.path.join(source, folder, file) \
