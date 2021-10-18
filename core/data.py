@@ -264,7 +264,7 @@ def datasets_by_cls(source, val_data=0.1, repeat=1):
     return datasets, datasets_val
 
 def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
-                        msk_frac=0.2, rnd_frac=0.1, same_frac=0.1, `repeat`=1,
+                        msk_frac=0.2, rnd_frac=0.1, same_frac=0.1, repeat=1,
                         embedding=None, is_train=False):
     """
     Pretraining data loader.
