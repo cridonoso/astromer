@@ -153,7 +153,7 @@ def run(opt):
     train_acc  = tf.keras.metrics.Mean(name='train_acc')
     valid_acc  = tf.keras.metrics.Mean(name='valid_acc')
 
-    train_dataset, val_dataset = load_records('./data/records/ogle/train',
+    train_dataset, val_dataset = load_records(opt.data,
                                               opt.batch_size,
                                               val_data=0.1,
                                               no_shuffle=False,
@@ -161,8 +161,8 @@ def run(opt):
                                               msk_frac=0.,
                                               rnd_frac=0.,
                                               same_frac=0.,
-                                              repeat=1)
-    num_classes = 10
+                                              repeat=opt.repeat)
+    num_classes = 0
     for x in train_dataset:
         num_classes = np.unique(x['label']).shape[0]
         break
@@ -235,8 +235,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # TRAINING PAREMETERS
-    parser.add_argument('--emb', default='./embeddings/ogle_20/train', type=str,
+    parser.add_argument('--data', default='./data/records/ogle/train', type=str,
                         help='Dataset folder containing the records files')
+    parser.add_argument('--emb', default='./embeddings/ogle_20/train', type=str,
+                        help='ASTROMER weights')
     parser.add_argument('--p', default="./experiments/exp_1/", type=str,
                         help='folder for saving embeddings')
     parser.add_argument('--batch-size', default=256, type=int,
@@ -245,7 +247,8 @@ if __name__ == '__main__':
                         help='validation subset fraction')
     parser.add_argument('--patience', default=20, type=int,
                         help='patience for early stopping')
-
+    parser.add_argument('--repeat', default=1, type=int,
+                        help='repeat dataset samples')
     parser.add_argument('--mode', default='mlp', type=str,
                         help='mlp_att - lstm - lstm_att')
 

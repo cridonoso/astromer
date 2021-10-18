@@ -245,6 +245,7 @@ def datasets_by_cls(source, val_data=0.1, repeat=1):
             cls_chunks.append(os.path.join(source, folder, file))
 
         ds = tf.data.TFRecordDataset(cls_chunks)
+        ds = ds.repeat(repeat)
 
         nval = cls_size[cls_size['index']==folder]['class'].astype(int).values[0]
 
@@ -255,14 +256,13 @@ def datasets_by_cls(source, val_data=0.1, repeat=1):
             train_ds = ds.skip(nval)
             val_ds   = ds.take(nval)
 
-        train_ds = train_ds.repeat(repeat)
         datasets.append(train_ds)
         datasets_val.append(val_ds)
 
     return datasets, datasets_val
 
 def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
-                        msk_frac=0.2, rnd_frac=0.1, same_frac=0.1, repeat=1,
+                        msk_frac=0.2, rnd_frac=0.1, same_frac=0.1, `repeat`=1,
                         embedding=None):
     """
     Pretraining data loader.
