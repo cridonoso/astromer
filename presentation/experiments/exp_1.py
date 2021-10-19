@@ -62,13 +62,12 @@ def get_lstm(units, num_classes, maxlen, dropout=0.5):
     bool_mask = tf.logical_not(tf.cast(placeholder['mask_in'], tf.bool))
 
     x = tf.concat([placeholder['times'], placeholder['input']], 2)
-
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(x, mask=bool_mask)
-    x = BatchNormalization()(x)
+    x = LayerNormalization(axis=1)(x)
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_1')(x, mask=bool_mask)
-    x = BatchNormalization()(x)
+    x = LayerNormalization(axis=1)(x)
     x = Dense(num_classes, name='FCN')(x)
 
     return Model(inputs=placeholder, outputs=x, name="RNNCLF")
