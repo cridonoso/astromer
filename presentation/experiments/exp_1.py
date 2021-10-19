@@ -67,10 +67,10 @@ def get_lstm(units, num_classes, maxlen, dropout=0.5):
 
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(x, mask=bool_mask)
-    x = LayerNormalization(axis=1)(x)
+    x = BatchNormalization()(x)
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_1')(x, mask=bool_mask)
-    x = LayerNormalization(axis=1)(x)
+    x = BatchNormalization()(x)
     x = Dense(num_classes, name='FCN')(x)
 
     return Model(inputs=placeholder, outputs=x, name="RNNCLF")
@@ -97,10 +97,10 @@ def get_lstm_att(units, num_classes, encoder, maxlen=200, dropout=0.5):
 
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(x, mask=bool_mask)
-    x = LayerNormalization()(x)
+    x = BatchNormalization()(x)
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_1')(x, mask=bool_mask)
-    x = LayerNormalization()(x)
+    x = BatchNormalization()(x)
     x = Dense(num_classes, name='FCN')(x)
 
     return Model(inputs=placeholder, outputs=x, name="RNNCLF")
