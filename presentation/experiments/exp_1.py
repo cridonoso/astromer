@@ -38,11 +38,8 @@ def get_mlp(num_classes, encoder, maxlen=200):
     x = encoder(placeholder)
     x = tf.reduce_mean(x, 1)
     x = Dense(1024, activation='relu')(x)
-    x = BatchNormalization()(x)
     x = Dense(512, activation='relu')(x)
-    x = BatchNormalization()(x)
     x = Dense(256, activation='relu')(x)
-    x = BatchNormalization()(x)
     x = Dense(num_classes)(x)
     return Model(inputs=placeholder, outputs=x, name="MLP")
 
