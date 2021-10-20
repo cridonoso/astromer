@@ -39,11 +39,12 @@ def get_mlp(num_classes, encoder, maxlen=200):
     x = encoder(placeholder)
     x = tf.multiply(x, bool_mask)
     x = tf.divide(tf.reduce_sum(x, 1), tf.reduce_sum(bool_mask, 1))
-    x = tf.divide(tf.subtract(x, tf.expand_dims(tf.reduce_mean(x, 1), 1)),
-                  tf.expand_dims(tf.math.reduce_std(x, 1), 1))
     x = Dense(1024, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(512, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(256, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(num_classes)(x)
     return Model(inputs=placeholder, outputs=x, name="MLP")
 
@@ -53,6 +54,9 @@ def get_lstm(units, num_classes, maxlen, dropout=0.5):
     serie  = Input(shape=(maxlen, 1),
                   batch_size=None,
                   name='input')
+    errs  = Input(shape=(maxlen, 1),
+                  batch_size=None,
+                  name='errs')
     times  = Input(shape=(maxlen, 1),
                   batch_size=None,
                   name='times')
@@ -61,11 +65,12 @@ def get_lstm(units, num_classes, maxlen, dropout=0.5):
                   name='mask')
     placeholder = {'input':serie,
                    'mask_in':mask,
-                   'times':times}
+                   'times':times,
+                   'obserr':errs}
 
     bool_mask = tf.logical_not(tf.cast(placeholder['mask_in'], tf.bool))
 
-    x = tf.concat([placeholder['times'], placeholder['input']], 2)
+    x = tf.concat([placeholder['times'], placeholder['input'], placeholder['obserr']], 2)
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(x, mask=bool_mask)
     x = LayerNormalization(axis=1)(x)

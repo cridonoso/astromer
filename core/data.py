@@ -286,6 +286,7 @@ def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
     fn = adjust_fn(_parse_pt, msk_frac, rnd_frac, same_frac, max_obs, is_train)
 
     if val_data == 0.:
+        print('No validation')
         chunks = [os.path.join(source, folder, file) \
                     for folder in os.listdir(source) \
                         for file in os.listdir(os.path.join(source, folder))]
