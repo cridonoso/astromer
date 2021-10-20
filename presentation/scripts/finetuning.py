@@ -57,15 +57,23 @@ def run(opt):
             json.dump(varsdic, json_file, indent=4)
 
         # Loading data
-        train_batches, valid_batches = load_records(os.path.join(opt.data, 'train'),
-                                                    opt.batch_size,
-                                                    val_data=opt.valptg,
-                                                    max_obs=conf['max_obs'],
-                                                    no_shuffle=opt.no_shuffle,
-                                                    msk_frac=conf['msk_frac'],
-                                                    rnd_frac=conf['rnd_frac'],
-                                                    same_frac=conf['same_frac'],
-                                                    repeat=opt.repeat)
+        train_batches = load_records(os.path.join(opt.data, 'train'),
+                                     opt.batch_size,
+                                     max_obs=conf['max_obs'],
+                                     msk_frac=conf['msk_frac'],
+                                     rnd_frac=conf['rnd_frac'],
+                                     same_frac=conf['same_frac'],
+                                     repeat=opt.repeat,
+                                     is_train=True)
+
+        valid_batches = load_records(os.path.join(opt.data, 'val'),
+                                     opt.batch_size,
+                                     max_obs=conf['max_obs'],
+                                     msk_frac=conf['msk_frac'],
+                                     rnd_frac=conf['rnd_frac'],
+                                     same_frac=conf['same_frac'],
+                                     repeat=opt.repeat,
+                                     is_train=True)
 
         # Training ASTROMER
         train(astromer, train_batches, valid_batches,
@@ -91,11 +99,11 @@ if __name__ == '__main__':
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--prefix', default="model", type=str,
                         help='prefix for the folder of the finetuned model')
-    parser.add_argument('--batch-size', default=256, type=int,
+    parser.add_argument('--batch-size', default=16, type=int,
                         help='batch size')
-    parser.add_argument('--epochs', default=10000, type=int,
+    parser.add_argument('--epochs', default=1000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=200, type=int,
+    parser.add_argument('--patience', default=20, type=int,
                         help='batch size')
     parser.add_argument('--repeat', default=1, type=int,
                         help='number of repetitions of the dataset')
@@ -114,8 +122,6 @@ if __name__ == '__main__':
     parser.add_argument('--base', default=1000, type=int,
                         help='base of embedding')
     parser.add_argument('--lr', default=1e-3, type=float,
-                        help='optimizer initial learning rate')
-    parser.add_argument('--valptg', default=0.15, type=float,
                         help='optimizer initial learning rate')
 
     parser.add_argument('--use-leak', default=False, action='store_true',

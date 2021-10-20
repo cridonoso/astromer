@@ -230,42 +230,22 @@ def adjust_fn(func, *arguments):
         return result
     return wrap
 
-def datasets_by_cls(source, val_data=0.1, repeat=1):
+def datasets_by_cls(source):
     objects  = pd.read_csv(source+'_objs.csv')
 
-    cls_size = objects['class'].value_counts().reset_index()
-    if val_data > 1:
-        cls_size['class'] = [val_data] * cls_size.shape[0]
-    else:
-        cls_size['class'] = cls_size['class']*val_data
-
     datasets = []
-    datasets_val = []
     for folder in os.listdir(source):
         cls_chunks = []
         for file in os.listdir(os.path.join(source, folder)):
             cls_chunks.append(os.path.join(source, folder, file))
-
         ds = tf.data.TFRecordDataset(cls_chunks)
-        ds = ds.repeat(repeat)
+        datasets.append(ds)
 
-        nval = cls_size[cls_size['index']==folder]['class'].astype(int).values[0]
+    return datasets
 
-        if val_data > 1:
-            train_ds = ds.take(nval)
-            val_ds   = ds.skip(nval).take(nval)
-        else:
-            train_ds = ds.skip(nval)
-            val_ds   = ds.take(nval)
-
-        datasets.append(train_ds)
-        datasets_val.append(val_ds)
-
-    return datasets, datasets_val
-
-def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
-                        msk_frac=0.2, rnd_frac=0.1, same_frac=0.1, repeat=1,
-                        embedding=None, is_train=False):
+def load_records(source, batch_size, max_obs=100,
+                msk_frac=0.2, rnd_frac=0.1,
+                same_frac=0.1, repeat=1, is_train=False):
     """
     Pretraining data loader.
     This method build the ASTROMER input format.
@@ -285,30 +265,23 @@ def load_records(source, batch_size, val_data=0., no_shuffle=True, max_obs=100,
     """
     fn = adjust_fn(_parse_pt, msk_frac, rnd_frac, same_frac, max_obs, is_train)
 
-    if val_data == 0.:
-        print('No validation')
+    if not is_train:
+        print('Testing mode')
         chunks = [os.path.join(source, folder, file) \
                     for folder in os.listdir(source) \
                         for file in os.listdir(os.path.join(source, folder))]
 
         dataset = tf.data.TFRecordDataset(chunks)
         dataset = dataset.map(fn)
-        dataset = dataset.cache()
         dataset = dataset.padded_batch(batch_size)
         dataset = dataset.prefetch(1)
         return dataset
     else:
-        datasets, datasets_val = datasets_by_cls(source, val_data, repeat)
-
+        print('Training Mode')
+        datasets = datasets_by_cls(source)
         dataset = tf.data.experimental.sample_from_datasets(datasets)
+        dataset = dataset.repeat(repeat)
         dataset = dataset.map(fn)
-        dataset = dataset.cache()
         dataset = dataset.padded_batch(batch_size)
         dataset = dataset.prefetch(1)
-
-        val_dataset = tf.data.experimental.sample_from_datasets(datasets_val)
-        val_dataset = val_dataset.map(fn)
-        val_dataset = val_dataset.cache()
-        val_dataset = val_dataset.padded_batch(batch_size)
-        val_dataset = val_dataset.prefetch(1)
-        return dataset, val_dataset
+        return dataset
