@@ -152,22 +152,30 @@ def init_astromer(path):
     return encoder
 
 def run(opt):
-    optimizer = tf.keras.optimizers.Adam(1e-3)
+    optimizer = tf.keras.optimizers.Adam(opt.lr)
     train_cce  = tf.keras.metrics.Mean(name='train_bce')
     valid_cce  = tf.keras.metrics.Mean(name='valid_bce')
     train_acc  = tf.keras.metrics.Mean(name='train_acc')
     valid_acc  = tf.keras.metrics.Mean(name='valid_acc')
 
-    train_dataset, val_dataset = load_records(opt.data,
-                                              opt.batch_size,
-                                              val_data=0.25,
-                                              no_shuffle=False,
-                                              max_obs=200,
-                                              msk_frac=0.,
-                                              rnd_frac=0.,
-                                              same_frac=0.,
-                                              repeat=opt.repeat,
-                                              is_train=True)
+    train_dataset = load_records(opt.data,
+                                 opt.batch_size,
+                                 max_obs=200,
+                                 msk_frac=0.,
+                                 rnd_frac=0.,
+                                 same_frac=0.,
+                                 repeat=opt.repeat,
+                                 is_train=True)
+
+    val_dataset = load_records(opt.data,
+                               opt.batch_size,
+                               max_obs=200,
+                               msk_frac=0.,
+                               rnd_frac=0.,
+                               same_frac=0.,
+                               repeat=opt.repeat,
+                               is_train=True)
+
     num_classes = 0
     for x in train_dataset:
         num_classes = np.unique(x['label']).shape[0]
@@ -249,6 +257,8 @@ if __name__ == '__main__':
                         help='folder for saving embeddings')
     parser.add_argument('--batch-size', default=16, type=int,
                         help='batch size')
+    parser.add_argument('--lr', default=1e-2, type=float,
+                        help='learning rate')
     parser.add_argument('--valptg', default=0.25, type=float,
                         help='validation subset fraction')
     parser.add_argument('--patience', default=20, type=int,
