@@ -45,7 +45,7 @@ def get_mlp(num_classes, encoder, maxlen=200):
     x = Dense(num_classes)(x)
     return Model(inputs=placeholder, outputs=x, name="MLP")
 
-def get_lstm(units, num_classes, maxlen, dropout=0.4):
+def get_lstm(units, num_classes, maxlen, dropout=0.5):
     ''' LSTM + LSTM + FC'''
 
     serie  = Input(shape=(maxlen, 1),
@@ -66,10 +66,10 @@ def get_lstm(units, num_classes, maxlen, dropout=0.4):
     x = tf.concat([placeholder['times'], placeholder['input']], 2)
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(x, mask=bool_mask)
-    x = LayerNormalization()(x)
+    x = LayerNormalization(axis=1)(x)
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_1')(x, mask=bool_mask)
-    x = LayerNormalization()(x)
+    x = LayerNormalization(axis=1)(x)
     x = Dense(num_classes, name='FCN')(x)
 
     return Model(inputs=placeholder, outputs=x, name="RNNCLF")
@@ -174,12 +174,12 @@ def run(opt):
         exp_path = os.path.join(opt.p, 'mlp_att')
 
     if opt.mode == 'lstm':
-        model = get_lstm(256, num_classes, 200, dropout=0.5)
+        model = get_lstm(256, num_classes, 200, dropout=0.4)
         exp_path = os.path.join(opt.p, 'lstm')
 
     if opt.mode == 'lstm_att':
         encoder = init_astromer(opt.emb)
-        model = get_lstm_att(256, num_classes, encoder=encoder, dropout=0.5)
+        model = get_lstm_att(256, num_classes, encoder=encoder, dropout=0.4)
         exp_path = os.path.join(opt.p, 'lstm_att')
 
     train_writter = tf.summary.create_file_writer(
