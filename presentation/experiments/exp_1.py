@@ -39,8 +39,8 @@ def get_mlp(num_classes, encoder, maxlen=200):
     x = encoder(placeholder)
     x = tf.multiply(x, bool_mask)
     x = tf.divide(tf.reduce_sum(x, 1), tf.reduce_sum(bool_mask, 1))
-    x = tf.divide(tf.subtract(x, tf.reduce_mean(x, 1)),
-                  tf.math.reduce_std(x, 1))
+    x = tf.divide(tf.subtract(x, tf.expand_dims(tf.reduce_mean(x, 1), 1)),
+                  tf.expand_dims(tf.math.reduce_std(x, 1), 1))
     x = Dense(1024, activation='relu')(x)
     x = Dense(512, activation='relu')(x)
     x = Dense(256, activation='relu')(x)
