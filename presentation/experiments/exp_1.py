@@ -158,7 +158,7 @@ def run(opt):
     train_acc  = tf.keras.metrics.Mean(name='train_acc')
     valid_acc  = tf.keras.metrics.Mean(name='valid_acc')
 
-    train_dataset = load_records(opt.data,
+    train_dataset = load_records(os.path.join(opt.data, 'train'),
                                  opt.batch_size,
                                  max_obs=200,
                                  msk_frac=0.,
@@ -167,7 +167,7 @@ def run(opt):
                                  repeat=opt.repeat,
                                  is_train=True)
 
-    val_dataset = load_records(opt.data,
+    val_dataset = load_records(os.path.join(opt.data, 'val'),
                                opt.batch_size,
                                max_obs=200,
                                msk_frac=0.,
@@ -249,7 +249,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # TRAINING PAREMETERS
-    parser.add_argument('--data', default='./data/records/alcock/train', type=str,
+    parser.add_argument('--data', default='./data/records/alcock/', type=str,
                         help='Dataset folder containing the records files')
     parser.add_argument('--emb', default='./weights/astromer_10022021', type=str,
                         help='ASTROMER weights')
