@@ -34,10 +34,11 @@ def get_mlp(num_classes, encoder, maxlen=200):
     placeholder = {'input':serie,
                    'mask_in':mask,
                    'times':times}
+    bool_mask = 1.-placeholder['mask_in']
 
     x = encoder(placeholder)
-    x = tf.reduce_mean(x, 1)
-    x = BatchNormalization()(x)
+    x = tf.multiply(x, bool_mask)
+    x = tf.divide(tf.reduce_sum(x, 1), tf.reduce_sum(bool_mask, 1))
     x = Dense(1024, activation='relu')(x)
     x = Dense(512, activation='relu')(x)
     x = Dense(256, activation='relu')(x)
@@ -234,21 +235,21 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # TRAINING PAREMETERS
-    parser.add_argument('--data', default='./data/records/ogle/train', type=str,
+    parser.add_argument('--data', default='./data/records/alcock/train', type=str,
                         help='Dataset folder containing the records files')
-    parser.add_argument('--emb', default='./embeddings/ogle_20/train', type=str,
+    parser.add_argument('--emb', default='./weights/astromer_10022021', type=str,
                         help='ASTROMER weights')
-    parser.add_argument('--p', default="./experiments/exp_1/", type=str,
+    parser.add_argument('--p', default="./experiments/debug/", type=str,
                         help='folder for saving embeddings')
-    parser.add_argument('--batch-size', default=256, type=int,
+    parser.add_argument('--batch-size', default=16, type=int,
                         help='batch size')
-    parser.add_argument('--valptg', default=0.2, type=float,
+    parser.add_argument('--valptg', default=0.25, type=float,
                         help='validation subset fraction')
     parser.add_argument('--patience', default=20, type=int,
                         help='patience for early stopping')
     parser.add_argument('--repeat', default=1, type=int,
                         help='repeat dataset samples')
-    parser.add_argument('--mode', default='mlp', type=str,
+    parser.add_argument('--mode', default='mlp_att', type=str,
                         help='mlp_att - lstm - lstm_att')
 
     opt = parser.parse_args()
