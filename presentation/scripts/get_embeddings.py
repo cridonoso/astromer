@@ -71,7 +71,7 @@ def run(opt):
             att = tf.reduce_mean(att, 1)
             hf.create_dataset('embs', data=att.numpy())
             hf.create_dataset('labels', data=batch['label'].numpy())
-            hf.create_dataset('oids', data=batch['lcid'].numpy())
+            hf.create_dataset('oids', data=batch['lcid'].numpy().astype('S'))
 
 
     os.makedirs(os.path.join(opt.p, 'val'), exist_ok=True)
@@ -81,8 +81,7 @@ def run(opt):
             att = tf.reduce_mean(att, 1)
             hf.create_dataset('embs', data=att.numpy())
             hf.create_dataset('labels', data=batch['label'].numpy())
-            hf.create_dataset('oids', data=batch['lcid'].numpy())
-
+            hf.create_dataset('oids', data=batch['lcid'].numpy().astype('S'))
 
     os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
     for i, batch in enumerate(test_batches):
@@ -91,8 +90,8 @@ def run(opt):
             att = tf.reduce_mean(att, 1)
             hf.create_dataset('embs', data=att.numpy())
             hf.create_dataset('labels', data=batch['label'].numpy())
-            oids = np.array(batch['lcid'].numpy(), dtype=np.str)
-            hf.create_dataset('oids', data=oids)
+            hf.create_dataset('oids', data=batch['lcid'].numpy().astype('S'))
+
 
     end_time = datetime.now()
     print('Duration: {}'.format(end_time - start_time))
