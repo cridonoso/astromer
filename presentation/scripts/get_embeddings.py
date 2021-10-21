@@ -3,25 +3,99 @@ import pandas as pd
 import numpy as np
 import argparse
 import logging
+import h5py
 import json
 import os
 
-from core.pretrained import ASTROMER_v1
+from core.astromer import get_ASTROMER
 from core.utils import get_folder_name
-
+from core.data import load_records
+from datetime import datetime
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 def run(opt):
+    conf_file = os.path.join(opt.w, 'conf.json')
+    with open(conf_file, 'r') as handle:
+        conf = json.load(handle)
 
-    model = ASTROMER_v1(project_dir=opt.w)
-    model.encode_from_records(os.path.join(opt.data, 'train'),
-                              opt.batch_size,
-                              dest=os.path.join(opt.p, 'train'))
+    start_time = datetime.now()
+    # Loading hyperparameters of the pretrained model
+    astromer = get_ASTROMER(num_layers=conf['layers'],
+                            d_model=conf['head_dim'],
+                            num_heads=conf['heads'],
+                            dff=conf['dff'],
+                            base=conf['base'],
+                            dropout=conf['dropout'],
+                            maxlen=conf['max_obs'],
+                            use_leak=conf['use_leak'],
+                            no_train=conf['no_train'])
 
-    model.encode_from_records(os.path.join(opt.data, 'test'),
-                              opt.batch_size,
-                              dest=os.path.join(opt.p, 'test'))
+    # Loading pretrained weights
+    weights_path = '{}/weights'.format(opt.w)
+    astromer.load_weights(weights_path)
+    astromer.trainable = False
+    encoder = astromer.get_layer('encoder')
+
+    train_batches = load_records(os.path.join(opt.data, 'train'),
+                                 opt.batch_size,
+                                 max_obs=conf['max_obs'],
+                                 msk_frac=conf['msk_frac'],
+                                 rnd_frac=conf['rnd_frac'],
+                                 same_frac=conf['same_frac'],
+                                 repeat=1,
+                                 is_train=False)
+
+    valid_batches = load_records(os.path.join(opt.data, 'val'),
+                                 opt.batch_size,
+                                 max_obs=conf['max_obs'],
+                                 msk_frac=conf['msk_frac'],
+                                 rnd_frac=conf['rnd_frac'],
+                                 same_frac=conf['same_frac'],
+                                 repeat=1,
+                                 is_train=False)
+
+    test_batches = load_records(os.path.join(opt.data, 'test'),
+                                opt.batch_size,
+                                max_obs=conf['max_obs'],
+                                msk_frac=conf['msk_frac'],
+                                rnd_frac=conf['rnd_frac'],
+                                same_frac=conf['same_frac'],
+                                repeat=1,
+                                is_train=False)
+
+    os.makedirs(os.path.join(opt.p, 'train'), exist_ok=True)
+    for i, batch in enumerate(train_batches):
+        with h5py.File(os.path.join(opt.p,'train','batch_{}.h5'.format(i)), 'w') as hf:
+            att = encoder(batch)
+            att = tf.reduce_mean(att, 1)
+            hf.create_dataset('embs', data=att.numpy())
+            hf.create_dataset('labels', data=batch['label'].numpy())
+            hf.create_dataset('oids', data=batch['lcid'].numpy())
+
+
+    os.makedirs(os.path.join(opt.p, 'val'), exist_ok=True)
+    for i, batch in enumerate(valid_batches):
+        with h5py.File(os.path.join(opt.p,'val','batch_{}.h5'.format(i)), 'w') as hf:
+            att = encoder(batch)
+            att = tf.reduce_mean(att, 1)
+            hf.create_dataset('embs', data=att.numpy())
+            hf.create_dataset('labels', data=batch['label'].numpy())
+            hf.create_dataset('oids', data=batch['lcid'].numpy())
+
+
+    os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
+    for i, batch in enumerate(test_batches):
+        with h5py.File(os.path.join(opt.p,'test','batch_{}.h5'.format(i)), 'w') as hf:
+            att = encoder(batch)
+            att = tf.reduce_mean(att, 1)
+            hf.create_dataset('embs', data=att.numpy())
+            hf.create_dataset('labels', data=batch['label'].numpy())
+            hf.create_dataset('oids', data=batch['lcid'].numpy())
+
+    end_time = datetime.now()
+    print('Duration: {}'.format(end_time - start_time))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

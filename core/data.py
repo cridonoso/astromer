@@ -245,7 +245,8 @@ def datasets_by_cls(source):
 
 def load_records(source, batch_size, max_obs=100,
                 msk_frac=0.2, rnd_frac=0.1,
-                same_frac=0.1, repeat=1, is_train=False):
+                same_frac=0.1, repeat=1,
+                is_train=False):
     """
     Pretraining data loader.
     This method build the ASTROMER input format.
