@@ -43,7 +43,7 @@ def run(opt):
                                  msk_frac=conf['msk_frac'],
                                  rnd_frac=conf['rnd_frac'],
                                  same_frac=conf['same_frac'],
-                                 repeat=5,
+                                 repeat=opt.repeat,
                                  is_train=True)
 
     valid_batches = load_records(os.path.join(opt.data, 'val'),
@@ -52,7 +52,7 @@ def run(opt):
                                  msk_frac=conf['msk_frac'],
                                  rnd_frac=conf['rnd_frac'],
                                  same_frac=conf['same_frac'],
-                                 repeat=5,
+                                 repeat=opt.repeat,
                                  is_train=True)
 
     test_batches = load_records(os.path.join(opt.data, 'test'),
@@ -109,6 +109,8 @@ if __name__ == '__main__':
                         help='folder for saving embeddings')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
+    parser.add_argument('--repeat', default=1, type=int,
+                        help='repeat')
 
     opt = parser.parse_args()
     run(opt)

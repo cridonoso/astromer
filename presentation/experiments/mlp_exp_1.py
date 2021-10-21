@@ -26,7 +26,7 @@ def standardize(x, y):
     x = tf.divide(tf.subtract(x, mean_), std_)
     return x, y
 
-def load_embeddings(path, n_classes, batch_size=16):
+def load_embeddings(path, n_classes, batch_size=16,is_train=False):
     files = [os.path.join(path, x) for x in os.listdir(path)]
     ds = tf.data.Dataset.from_tensor_slices(files)
     ds = ds.interleave(lambda filename: tf.data.Dataset.from_generator(
@@ -35,7 +35,8 @@ def load_embeddings(path, n_classes, batch_size=16):
         (tf.TensorShape([256]), tf.TensorShape([n_classes])),
         args=(filename,)))
     ds = ds.map(standardize)
-    ds = ds.shuffle(1000)
+    if is_train:
+        ds = ds.shuffle(1000)
     ds = ds.batch(batch_size)
     ds = ds.prefetch(1)
     return ds
@@ -67,7 +68,7 @@ def run(opt):
         mode='auto', baseline=None, restore_best_weights=True
     )
     tb = tf.keras.callbacks.TensorBoard(
-        log_dir=os.path.join(opt.p, 'logs'),
+        log_dir=os.path.join(opt.p, 'mlp_att', 'logs'),
         write_graph=False)
 
     hist = model.fit(train_batches,

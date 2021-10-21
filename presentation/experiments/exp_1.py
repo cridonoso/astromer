@@ -20,34 +20,10 @@ from core.tboard import save_scalar
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
-def get_mlp(num_classes, encoder, maxlen=200):
+def get_mlp(path):
     ''' FC + ATT'''
-    serie  = Input(shape=(maxlen, 1),
-                  batch_size=None,
-                  name='input')
-    times  = Input(shape=(maxlen, 1),
-                  batch_size=None,
-                  name='times')
-    mask   = Input(shape=(maxlen, 1),
-                  batch_size=None,
-                  name='mask')
-    placeholder = {'input':serie,
-                   'mask_in':mask,
-                   'times':times}
-    bool_mask = 1.-placeholder['mask_in']
-
-    x = encoder(placeholder)
-    x = tf.multiply(x, bool_mask)
-    x = tf.divide(tf.reduce_sum(x, 1),
-                  tf.reduce_sum(bool_mask, 1))
-    x = Dense(1024, activation='relu')(x)
-    x = BatchNormalization()(x)
-    x = Dense(512, activation='relu')(x)
-    x = BatchNormalization()(x)
-    x = Dense(256, activation='relu')(x)
-    x = BatchNormalization()(x)
-    x = Dense(num_classes)(x)
-    return Model(inputs=placeholder, outputs=x, name="MLP")
+    model = tf.keras.models.load_model(path)
+    return model
 
 def get_lstm(units, num_classes, maxlen, dropout=0.5):
     ''' LSTM + LSTM + FC'''
