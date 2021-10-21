@@ -91,7 +91,8 @@ def run(opt):
             att = tf.reduce_mean(att, 1)
             hf.create_dataset('embs', data=att.numpy())
             hf.create_dataset('labels', data=batch['label'].numpy())
-            hf.create_dataset('oids', data=batch['lcid'].numpy())
+            oids = np.array(batch['lcid'].numpy(), dtype=np.str)
+            hf.create_dataset('oids', data=oids)
 
     end_time = datetime.now()
     print('Duration: {}'.format(end_time - start_time))
