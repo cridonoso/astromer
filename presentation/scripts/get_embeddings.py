@@ -43,8 +43,8 @@ def run(opt):
                                  msk_frac=conf['msk_frac'],
                                  rnd_frac=conf['rnd_frac'],
                                  same_frac=conf['same_frac'],
-                                 repeat=1,
-                                 is_train=False)
+                                 repeat=5,
+                                 is_train=True)
 
     valid_batches = load_records(os.path.join(opt.data, 'val'),
                                  opt.batch_size,
@@ -52,8 +52,8 @@ def run(opt):
                                  msk_frac=conf['msk_frac'],
                                  rnd_frac=conf['rnd_frac'],
                                  same_frac=conf['same_frac'],
-                                 repeat=1,
-                                 is_train=False)
+                                 repeat=5,
+                                 is_train=True)
 
     test_batches = load_records(os.path.join(opt.data, 'test'),
                                 opt.batch_size,
