@@ -55,14 +55,19 @@ def run(opt):
                                  repeat=opt.repeat,
                                  is_train=True)
 
-    test_batches = load_records(os.path.join(opt.data, 'test'),
-                                opt.batch_size,
-                                max_obs=conf['max_obs'],
-                                msk_frac=conf['msk_frac'],
-                                rnd_frac=conf['rnd_frac'],
-                                same_frac=conf['same_frac'],
-                                repeat=1,
-                                is_train=False)
+    try:
+        test_batches = load_records(os.path.join(opt.data, 'test'),
+                                    opt.batch_size,
+                                    max_obs=conf['max_obs'],
+                                    msk_frac=conf['msk_frac'],
+                                    rnd_frac=conf['rnd_frac'],
+                                    same_frac=conf['same_frac'],
+                                    repeat=1,
+                                    is_train=False)
+        using_test = True
+    except:
+        using_test = False
+        print('NO TEST')
 
     os.makedirs(os.path.join(opt.p, 'train'), exist_ok=True)
     for i, batch in enumerate(train_batches):
@@ -83,14 +88,15 @@ def run(opt):
             hf.create_dataset('labels', data=batch['label'].numpy())
             hf.create_dataset('oids', data=batch['lcid'].numpy().astype('S'))
 
-    os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
-    for i, batch in enumerate(test_batches):
-        with h5py.File(os.path.join(opt.p,'test','batch_{}.h5'.format(i)), 'w') as hf:
-            att = encoder(batch)
-            att = tf.reduce_mean(att, 1)
-            hf.create_dataset('embs', data=att.numpy())
-            hf.create_dataset('labels', data=batch['label'].numpy())
-            hf.create_dataset('oids', data=batch['lcid'].numpy().astype('S'))
+    if using_test:
+        os.makedirs(os.path.join(opt.p, 'test'), exist_ok=True)
+        for i, batch in enumerate(test_batches):
+            with h5py.File(os.path.join(opt.p,'test','batch_{}.h5'.format(i)), 'w') as hf:
+                att = encoder(batch)
+                att = tf.reduce_mean(att, 1)
+                hf.create_dataset('embs', data=att.numpy())
+                hf.create_dataset('labels', data=batch['label'].numpy())
+                hf.create_dataset('oids', data=batch['lcid'].numpy().astype('S'))
 
 
     end_time = datetime.now()

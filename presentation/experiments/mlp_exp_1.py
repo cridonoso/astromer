@@ -54,11 +54,11 @@ def run(opt):
     model = tf.keras.Sequential()
     model.add(tf.keras.Input(shape=(256)))
     model.add(Dense(1024, activation='relu'))
-    model.add(LayerNormalization())
+    # model.add(LayerNormalization())
     model.add(Dense(512, activation='relu'))
-    model.add(LayerNormalization())
+    # model.add(LayerNormalization())
     model.add(Dense(256, activation='relu'))
-    model.add(LayerNormalization())
+    # model.add(LayerNormalization())
     model.add(Dense(n_classes))
 
     model.compile(optimizer=Adam(learning_rate=1e-3),
