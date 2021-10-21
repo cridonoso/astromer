@@ -38,10 +38,14 @@ def get_mlp(num_classes, encoder, maxlen=200):
 
     x = encoder(placeholder)
     x = tf.multiply(x, bool_mask)
-    x = tf.divide(tf.reduce_sum(x, 1), tf.reduce_sum(bool_mask, 1))
+    x = tf.divide(tf.reduce_sum(x, 1),
+                  tf.reduce_sum(bool_mask, 1))
     x = Dense(1024, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(512, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(256, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(num_classes)(x)
     return Model(inputs=placeholder, outputs=x, name="MLP")
 
