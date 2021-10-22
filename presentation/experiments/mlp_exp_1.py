@@ -32,7 +32,7 @@ def load_embeddings(path, n_classes, batch_size=16,is_train=False):
     ds = ds.interleave(lambda filename: tf.data.Dataset.from_generator(
         generator(n_classes),
         (tf.float32, tf.int32),
-        (tf.TensorShape([256]), tf.TensorShape([n_classes])),
+        (tf.TensorShape([200, 256]), tf.TensorShape([n_classes])),
         args=(filename,)))
     ds = ds.map(standardize)
     if is_train:

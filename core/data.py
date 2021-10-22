@@ -286,3 +286,54 @@ def load_records(source, batch_size, max_obs=100,
         dataset = dataset.padded_batch(batch_size)
         dataset = dataset.prefetch(1)
         return dataset
+
+def format_input(batch):
+
+    x = tf.concat([batch['times'], batch['input']], 1)
+
+    return x, batch['label']
+def load_records_v2(source, batch_size, max_obs=100,
+                    msk_frac=0.2, rnd_frac=0.1,
+                    same_frac=0.1, repeat=1,
+                    is_train=False):
+    """
+    Pretraining data loader.
+    This method build the ASTROMER input format.
+    ASTROMER format is based on the BERT masking strategy.
+
+    Args:
+        source (string): Record folder
+        batch_size (int): Batch size
+        no_shuffle (bool): Do not shuffle training and validation dataset
+        max_obs (int): Max. number of observation per serie
+        msk_frac (float): fraction of values to be predicted ([MASK])
+        rnd_frac (float): fraction of [MASKED] values to replace with random values
+        same_frac (float): fraction of [MASKED] values to replace with true values
+
+    Returns:
+        Tensorflow Dataset: Iterator withg preprocessed batches
+    """
+    fn = adjust_fn(_parse_pt, msk_frac, rnd_frac, same_frac, max_obs, is_train)
+
+    if not is_train:
+        print('Testing mode')
+        chunks = [os.path.join(source, folder, file) \
+                    for folder in os.listdir(source) \
+                        for file in os.listdir(os.path.join(source, folder))]
+
+        dataset = tf.data.TFRecordDataset(chunks)
+        dataset = dataset.map(fn)
+        dataset = dataset.map(format_input)
+        dataset = dataset.padded_batch(batch_size)
+        dataset = dataset.prefetch(1)
+        return dataset
+    else:
+        print('Training Mode')
+        datasets = datasets_by_cls(source)
+        dataset = tf.data.experimental.sample_from_datasets(datasets)
+        dataset = dataset.repeat(repeat)
+        dataset = dataset.map(fn)
+        dataset = dataset.map(format_input)
+        dataset = dataset.padded_batch(batch_size)
+        dataset = dataset.prefetch(1)
+        return dataset

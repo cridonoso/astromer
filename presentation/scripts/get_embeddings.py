@@ -73,7 +73,6 @@ def run(opt):
     for i, batch in enumerate(train_batches):
         with h5py.File(os.path.join(opt.p,'train','batch_{}.h5'.format(i)), 'w') as hf:
             att = encoder(batch)
-            att = tf.reduce_mean(att, 1)
             hf.create_dataset('embs', data=att.numpy())
             hf.create_dataset('labels', data=batch['label'].numpy())
             hf.create_dataset('oids', data=batch['lcid'].numpy().astype('S'))
@@ -83,7 +82,6 @@ def run(opt):
     for i, batch in enumerate(valid_batches):
         with h5py.File(os.path.join(opt.p,'val','batch_{}.h5'.format(i)), 'w') as hf:
             att = encoder(batch)
-            att = tf.reduce_mean(att, 1)
             hf.create_dataset('embs', data=att.numpy())
             hf.create_dataset('labels', data=batch['label'].numpy())
             hf.create_dataset('oids', data=batch['lcid'].numpy().astype('S'))
@@ -93,7 +91,6 @@ def run(opt):
         for i, batch in enumerate(test_batches):
             with h5py.File(os.path.join(opt.p,'test','batch_{}.h5'.format(i)), 'w') as hf:
                 att = encoder(batch)
-                att = tf.reduce_mean(att, 1)
                 hf.create_dataset('embs', data=att.numpy())
                 hf.create_dataset('labels', data=batch['label'].numpy())
                 hf.create_dataset('oids', data=batch['lcid'].numpy().astype('S'))
