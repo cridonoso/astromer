@@ -44,6 +44,7 @@ def standardize(tensor, axis=0, return_mean=False):
         tensor (1-dim tensorflow tensor): standardize tensor
     """
     mean_value = tf.reduce_mean(tensor, axis, name='mean_value')
+    std_value = tf.math.reduce_std(tensor, axis, name='std_value')
     z = tensor - tf.expand_dims(mean_value, axis)
 
     if return_mean:

@@ -13,6 +13,7 @@ from core.data import load_records
 from shutil import copyfile
 from datetime import datetime
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 def run(opt):

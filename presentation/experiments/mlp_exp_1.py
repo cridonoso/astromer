@@ -1,82 +1,121 @@
-import tensorflow as tf
-import h5py
+import matplotlib.pyplot as plt
+import tensorflow as tf 
 import pandas as pd
+import pickle
+import json
+import os 
 
-from tensorflow.keras.layers import (BatchNormalization,
-                                     Dense,
-                                     LSTM,
-                                     LayerNormalization)
-from tensorflow.keras.losses import CategoricalCrossentropy
+from tensorflow.keras.losses import CategoricalCrossentropy, SparseCategoricalCrossentropy
+from tensorflow.keras.layers import LSTM, Dense, BatchNormalization, InputLayer, LayerNormalization
 from tensorflow.keras.optimizers import Adam
-import argparse
-import os
+from tensorflow.keras.metrics import Recall
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
+from tensorflow.keras import Model, Input
 
-class generator:
-    def __init__(self, n_classes):
-        self.n_classes = n_classes
+from core.data import load_records, load_records_v2, load_embeddings
+from sklearn.metrics import confusion_matrix, accuracy_score
 
-    def __call__(self, file):
-        with h5py.File(file, 'r') as hf:
-            for x, y in zip(hf['embs'], hf['labels']):
-                yield x, tf.one_hot(y, self.n_classes)
+def get_lstm(num_cls):
+    model = tf.keras.Sequential()
+    model.add(Input(shape=(200, 2)))
+    model.add(LSTM(256, return_sequences=True,  name='lstm_0', dropout=0.5))
+    model.add(BatchNormalization(name='bn0'))
+    model.add(LSTM(256, return_sequences=False, name='lstm_1', dropout=0.5))
+    model.add(BatchNormalization(name='bn1'))
+    model.add(Dense(num_cls, name='dense'))
+    return model
 
-def standardize(x, y):
-    mean_ = tf.reduce_mean(x)
-    std_  = tf.math.reduce_std(x)
-    x = tf.divide(tf.subtract(x, mean_), std_)
-    return x, y
-
-def load_embeddings(path, n_classes, batch_size=16,is_train=False):
-    files = [os.path.join(path, x) for x in os.listdir(path)]
-    ds = tf.data.Dataset.from_tensor_slices(files)
-    ds = ds.interleave(lambda filename: tf.data.Dataset.from_generator(
-        generator(n_classes),
-        (tf.float32, tf.int32),
-        (tf.TensorShape([200, 256]), tf.TensorShape([n_classes])),
-        args=(filename,)))
-    ds = ds.map(standardize)
-    if is_train:
-        ds = ds.shuffle(1000)
-    ds = ds.batch(batch_size)
-    ds = ds.prefetch(1)
-    return ds
-
-
-def run(opt):
-    df = pd.read_csv(os.path.join(opt.data, 'test_objs.csv'))
-    n_classes = len(df['class'].unique())
-
-    train_batches = load_embeddings(os.path.join(opt.data, 'train'),
-                                    n_classes, opt.batch_size)
-    val_batches = load_embeddings(os.path.join(opt.data, 'val'),
-                                    n_classes, opt.batch_size)
-
+def get_mlp(num_cls):
     model = tf.keras.Sequential()
     model.add(tf.keras.Input(shape=(256)))
     model.add(Dense(1024, activation='relu'))
-    # model.add(LayerNormalization())
+    model.add(BatchNormalization(name='bn0'))
     model.add(Dense(512, activation='relu'))
-    # model.add(LayerNormalization())
+    model.add(BatchNormalization(name='bn0'))
     model.add(Dense(256, activation='relu'))
-    # model.add(LayerNormalization())
     model.add(Dense(n_classes))
 
-    model.compile(optimizer=Adam(learning_rate=1e-3),
-                  loss=CategoricalCrossentropy(from_logits=True), metrics='accuracy')
-    estop = tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss', min_delta=0, patience=20, verbose=0,
+def get_lstm_att(num_cls):
+    model = tf.keras.Sequential()
+    model.add(Input(shape=(200, 256)))
+    model.add(LSTM(256, return_sequences=True,  name='lstm_0', dropout=0.5))
+    model.add(BatchNormalization(name='bn0'))
+    model.add(LSTM(256, return_sequences=False, name='lstm_1', dropout=0.5))
+    model.add(BatchNormalization(name='bn1'))
+    model.add(Dense(num_cls, name='dense'))
+    return model
+
+def run(opt):
+        
+    test_objs = pd.read_csv('{}/test_objs.csv'.format(opt.data))
+    num_cls   = test_objs['class'].unique().size
+        
+    if opt.mode == 'lstm':
+        train_batches = load_records_v2('{}/train'.format(opt.data), opt.batch_size,   
+                                max_obs=200,
+                                msk_frac=0.,
+                                rnd_frac=0.,
+                                same_frac=0.,
+                                repeat=5,
+                                is_train=True)
+        
+        val_batches = load_records_v2('{}/val'.format(opt.data), opt.batch_size,   
+                                      max_obs=200,
+                                      msk_frac=0.,
+                                      rnd_frac=0.,
+                                      same_frac=0.,
+                                      repeat=5,
+                                      is_train=True)
+    else:
+        if opt.mode == 'mlp_att':
+            time_avg = True
+        else:
+            time_avg = False
+            
+        train_batches = load_embeddings('{}/train'.format(opt.data), 
+                                        num_cls, 
+                                        opt.batch_size, 
+                                        is_train=True,
+                                        time_average=ta)
+        val_batches   = load_embeddings('{}/val'.format(opt.data), 
+                                        num_cls, 
+                                        opt.batch_size, 
+                                        is_train=True,
+                                        time_average=time_avg)
+        
+
+    
+    if opt.mode == 'lstm':
+        model = get_lstm(num_cls)
+        exp_path = '{}/lstm'
+    if opt.mode == 'mlp_att':
+        model = get_mlp(num_cls)
+        exp_path = '{}/mlp_att'
+    if opt.mode == 'lstm_att':
+        model = get_lstm_att(num_cls)
+        exp_path = '{}/lstm_att'
+ 
+    model.compile(optimizer='rmsprop', 
+                  loss=SparseCategoricalCrossentropy(), 
+                  metrics=['accuracy'])
+
+    estop = EarlyStopping(
+        monitor='val_loss', min_delta=0, patience=50, verbose=0,
         mode='auto', baseline=None, restore_best_weights=True
     )
-    tb = tf.keras.callbacks.TensorBoard(
-        log_dir=os.path.join(opt.p, 'mlp_att', 'logs'),
-        write_graph=False)
+    tboad = TensorBoard(
+        log_dir='{}/logs'.format(exp_path), histogram_freq=0, write_graph=False,
+        write_images=False, write_steps_per_second=False, update_freq='epoch',
+        profile_batch=2, embeddings_freq=0, embeddings_metadata=None, **kwargs
+    )
 
-    hist = model.fit(train_batches,
-                     epochs=opt.epochs,
-                     callbacks=[estop, tb],
-                     validation_data=val_batches)
-
-    model.save(os.path.join(opt.p, 'mlp_att', 'model'))
+    hist = lstm_att.fit(train_batches, 
+                    epochs=opt.epochs,
+                    callbacks=[estop, tboad],
+                    validation_data=val_batches,
+                    verbose=0)
+    
+    model.save(os.path.join(exp_path, 'model'))
 
 
 if __name__ == '__main__':
@@ -91,6 +130,8 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--epochs', default=100, type=int,
                         help='num of epochs')
+    parser.add_argument('--mode', default="lstm_att", type=str,
+                        help='mlp_att - lstm_att - lstm')
 
     opt = parser.parse_args()
     run(opt)
