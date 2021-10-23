@@ -3,6 +3,7 @@ import dask.dataframe as dd
 import tensorflow as tf
 import pandas as pd
 import numpy as np
+import h5py
 import json
 import logging
 import os
@@ -288,10 +289,10 @@ def load_records(source, batch_size, max_obs=100,
         return dataset
 
 def format_input(batch):
-
     x = tf.concat([batch['times'], batch['input']], 1)
-
+    m = 1.-batch['mask_in']
     return x, batch['label']
+
 def load_records_v2(source, batch_size, max_obs=100,
                     msk_frac=0.2, rnd_frac=0.1,
                     same_frac=0.1, repeat=1,
@@ -337,3 +338,31 @@ def load_records_v2(source, batch_size, max_obs=100,
         dataset = dataset.padded_batch(batch_size)
         dataset = dataset.prefetch(1)
         return dataset
+
+class generator:
+    def __init__(self, n_classes):
+        self.n_classes = n_classes
+
+    def __call__(self, file):
+        with h5py.File(file, 'r') as hf:
+            for x, y in zip(hf['embs'], hf['labels']):
+                mean_ = tf.reduce_mean(x)
+                std_  = tf.math.reduce_std(x)
+                x = tf.divide(tf.subtract(x, mean_), std_)
+                yield x, y
+
+
+def load_embeddings(path, n_classes, batch_size=16,is_train=False):
+    files = [os.path.join(path, x) for x in os.listdir(path)]
+    ds = tf.data.Dataset.from_tensor_slices(files)
+    ds = ds.interleave(lambda filename: tf.data.Dataset.from_generator(
+        generator(n_classes),
+        (tf.float32, tf.int32),
+        (tf.TensorShape([200, 256]), tf.TensorShape([])),
+        args=(filename,)))
+
+    if is_train:
+        ds = ds.shuffle(1000)
+    ds = ds.batch(batch_size)
+    ds = ds.prefetch(1)
+    return ds
