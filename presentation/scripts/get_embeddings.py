@@ -44,18 +44,18 @@ def run(opt):
     train_batches = load_records(os.path.join(opt.data, 'train'),
                                  opt.batch_size,
                                  max_obs=conf['max_obs'],
-                                 msk_frac=conf['msk_frac'],
-                                 rnd_frac=conf['rnd_frac'],
-                                 same_frac=conf['same_frac'],
+                                 msk_frac=0.,
+                                 rnd_frac=0.,
+                                 same_frac=0.,
                                  repeat=opt.repeat,
                                  is_train=True)
 
     valid_batches = load_records(os.path.join(opt.data, 'val'),
                                  opt.batch_size,
                                  max_obs=conf['max_obs'],
-                                 msk_frac=conf['msk_frac'],
-                                 rnd_frac=conf['rnd_frac'],
-                                 same_frac=conf['same_frac'],
+                                 msk_frac=0.,
+                                 rnd_frac=0.,
+                                 same_frac=0.,
                                  repeat=opt.repeat,
                                  is_train=True)
 
@@ -63,9 +63,9 @@ def run(opt):
         test_batches = load_records(os.path.join(opt.data, 'test'),
                                     opt.batch_size,
                                     max_obs=conf['max_obs'],
-                                    msk_frac=conf['msk_frac'],
-                                    rnd_frac=conf['rnd_frac'],
-                                    same_frac=conf['same_frac'],
+                                    msk_frac=0.,
+                                    rnd_frac=0.,
+                                    same_frac=0.,
                                     repeat=1,
                                     is_train=False)
         using_test = True
@@ -77,6 +77,8 @@ def run(opt):
     for i, batch in enumerate(train_batches):
         with h5py.File(os.path.join(opt.p,'train','batch_{}.h5'.format(i)), 'w') as hf:
             att = encoder(batch)
+            lenghts = tf.reduce_sum(1.-batch['mask_in'], 1)[...,0]
+            hf.create_dataset('lengths', data=lenghts.numpy())
             hf.create_dataset('embs', data=att.numpy())
             hf.create_dataset('labels', data=batch['label'].numpy())
             hf.create_dataset('oids', data=batch['lcid'].numpy().astype('S'))
@@ -88,6 +90,8 @@ def run(opt):
     for i, batch in enumerate(valid_batches):
         with h5py.File(os.path.join(opt.p,'val','batch_{}.h5'.format(i)), 'w') as hf:
             att = encoder(batch)
+            lenghts = tf.reduce_sum(1.-batch['mask_in'], 1)[...,0]
+            hf.create_dataset('lengths', data=lenghts.numpy())
             hf.create_dataset('embs', data=att.numpy())
             hf.create_dataset('labels', data=batch['label'].numpy())
             hf.create_dataset('oids', data=batch['lcid'].numpy().astype('S'))
@@ -97,6 +101,8 @@ def run(opt):
         for i, batch in enumerate(test_batches):
             with h5py.File(os.path.join(opt.p,'test','batch_{}.h5'.format(i)), 'w') as hf:
                 att = encoder(batch)
+                lenghts = tf.reduce_sum(1.-batch['mask_in'], 1)[...,0]
+                hf.create_dataset('lengths', data=lenghts.numpy())
                 hf.create_dataset('embs', data=att.numpy())
                 hf.create_dataset('labels', data=batch['label'].numpy())
                 hf.create_dataset('oids', data=batch['lcid'].numpy().astype('S'))
