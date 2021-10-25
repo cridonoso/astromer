@@ -116,10 +116,7 @@ def run(opt):
         monitor='val_loss', min_delta=0, patience=50, verbose=0,
         mode='auto', baseline=None, restore_best_weights=True
     )
-    tboad = TensorBoard(
-        log_dir='{}/logs'.format(exp_path), histogram_freq=0, write_graph=False,
-        write_images=False, write_steps_per_second=False, update_freq='epoch',
-        profile_batch=2, embeddings_freq=0, embeddings_metadata=None)
+    tboad = TensorBoard(log_dir='{}/logs'.format(exp_path), histogram_freq=0, write_graph=False)
 
     hist = model.fit(train_batches,
                      epochs=opt.epochs,
