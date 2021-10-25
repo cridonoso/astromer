@@ -161,9 +161,9 @@ def run(opt):
                      callbacks=[estop, tboad],
                      validation_data=val_batches,
                      verbose=1)
-    
+
     print('Saving Model')
-    model.save(os.path.join(exp_path, 'model.h5'))
+    model.save(os.path.join(exp_path, 'model'))
 
 
 if __name__ == '__main__':

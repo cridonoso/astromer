@@ -60,7 +60,11 @@ class EncoderLayer(tf.keras.layers.Layer):
             'dropout2':self.dropout2,
         })
         return config
-    
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
+
+
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, num_layers, d_model, num_heads, dff,
                  base=10000, rate=0.1, use_leak=False, **kwargs):
@@ -88,7 +92,7 @@ class Encoder(tf.keras.layers.Layer):
             x = self.enc_layers[i](x, training, data['mask_in'])
 
         return x  # (batch_size, input_seq_len, d_model)
-    
+
     def get_config(self):
 
         config = super().get_config().copy()
@@ -101,4 +105,3 @@ class Encoder(tf.keras.layers.Layer):
             'dropout': self.dropout,
         })
         return config
-    
