@@ -130,7 +130,11 @@ def get_sample(sample, ndims=3):
 
 
     sequence = tf.stack(casted_inp_parameters, axis=2)[0]
-    input_dict['input'] = sequence
+    
+    errs = tf.slice(sequence, [0, 2], [-1, 1])
+    cond = errs < 1    
+    input_dict['input'] = sequence[cond[...,0]]
+    
     return input_dict
 
 def get_first_k_obs(sequence, max_obs):
@@ -168,7 +172,7 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs, is_train=False):
     '''
 
     input_dict = get_sample(sample)
-
+    
     if is_train:
         sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
     else:
@@ -215,7 +219,7 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs, is_train=False):
         orig_magn = tf.concat([orig_magn, 1.-filler], 0)
 
     input_dict['output']   = orig_magn
-    input_dict['input'] = seq_magn
+    input_dict['input']    = seq_magn
     input_dict['times']    = seq_time
     input_dict['mask_out'] = mask_out
     input_dict['mask_in']  = mask_in
@@ -291,6 +295,7 @@ def load_records(source, batch_size, max_obs=100,
 def formatter(batch):
     return {'input': batch['input'],
             'times': batch['times'],
+            'obserr': batch['obserr'],
             'mask_in': batch['mask_in']}, batch['label']
 
 def load_records_v3(source, batch_size, max_obs=100,

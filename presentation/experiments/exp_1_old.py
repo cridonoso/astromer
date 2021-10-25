@@ -30,11 +30,15 @@ def get_mlp(num_classes, encoder, maxlen=200):
     x = encoder(inputs)
     x = tf.ragged.boolean_mask(x, m)
     x = tf.reduce_mean(x, 1)
-    x = BatchNormalization()(x)
+    x = (x - tf.reduce_mean(x, 0))/tf.math.reduce_std(x, 0)
+
     x = Dense(1024, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(512, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(256, activation='relu')(x)
-    x = Dense(num_classes, activation='relu')(x)
+    x = BatchNormalization()(x)
+    x = Dense(num_classes, activation='softmax')(x)
     return Model(inputs=inputs, outputs=x, name="MLP_ATT")
 
 def get_lstm(units, num_classes, maxlen, dropout=0.5):
@@ -54,7 +58,7 @@ def get_lstm(units, num_classes, maxlen, dropout=0.5):
     x = LSTM(units, return_sequences=False,
              dropout=dropout, name='RNN_1')(x, mask=m)
     x = BatchNormalization()(x)
-    x = Dense(num_classes, name='FCN')(x)
+    x = Dense(num_classes, activation='softmax', name='FCN')(x)
     return Model(inputs=inputs, outputs=x, name="LSTM")
 
 def get_lstm_att(units, num_classes, encoder, maxlen=200, dropout=0.5):
@@ -72,7 +76,7 @@ def get_lstm_att(units, num_classes, encoder, maxlen=200, dropout=0.5):
     x = LSTM(units, return_sequences=False,
              dropout=dropout, name='RNN_1')(x, mask=m)
     x = BatchNormalization()(x)
-    x = Dense(num_classes, name='FCN')(x)
+    x = Dense(num_classes, activation='softmax', name='FCN')(x)
     return Model(inputs=inputs, outputs=x, name="LSTM_ATT")
 
 def init_astromer(path):
