@@ -30,6 +30,7 @@ def get_mlp(num_classes, encoder, maxlen=200):
     x = encoder(inputs)
     x = tf.ragged.boolean_mask(x, m)
     x = tf.reduce_mean(x, 1)
+    x = BatchNormalization()(x)
     x = Dense(1024, activation='relu')(x)
     x = Dense(512, activation='relu')(x)
     x = Dense(256, activation='relu')(x)
@@ -49,10 +50,10 @@ def get_lstm(units, num_classes, maxlen, dropout=0.5):
 
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(x, mask=m)
-    x = LayerNormalization(axis=1)(x)
+    x = BatchNormalization()(x)
     x = LSTM(units, return_sequences=False,
              dropout=dropout, name='RNN_1')(x, mask=m)
-    x = LayerNormalization(axis=1)(x)
+    x = BatchNormalization()(x)
     x = Dense(num_classes, name='FCN')(x)
     return Model(inputs=inputs, outputs=x, name="LSTM")
 
