@@ -54,10 +54,10 @@ def get_lstm(units, num_classes, maxlen, dropout=0.5):
 
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(x, mask=m)
-    x = LayerNormalization()(x)
+    x = LayerNormalization(axis=1)(x)
     x = LSTM(units, return_sequences=False,
              dropout=dropout, name='RNN_1')(x, mask=m)
-    x = LayerNormalization()(x)
+    x = LayerNormalization(axis=1)(x)
     x = Dense(num_classes, activation='softmax', name='FCN')(x)
     return Model(inputs=inputs, outputs=x, name="LSTM")
 
