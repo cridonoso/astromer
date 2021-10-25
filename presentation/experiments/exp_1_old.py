@@ -141,8 +141,11 @@ def run(opt):
                   metrics=['accuracy'])
 
     estop = EarlyStopping(
-        monitor='val_loss', min_delta=0, patience=20, verbose=0,
-        mode='auto', baseline=None, restore_best_weights=True
+        monitor='val_loss',
+        min_delta=0,
+        patience=opt.patience,
+        mode='auto',
+        restore_best_weights=True
     )
     tboad = TensorBoard(log_dir='{}/logs'.format(exp_path),
                         histogram_freq=0,
