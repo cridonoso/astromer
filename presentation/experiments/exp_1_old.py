@@ -129,13 +129,13 @@ def run(opt):
         print(model.summary())
 
     if opt.mode == 'lstm':
-        model = get_lstm(256, num_cls, 200, dropout=0.4)
+        model = get_lstm(256, num_cls, 200, dropout=0.5)
         exp_path = os.path.join(opt.p, 'lstm')
         print(model.summary())
 
     if opt.mode == 'lstm_att':
         encoder = init_astromer(opt.emb)
-        model = get_lstm_att(256, num_cls, encoder=encoder, dropout=0.4)
+        model = get_lstm_att(256, num_cls, encoder=encoder, dropout=0.5)
         exp_path = os.path.join(opt.p, 'lstm_att')
         print(model.summary())
 
@@ -161,8 +161,9 @@ def run(opt):
                      callbacks=[estop, tboad],
                      validation_data=val_batches,
                      verbose=1)
-
-    model.save(os.path.join(exp_path, 'model'))
+    
+    print('Saving Model')
+    model.save(os.path.join(exp_path, 'model.h5'))
 
 
 if __name__ == '__main__':

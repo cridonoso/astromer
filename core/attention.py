@@ -84,3 +84,16 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         output = self.dense(concat_attention)  # (batch_size, seq_len_q, d_model)
 
         return output, attention_weights
+    
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+            'num_heads':self.num_heads,
+            'd_model':self.d_model,
+            'depth':self.depth,
+            'wq':self.wq,
+            'wk':self.wk,
+            'wv':self.wv,
+            'dense':self.dense,
+        })
+        return config
