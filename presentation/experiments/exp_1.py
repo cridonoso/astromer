@@ -8,7 +8,7 @@ import os
 
 from tensorflow.keras.losses import CategoricalCrossentropy, SparseCategoricalCrossentropy
 from tensorflow.keras.layers import LSTM, Dense, BatchNormalization, InputLayer, LayerNormalization
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, RMSprop
 from tensorflow.keras.metrics import Recall
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
 from tensorflow.keras import Model, Input
@@ -108,21 +108,24 @@ def run(opt):
         model = get_lstm_att(num_cls)
         exp_path = '{}/lstm_att'.format(opt.p)
 
-    model.compile(optimizer='adam',
+    optimizer = RMSprop(learning_rate=opt.lr)
+    model.compile(optimizer=optimizer,
                   loss=SparseCategoricalCrossentropy(),
                   metrics=['accuracy'])
 
     estop = EarlyStopping(
-        monitor='val_loss', min_delta=0, patience=50, verbose=0,
+        monitor='val_loss', min_delta=0, patience=20, verbose=0,
         mode='auto', baseline=None, restore_best_weights=True
     )
-    tboad = TensorBoard(log_dir='{}/logs'.format(exp_path), histogram_freq=0, write_graph=False)
+    tboad = TensorBoard(log_dir='{}/logs'.format(exp_path),
+                        histogram_freq=0,
+                        write_graph=False)
 
     hist = model.fit(train_batches,
                      epochs=opt.epochs,
                      callbacks=[estop, tboad],
                      validation_data=val_batches,
-                     verbose=0)
+                     verbose=1)
 
     model.save(os.path.join(exp_path, 'model'))
 
@@ -131,12 +134,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # TRAINING PAREMETERS
-    parser.add_argument('--data', default='./data/records/macho', type=str,
+    parser.add_argument('--data', default='./data/records/alcock', type=str,
                         help='Dataset folder containing the records files')
-    parser.add_argument('--p', default="./runs/debug", type=str,
-                        help='folder for saving embeddings')
+    parser.add_argument('--p',
+                    default="./weights/astromer_10022021/finetuning/alcock",
+                    type=str,
+                    help='folder for saving embeddings')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
+    parser.add_argument('--lr', default=1e-3, type=float,
+                        help='learning rate')
     parser.add_argument('--epochs', default=100, type=int,
                         help='num of epochs')
     parser.add_argument('--mode', default="lstm_att", type=str,
