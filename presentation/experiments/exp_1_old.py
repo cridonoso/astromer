@@ -163,7 +163,7 @@ def run(opt):
                      verbose=1)
 
     print('Saving Model')
-    model.save(os.path.join(exp_path, 'model'))
+    model.save(os.path.join(exp_path, 'model.h5'))
 
 
 if __name__ == '__main__':
