@@ -142,7 +142,7 @@ def run(opt):
 
     optimizer = Adam(learning_rate=opt.lr)
     model.compile(optimizer=optimizer,
-                  loss=SparseCategoricalCrossentropy(),
+                  loss=CategoricalCrossentropy(),
                   metrics=['accuracy'])
 
     estop = EarlyStopping(

@@ -130,11 +130,11 @@ def get_sample(sample, ndims=3):
 
 
     sequence = tf.stack(casted_inp_parameters, axis=2)[0]
-    
+
     errs = tf.slice(sequence, [0, 2], [-1, 1])
-    cond = errs < 1    
+    cond = errs < 1
     input_dict['input'] = sequence[cond[...,0]]
-    
+
     return input_dict
 
 def get_first_k_obs(sequence, max_obs):
@@ -172,7 +172,7 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs, is_train=False):
     '''
 
     input_dict = get_sample(sample)
-    
+
     if is_train:
         sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
     else:
@@ -292,35 +292,46 @@ def load_records(source, batch_size, max_obs=100,
         dataset = dataset.prefetch(1)
         return dataset
 
-def formatter(batch):
-    return {'input': batch['input'],
-            'times': batch['times'],
-            'obserr': batch['obserr'],
-            'mask_in': batch['mask_in']}, batch['label']
+def formatter(sample, is_train, max_obs, num_cls):
+    input_dict = get_sample(sample)
 
-def load_records_v3(source, batch_size, max_obs=100,
-                    msk_frac=0.2, rnd_frac=0.1,
-                    same_frac=0.1, repeat=1,
-                    is_train=False):
+    if is_train:
+        sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
+    else:
+        sequence, curr_max_obs = get_first_k_obs(input_dict['input'], max_obs)
+
+    sequence, mean = standardize(sequence, return_mean=True)
+
+    seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
+    seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
+    seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
+    mask_in  = tf.zeros([curr_max_obs, 1])
+
+    if curr_max_obs < max_obs:
+        filler    = tf.ones([max_obs-curr_max_obs, 1])
+        mask_in   = tf.concat([mask_in, filler], 0)
+        seq_magn  = tf.concat([seq_magn, 1.-filler], 0)
+        seq_time  = tf.concat([seq_time, 1.-filler], 0)
+
+    dictonary = {
+            'input': seq_magn,
+            'times': seq_time,
+            'mask_in': mask_in
+            }
+    return dictonary, tf.one_hot(input_dict['label'], num_cls)
+
+def load_records_v3(source, batch_size, max_obs=100, repeat=1, is_train=False,
+                   num_cls=5):
     """
-    Pretraining data loader.
-    This method build the ASTROMER input format.
-    ASTROMER format is based on the BERT masking strategy.
-
+    Specific Task data loader.
     Args:
         source (string): Record folder
         batch_size (int): Batch size
-        no_shuffle (bool): Do not shuffle training and validation dataset
         max_obs (int): Max. number of observation per serie
-        msk_frac (float): fraction of values to be predicted ([MASK])
-        rnd_frac (float): fraction of [MASKED] values to replace with random values
-        same_frac (float): fraction of [MASKED] values to replace with true values
-
     Returns:
         Tensorflow Dataset: Iterator withg preprocessed batches
     """
-    fn = adjust_fn(_parse_pt, msk_frac, rnd_frac, same_frac, max_obs, is_train)
-
+    fn = adjust_fn(formatter, is_train, max_obs, num_cls)
     if not is_train:
         print('Testing mode')
         chunks = [os.path.join(source, folder, file) \
@@ -329,8 +340,7 @@ def load_records_v3(source, batch_size, max_obs=100,
 
         dataset = tf.data.TFRecordDataset(chunks)
         dataset = dataset.map(fn)
-        dataset = dataset.map(formatter)
-        dataset = dataset.padded_batch(batch_size)
+        dataset = dataset.batch(batch_size)
         dataset = dataset.prefetch(1)
         return dataset
     else:
@@ -339,58 +349,6 @@ def load_records_v3(source, batch_size, max_obs=100,
         dataset = tf.data.experimental.sample_from_datasets(datasets)
         dataset = dataset.repeat(repeat)
         dataset = dataset.map(fn)
-        dataset = dataset.map(formatter)
-        dataset = dataset.padded_batch(batch_size)
-        dataset = dataset.prefetch(1)
-        return dataset
-
-def format_input(batch):
-    x = tf.concat([batch['times'], batch['input']], 1)
-    m = tf.cast(1.-batch['mask_in'], tf.bool)
-    return {'x':x, 'mask': m}, batch['label']
-
-def load_records_v2(source, batch_size, max_obs=100,
-                    msk_frac=0.2, rnd_frac=0.1,
-                    same_frac=0.1, repeat=1,
-                    is_train=False):
-    """
-    Pretraining data loader.
-    This method build the ASTROMER input format.
-    ASTROMER format is based on the BERT masking strategy.
-
-    Args:
-        source (string): Record folder
-        batch_size (int): Batch size
-        no_shuffle (bool): Do not shuffle training and validation dataset
-        max_obs (int): Max. number of observation per serie
-        msk_frac (float): fraction of values to be predicted ([MASK])
-        rnd_frac (float): fraction of [MASKED] values to replace with random values
-        same_frac (float): fraction of [MASKED] values to replace with true values
-
-    Returns:
-        Tensorflow Dataset: Iterator withg preprocessed batches
-    """
-    fn = adjust_fn(_parse_pt, msk_frac, rnd_frac, same_frac, max_obs, is_train)
-
-    if not is_train:
-        print('Testing mode')
-        chunks = [os.path.join(source, folder, file) \
-                    for folder in os.listdir(source) \
-                        for file in os.listdir(os.path.join(source, folder))]
-
-        dataset = tf.data.TFRecordDataset(chunks)
-        dataset = dataset.map(fn)
-        dataset = dataset.map(format_input)
-        dataset = dataset.padded_batch(batch_size)
-        dataset = dataset.prefetch(1)
-        return dataset
-    else:
-        print('Training Mode')
-        datasets = datasets_by_cls(source)
-        dataset = tf.data.experimental.sample_from_datasets(datasets)
-        dataset = dataset.repeat(repeat)
-        dataset = dataset.map(fn)
-        dataset = dataset.map(format_input)
         dataset = dataset.padded_batch(batch_size)
         dataset = dataset.prefetch(1)
         return dataset
