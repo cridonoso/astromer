@@ -33,8 +33,11 @@ def get_mlp(num_classes, encoder, maxlen=200):
     x = (x - tf.reduce_mean(x, 0))/tf.math.reduce_std(x, 0)
 
     x = Dense(1024, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(1024, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(512, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(num_classes, activation='softmax')(x)
     return Model(inputs=inputs, outputs=x, name="MLP_ATT")
 
