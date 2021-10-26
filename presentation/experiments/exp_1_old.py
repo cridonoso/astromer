@@ -171,7 +171,7 @@ def run(opt):
         patience=opt.patience,
         mode='auto',
         restore_best_weights=True)
-        
+
     tboad = TensorBoard(log_dir='{}/logs'.format(exp_path),
                         histogram_freq=0,
                         write_graph=False)
