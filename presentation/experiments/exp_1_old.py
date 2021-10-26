@@ -72,10 +72,10 @@ def get_lstm_att(units, num_classes, encoder, maxlen=200, dropout=0.5):
     x = encoder(inputs)
     x = LSTM(units, return_sequences=True,
              dropout=dropout, name='RNN_0')(x, mask=m)
-    x = LayerNormalization()(x)
+    x = BatchNormalization()(x)
     x = LSTM(units, return_sequences=False,
              dropout=dropout, name='RNN_1')(x, mask=m)
-    x = LayerNormalization()(x)
+    x = BatchNormalization()(x)
     x = Dense(num_classes, activation='softmax', name='FCN')(x)
     return Model(inputs=inputs, outputs=x, name="LSTM_ATT")
 
