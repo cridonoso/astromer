@@ -163,6 +163,7 @@ def run(opt):
                      verbose=1)
 
     print('Saving Model')
+    model.save_weights(os.path.join(exp_path, 'ckpt'))
     model.save(os.path.join(exp_path, 'model.h5'))
 
 
