@@ -9,7 +9,7 @@ import os
 from tensorflow.keras.losses import CategoricalCrossentropy, SparseCategoricalCrossentropy
 from tensorflow.keras.layers import LSTM, Dense, BatchNormalization, InputLayer, LayerNormalization
 from tensorflow.keras.optimizers import Adam, RMSprop
-from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
 from tensorflow.keras import Model, Input
 
 from core.metrics import custom_acc
@@ -158,25 +158,31 @@ def run(opt):
                   loss=CategoricalCrossentropy(),
                   metrics=['accuracy'])
 
+    ckpts = ModelCheckpoint(
+        filepath=os.path.join(exp_path, 'ckpt'),
+        save_weights_only=True,
+        monitor='val_accuracy',
+        mode='max',
+        save_best_only=True)
+
     estop = EarlyStopping(
         monitor='val_loss',
         min_delta=0,
         patience=opt.patience,
         mode='auto',
-        restore_best_weights=True
-    )
+        restore_best_weights=True)
+        
     tboad = TensorBoard(log_dir='{}/logs'.format(exp_path),
                         histogram_freq=0,
                         write_graph=False)
 
     hist = model.fit(train_batches,
                      epochs=opt.epochs,
-                     callbacks=[estop, tboad],
+                     callbacks=[ckpts, estop, tboad],
                      validation_data=val_batches,
                      verbose=1)
 
     print('Saving Model')
-    model.save_weights(os.path.join(exp_path, 'ckpt'))
     # model.save(os.path.join(exp_path, 'model.h5'))
 
 
