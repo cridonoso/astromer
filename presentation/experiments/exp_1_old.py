@@ -71,12 +71,25 @@ def get_lstm_att(units, num_classes, encoder, maxlen=200, dropout=0.5):
     m = tf.cast(1.-inputs['mask_in'][...,0], tf.bool)
     x = encoder(inputs)
     x = (x - tf.expand_dims(tf.reduce_mean(x, 1), 1))/tf.expand_dims(tf.math.reduce_std(x, 1), 1)
-    x = LSTM(units, return_sequences=True,
-             dropout=dropout, name='RNN_0')(x, mask=m)
+    # x = LSTM(units, return_sequences=True,
+    #          dropout=dropout, name='RNN_0')(x, mask=m)
+
+    rnn_0 = tf.keras.layers.LSTMCell(256,
+                                     recurrent_initializer='zeros',
+                                     dropout=dropout,
+                                     name='RNN0')
+    rnn_1 = tf.keras.layers.LSTMCell(256,
+                                     recurrent_initializer='zeros',
+                                     dropout=dropout,
+                                     name='RNN1')
+    stacked = tf.keras.layers.RNN([rnn_0, rnn_1],
+                                   return_sequences=True)
+
     # x = BatchNormalization()(x)
-    x = LSTM(units, return_sequences=False,
-             dropout=dropout, name='RNN_1')(x, mask=m)
-    # x = BatchNormalization()(x)
+    # x = LSTM(units, return_sequences=False,
+    #          dropout=dropout, name='RNN_1')(x, mask=m)
+    x = stacked(x, mask=m)
+    x = BatchNormalization()(x[:, -1, :])
     x = Dense(num_classes, activation='softmax', name='FCN')(x)
     return Model(inputs=inputs, outputs=x, name="LSTM_ATT")
 
