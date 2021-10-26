@@ -55,14 +55,10 @@ def get_lstm(units, num_classes, maxlen, dropout=0.5):
     rnn_0 = tf.keras.layers.LSTMCell(256,
                                      recurrent_initializer='zeros',
                                      dropout=dropout,
-                                     recurrent_constraint=LayerNormalization(),
-                                     kernel_constraint=LayerNormalization(),
                                      name='RNN0')
     rnn_1 = tf.keras.layers.LSTMCell(256,
                                      recurrent_initializer='zeros',
                                      dropout=dropout,
-                                     recurrent_constraint=LayerNormalization(),
-                                     kernel_constraint=LayerNormalization(),
                                      name='RNN1')
     stacked = tf.keras.layers.RNN([rnn_0, rnn_1],
                                    return_sequences=True)
@@ -85,14 +81,10 @@ def get_lstm_att(units, num_classes, encoder, maxlen=200, dropout=0.5):
     rnn_0 = tf.keras.layers.LSTMCell(256,
                                      recurrent_initializer='zeros',
                                      dropout=dropout,
-                                     recurrent_constraint=LayerNormalization(),
-                                     kernel_constraint=LayerNormalization(),
                                      name='RNN0')
     rnn_1 = tf.keras.layers.LSTMCell(256,
                                      recurrent_initializer='zeros',
                                      dropout=dropout,
-                                     recurrent_constraint=LayerNormalization(),
-                                     kernel_constraint=LayerNormalization(),
                                      name='RNN1')
     stacked = tf.keras.layers.RNN([rnn_0, rnn_1],
                                    return_sequences=True)
@@ -185,7 +177,7 @@ def run(opt):
 
     print('Saving Model')
     model.save_weights(os.path.join(exp_path, 'ckpt'))
-    model.save(os.path.join(exp_path, 'model.h5'))
+    # model.save(os.path.join(exp_path, 'model.h5'))
 
 
 if __name__ == '__main__':
