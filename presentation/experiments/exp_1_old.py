@@ -100,26 +100,24 @@ def init_astromer(path):
     return encoder
 
 def run(opt):
+    df = pd.read_csv(os.path.join(opt.data, 'test_objs.csv'))
+    num_cls = df['class'].unique().size
+
     train_batches = load_records_v3(os.path.join(opt.data, 'train'),
                                  opt.batch_size,
                                  max_obs=200,
-                                 msk_frac=0.,
-                                 rnd_frac=0.,
-                                 same_frac=0.,
                                  repeat=opt.repeat,
-                                 is_train=True)
+                                 is_train=True,
+                                 num_cls=num_cls)
 
     val_batches = load_records_v3(os.path.join(opt.data, 'val'),
                                opt.batch_size,
                                max_obs=200,
-                               msk_frac=0.,
-                               rnd_frac=0.,
-                               same_frac=0.,
                                repeat=opt.repeat,
-                               is_train=True)
+                               is_train=True,
+                               num_cls=num_cls)
 
-    df = pd.read_csv(os.path.join(opt.data, 'test_objs.csv'))
-    num_cls = df['class'].unique().size
+
 
     exp_path = opt.p
     if opt.mode == 'mlp_att':
