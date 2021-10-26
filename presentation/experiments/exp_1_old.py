@@ -126,7 +126,7 @@ def run(opt):
     val_batches = load_records_v3(os.path.join(opt.data, 'val'),
                                opt.batch_size,
                                max_obs=200,
-                               repeat=opt.repeat,
+                               repeat=2,
                                is_train=True,
                                num_cls=num_cls)
 
