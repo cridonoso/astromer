@@ -82,7 +82,6 @@ def get_lstm_att(units, num_classes, encoder, maxlen=200, dropout=0.5):
     }
     m = tf.cast(1.-inputs['mask_in'][...,0], tf.bool)
     x = encoder(inputs)
-    x = normalize_batch(x)
 
     rnn_0 = tf.keras.layers.LSTMCell(256,
                                      recurrent_initializer='zeros',
