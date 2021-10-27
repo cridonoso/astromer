@@ -39,6 +39,12 @@ def get_mlp(num_classes, encoder, maxlen=200):
     x = Dense(num_classes, activation='softmax')(x)
     return Model(inputs=inputs, outputs=x, name="MLP_ATT")
 
+def normalize_batch(tensor):
+    min_ = tf.expand_dims(tf.reduce_min(tensor, 1), 1)
+    max_ = tf.expand_dims(tf.reduce_max(tensor, 1), 1)
+    tensor = (tensor - min_)/(max_ - min_)
+    return tensor
+
 def get_lstm(units, num_classes, maxlen, dropout=0.5):
     ''' LSTM + LSTM + FC'''
     inputs = {
@@ -47,8 +53,10 @@ def get_lstm(units, num_classes, maxlen, dropout=0.5):
     'mask_in': Input(shape=(maxlen, 1), name='mask'),
     }
     m = tf.cast(1.-inputs['mask_in'][...,0], tf.bool)
-    x = tf.concat([inputs['times'],
-                   inputs['input']], 2)
+
+    tim = normalize_batch(inputs['times'])
+    inp = normalize_batch(inputs['input'])
+    x = tf.concat([tim, inp], 2)
 
     rnn_0 = tf.keras.layers.LSTMCell(256,
                                      recurrent_initializer='zeros',
@@ -121,14 +129,16 @@ def run(opt):
                                  max_obs=200,
                                  repeat=opt.repeat,
                                  is_train=True,
-                                 num_cls=num_cls)
+                                 num_cls=num_cls,
+                                 norm=opt.norm)
 
     val_batches = load_records_v3(os.path.join(opt.data, 'val'),
                                opt.batch_size,
                                max_obs=200,
                                repeat=opt.repeat,
                                is_train=True,
-                               num_cls=num_cls)
+                               num_cls=num_cls,
+                               norm=opt.norm)
 
 
 
@@ -206,6 +216,8 @@ if __name__ == '__main__':
                         help='repeat dataset samples')
     parser.add_argument('--mode', default='mlp_att', type=str,
                         help='mlp_att - lstm - lstm_att')
+    parser.add_argument('--norm', default='zscore', type=str,
+                        help='"min-max" and "zscaler" normalization')
 
     opt = parser.parse_args()
     run(opt)
