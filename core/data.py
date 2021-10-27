@@ -131,9 +131,9 @@ def get_sample(sample, ndims=3):
 
     sequence = tf.stack(casted_inp_parameters, axis=2)[0]
 
-    errs = tf.slice(sequence, [0, 2], [-1, 1])
-    cond = errs < 1
-    input_dict['input'] = sequence[cond[...,0]]
+    # errs = tf.slice(sequence, [0, 2], [-1, 1])
+    # cond = errs < 1
+    input_dict['input'] = sequence#sequence[cond[...,0]]
 
     return input_dict
 
