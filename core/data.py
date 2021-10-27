@@ -11,7 +11,7 @@ import os
 from core.masking import get_masked, set_random, get_padding_mask
 from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
-from core.utils import standardize
+from core.utils import standardize, normalize
 
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
@@ -292,7 +292,7 @@ def load_records(source, batch_size, max_obs=100,
         dataset = dataset.prefetch(1)
         return dataset
 
-def formatter(sample, is_train, max_obs, num_cls):
+def formatter(sample, is_train, max_obs, num_cls, norm='zscore'):
     input_dict = get_sample(sample)
 
     if is_train:
@@ -300,7 +300,10 @@ def formatter(sample, is_train, max_obs, num_cls):
     else:
         sequence, curr_max_obs = get_first_k_obs(input_dict['input'], max_obs)
 
-    sequence, mean = standardize(sequence, return_mean=True)
+    if norm == 'min-max':
+        sequence = normalize(sequence, return_mean=True)
+    else:
+        sequence, _ = standardize(sequence, return_mean=True)
 
     seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
     seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
@@ -321,7 +324,7 @@ def formatter(sample, is_train, max_obs, num_cls):
     return dictonary, tf.one_hot(input_dict['label'], num_cls)
 
 def load_records_v3(source, batch_size, max_obs=100, repeat=1, is_train=False,
-                   num_cls=5):
+                   num_cls=5, norm='zscore'):
     """
     Specific Task data loader.
     Args:
@@ -331,7 +334,7 @@ def load_records_v3(source, batch_size, max_obs=100, repeat=1, is_train=False,
     Returns:
         Tensorflow Dataset: Iterator withg preprocessed batches
     """
-    fn = adjust_fn(formatter, is_train, max_obs, num_cls)
+    fn = adjust_fn(formatter, is_train, max_obs, num_cls, norm)
     if not is_train:
         print('Testing mode')
         chunks = [os.path.join(source, folder, file) \

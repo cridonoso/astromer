@@ -31,6 +31,23 @@ def get_folder_name(path, prefix=''):
 
     return path
 
+def normalize(tensor, axis=0, return_mean=False):
+    """
+    Standardize a tensor subtracting the mean
+
+    Args:
+        tensor (1-dim tensorflow tensor): values
+        axis (int): axis on which we calculate the mean
+        return_mean (bool): output the mean of the tensor
+                            turning on the original scale
+    Returns:
+        tensor (1-dim tensorflow tensor): standardize tensor
+    """
+    min_value = tf.reduce_min(tensor, axis, name='min_value')
+    max_value = tf.reduce_max(tensor, axis, name='max_value')
+    normed = (tensor - min_value)/(max_value - min_value)
+    return normed
+
 def standardize(tensor, axis=0, return_mean=False):
     """
     Standardize a tensor subtracting the mean
