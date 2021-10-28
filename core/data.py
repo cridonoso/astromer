@@ -354,7 +354,7 @@ def load_records_v3(source, batch_size, max_obs=100, repeat=1, is_train=False,
         dataset = dataset.map(fn)
         dataset = dataset.padded_batch(batch_size)
         dataset = dataset.prefetch(1)
-        return dataset
+        return dataset.cache()
 
 class generator:
     def __init__(self, n_classes):
