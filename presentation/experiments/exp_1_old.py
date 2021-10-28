@@ -33,9 +33,11 @@ def get_mlp(num_classes, encoder, maxlen=200):
     x = (x - tf.reduce_mean(x, 0))/tf.math.reduce_std(x, 0)
 
     x = Dense(1024, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(512, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(256, activation='relu')(x)
-    # x = BatchNormalization()(x)
+    x = BatchNormalization()(x)
     x = Dense(num_classes, activation='softmax')(x)
     return Model(inputs=inputs, outputs=x, name="MLP_ATT")
 
@@ -82,13 +84,11 @@ def get_lstm_att(units, num_classes, encoder, maxlen=200, dropout=0.5):
     }
     m = tf.cast(1.-inputs['mask_in'][...,0], tf.bool)
     x = encoder(inputs)
-
+    x = (x-tf.expand_dims(tf.reduce_mean(x, 1),1))/tf.expand_dims(tf.math.reduce_std(x, 1), 1)
     rnn_0 = tf.keras.layers.LSTMCell(256,
-                                     recurrent_initializer='zeros',
                                      dropout=dropout,
                                      name='RNN0')
     rnn_1 = tf.keras.layers.LSTMCell(256,
-                                     recurrent_initializer='zeros',
                                      dropout=dropout,
                                      name='RNN1')
     stacked = tf.keras.layers.RNN([rnn_0, rnn_1],
