@@ -342,8 +342,8 @@ def load_records_v3(source, batch_size, max_obs=100, repeat=1, is_train=False,
                         for file in os.listdir(os.path.join(source, folder))]
 
         dataset = tf.data.TFRecordDataset(chunks)
-        dataset = dataset.map(fn)
         dataset = dataset.shuffle(1000)
+        dataset = dataset.map(fn)
         dataset = dataset.batch(batch_size).cache()
         dataset = dataset.prefetch(1)
         return dataset
