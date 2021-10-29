@@ -335,7 +335,19 @@ def load_records_v3(source, batch_size, max_obs=100, repeat=1, is_train=False,
         Tensorflow Dataset: Iterator withg preprocessed batches
     """
     fn = adjust_fn(formatter, is_train, max_obs, num_cls, norm)
-    if not is_train:
+    if is_train:
+        print('Testing mode')
+        chunks = [os.path.join(source, folder, file) \
+                    for folder in os.listdir(source) \
+                        for file in os.listdir(os.path.join(source, folder))]
+
+        dataset = tf.data.TFRecordDataset(chunks)
+        dataset = dataset.map(fn)
+        dataset = dataset.shuffle(1000)
+        dataset = dataset.batch(batch_size).cache()
+        dataset = dataset.prefetch(1)
+        return dataset
+    else:
         print('Testing mode')
         chunks = [os.path.join(source, folder, file) \
                     for folder in os.listdir(source) \
@@ -346,15 +358,15 @@ def load_records_v3(source, batch_size, max_obs=100, repeat=1, is_train=False,
         dataset = dataset.batch(batch_size)
         dataset = dataset.prefetch(1)
         return dataset
-    else:
-        print('Training Mode')
-        datasets = datasets_by_cls(source)
-        dataset = tf.data.experimental.sample_from_datasets(datasets)
-        dataset = dataset.repeat(repeat)
-        dataset = dataset.map(fn)
-        dataset = dataset.padded_batch(batch_size)
-        dataset = dataset.prefetch(1)
-        return dataset.cache()
+    # else:
+    #     print('Training Mode')
+    #     datasets = datasets_by_cls(source)
+    #     dataset = tf.data.experimental.sample_from_datasets(datasets)
+    #     dataset = dataset.repeat(repeat)
+    #     dataset = dataset.map(fn)
+    #     dataset = dataset.padded_batch(batch_size)
+    #     dataset = dataset.prefetch(1)
+    #     return dataset.cache()
 
 class generator:
     def __init__(self, n_classes):
