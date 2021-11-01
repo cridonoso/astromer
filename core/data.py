@@ -3,9 +3,10 @@ import dask.dataframe as dd
 import tensorflow as tf
 import pandas as pd
 import numpy as np
+import itertools
+import logging
 import h5py
 import json
-import logging
 import os
 
 from core.masking import get_masked, set_random, get_padding_mask
@@ -19,7 +20,7 @@ logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 def _float_feature(list_of_floats):  # float32
     return tf.train.Feature(float_list=tf.train.FloatList(value=list_of_floats))
 
-def get_example(lcid, label, lightcurve):
+def get_example(lcid, label, lightcurve, length):
     """
     Create a record example from numpy values.
 
@@ -37,7 +38,7 @@ def get_example(lcid, label, lightcurve):
     dict_features={
     'id': tf.train.Feature(bytes_list=tf.train.BytesList(value=[str(lcid).encode()])),
     'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label])),
-    'length': tf.train.Feature(int64_list=tf.train.Int64List(value=[lightcurve.shape[0]])),
+    'length': tf.train.Feature(int64_list=tf.train.Int64List(value=[length])),
     }
     element_context = tf.train.Features(feature = dict_features)
 
@@ -52,20 +53,84 @@ def get_example(lcid, label, lightcurve):
                                   feature_lists= element_lists)
     return ex
 
-@wrap_non_picklable_objects
-def clear_sample(observations, band=1):
-    observations = observations[['mjd', 'mag', 'std', 'band']] # Sanity check
-    observations = observations[observations['band']==band]
-    observations = observations.dropna()
-    observations = observations.sort_values('mjd')
-    observations = observations.drop_duplicates(keep='last')
-    return observations.values
-
 def write_record(chunk, index, dest, label):
     with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(index)) as writer:
         for oid, sample in zip(chunk.index, chunk):
             ex = get_example(oid, label, sample[:, :-1])
             writer.write(ex.SerializeToString())
+
+def write_record_v2(chunk, index, dest, label):
+    '''For split_and_create_records function'''
+    with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(index)) as writer:
+        for sample in chunk:
+            oid = sample[0, -1]
+            lc = sample[:, :-2]
+            length = int(np.sum(sample[:, 3]))
+            ex = get_example(oid, label, lc, length)
+            writer.write(ex.SerializeToString())
+
+@wrap_non_picklable_objects
+def clear_sample(observations, band=1):
+    oid = observations['oid'].iloc[0]
+    observations = observations[['mjd', 'mag', 'std', 'band']] # Sanity check
+    observations = observations[observations['band']==band]
+    observations = observations.dropna()
+    observations = observations.sort_values('mjd')
+    observations = observations.drop_duplicates(keep='first')
+    return (observations.values, oid)
+
+def get_windows(sample, oid, max_obs):
+    lc = pd.DataFrame(sample[:, :-1], columns=['mjd', 'mag', 'std'])
+    length = lc.shape[0]
+    rest = length%max_obs
+    filler = max_obs - rest
+    lc['mask'] = np.ones(lc.shape[0])
+    lc = lc.reindex(range(length+filler), fill_value=0)
+    windows = []
+    for w in np.split(lc, lc.shape[0]/max_obs):
+        if w['mjd'].sum() != 0.:
+            w['oid'] = [oid]*max_obs
+            windows.append(w)
+    return windows
+
+def split_and_create_records(observations, metadata, max_obs=200, dest='.',
+                             class_code=None, max_lc_per_record=20000, njobs=1):
+    '''
+    Each lighcurve is divided in windows of max_obs. If the number of observations
+    is lower than max_obs, then padd to complete.
+    At the end of this methodx we will get a tf record dataset containing
+    equal-length samples
+    '''
+    if class_code==None:
+        class_code = dict()
+        for index, cls_name in enumerate(metadata['class'].unique()):
+            class_code[cls_name] = index
+
+    for label, group in metadata.groupby('class'):
+        print('[INFO] Processing {} class...'.format(label))
+        obj_cls = observations[observations['oid'].isin(group['oid'])]
+        res_0 = obj_cls.groupby('oid').apply(clear_sample,
+                                          band=1, meta=('x', 'f8')).compute()
+        print('[INFO] Cooking windows')
+        res_1 = Parallel(n_jobs=njobs, backend='multiprocessing')(
+                delayed(get_windows)(sample, oid, max_obs) \
+                for sample, oid in res_0)
+        res_1 = list(itertools.chain(*res_1))
+
+        print('[INFO] Writting records')
+        chunks = np.array_split(res_1,
+                                np.arange(max_lc_per_record,
+                                          len(res_1),
+                                          max_lc_per_record))
+
+        cls_dest = os.path.join(dest, label)
+        os.makedirs(cls_dest, exist_ok=True)
+
+        var = Parallel(n_jobs=njobs, backend='multiprocessing')(
+                delayed(write_record_v2)(chunk, k, cls_dest, class_code[label]) \
+                                    for k, chunk in enumerate(chunks))
+
+    print('[INFO] Records succefully created. Have a good training')
 
 def create_records(observations, metadata, dest='.', class_code=None, max_lc_per_record=20000, njobs=1):
 
@@ -88,7 +153,8 @@ def create_records(observations, metadata, dest='.', class_code=None, max_lc_per
         cls_dest = os.path.join(dest, label)
         os.makedirs(cls_dest, exist_ok=True)
 
-        var = Parallel(n_jobs=njobs, backend='multiprocessing')(delayed(write_record)(chunk, k, cls_dest, class_code[label]) \
+        var = Parallel(n_jobs=njobs, backend='multiprocessing')(
+        delayed(write_record)(chunk, k, cls_dest, class_code[label]) \
                                     for k, chunk in enumerate(chunks))
 
     print('[INFO] Records succefully created. Have a good training')
@@ -295,26 +361,20 @@ def load_records(source, batch_size, max_obs=100,
 def formatter(sample, is_train, max_obs, num_cls, norm='zscore'):
     input_dict = get_sample(sample)
 
-    if is_train:
-        sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
-    else:
-        sequence, curr_max_obs = get_first_k_obs(input_dict['input'], max_obs)
+    sequence = input_dict['input']
 
     if norm == 'min-max':
         sequence = normalize(sequence, return_mean=True)
     else:
         sequence, _ = standardize(sequence, return_mean=True)
 
-    seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
-    seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
-    seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
-    mask_in  = tf.zeros([curr_max_obs, 1])
+    seq_time = tf.slice(sequence, [0, 0], [-1, 1])
+    seq_magn = tf.slice(sequence, [0, 1], [-1, 1])
+    seq_errs = tf.slice(sequence, [0, 2], [-1, 1])
 
-    if curr_max_obs < max_obs:
-        filler    = tf.ones([max_obs-curr_max_obs, 1])
-        mask_in   = tf.concat([mask_in, filler], 0)
-        seq_magn  = tf.concat([seq_magn, 1.-filler], 0)
-        seq_time  = tf.concat([seq_time, 1.-filler], 0)
+    mask_in  = tf.zeros([input_dict['length'], 1])
+    filler    = tf.ones([max_obs-input_dict['length'], 1])
+    mask_in   = tf.concat([mask_in, filler], 0)
 
     dictonary = {
             'input': seq_magn,
@@ -336,17 +396,13 @@ def load_records_v3(source, batch_size, max_obs=100, repeat=1, is_train=False,
     """
     fn = adjust_fn(formatter, is_train, max_obs, num_cls, norm)
     if is_train:
-        print('Testing mode')
-        chunks = [os.path.join(source, folder, file) \
-                    for folder in os.listdir(source) \
-                        for file in os.listdir(os.path.join(source, folder))]
-
-        dataset = tf.data.TFRecordDataset(chunks)
-        dataset = dataset.shuffle(1000)
+        print('Training mode')
+        datasets = datasets_by_cls(source)
+        dataset = tf.data.experimental.sample_from_datasets(datasets)
         dataset = dataset.map(fn)
-        dataset = dataset.batch(batch_size).cache()
+        dataset = dataset.batch(batch_size)
         dataset = dataset.prefetch(1)
-        return dataset
+        return dataset.cache()
     else:
         print('Testing mode')
         chunks = [os.path.join(source, folder, file) \
@@ -358,15 +414,7 @@ def load_records_v3(source, batch_size, max_obs=100, repeat=1, is_train=False,
         dataset = dataset.batch(batch_size)
         dataset = dataset.prefetch(1)
         return dataset
-    # else:
-    #     print('Training Mode')
-    #     datasets = datasets_by_cls(source)
-    #     dataset = tf.data.experimental.sample_from_datasets(datasets)
-    #     dataset = dataset.repeat(repeat)
-    #     dataset = dataset.map(fn)
-    #     dataset = dataset.padded_batch(batch_size)
-    #     dataset = dataset.prefetch(1)
-    #     return dataset.cache()
+
 
 class generator:
     def __init__(self, n_classes):

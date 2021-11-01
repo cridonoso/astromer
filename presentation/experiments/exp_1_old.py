@@ -147,7 +147,6 @@ def run(opt):
     train_batches = load_records_v3(os.path.join(opt.data, 'train'),
                                  opt.batch_size,
                                  max_obs=200,
-                                 repeat=opt.repeat,
                                  is_train=True,
                                  num_cls=num_cls,
                                  norm=opt.norm)
@@ -155,12 +154,9 @@ def run(opt):
     val_batches = load_records_v3(os.path.join(opt.data, 'val'),
                                opt.batch_size,
                                max_obs=200,
-                               repeat=opt.repeat,
                                is_train=True,
                                num_cls=num_cls,
                                norm=opt.norm)
-
-
 
     exp_path = opt.p
     if opt.mode == 'mlp_att':
@@ -189,7 +185,7 @@ def run(opt):
     ckpts = ModelCheckpoint(
         filepath=os.path.join(exp_path, 'ckpt'),
         save_weights_only=True,
-        monitor='val_accuracy',
+        monitor='val_loss',
         mode='max',
         save_best_only=True)
 
@@ -211,7 +207,6 @@ def run(opt):
                      verbose=1)
 
     print('Saving Model')
-    # model.save(os.path.join(exp_path, 'model.h5'))
 
 
 if __name__ == '__main__':
