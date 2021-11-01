@@ -47,6 +47,24 @@ def normalize_batch(tensor):
     tensor = (tensor - min_)/(max_ - min_)
     return tensor
 
+class NormedLSTMCell(tf.keras.layers.Layer):
+
+    def __init__(self, units, **kwargs):
+        self.units = units
+        self.state_size = ((units, units), (units, units))
+
+        super(NormedLSTMCell, self).__init__(**kwargs)
+
+        self.cell_0 = tf.keras.layers.LSTMCell(units)
+        self.cell_1 = tf.keras.layers.LSTMCell(units)
+        self.bn = LayerNormalization()
+
+    def call(self, inputs, states):
+        output, s0 = self.cell_0(inputs, states[0])
+        output = self.bn(output)
+        output, s1 = self.cell_1(output, states[1])
+        return output, [s0, s1]
+
 def get_lstm(units, num_classes, maxlen, dropout=0.5):
     ''' LSTM + LSTM + FC'''
     inputs = {
@@ -55,25 +73,25 @@ def get_lstm(units, num_classes, maxlen, dropout=0.5):
     'mask_in': Input(shape=(maxlen, 1), name='mask'),
     }
     m = tf.cast(1.-inputs['mask_in'][...,0], tf.bool)
-
     tim = normalize_batch(inputs['times'])
     inp = normalize_batch(inputs['input'])
     x = tf.concat([tim, inp], 2)
 
-    rnn_0 = tf.keras.layers.LSTMCell(256,
-                                     recurrent_initializer='zeros',
-                                     dropout=dropout,
-                                     name='RNN0')
-    rnn_1 = tf.keras.layers.LSTMCell(256,
-                                     recurrent_initializer='zeros',
-                                     dropout=dropout,
-                                     name='RNN1')
-    stacked = tf.keras.layers.RNN([rnn_0, rnn_1],
-                                   return_sequences=True)
-    x = stacked(x, mask=m)
-    x = BatchNormalization()(x[:, -1, :])
-    x = Dense(num_classes, activation='softmax', name='FCN')(x)
-    return Model(inputs=inputs, outputs=x, name="LSTM")
+    cell_0 = NormedLSTMCell(units=units)
+    dense  = Dense(num_classes, activation='softmax', name='FCN')
+
+    s0 = [tf.zeros([tf.shape(x)[0], units]),
+          tf.zeros([tf.shape(x)[0], units])]
+    s1 = [tf.zeros([tf.shape(x)[0], units]),
+          tf.zeros([tf.shape(x)[0], units])]
+
+    rnn = tf.keras.layers.RNN(cell_0, return_sequences=False)
+
+    x = rnn(x, initial_state=[s0, s1], mask=m)
+    x = tf.nn.dropout(x, dropout)
+    x = dense(x)
+
+    return Model(inputs, outputs=x, name="LSTM")
 
 def get_lstm_att(units, num_classes, encoder, maxlen=200, dropout=0.5):
     ''' ATT + LSTM + LSTM + FC'''
@@ -85,19 +103,22 @@ def get_lstm_att(units, num_classes, encoder, maxlen=200, dropout=0.5):
     m = tf.cast(1.-inputs['mask_in'][...,0], tf.bool)
     x = encoder(inputs)
     x = (x-tf.expand_dims(tf.reduce_mean(x, 1),1))/tf.expand_dims(tf.math.reduce_std(x, 1), 1)
-    rnn_0 = tf.keras.layers.LSTMCell(256,
-                                     dropout=dropout,
-                                     name='RNN0')
-    rnn_1 = tf.keras.layers.LSTMCell(256,
-                                     dropout=dropout,
-                                     name='RNN1')
-    stacked = tf.keras.layers.RNN([rnn_0, rnn_1],
-                                   return_sequences=True)
 
-    x = stacked(x, mask=m)
-    x = BatchNormalization()(x[:, -1, :])
-    x = Dense(num_classes, activation='softmax', name='FCN')(x)
-    return Model(inputs=inputs, outputs=x, name="LSTM_ATT")
+    cell_0 = NormedLSTMCell(units=units)
+    dense  = Dense(num_classes, activation='softmax', name='FCN')
+
+    s0 = [tf.zeros([tf.shape(x)[0], units]),
+          tf.zeros([tf.shape(x)[0], units])]
+    s1 = [tf.zeros([tf.shape(x)[0], units]),
+          tf.zeros([tf.shape(x)[0], units])]
+
+    rnn = tf.keras.layers.RNN(cell_0, return_sequences=False)
+
+    x = rnn(x, initial_state=[s0, s1], mask=m)
+    x = tf.nn.dropout(x, dropout)
+    x = dense(x)
+
+    return Model(inputs, outputs=x, name="LSTM")
 
 def init_astromer(path):
     conf_file = os.path.join(path, 'conf.json')
@@ -209,7 +230,7 @@ if __name__ == '__main__':
                         help='learning rate')
     parser.add_argument('--epochs', default=10000, type=int,
                         help='Number of Epochs')
-    parser.add_argument('--patience', default=20, type=int,
+    parser.add_argument('--patience', default=40, type=int,
                         help='patience for early stopping')
     parser.add_argument('--repeat', default=1, type=int,
                         help='repeat dataset samples')
