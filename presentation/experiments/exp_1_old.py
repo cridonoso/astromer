@@ -33,7 +33,9 @@ def get_mlp(num_classes, encoder, maxlen=200):
     x = (x - tf.reduce_mean(x, 0))/tf.math.reduce_std(x, 0)
 
     x = Dense(1024, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(512, activation='relu')(x)
+    x = BatchNormalization()(x)
     x = Dense(256, activation='relu')(x)
     x = BatchNormalization()(x)
     x = Dense(num_classes, activation='softmax')(x)
@@ -147,14 +149,16 @@ def run(opt):
                                  max_obs=200,
                                  is_train=True,
                                  num_cls=num_cls,
-                                 norm=opt.norm)
+                                 norm=opt.norm,
+                                 take=opt.take)
 
     val_batches = load_records_v3(os.path.join(opt.data, 'val'),
                                opt.batch_size,
                                max_obs=200,
                                is_train=True,
                                num_cls=num_cls,
-                               norm=opt.norm)
+                               norm=opt.norm,
+                               take=opt.take)
 
     exp_path = opt.p
     if opt.mode == 'mlp_att':
@@ -225,8 +229,8 @@ if __name__ == '__main__':
                         help='Number of Epochs')
     parser.add_argument('--patience', default=40, type=int,
                         help='patience for early stopping')
-    parser.add_argument('--repeat', default=1, type=int,
-                        help='repeat dataset samples')
+    parser.add_argument('--take', default=1, type=int,
+                        help='Number of batches for training')
     parser.add_argument('--mode', default='mlp_att', type=str,
                         help='mlp_att - lstm - lstm_att')
     parser.add_argument('--norm', default='zscore', type=str,

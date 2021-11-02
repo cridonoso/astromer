@@ -55,8 +55,8 @@ def get_example(lcid, label, lightcurve, length):
 
 def write_record(chunk, index, dest, label):
     with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(index)) as writer:
-        for oid, sample in zip(chunk.index, chunk):
-            ex = get_example(oid, label, sample[:, :-1])
+        for sample, oid in chunk:
+            ex = get_example(oid, label, sample[:, :-1], length=sample.shape[0])
             writer.write(ex.SerializeToString())
 
 def write_record_v2(chunk, index, dest, label):
@@ -131,7 +131,8 @@ def split_and_create_records(observations, metadata, max_obs=200, dest='.',
 
     print('[INFO] Records succefully created. Have a good training')
 
-def create_records(observations, metadata, dest='.', class_code=None, max_lc_per_record=20000, njobs=1):
+def create_records(observations, metadata, dest='.', class_code=None,
+                   max_lc_per_record=20000, njobs=1):
 
     if class_code==None:
         class_code = dict()
@@ -139,11 +140,11 @@ def create_records(observations, metadata, dest='.', class_code=None, max_lc_per
             class_code[cls_name] = index
 
     for label, group in metadata.groupby('class'):
-
+        print('[INFO] Processing {} class...'.format(label))
         obj_cls = observations[observations['oid'].isin(group['oid'])]
 
-        res = obj_cls.groupby('oid').apply(clear_sample, band=1, meta=('x', 'f8')).compute()
-
+        res = obj_cls.groupby('oid').apply(clear_sample, band=1)
+        print('[INFO] Writting records')
         chunks = np.array_split(res,
                                 np.arange(max_lc_per_record,
                                           res.shape[0],
@@ -236,12 +237,13 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs, is_train=False):
 
     input_dict = get_sample(sample)
 
-    sequence = input_dict['input']
+    sequence, _ = sample_lc(input_dict['input'], max_obs)
     sequence, mean = standardize(sequence, axis=0, return_mean=True)
 
-    seq_time = tf.slice(sequence, [0, 0], [input_dict['length'], 1])
-    seq_magn = tf.slice(sequence, [0, 1], [input_dict['length'], 1])
-    seq_errs = tf.slice(sequence, [0, 2], [input_dict['length'], 1])
+    limit = tf.minimum(input_dict['length'], max_obs)
+    seq_time = tf.slice(sequence, [0, 0], [limit, 1])
+    seq_magn = tf.slice(sequence, [0, 1], [limit, 1])
+    seq_errs = tf.slice(sequence, [0, 2], [limit, 1])
 
 
     # Save the true values
@@ -293,7 +295,7 @@ def adjust_fn(func, *arguments):
         return result
     return wrap
 
-def datasets_by_cls(source):
+def datasets_by_cls(source, repeat=1):
     objects  = pd.read_csv(source+'_objs.csv')
 
     datasets = []
@@ -302,6 +304,7 @@ def datasets_by_cls(source):
         for file in os.listdir(os.path.join(source, folder)):
             cls_chunks.append(os.path.join(source, folder, file))
         ds = tf.data.TFRecordDataset(cls_chunks)
+        ds = ds.repeat()
         datasets.append(ds)
 
     return datasets
@@ -355,7 +358,12 @@ def load_records(source, batch_size, max_obs=100,
 def formatter(sample, is_train, max_obs, num_cls, norm='zscore'):
     input_dict = get_sample(sample)
 
-    sequence = input_dict['input']
+    if is_train:
+        print('Sampling LC')
+        sequence, _ = sample_lc(input_dict['input'], max_obs)
+        input_dict['length'] = tf.minimum(input_dict['length'], max_obs)
+    else:
+        sequence = input_dict['input']
 
     if norm == 'min-max':
         sequence = normalize(sequence, return_mean=True)
@@ -377,7 +385,7 @@ def formatter(sample, is_train, max_obs, num_cls, norm='zscore'):
             }
     return dictonary, tf.one_hot(input_dict['label'], num_cls)
 
-def load_records_v3(source, batch_size, max_obs=100, repeat=1, is_train=False,
+def load_records_v3(source, batch_size, max_obs=100, take=1, is_train=False,
                    num_cls=5, norm='zscore'):
     """
     Specific Task data loader.
@@ -390,22 +398,13 @@ def load_records_v3(source, batch_size, max_obs=100, repeat=1, is_train=False,
     """
     fn = adjust_fn(formatter, is_train, max_obs, num_cls, norm)
     if is_train:
-        # datasets = datasets_by_cls(source)
-        # dataset = tf.data.experimental.sample_from_datasets(datasets)
-        # dataset = dataset.map(fn)
-        # dataset = dataset.batch(batch_size)
-        # dataset = dataset.prefetch(1)
-        # return dataset.cache()
         print('Training Mode')
-        chunks = [os.path.join(source, folder, file) \
-                    for folder in os.listdir(source) \
-                        for file in os.listdir(os.path.join(source, folder))]
-
-        dataset = tf.data.TFRecordDataset(chunks)
-        dataset = dataset.shuffle(5000).map(fn)
+        datasets = datasets_by_cls(source)
+        dataset = tf.data.experimental.sample_from_datasets(datasets)
+        dataset = dataset.map(fn)
         dataset = dataset.padded_batch(batch_size)
         dataset = dataset.prefetch(1)
-        return dataset
+        return dataset.take(take)
     else:
         print('Testing mode')
         chunks = [os.path.join(source, folder, file) \
@@ -414,7 +413,7 @@ def load_records_v3(source, batch_size, max_obs=100, repeat=1, is_train=False,
 
         dataset = tf.data.TFRecordDataset(chunks)
         dataset = dataset.map(fn)
-        dataset = dataset.batch(batch_size)
+        dataset = dataset.padded_batch(batch_size)
         dataset = dataset.prefetch(1)
         return dataset
 
