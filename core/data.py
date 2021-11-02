@@ -109,8 +109,7 @@ def split_and_create_records(observations, metadata, max_obs=200, dest='.',
     for label, group in metadata.groupby('class'):
         print('[INFO] Processing {} class...'.format(label))
         obj_cls = observations[observations['oid'].isin(group['oid'])]
-        res_0 = obj_cls.groupby('oid').apply(clear_sample,
-                                          band=1, meta=('x', 'f8')).compute()
+        res_0 = obj_cls.groupby('oid').apply(clear_sample, band=1)
         print('[INFO] Cooking windows')
         res_1 = Parallel(n_jobs=njobs, backend='multiprocessing')(
                 delayed(get_windows)(sample, oid, max_obs) \
