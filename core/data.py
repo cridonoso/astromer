@@ -196,9 +196,7 @@ def get_sample(sample, ndims=3):
 
     sequence = tf.stack(casted_inp_parameters, axis=2)[0]
 
-    # errs = tf.slice(sequence, [0, 2], [-1, 1])
-    # cond = errs < 1
-    input_dict['input'] = sequence#sequence[cond[...,0]]
+    input_dict['input'] = sequence
 
     return input_dict
 
@@ -343,13 +341,6 @@ def load_records(source, batch_size, max_obs=100,
         dataset = dataset.prefetch(1)
         return dataset
     else:
-        # print('Training Mode')
-        # datasets = datasets_by_cls(source)
-        # dataset = tf.data.experimental.sample_from_datasets(datasets)
-        # dataset = dataset.map(fn)
-        # dataset = dataset.padded_batch(batch_size)
-        # dataset = dataset.prefetch(1)
-        # return dataset
         print('Training Mode')
         chunks = [os.path.join(source, folder, file) \
                     for folder in os.listdir(source) \

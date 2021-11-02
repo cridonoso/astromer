@@ -41,12 +41,11 @@ def run(opt):
     # Loading data
     train_batches, valid_batches = load_records(os.path.join(opt.data, 'train'),
                                                 opt.batch_size,
-                                                valptg=opt.valptg,
                                                 max_obs=opt.max_obs,
-                                                no_shuffle=opt.no_shuffle,
                                                 msk_frac=opt.msk_frac,
                                                 rnd_frac=opt.rnd_frac,
-                                                same_frac=opt.same_frac)
+                                                same_frac=opt.same_frac,
+                                                is_train=True)
     # Training ASTROMER
     train(astromer, train_batches, valid_batches,
           patience=opt.patience,
