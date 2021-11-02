@@ -399,13 +399,22 @@ def load_records_v3(source, batch_size, max_obs=100, repeat=1, is_train=False,
     """
     fn = adjust_fn(formatter, is_train, max_obs, num_cls, norm)
     if is_train:
-        print('Training mode')
-        datasets = datasets_by_cls(source)
-        dataset = tf.data.experimental.sample_from_datasets(datasets)
-        dataset = dataset.map(fn)
-        dataset = dataset.batch(batch_size)
+        # datasets = datasets_by_cls(source)
+        # dataset = tf.data.experimental.sample_from_datasets(datasets)
+        # dataset = dataset.map(fn)
+        # dataset = dataset.batch(batch_size)
+        # dataset = dataset.prefetch(1)
+        # return dataset.cache()
+        print('Training Mode')
+        chunks = [os.path.join(source, folder, file) \
+                    for folder in os.listdir(source) \
+                        for file in os.listdir(os.path.join(source, folder))]
+
+        dataset = tf.data.TFRecordDataset(chunks)
+        dataset = dataset.shuffle(5000).map(fn)
+        dataset = dataset.padded_batch(batch_size)
         dataset = dataset.prefetch(1)
-        return dataset.cache()
+        return dataset
     else:
         print('Testing mode')
         chunks = [os.path.join(source, folder, file) \
