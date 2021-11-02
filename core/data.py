@@ -343,10 +343,20 @@ def load_records(source, batch_size, max_obs=100,
         dataset = dataset.prefetch(1)
         return dataset
     else:
+        # print('Training Mode')
+        # datasets = datasets_by_cls(source)
+        # dataset = tf.data.experimental.sample_from_datasets(datasets)
+        # dataset = dataset.map(fn)
+        # dataset = dataset.padded_batch(batch_size)
+        # dataset = dataset.prefetch(1)
+        # return dataset
         print('Training Mode')
-        datasets = datasets_by_cls(source)
-        dataset = tf.data.experimental.sample_from_datasets(datasets)
-        dataset = dataset.map(fn)
+        chunks = [os.path.join(source, folder, file) \
+                    for folder in os.listdir(source) \
+                        for file in os.listdir(os.path.join(source, folder))]
+
+        dataset = tf.data.TFRecordDataset(chunks)
+        dataset = dataset.shuffle(5000).map(fn)
         dataset = dataset.padded_batch(batch_size)
         dataset = dataset.prefetch(1)
         return dataset
