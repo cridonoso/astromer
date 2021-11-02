@@ -183,7 +183,7 @@ def run(opt):
     ckpts = ModelCheckpoint(
         filepath=os.path.join(exp_path, 'ckpt'),
         save_weights_only=True,
-        monitor='val_loss',
+        monitor='val_accuracy',
         mode='max',
         save_best_only=True)
 
