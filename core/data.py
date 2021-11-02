@@ -311,7 +311,7 @@ def datasets_by_cls(source, repeat=1):
 
 def load_records(source, batch_size, max_obs=100,
                 msk_frac=0.2, rnd_frac=0.1,
-                same_frac=0.1, repeat=1,
+                same_frac=0.1, take=1,
                 is_train=False):
     """
     Pretraining data loader.
@@ -345,15 +345,12 @@ def load_records(source, batch_size, max_obs=100,
         return dataset
     else:
         print('Training Mode')
-        chunks = [os.path.join(source, folder, file) \
-                    for folder in os.listdir(source) \
-                        for file in os.listdir(os.path.join(source, folder))]
-
-        dataset = tf.data.TFRecordDataset(chunks)
-        dataset = dataset.shuffle(5000).map(fn)
+        datasets = datasets_by_cls(source)
+        dataset = tf.data.experimental.sample_from_datasets(datasets)
+        dataset = dataset.map(fn)
         dataset = dataset.padded_batch(batch_size)
         dataset = dataset.prefetch(1)
-        return dataset
+        return dataset.take(take)
 
 def formatter(sample, is_train, max_obs, num_cls, norm='zscore'):
     input_dict = get_sample(sample)
