@@ -63,20 +63,18 @@ def run(opt):
                                      msk_frac=conf['msk_frac'],
                                      rnd_frac=conf['rnd_frac'],
                                      same_frac=conf['same_frac'],
-                                     repeat=opt.repeat,
                                      is_train=True)
-        
+
         valid_batches = load_records(os.path.join(opt.data, 'val'),
                                      opt.batch_size,
                                      max_obs=conf['max_obs'],
                                      msk_frac=conf['msk_frac'],
                                      rnd_frac=conf['rnd_frac'],
                                      same_frac=conf['same_frac'],
-                                     repeat=opt.repeat,
                                      is_train=True)
 
         # Training ASTROMER
-        train(astromer, train_batches, valid_batches,
+        train(astromer, train_batches.take(5), valid_batches.take(5),
               patience=opt.patience,
               exp_path=opt.p,
               epochs=opt.epochs,
@@ -93,13 +91,13 @@ if __name__ == '__main__':
                     help='Max number of observations')
 
     # TRAINING PAREMETERS
-    parser.add_argument('--data', default='./data/records_v2/alcock', type=str,
+    parser.add_argument('--data', default='./data/records/alcock', type=str,
                         help='Dataset folder containing the records files')
-    parser.add_argument('--p', default="./weights/astromer_10022021/finetuning/alcock", type=str,
+    parser.add_argument('--p', default="./weights/astromer_10022021/", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
-    parser.add_argument('--prefix', default="model", type=str,
+    parser.add_argument('--prefix', default="test", type=str,
                         help='prefix for the folder of the finetuned model')
-    parser.add_argument('--batch-size', default=16, type=int,
+    parser.add_argument('--batch-size', default=128, type=int,
                         help='batch size')
     parser.add_argument('--epochs', default=1000, type=int,
                         help='Number of epochs')

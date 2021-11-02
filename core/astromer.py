@@ -74,7 +74,6 @@ def train_step(model, batch, opt):
                          y_pred=x_pred,
                          mask=batch['mask_out'])
 
-
     grads = tape.gradient(mse, model.trainable_weights)
     opt.apply_gradients(zip(grads, model.trainable_weights))
     return mse
@@ -83,15 +82,6 @@ def train_step(model, batch, opt):
 def valid_step(model, batch, return_pred=False, normed=False):
     with tf.GradientTape() as tape:
         x_pred = model(batch)
-        # if normed:
-        #     mean_x = tf.reshape(batch['mean'][:, 1], [-1, 1, 1])
-        #     x_true = batch['output'] + mean_x
-        #     x_pred = x_pred + mean_x
-        #
-        #     mse = custom_rmse(y_true=x_true,
-        #                       y_pred=x_pred,
-        #                       mask=batch['mask_out'])
-        # else:
         x_true = batch['output']
         mse = custom_rmse(y_true=x_true,
                           y_pred=x_pred,

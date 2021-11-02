@@ -88,7 +88,7 @@ def get_windows(sample, oid, max_obs):
     lc = lc.reindex(range(length+filler), fill_value=0)
     windows = []
     for w in np.split(lc, lc.shape[0]/max_obs):
-        if w['mjd'].sum() != 0.:
+        if w[w['mjd']!=0].shape[0] > 10:
             w['oid'] = [oid]*max_obs
             windows.append(w)
     return windows
@@ -239,7 +239,7 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs, is_train=False):
     input_dict = get_sample(sample)
 
     sequence = input_dict['input']
-    sequence, mean = standardize(sequence, return_mean=True)
+    sequence, mean = standardize(sequence, axis=0, return_mean=True)
 
     seq_time = tf.slice(sequence, [0, 0], [input_dict['length'], 1])
     seq_magn = tf.slice(sequence, [0, 1], [input_dict['length'], 1])
