@@ -239,16 +239,12 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs, is_train=False):
 
     input_dict = get_sample(sample)
 
-    if is_train:
-        sequence, curr_max_obs = sample_lc(input_dict['input'], max_obs)
-    else:
-        sequence, curr_max_obs = get_first_k_obs(input_dict['input'], max_obs)
-
+    sequence = input_dict['input']
     sequence, mean = standardize(sequence, return_mean=True)
 
-    seq_time = tf.slice(sequence, [0, 0], [curr_max_obs, 1])
-    seq_magn = tf.slice(sequence, [0, 1], [curr_max_obs, 1])
-    seq_errs = tf.slice(sequence, [0, 2], [curr_max_obs, 1])
+    seq_time = tf.slice(sequence, [0, 0], [input_dict['length'], 1])
+    seq_magn = tf.slice(sequence, [0, 1], [input_dict['length'], 1])
+    seq_errs = tf.slice(sequence, [0, 2], [input_dict['length'], 1])
 
 
     # Save the true values
@@ -276,8 +272,8 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs, is_train=False):
     mask_out = tf.reshape(mask_out, [time_steps, 1])
     mask_in = tf.reshape(mask_in, [time_steps, 1])
 
-    if curr_max_obs < max_obs:
-        filler    = tf.ones([max_obs-curr_max_obs, 1])
+    if time_steps < max_obs:
+        filler    = tf.ones([max_obs-time_steps, 1])
         mask_in   = tf.concat([mask_in, filler], 0)
         seq_magn  = tf.concat([seq_magn, 1.-filler], 0)
         seq_time  = tf.concat([seq_time, 1.-filler], 0)
@@ -289,7 +285,6 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs, is_train=False):
     input_dict['times']    = seq_time
     input_dict['mask_out'] = mask_out
     input_dict['mask_in']  = mask_in
-    input_dict['length']   = time_steps
     input_dict['mean']     = mean
     input_dict['obserr']   = seq_errs
 
@@ -352,7 +347,6 @@ def load_records(source, batch_size, max_obs=100,
         print('Training Mode')
         datasets = datasets_by_cls(source)
         dataset = tf.data.experimental.sample_from_datasets(datasets)
-        dataset = dataset.repeat(repeat)
         dataset = dataset.map(fn)
         dataset = dataset.padded_batch(batch_size)
         dataset = dataset.prefetch(1)

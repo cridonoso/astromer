@@ -65,7 +65,7 @@ def run(opt):
                                      same_frac=conf['same_frac'],
                                      repeat=opt.repeat,
                                      is_train=True)
-
+        
         valid_batches = load_records(os.path.join(opt.data, 'val'),
                                      opt.batch_size,
                                      max_obs=conf['max_obs'],
@@ -93,9 +93,9 @@ if __name__ == '__main__':
                     help='Max number of observations')
 
     # TRAINING PAREMETERS
-    parser.add_argument('--data', default='./data/records/macho', type=str,
+    parser.add_argument('--data', default='./data/records_v2/alcock', type=str,
                         help='Dataset folder containing the records files')
-    parser.add_argument('--p', default="./runs/debug", type=str,
+    parser.add_argument('--p', default="./weights/astromer_10022021/finetuning/alcock", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--prefix', default="model", type=str,
                         help='prefix for the folder of the finetuned model')
