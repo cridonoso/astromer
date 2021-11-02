@@ -5,24 +5,25 @@ from google_drive_downloader import GoogleDriveDownloader as gdd
 
 dataset_id = {
 	'raw':{
-		'ztf': '1RY3pwZ5uYJ9HvlNUlivt-DsIbBXHYWx2',
-		'wise': '1O-cFXWjuTMNNfWjVQCyEAa2IoAJFSPI6',
-		'ogle': '1whdP_2SdMSHcODu8ItTWfM0tI-frGhie',
-		'macho': '1zFkrP2TCYoGa3yWkrtymVDmWjLlViIpp',
+		'ztf'   : '1RY3pwZ5uYJ9HvlNUlivt-DsIbBXHYWx2',
+		'wise'  : '1O-cFXWjuTMNNfWjVQCyEAa2IoAJFSPI6',
+		'ogle'  : '1whdP_2SdMSHcODu8ItTWfM0tI-frGhie',
+		'macho' : '1zFkrP2TCYoGa3yWkrtymVDmWjLlViIpp',
 		'linear': '10E6e4E75TPfgjxYvS6IBb4pveXxB-YNM',
-		'gaia': '1VgG2RNi88VcVnpE_MgOYPFjS8A42KXTJ',
-		'css': '1ZgSMYetSss8hqLMEBXhVjgo2hCHFdMBf',
-		'asas': '1ouQmBedVok5LNH2u2aEQjAvl0KchrmTI',
+		'gaia'  : '1VgG2RNi88VcVnpE_MgOYPFjS8A42KXTJ',
+		'css'   : '1ZgSMYetSss8hqLMEBXhVjgo2hCHFdMBf',
+		'asas'  : '1ouQmBedVok5LNH2u2aEQjAvl0KchrmTI',
+        'macho_xl':'1ZyGdqoW2Fg3x91GgS6zq57SPBar7ndqx'
 	},
 	'record':{
-		'ztf': '',
-		'wise': '1zfRvNtzBgdkM1l3_Drhq3BEJoGapp2R6',
-		'ogle': '',
-		'macho': '1t2M7aqM4JiwapN-CR3Gd36AWwRE1efkB',
+		'ztf'   : '',
+		'wise'  : '1zfRvNtzBgdkM1l3_Drhq3BEJoGapp2R6',
+		'ogle'  : '',
+		'macho' : '1t2M7aqM4JiwapN-CR3Gd36AWwRE1efkB',
 		'linear': '1NDZh3bu-6GDfSwpqBNVg-bZk5PAmi2lK',
-		'gaia': '1EgLYoqHLlFHxAvXKXM7KsMwvRfMwIQiK',
-		'css': '1f-3tJojGQoI6dyq_teCr2OOa19uGmMgO',
-		'asas': '1RJjYcMePgVT2mC2x3T7p_B5l23pFEM_C',
+		'gaia'  : '1EgLYoqHLlFHxAvXKXM7KsMwvRfMwIQiK',
+		'css'   : '1f-3tJojGQoI6dyq_teCr2OOa19uGmMgO',
+		'asas'  : '1RJjYcMePgVT2mC2x3T7p_B5l23pFEM_C',
 		'large_macho':'1Bzi9U30BZVHuwimn2KAATARlRffH8iGP',
 	}
 }

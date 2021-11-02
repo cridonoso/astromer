@@ -3,7 +3,7 @@ import argparse
 import logging
 import json
 import time
-import os
+import os, sys
 
 from core.astromer import get_ASTROMER, train
 from core.data  import load_records
@@ -12,8 +12,8 @@ from time import gmtime, strftime
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
-
 def run(opt):
+    os.environ["CUDA_VISIBLE_DEVICES"]= opt.gpu
     # Get model
     astromer = get_ASTROMER(num_layers=opt.layers,
                             d_model=opt.head_dim,
@@ -38,14 +38,23 @@ def run(opt):
     with open(conf_file, 'w') as json_file:
         json.dump(varsdic, json_file, indent=4)
 
-    # Loading data
-    train_batches, valid_batches = load_records(os.path.join(opt.data, 'train'),
-                                                opt.batch_size,
-                                                max_obs=opt.max_obs,
-                                                msk_frac=opt.msk_frac,
-                                                rnd_frac=opt.rnd_frac,
-                                                same_frac=opt.same_frac,
-                                                is_train=True)
+    # Loading data                                                
+    train_batches = load_records(os.path.join(opt.data, 'train'),
+			         opt.batch_size,
+			         max_obs=opt.max_obs,
+			         msk_frac=opt.msk_frac,
+			         rnd_frac=opt.rnd_frac,
+			         same_frac=opt.same_frac,
+			         is_train=True)
+
+    valid_batches = load_records(os.path.join(opt.data, 'val'),
+			         opt.batch_size,
+			         max_obs=opt.max_obs,
+			         msk_frac=opt.msk_frac,
+			         rnd_frac=opt.rnd_frac,
+			         same_frac=opt.same_frac,
+			         is_train=True)
+                                                
     # Training ASTROMER
     train(astromer, train_batches, valid_batches,
           patience=opt.patience,
@@ -60,7 +69,7 @@ def run(opt):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # DATA
-    parser.add_argument('--max-obs', default=50, type=int,
+    parser.add_argument('--max-obs', default=200, type=int,
                     help='Max number of observations')
 
     parser.add_argument('--msk-frac', default=0.7, type=float,
@@ -71,15 +80,15 @@ if __name__ == '__main__':
                         help='Fraction of [MASKED] to be replaced by same values')
 
     # TRAINING PAREMETERS
-    parser.add_argument('--data', default='./data/records/macho', type=str,
+    parser.add_argument('--data', default='./data/records/huge', type=str,
                         help='Dataset folder containing the records files')
-    parser.add_argument('--p', default="./runs/debug", type=str,
+    parser.add_argument('--p', default="./runs/macho", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
     parser.add_argument('--epochs', default=10000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=200, type=int,
+    parser.add_argument('--patience', default=50, type=int,
                         help='batch size')
 
     # ASTROMER HIPERPARAMETERS
@@ -99,7 +108,8 @@ if __name__ == '__main__':
                         help='optimizer initial learning rate')
     parser.add_argument('--valptg', default=0.15, type=float,
                         help='optimizer initial learning rate')
-
+    parser.add_argument('--gpu', default=0, type=str,
+                        help='GPU device')
 
     parser.add_argument('--use-leak', default=False, action='store_true',
                         help='Add the input to the attention vector')
