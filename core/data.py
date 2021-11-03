@@ -279,15 +279,18 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs, is_train=False):
         mask_out  = tf.concat([mask_out, 1.-filler], 0)
         orig_magn = tf.concat([orig_magn, 1.-filler], 0)
 
-    input_dict['output']   = orig_magn
-    input_dict['input']    = seq_magn
-    input_dict['times']    = seq_time
-    input_dict['mask_out'] = mask_out
-    input_dict['mask_in']  = mask_in
-    input_dict['mean']     = mean
-    input_dict['obserr']   = seq_errs
+    final_inp = {
+        'input':seq_magn,
+        'times':seq_time,
+        'mask_in':mask_in
+    }
 
-    return input_dict
+    # input_dict['mean']     = mean
+    # input_dict['obserr']   = seq_errs
+
+    y_true = tf.multiply(orig_magn, -99*mask_out)
+
+    return final_inp, y_true
 
 def adjust_fn(func, *arguments):
     def wrap(*args, **kwargs):

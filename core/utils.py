@@ -14,7 +14,6 @@ def get_folder_name(path, prefix=''):
     Returns:
         string: unique path to save the experiment
 """
-
     if prefix == '':
         prefix = path.split('/')[-1]
         path = '/'.join(path.split('/')[:-1])

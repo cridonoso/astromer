@@ -5,10 +5,15 @@ import json
 import time
 import os, sys
 
-from core.astromer import get_ASTROMER, train
-from core.data  import load_records
+from core.metrics import custom_rmse, custom_rsquare
+from core.astromer import get_ASTROMER
 from core.utils import get_folder_name
+from core.data  import load_records
+from core.losses import MaskedRMSE
 from time import gmtime, strftime
+
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
+from tensorflow.keras.optimizers import Adam
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
@@ -21,9 +26,11 @@ def run(opt):
                             dff=opt.dff,
                             base=opt.base,
                             dropout=opt.dropout,
-                            maxlen=opt.max_obs,
-                            use_leak=opt.use_leak,
-                            no_train=opt.no_train)
+                            maxlen=opt.max_obs)
+
+    folder = '/'.join(opt.p.split('/')[:-1])
+    if not os.path.isdir(folder):
+        os.makedirs(folder, exist_ok=True)
 
     # Make sure we don't overwrite a previous training
     opt.p = get_folder_name(opt.p, prefix='')
@@ -38,13 +45,14 @@ def run(opt):
     with open(conf_file, 'w') as json_file:
         json.dump(varsdic, json_file, indent=4)
 
-    # Loading data                                                
+    # Loading data
     train_batches = load_records(os.path.join(opt.data, 'train'),
 			         opt.batch_size,
 			         max_obs=opt.max_obs,
 			         msk_frac=opt.msk_frac,
 			         rnd_frac=opt.rnd_frac,
 			         same_frac=opt.same_frac,
+                     take=opt.take,
 			         is_train=True)
 
     valid_batches = load_records(os.path.join(opt.data, 'val'),
@@ -53,17 +61,45 @@ def run(opt):
 			         msk_frac=opt.msk_frac,
 			         rnd_frac=opt.rnd_frac,
 			         same_frac=opt.same_frac,
+                     take=opt.take,
 			         is_train=True)
-                                                
+
     # Training ASTROMER
-    train(astromer, train_batches, valid_batches,
-          patience=opt.patience,
-          exp_path=opt.p,
-          epochs=opt.epochs,
-          lr=opt.lr,
-          verbose=0)
+    optimizer = Adam(learning_rate=opt.lr)
+    astromer.compile(optimizer=optimizer,
+                     loss=MaskedRMSE(),
+                     metrics=[custom_rmse, custom_rsquare])
 
 
+    ckpts = ModelCheckpoint(
+        filepath=os.path.join(opt.p, 'ckpt'),
+        save_weights_only=True,
+        monitor='val_loss',
+        mode='min',
+        save_best_only=True)
+
+    estop = EarlyStopping(
+        monitor='val_loss',
+        min_delta=0,
+        patience=opt.patience,
+        mode='auto',
+        restore_best_weights=True)
+
+    tboard = TensorBoard(
+        log_dir=os.path.join(opt.p, 'logs'),
+        histogram_freq=0,
+        write_graph=True,
+        write_images=False,
+        write_steps_per_second=False,
+        update_freq='epoch',
+        profile_batch=2,
+    )
+
+    hist = astromer.fit(train_batches,
+                        epochs=opt.epochs,
+                        validation_data=valid_batches,
+                        callbacks=[estop, ckpts, tboard],
+                        verbose=1)
 
 
 if __name__ == '__main__':
@@ -71,18 +107,20 @@ if __name__ == '__main__':
     # DATA
     parser.add_argument('--max-obs', default=200, type=int,
                     help='Max number of observations')
+    parser.add_argument('--take', default=1, type=int,
+                    help='Number of batches to take')
 
-    parser.add_argument('--msk-frac', default=0.7, type=float,
+    parser.add_argument('--msk-frac', default=0.5, type=float,
                         help='[MASKED] fraction')
-    parser.add_argument('--rnd-frac', default=0.2, type=float,
+    parser.add_argument('--rnd-frac', default=0.15, type=float,
                         help='Fraction of [MASKED] to be replaced by random values')
-    parser.add_argument('--same-frac', default=0.2, type=float,
+    parser.add_argument('--same-frac', default=0.15, type=float,
                         help='Fraction of [MASKED] to be replaced by same values')
 
     # TRAINING PAREMETERS
-    parser.add_argument('--data', default='./data/records/huge', type=str,
+    parser.add_argument('--data', default='./data/records/alcock', type=str,
                         help='Dataset folder containing the records files')
-    parser.add_argument('--p', default="./runs/macho", type=str,
+    parser.add_argument('--p', default="./runs/test", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
@@ -106,17 +144,9 @@ if __name__ == '__main__':
                         help='base of embedding')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
-    parser.add_argument('--valptg', default=0.15, type=float,
-                        help='optimizer initial learning rate')
-    parser.add_argument('--gpu', default=0, type=str,
+    parser.add_argument('--gpu', default="0", type=str,
                         help='GPU device')
 
-    parser.add_argument('--use-leak', default=False, action='store_true',
-                        help='Add the input to the attention vector')
-    parser.add_argument('--no-train', default=False, action='store_true',
-                        help='Train self-attention layer')
-    parser.add_argument('--no-shuffle', default=False, action='store_true',
-                        help='No shuffle training and validation set')
 
     opt = parser.parse_args()
     run(opt)

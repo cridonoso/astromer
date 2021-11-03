@@ -64,3 +64,17 @@ def custom_cce(masks, sample_weight=None):
         return tf.reduce_mean(losses)
 
     return lossFunction
+
+class MaskedRMSE(tf.keras.losses.Loss):
+    def call(self, y_true, y_pred):
+        mask = tf.math.divide_no_nan(y_true, y_true)
+        y_true = tf.cast(y_true, y_pred.dtype)
+        num = tf.math.square(y_pred - y_true)
+        num = tf.multiply(num, mask)
+        num = tf.reduce_sum(num, axis=1)
+        tot = tf.reduce_sum(mask, axis=1)
+        return tf.math.sqrt(tf.math.divide_no_nan(num, tot))
+
+    def get_config(self):
+        config = super().get_config().copy()
+        return config

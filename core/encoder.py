@@ -19,15 +19,15 @@ class EncoderLayer(tf.keras.layers.Layer):
         self.dff = dff
         self.rate =rate
         self.use_leak = use_leak
-        
-        
+
+
         self.mha = MultiHeadAttention(d_model, num_heads)
         self.ffn = point_wise_feed_forward_network(d_model, dff)
 
         self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
         self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 
-        
+
         if use_leak:
             self.reshape_leak_1 = tf.keras.layers.Dense(d_model)
             self.reshape_leak_2 = tf.keras.layers.Dense(d_model)
@@ -81,7 +81,7 @@ class Encoder(tf.keras.layers.Layer):
         self.base = base
         self.rate = rate
         self.use_leak = use_leak
-        
+
         self.inp_transform = tf.keras.layers.Dense(d_model)
         self.enc_layers = [EncoderLayer(d_model, num_heads, dff, rate, use_leak)
                             for _ in range(num_layers)]
