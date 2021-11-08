@@ -40,7 +40,7 @@ def scaled_dot_product_attention(q, k, v, mask):
 
 class MultiHeadAttention(tf.keras.layers.Layer):
     def __init__(self, d_model, num_heads):
-        super().__init__()
+        super(MultiHeadAttention, self).__init__()
         self.num_heads = num_heads
         self.d_model = d_model
 
@@ -84,11 +84,3 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         output = self.dense(concat_attention)  # (batch_size, seq_len_q, d_model)
 
         return output, attention_weights
-    
-    def get_config(self):
-        config = super().get_config().copy()
-        config.update({
-            'num_heads':self.num_heads,
-            'd_model':self.d_model,
-        })
-        return config

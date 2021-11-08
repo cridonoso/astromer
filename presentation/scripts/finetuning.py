@@ -6,14 +6,28 @@ import time
 import os
 
 from core.astromer import get_ASTROMER, train
-from core.data  import load_records
+from core.data  import pretraining_records
 from core.utils import get_folder_name
 from time import gmtime, strftime
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 
+
 def run(opt):
+    os.environ["CUDA_VISIBLE_DEVICES"]=opt.gpu
+    
+    # Get model
+    astromer = get_ASTROMER(num_layers=opt.layers,
+                            d_model=opt.head_dim,
+                            num_heads=opt.heads,
+                            dff=opt.dff,
+                            base=opt.base,
+                            dropout=opt.dropout,
+                            maxlen=opt.max_obs,
+                            use_leak=opt.use_leak,
+                            no_train=opt.no_train)
+
     # Check for pretrained weigths
     if os.path.isfile(os.path.join(opt.p, 'checkpoint')):
         print('[INFO] Pretrained model detected! - Finetuning...')
@@ -48,7 +62,7 @@ def run(opt):
         varsdic = vars(opt)
 
         for key in conf.keys():
-            if key in ['batch_size', 'p', 'repeat', 'data']:
+            if key in ['batch_size', 'p', 'repeat', 'data', 'patience']:
                 continue
             varsdic[key] = conf[key]
 
@@ -57,24 +71,35 @@ def run(opt):
             json.dump(varsdic, json_file, indent=4)
 
         # Loading data
-        train_batches = load_records(os.path.join(opt.data, 'train'),
-                                     opt.batch_size,
-                                     max_obs=conf['max_obs'],
-                                     msk_frac=conf['msk_frac'],
-                                     rnd_frac=conf['rnd_frac'],
-                                     same_frac=conf['same_frac'],
-                                     is_train=True)
-
-        valid_batches = load_records(os.path.join(opt.data, 'val'),
-                                     opt.batch_size,
-                                     max_obs=conf['max_obs'],
-                                     msk_frac=conf['msk_frac'],
-                                     rnd_frac=conf['rnd_frac'],
-                                     same_frac=conf['same_frac'],
-                                     is_train=True)
-
+        test_batches = pretraining_records(os.path.join(opt.data, 'test'),
+                                            opt.batch_size,
+                                            max_obs=conf['max_obs'],
+                                            shuffle=True,
+                                            msk_frac=conf['msk_frac'],
+                                            rnd_frac=conf['rnd_frac'],
+                                            same_frac=conf['same_frac'])
+        
+        train_batches = pretraining_records(os.path.join(opt.data, 'train'),
+                                            opt.batch_size,
+                                            max_obs=conf['max_obs'],
+                                            shuffle=True,
+                                            msk_frac=conf['msk_frac'],
+                                            rnd_frac=conf['rnd_frac'],
+                                            same_frac=conf['same_frac'])
+        
+        train_batches = train_batches.concatenate(test_batches)
+        
+        valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
+                                            opt.batch_size,
+                                            max_obs=conf['max_obs'],
+                                            shuffle=True,
+                                            msk_frac=conf['msk_frac'],
+                                            rnd_frac=conf['rnd_frac'],
+                                            same_frac=conf['same_frac'])
+            
+        
         # Training ASTROMER
-        train(astromer, train_batches.take(5), valid_batches.take(5),
+        train(astromer, train_batches, valid_batches,
               patience=opt.patience,
               exp_path=opt.p,
               epochs=opt.epochs,
@@ -91,20 +116,18 @@ if __name__ == '__main__':
                     help='Max number of observations')
 
     # TRAINING PAREMETERS
-    parser.add_argument('--data', default='./data/records/alcock', type=str,
+    parser.add_argument('--data', default='./data/records/macho', type=str,
                         help='Dataset folder containing the records files')
-    parser.add_argument('--p', default="./weights/astromer_10022021/", type=str,
+    parser.add_argument('--p', default="./runs/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
-    parser.add_argument('--prefix', default="test", type=str,
+    parser.add_argument('--prefix', default="model", type=str,
                         help='prefix for the folder of the finetuned model')
-    parser.add_argument('--batch-size', default=128, type=int,
+    parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
-    parser.add_argument('--epochs', default=1000, type=int,
+    parser.add_argument('--epochs', default=10000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=20, type=int,
+    parser.add_argument('--patience', default=40, type=int,
                         help='batch size')
-    parser.add_argument('--repeat', default=1, type=int,
-                        help='number of repetitions of the dataset')
 
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=1, type=int,
@@ -126,8 +149,9 @@ if __name__ == '__main__':
                         help='Add the input to the attention vector')
     parser.add_argument('--no-train', default=False, action='store_true',
                         help='Train self-attention layer')
-    parser.add_argument('--no-shuffle', default=False, action='store_true',
-                        help='Do not shuffle training datasets')
-
+    parser.add_argument('--shuffle', default=False, action='store_true',
+                        help='Shuffle while training datasets')
+    parser.add_argument('--gpu', default='0', type=str,
+                        help='GPU to use')
     opt = parser.parse_args()
     run(opt)
