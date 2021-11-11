@@ -27,7 +27,8 @@ def run(opt):
     # Loading data
     batches = clf_records(opt.data,
                           opt.batch_size,
-                          max_obs=opt.max_obs)
+                          max_obs=opt.max_obs,
+                          take=-1)
 
     
     conf_file = os.path.join(opt.w, 'conf.json')

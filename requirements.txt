@@ -7,3 +7,4 @@ scikit-learn
 seaborn
 googledrivedownloader
 dask[dataframe]
+optuna

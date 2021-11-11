@@ -13,7 +13,7 @@ import tensorflow as tf
 from tensorflow.keras.layers import BatchNormalization, Dense, LSTM, LayerNormalization
 from tensorflow.keras.callbacks import EarlyStopping, TensorBoard
 from tensorflow.keras.losses import CategoricalCrossentropy
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, RMSprop
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
@@ -28,6 +28,46 @@ def load_embeddings(source):
     m = 1. - hf['m'][()]
     return att, y, m, lc
 
+def build_lstm_att(unit_1=256, unit_2=256, drop_1=0.2, drop_2=0.2, n_classes=5):
+    inputs = tf.keras.Input(shape=(200, 256), name='input')
+    mask = tf.keras.Input(shape=(200, ), dtype=tf.bool, name='mask')
+    x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
+    x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
+    x = (inputs - x_mean)/x_std
+    x = LSTM(unit_1, dropout=drop_1, return_sequences=True)(x, mask=mask)
+    x = LayerNormalization()(x)
+    x = LSTM(unit_2, dropout=drop_2)(x, mask=mask)
+    x = LayerNormalization()(x)
+    x = Dense(n_classes)(x)
+    model = tf.keras.Model(inputs=[inputs, mask], outputs=x)
+    return model 
+
+def build_mpl_att(n_layers=3, units=[1024,512,256], n_classes=5):
+    inputs = tf.keras.Input(shape=(256))
+    x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
+    x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
+    x = (inputs - x_mean)/x_std
+    for i in range(n_layers):
+        x = Dense(units[i])(x)
+        x = LayerNormalization()(x)
+    x = Dense(n_classes)(x)
+    model = tf.keras.Model(inputs=inputs, outputs=x)
+    return model
+
+def build_lstm(unit_1=256, unit_2=256, drop_1=0.2, drop_2=0.2, n_classes=5):
+    inputs = tf.keras.Input(shape=(200, 2), name='input')
+    mask = tf.keras.Input(shape=(200, ), dtype=tf.bool, name='mask')
+    x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
+    x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
+    x = (inputs - x_mean)/x_std
+    x = LSTM(unit_1, dropout=drop_1, return_sequences=True)(x, mask=mask)
+    x = LayerNormalization()(x)
+    x = LSTM(unit_2, dropout=drop_2)(x, mask=mask)
+    x = LayerNormalization()(x)
+    x = Dense(n_classes)(x)
+    model = tf.keras.Model(inputs=[inputs, mask], outputs=x)
+    return model
+
 def run(opt):
     
     os.environ["CUDA_VISIBLE_DEVICES"]=opt.gpu
@@ -40,6 +80,8 @@ def run(opt):
     y_train = np.concatenate([y_0, y_1])
     y_train = tf.one_hot(y_train, n_classes) # One-hot encoding
     
+    
+    optimizer = Adam(learning_rate=opt.lr)        
     # Init. classifier
     if opt.mode == 0: # LSTM + ATT
         # Formatting data
@@ -47,19 +89,21 @@ def run(opt):
         m_train = np.concatenate([m_0, m_1])
         x_train = [x_train, m_train]
         # Create model
-        inputs = tf.keras.Input(shape=(200, 256), name='input')
-        mask = tf.keras.Input(shape=(200, ), dtype=tf.bool, name='mask')
-
-        x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
-        x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
-        x = (inputs - x_mean)/x_std
-        x = LSTM(256, dropout=0.2, return_sequences=True)(x, mask=mask)
-        x = LayerNormalization()(x)
-        x = LSTM(256, dropout=0.2)(x, mask=mask)
-        x = LayerNormalization()(x)
-        x = Dense(n_classes)(x)
-
-        model = tf.keras.Model(inputs=[inputs, mask], outputs=x)
+        if os.path.isfile(opt.conf):
+            print('[INFO] LOADING PREDEFINED CONFIG')
+            with open(opt.conf, 'r') as f:
+                config = json.load(f)
+            print(config)
+            model = build_lstm_att(unit_1=config['units_0'], unit_2=config['units_1'], 
+                           drop_1=config['dropout_0'], drop_2=config['dropout_1'], 
+                           n_classes=n_classes)
+            if config['optimizer'] == 'Adam':
+                optimizer = Adam(learning_rate=config['adam_learning_rate'])
+            else:
+                optimizer = RMSprop(learning_rate=config['rmsprop_learning_rate'])
+        else:
+            model = build_lstm_att(n_classes=n_classes)
+            
         
         target_dir = os.path.join(opt.p, 'lstm_att')
         
@@ -70,21 +114,22 @@ def run(opt):
         x_train = np.concatenate([mean_1, mean_2])
 
         # Create model
-        inputs = tf.keras.Input(shape=(256))
-        x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
-        x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
-        x = (inputs - x_mean)/x_std
-        x = Dense(1024)(x)
-        x = LayerNormalization()(x)
-        x = Dense(512)(x)
-        x = LayerNormalization()(x)
-        x = Dense(256)(x)
-        x = LayerNormalization()(x)
-        x = Dense(n_classes)(x)
-
-        model = tf.keras.Model(inputs=inputs, outputs=x)
+        if os.path.isfile(opt.conf):
+            print('[INFO] LOADING PREDEFINED CONFIG')
+            with open(opt.conf, 'r') as f:
+                config = json.load(f) 
+            units = [val for key, val in config.items() if 'n_units'in key]
+            model = build_mpl_att(n_layers=config['n_layers'], units=units, n_classes=n_classes)
+            if config['optimizer'] == 'Adam':
+                optimizer = Adam(learning_rate=config['adam_learning_rate'])
+            else:
+                optimizer = RMSprop(learning_rate=config['rmsprop_learning_rate'])
+        else:
+            model = build_mpl_att(n_classes=n_classes)
+            
         
         target_dir = os.path.join(opt.p, 'mlp_att')
+        
         
     if opt.mode == 2: # LSTM
         # Formatting data
@@ -93,26 +138,29 @@ def run(opt):
         x_train = [x_train, m_train]
         
         # Create model
-        inputs = tf.keras.Input(shape=(200, 2), name='input')
-        mask = tf.keras.Input(shape=(200, ), dtype=tf.bool, name='mask')
+        if os.path.isfile(opt.conf):
+            print('[INFO] LOADING PREDEFINED CONFIG')
+            with open(opt.conf, 'r') as f:
+                config = json.load(f)
+           
+            model = build_lstm(unit_1=config['units_0'], unit_2=config['units_1'], 
+                                   drop_1=config['dropout_0'], drop_2=config['dropout_1'], 
+                                   n_classes=n_classes)
+            if config['optimizer'] == 'Adam':
+                optimizer = Adam(learning_rate=config['adam_learning_rate'])
+            else:
+                optimizer = RMSprop(learning_rate=config['rmsprop_learning_rate'])
+        else:
+            model = build_lstm(n_classes=n_classes)
+            
 
-        x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
-        x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
-        x = (inputs - x_mean)/x_std
-        x = LSTM(256, dropout=0.2, return_sequences=True)(x, mask=mask)
-        x = LayerNormalization()(x)
-        x = LSTM(256, dropout=0.2)(x, mask=mask)
-        x = LayerNormalization()(x)
-        x = Dense(n_classes)(x)
 
-        model = tf.keras.Model(inputs=[inputs, mask], outputs=x)
-        x_train = [x_train, ]
         target_dir = os.path.join(opt.p, 'lstm')
         
     # Creating (--p)royect directory
     os.makedirs(opt.p, exist_ok=True)
 
-    model.compile(optimizer=Adam(learning_rate=opt.lr), 
+    model.compile(optimizer=optimizer, 
                   loss=CategoricalCrossentropy(from_logits=True), 
                   metrics='accuracy')
     
@@ -160,6 +208,10 @@ if __name__ == '__main__':
                         help='optimizer initial learning rate')
     parser.add_argument('--mode', default=0, type=int,
                         help='Classifier model: 0: LSTM + ATT - 1: MLP + ATT - 2 LSTM')
+    
+    parser.add_argument('--conf', default='./hypersearch/something.json', type=str,
+                        help='Hyperparameter configuration')
+    
 
     opt = parser.parse_args()
     run(opt)
