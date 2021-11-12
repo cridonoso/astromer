@@ -121,9 +121,9 @@ def process_lc2(row, source, unique_classes, max_obs):
     path  = row['Path'].split('/')[-1]
     label = list(unique_classes).index(row['Class'])
     lc_path = os.path.join(source, path)
-    
+
     observations = pd.read_csv(lc_path, delim_whitespace=True, names=['mjd', 'mag', 'std'])
-    
+
     observations.columns = ['mjd', 'mag', 'errmag']
     observations = observations.dropna()
     observations.sort_values('mjd')
@@ -134,8 +134,8 @@ def process_lc2(row, source, unique_classes, max_obs):
         rest = length%max_obs
         filler = max_obs - rest
         observations = observations.reindex(range(length+filler), fill_value=0)
-    
-    
+
+
     numpy_lc = observations.values
 
     return row['ID'], label, numpy_lc
@@ -154,7 +154,7 @@ def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None, 
 
 #     if 'test' in dest:
 #         max_obs = 200 # For testing we split the entire lc in windows of 200 obs
-        
+
     # Iterate over subset
     # First process and then serialize
     for counter, subframe in enumerate(collection):
@@ -251,18 +251,17 @@ def sample_lc(sequence, max_obs):
     Sample a random window of "max_obs" observations from the input sequence
     '''
     serie_len = tf.shape(sequence)[0]
-    curr_max_obs = tf.minimum(serie_len, max_obs)
-    
+
     pivot = 0
     if tf.greater(serie_len, max_obs):
         pivot = tf.random.uniform([],
                                   minval=0,
-                                  maxval=serie_len-curr_max_obs,
+                                  maxval=serie_len-max_obs+1,
                                   dtype=tf.int32)
 
-        sequence = tf.slice(sequence, [pivot,0], [curr_max_obs, -1])
+        sequence = tf.slice(sequence, [pivot,0], [max_obs, -1])
     else:
-        sequence = tf.slice(sequence, [0,0], [curr_max_obs, -1])
+        sequence = tf.slice(sequence, [0,0], [serie_len, -1])
 
     return sequence
 
@@ -274,12 +273,12 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
     input_dict = get_sample(sample)
 
     sequence = sample_lc(input_dict['input'], max_obs)
-    
+
     pad_mask = tf.reduce_sum(sequence, 1)
     pad_mask = tf.math.divide_no_nan(pad_mask, pad_mask)
     curr_max_obs = tf.reduce_sum(pad_mask, 0)
     pad_mask = tf.expand_dims(pad_mask, 1)
-    
+
     sequence, mean = standardize(sequence, return_mean=True)
 
     seq_time = tf.slice(sequence, [0, 0], [max_obs, 1])
@@ -311,7 +310,7 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
 
     mask_out = tf.reshape(mask_out, [max_obs, 1])
     mask_out = tf.multiply(mask_out, pad_mask)
-    
+
     mask_in = tf.reshape(mask_in, [max_obs, 1])
     mask_in = tf.maximum(1.-pad_mask, mask_in)
 
@@ -340,13 +339,13 @@ def _parse_normal(sample, max_obs):
     Specific task formater
     '''
     input_dict = get_sample(sample)
-       
+
     sequence = sample_lc(input_dict['input'], max_obs)
-    
+
     mask = tf.reduce_sum(sequence, 1)
     curr_max_obs = tf.reduce_sum(mask, 0)
     mask = 1.-tf.math.divide_no_nan(mask, mask)
-    
+
     sequence = standardize(sequence)
     seq_time = tf.slice(sequence, [0, 0], [max_obs, 1])
     seq_magn = tf.slice(sequence, [0, 1], [max_obs, 1])
@@ -447,78 +446,3 @@ def clf_records(source, batch_size, max_obs=100, take=1):
         # dataset = dataset.cache()
         dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
         return dataset
-
-# SINUSOIDAL DATA
-def count(stop):
-    input_dict = dict()
-    while True:
-        seq_times = tf.reshape(tf.linspace(0., 20., stop), [stop, 1])
-        seq_times = tf.cast(seq_times, tf.float32)
-        seq_magn  = tf.math.sin(seq_times)
-        seq_magn = tf.cast(seq_magn, tf.float32)
-        seq_err   = tf.random.normal([stop, 1], mean=0, stddev=1)
-        seq_err = tf.cast(seq_err, tf.float32)
-
-        # Save the true values
-        orig_magn = seq_magn
-
-        # [MASK] values
-        mask_out = get_masked(seq_magn, 0.5)
-
-        # [MASK] -> Same values
-        seq_magn, mask_in = set_random(seq_magn,
-                                       mask_out,
-                                       seq_magn,
-                                       0.2,
-                                       name='set_same')
-
-        # [MASK] -> Random value
-        seq_magn, mask_in = set_random(seq_magn,
-                                       mask_in,
-                                       tf.random.shuffle(seq_magn),
-                                       0.2,
-                                       name='set_random')
-
-        time_steps = tf.shape(seq_magn)[0]
-
-        mask_out = tf.reshape(mask_out, [time_steps, 1])
-        mask_in = tf.reshape(mask_in, [time_steps, 1])
-
-        input_dict['input']    = seq_magn
-        input_dict['output']   = orig_magn
-        input_dict['times']    = seq_times
-        input_dict['obserr']   = tf.zeros_like(seq_magn)
-        input_dict['mask_in']  = mask_in
-        input_dict['mask_out'] = mask_out
-        input_dict['length']   = time_steps
-
-        yield input_dict
-
-
-
-def from_generator(len, n, batch_size):
-
-    ds_counter = tf.data.Dataset.from_generator(count,
-                                                args=[len],
-                                                output_types={'input': tf.float32,
-                                                              'output': tf.float32,
-                                                              'times': tf.float32,
-                                                              'obserr': tf.float32,
-                                                              'mask_in': tf.float32,
-                                                              'mask_out': tf.float32,
-                                                              'length': tf.int32
-                                                              },
-                                                output_shapes ={'input': (len, 1),
-                                                                'output': (len, 1),
-                                                                'times': (len, 1),
-                                                                'obserr': (len, 1),
-                                                                'mask_in': (len, 1),
-                                                                'mask_out': (len, 1),
-                                                                'length': ()
-                                                                })
-
-
-
-    ds_counter = ds_counter.take(n).cache()
-    ds_counter = ds_counter.batch(batch_size)
-    return ds_counter

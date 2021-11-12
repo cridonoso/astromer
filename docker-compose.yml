@@ -4,10 +4,10 @@ services:
         build: .
         container_name: astromer
         volumes:
-            - ./:/tf/astromer/
+            - ./:/home/astronaut/astromer
         ports:
             - 6006:6006
             - 8888:8888
-        runtime: nvidia
-        environment:
-            FLASK_DEBUG: 1
+        #runtime: nvidia
+        stdin_open: true # docker run -i
+        # tty: true        # docker run -t
