@@ -78,7 +78,6 @@ def create_lstm_att(trial, n_classes):
     x = LSTM(units_list_0, dropout=drop_list_0, return_sequences=True)(x, mask=mask)
     x = LayerNormalization()(x)
     x = LSTM(units_list_1, dropout=drop_list_1)(x, mask=mask)
-    
     x = LayerNormalization()(x)
     x = Dense(n_classes)(x)
 
@@ -107,7 +106,7 @@ def create_mlp(trial, n_classes):
 def create_optimizer(trial):
     # We optimize the choice of optimizers as well as their parameters.
     kwargs = {}
-    optimizer_options = ["Adam"]
+    optimizer_options = ["Adam", "RMSprop"]
     optimizer_selected = trial.suggest_categorical("optimizer", optimizer_options)
     
     if optimizer_selected == "RMSprop":
@@ -138,10 +137,10 @@ def learn(model, optimizer, x_train, y_train, x_val, y_val):
         )
 
     _ = model.fit(x_train, y_train, 
-                  epochs=10000,
+                  epochs=100,
                   batch_size=2048,
                   callbacks=[estop],
-                  verbose=0,
+                  verbose=1,
                   validation_data=(x_val, y_val))
     
     y_pred = model.predict(x_val)
@@ -224,9 +223,6 @@ if __name__ == '__main__':
                         help='GPU number to be used')
     parser.add_argument('--data', default='./data/records/alcock', type=str,
                         help='Dataset folder containing the records files')
-    parser.add_argument('--p', default="./experiments/hp", type=str,
-                        help='Proyect path. Here will be stored weights and metrics')
-
     parser.add_argument('--mode', default='mlp', type=str,
                         help='mlp_att - lstm_att - lstm')
 

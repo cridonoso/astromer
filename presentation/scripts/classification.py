@@ -48,7 +48,7 @@ def build_mpl_att(n_layers=3, units=[1024,512,256], n_classes=5):
     x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
     x = (inputs - x_mean)/x_std
     for i in range(n_layers):
-        x = Dense(units[i])(x)
+        x = Dense(units[i], activation='relu')(x)
         x = LayerNormalization()(x)
     x = Dense(n_classes)(x)
     model = tf.keras.Model(inputs=inputs, outputs=x)
@@ -57,9 +57,11 @@ def build_mpl_att(n_layers=3, units=[1024,512,256], n_classes=5):
 def build_lstm(unit_1=256, unit_2=256, drop_1=0.2, drop_2=0.2, n_classes=5):
     inputs = tf.keras.Input(shape=(200, 2), name='input')
     mask = tf.keras.Input(shape=(200, ), dtype=tf.bool, name='mask')
+    
     x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
     x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
     x = (inputs - x_mean)/x_std
+    
     x = LSTM(unit_1, dropout=drop_1, return_sequences=True)(x, mask=mask)
     x = LayerNormalization()(x)
     x = LSTM(unit_2, dropout=drop_2)(x, mask=mask)
@@ -142,7 +144,7 @@ def run(opt):
             print('[INFO] LOADING PREDEFINED CONFIG')
             with open(opt.conf, 'r') as f:
                 config = json.load(f)
-           
+            print(config)
             model = build_lstm(unit_1=config['units_0'], unit_2=config['units_1'], 
                                    drop_1=config['dropout_0'], drop_2=config['dropout_1'], 
                                    n_classes=n_classes)
