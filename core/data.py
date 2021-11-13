@@ -117,24 +117,16 @@ def process_lc(row, source, unique_classes, writer):
         print('[ERROR] {} Lightcurve could not be processed.'.format(row['ID']))
 
 @wrap_non_picklable_objects
-def process_lc2(row, source, unique_classes, max_obs):
+def process_lc2(row, source, unique_classes):
     path  = row['Path'].split('/')[-1]
     label = list(unique_classes).index(row['Class'])
     lc_path = os.path.join(source, path)
 
-    observations = pd.read_csv(lc_path, delim_whitespace=True, names=['mjd', 'mag', 'std'])
-
+    observations = pd.read_csv(lc_path)
     observations.columns = ['mjd', 'mag', 'errmag']
     observations = observations.dropna()
     observations.sort_values('mjd')
     observations = observations.drop_duplicates(keep='last')
-
-    if max_obs != -1:
-        length = observations.shape[0]
-        rest = length%max_obs
-        filler = max_obs - rest
-        observations = observations.reindex(range(length+filler), fill_value=0)
-
 
     numpy_lc = observations.values
 
@@ -152,27 +144,13 @@ def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None, 
     collection = [frame.iloc[i:i+max_lcs_per_record] \
                   for i in range(0, frame.shape[0], max_lcs_per_record)]
 
-#     if 'test' in dest:
-#         max_obs = 200 # For testing we split the entire lc in windows of 200 obs
-
-    # Iterate over subset
-    # First process and then serialize
     for counter, subframe in enumerate(collection):
-        var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique, max_obs) \
+        var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique) \
                                     for k, row in subframe.iterrows())
 
         with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
             for counter2, data_lc in enumerate(var):
-#                 if 'test' in dest:
-                oid, y, x = data_lc
-                windows = np.split(x, x.shape[0]/max_obs)
-                for w in windows:
-                    if np.sum(w) != 0:
-                        process_lc3(oid, y, w, writer)
-#                 else:
-#                     process_lc3(*data_lc, writer)
-
-
+                process_lc3(*data_lc, writer)
 
 def create_dataset(meta_df,
                    source='data/raw_data/macho/MACHO/LCs',
@@ -205,6 +183,15 @@ def create_dataset(meta_df,
             dest = os.path.join(target, subset_name, cls_name)
             os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs)
+
+# ==============================        
+# ====== LOADING FUNCTIONS =====
+# ==============================
+def adjust_fn(func, *arguments):
+    def wrap(*args, **kwargs):
+        result = func(*args, *arguments)
+        return result
+    return wrap
 
 def get_sample(sample):
     """
@@ -265,26 +252,40 @@ def sample_lc(sequence, max_obs):
 
     return sequence
 
-def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
+def get_window(sequence, length, pivot, max_obs):
+    pivot = tf.minimum(length-max_obs, pivot)
+    sliced = tf.slice(sequence, [pivot, 0], [max_obs, -1])
+    return sliced
+
+def get_windows(sample, max_obs):
+    input_dict = get_sample(sample)
+
+    sequence = input_dict['input']
+
+    rest = input_dict['length']%max_obs
+
+    pivots = tf.tile([max_obs], [tf.cast(input_dict['length']/max_obs, tf.int32)])
+    pivots = tf.concat([[0], pivots], 0)
+    pivots = tf.math.cumsum(pivots)
+    splits = tf.map_fn(lambda x: get_window(sequence,
+                                            input_dict['length'],
+                                            x,
+                                            max_obs),  pivots,
+                       infer_shape=False,
+                       fn_output_signature=(tf.float32))
+
+    # aqui falta retornar labels y oids
+    return splits
+
+def mask_sample(sequence, msk_prob, rnd_prob, same_prob):
     '''
     Pretraining formater
     '''
+    # sequence, mean = standardize(sequence, return_mean=True)
 
-    input_dict = get_sample(sample)
-
-    sequence = sample_lc(input_dict['input'], max_obs)
-
-    pad_mask = tf.reduce_sum(sequence, 1)
-    pad_mask = tf.math.divide_no_nan(pad_mask, pad_mask)
-    curr_max_obs = tf.reduce_sum(pad_mask, 0)
-    pad_mask = tf.expand_dims(pad_mask, 1)
-
-    sequence, mean = standardize(sequence, return_mean=True)
-
-    seq_time = tf.slice(sequence, [0, 0], [max_obs, 1])
-    seq_magn = tf.slice(sequence, [0, 1], [max_obs, 1])
-    seq_errs = tf.slice(sequence, [0, 2], [max_obs, 1])
-
+    seq_time = tf.slice(sequence, [0, 0], [-1, 1])
+    seq_magn = tf.slice(sequence, [0, 1], [-1, 1])
+    seq_errs = tf.slice(sequence, [0, 2], [-1, 1])
 
     # Save the true values
     orig_magn = seq_magn
@@ -307,32 +308,53 @@ def _parse_pt(sample, msk_prob, rnd_prob, same_prob, max_obs):
                                    name='set_random')
 
     time_steps = tf.shape(seq_magn)[0]
+    mask_out = tf.reshape(mask_out, [time_steps, 1])
+    mask_in = tf.reshape(mask_in, [time_steps, 1])
 
-    mask_out = tf.reshape(mask_out, [max_obs, 1])
-    mask_out = tf.multiply(mask_out, pad_mask)
-
-    mask_in = tf.reshape(mask_in, [max_obs, 1])
-    mask_in = tf.maximum(1.-pad_mask, mask_in)
-
-#     if curr_max_obs < max_obs:
-#         print('Masking')
-#         filler    = tf.ones([max_obs-curr_max_obs, 1])
-#         mask_in   = tf.concat([mask_in, filler], 0)
-#         seq_magn  = tf.concat([seq_magn, 1.-filler], 0)
-#         seq_time  = tf.concat([seq_time, 1.-filler], 0)
-#         mask_out  = tf.concat([mask_out, 1.-filler], 0)
-#         orig_magn = tf.concat([orig_magn, 1.-filler], 0)
-
+    input_dict = dict()
     input_dict['output']   = orig_magn
     input_dict['input']    = seq_magn
     input_dict['times']    = seq_time
     input_dict['mask_out'] = mask_out
     input_dict['mask_in']  = mask_in
-    input_dict['length']   = curr_max_obs
-    input_dict['mean']     = mean
+    input_dict['length']   = time_steps
     input_dict['obserr']   = seq_errs
 
-    return input_dict
+    return sequence
+
+def pretraining_records(source, batch_size, shuffle=False, max_obs=100,
+                        msk_frac=0.2, rnd_frac=0.1, same_frac=0.1):
+    """
+    Pretraining data loader.
+    This method build the ASTROMER input format.
+    ASTROMER format is based on the BERT masking strategy.
+
+    Args:
+        source (string): Record folder
+        batch_size (int): Batch size
+        no_shuffle (bool): Do not shuffle training and validation dataset
+        max_obs (int): Max. number of observation per serie
+        msk_frac (float): fraction of values to be predicted ([MASK])
+        rnd_frac (float): fraction of [MASKED] values to replace with random values
+        same_frac (float): fraction of [MASKED] values to replace with true values
+
+    Returns:
+        Tensorflow Dataset: Iterator withg preprocessed batches
+    """
+    fn_0 = adjust_fn(get_windows, max_obs)
+    fn_1 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac)
+
+    rec_paths = [os.path.join(source, folder, x) for folder in os.listdir(source) \
+                 for x in os.listdir(os.path.join(source, folder))]
+
+    dataset = tf.data.TFRecordDataset(rec_paths)
+    dataset = dataset.map(fn_0)
+    dataset = dataset.flat_map(lambda x: tf.data.Dataset.from_tensor_slices(x))
+    dataset = dataset.map(fn_1)
+    # dataset = dataset.cache()
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+    return dataset
 
 def _parse_normal(sample, max_obs):
     '''
@@ -360,47 +382,6 @@ def _parse_normal(sample, max_obs):
     input_dict['length']   = curr_max_obs
 
     return input_dict
-
-def adjust_fn(func, msk_prob, rnd_prob, same_prob, max_obs):
-    def wrap(*args, **kwargs):
-        result = func(*args, msk_prob, rnd_prob, same_prob, max_obs)
-        return result
-    return wrap
-
-def pretraining_records(source, batch_size, shuffle=False, max_obs=100,
-                        msk_frac=0.2, rnd_frac=0.1, same_frac=0.1):
-    """
-    Pretraining data loader.
-    This method build the ASTROMER input format.
-    ASTROMER format is based on the BERT masking strategy.
-
-    Args:
-        source (string): Record folder
-        batch_size (int): Batch size
-        no_shuffle (bool): Do not shuffle training and validation dataset
-        max_obs (int): Max. number of observation per serie
-        msk_frac (float): fraction of values to be predicted ([MASK])
-        rnd_frac (float): fraction of [MASKED] values to replace with random values
-        same_frac (float): fraction of [MASKED] values to replace with true values
-
-    Returns:
-        Tensorflow Dataset: Iterator withg preprocessed batches
-    """
-    fn = adjust_fn(_parse_pt, msk_frac, rnd_frac, same_frac, max_obs)
-
-    rec_paths = [os.path.join(source, folder, x) for folder in os.listdir(source) \
-                 for x in os.listdir(os.path.join(source, folder))]
-
-    dataset = tf.data.TFRecordDataset(rec_paths)
-    if shuffle:
-        print('[INFO] Shuffling')
-        dataset = dataset.shuffle(10000)
-
-    dataset = dataset.map(fn)
-    dataset = dataset.cache()
-    dataset = dataset.padded_batch(batch_size)
-    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
-    return dataset
 
 def adjust_fn_clf(func, max_obs):
     def wrap(*args, **kwargs):
