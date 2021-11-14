@@ -184,7 +184,7 @@ def create_dataset(meta_df,
             os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs)
 
-# ==============================        
+# ==============================
 # ====== LOADING FUNCTIONS =====
 # ==============================
 def adjust_fn(func, *arguments):
@@ -193,7 +193,7 @@ def adjust_fn(func, *arguments):
         return result
     return wrap
 
-def get_sample(sample):
+def deserialize(sample):
     """
     Read a serialized sample and convert it to tensor
     Context and sequence features should match with the name used when writing.
@@ -233,10 +233,13 @@ def get_sample(sample):
     input_dict['input'] = sequence
     return input_dict
 
-def sample_lc(sequence, max_obs):
+def sample_lc(sample, max_obs):
     '''
     Sample a random window of "max_obs" observations from the input sequence
     '''
+    input_dict = deserialize(sample)
+    sequence = input_dict['input']
+
     serie_len = tf.shape(sequence)[0]
 
     pivot = 0
@@ -250,23 +253,27 @@ def sample_lc(sequence, max_obs):
     else:
         sequence = tf.slice(sequence, [0,0], [serie_len, -1])
 
-    return sequence
+    input_dict['sequence'] = sequence
+    return sequence, input_dict['label'], input_dict['lcid']
 
 def get_window(sequence, length, pivot, max_obs):
     pivot = tf.minimum(length-max_obs, pivot)
-    sliced = tf.slice(sequence, [pivot, 0], [max_obs, -1])
+    pivot = tf.maximum(0, pivot)
+    end = tf.minimum(length, max_obs)
+
+    sliced = tf.slice(sequence, [pivot, 0], [end, -1])
     return sliced
 
 def get_windows(sample, max_obs):
-    input_dict = get_sample(sample)
+    input_dict = deserialize(sample)
 
     sequence = input_dict['input']
-
     rest = input_dict['length']%max_obs
 
     pivots = tf.tile([max_obs], [tf.cast(input_dict['length']/max_obs, tf.int32)])
     pivots = tf.concat([[0], pivots], 0)
     pivots = tf.math.cumsum(pivots)
+
     splits = tf.map_fn(lambda x: get_window(sequence,
                                             input_dict['length'],
                                             x,
@@ -275,17 +282,20 @@ def get_windows(sample, max_obs):
                        fn_output_signature=(tf.float32))
 
     # aqui falta retornar labels y oids
-    return splits
+    y = tf.tile([input_dict['label']], [len(splits)])
+    ids = tf.tile([input_dict['lcid']], [len(splits)])
 
-def mask_sample(sequence, msk_prob, rnd_prob, same_prob):
+    return splits, y, ids
+
+def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
     '''
     Pretraining formater
     '''
-    # sequence, mean = standardize(sequence, return_mean=True)
+    x = standardize(x, return_mean=False)
 
-    seq_time = tf.slice(sequence, [0, 0], [-1, 1])
-    seq_magn = tf.slice(sequence, [0, 1], [-1, 1])
-    seq_errs = tf.slice(sequence, [0, 2], [-1, 1])
+    seq_time = tf.slice(x, [0, 0], [-1, 1])
+    seq_magn = tf.slice(x, [0, 1], [-1, 1])
+    seq_errs = tf.slice(x, [0, 2], [-1, 1])
 
     # Save the true values
     orig_magn = seq_magn
@@ -308,8 +318,14 @@ def mask_sample(sequence, msk_prob, rnd_prob, same_prob):
                                    name='set_random')
 
     time_steps = tf.shape(seq_magn)[0]
+
     mask_out = tf.reshape(mask_out, [time_steps, 1])
     mask_in = tf.reshape(mask_in, [time_steps, 1])
+
+    if time_steps < max_obs:
+        mask_fill = tf.ones([max_obs - time_steps, 1], dtype=tf.float32)
+        mask_out  = tf.concat([mask_out, 1-mask_fill], 0)
+        mask_in   = tf.concat([mask_in, mask_fill], 0)
 
     input_dict = dict()
     input_dict['output']   = orig_magn
@@ -318,12 +334,13 @@ def mask_sample(sequence, msk_prob, rnd_prob, same_prob):
     input_dict['mask_out'] = mask_out
     input_dict['mask_in']  = mask_in
     input_dict['length']   = time_steps
-    input_dict['obserr']   = seq_errs
+    input_dict['label']    = y
+    input_dict['id']       = i
 
-    return sequence
+    return input_dict
 
-def pretraining_records(source, batch_size, shuffle=False, max_obs=100,
-                        msk_frac=0.2, rnd_frac=0.1, same_frac=0.1):
+def pretraining_records(source, batch_size, max_obs=100, msk_frac=0.2,
+                        rnd_frac=0.1, same_frac=0.1, sampling=False, shuffle=False):
     """
     Pretraining data loader.
     This method build the ASTROMER input format.
@@ -341,26 +358,33 @@ def pretraining_records(source, batch_size, shuffle=False, max_obs=100,
     Returns:
         Tensorflow Dataset: Iterator withg preprocessed batches
     """
-    fn_0 = adjust_fn(get_windows, max_obs)
-    fn_1 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac)
-
     rec_paths = [os.path.join(source, folder, x) for folder in os.listdir(source) \
                  for x in os.listdir(os.path.join(source, folder))]
 
+    if sampling:
+        fn_0 = adjust_fn(sample_lc, max_obs)
+    else:
+        fn_0 = adjust_fn(get_windows, max_obs)
+
+    fn_1 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac, max_obs)
+
     dataset = tf.data.TFRecordDataset(rec_paths)
+    if shuffle:
+        dataset = dataset.shuffle(10000)
     dataset = dataset.map(fn_0)
-    dataset = dataset.flat_map(lambda x: tf.data.Dataset.from_tensor_slices(x))
+    if not sampling:
+        dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
     dataset = dataset.map(fn_1)
-    # dataset = dataset.cache()
-    dataset = dataset.batch(batch_size)
+    dataset = dataset.padded_batch(batch_size).cache()
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+
     return dataset
 
 def _parse_normal(sample, max_obs):
     '''
     Specific task formater
     '''
-    input_dict = get_sample(sample)
+    input_dict = deserialize(sample)
 
     sequence = sample_lc(input_dict['input'], max_obs)
 

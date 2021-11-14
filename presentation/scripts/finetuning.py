@@ -71,31 +71,38 @@ def run(opt):
             json.dump(varsdic, json_file, indent=4)
 
         # Loading data
+        dataset = pretraining_records('./data/records/alcock/train/', 16, max_obs=200, 
+                              msk_frac=0.5, rnd_frac=0.2, same_frac=0.2,
+                              sampling=True, shuffle=True)
+        
         test_batches = pretraining_records(os.path.join(opt.data, 'test'),
                                             opt.batch_size,
                                             max_obs=conf['max_obs'],
-                                            shuffle=True,
                                             msk_frac=conf['msk_frac'],
                                             rnd_frac=conf['rnd_frac'],
-                                            same_frac=conf['same_frac'])
+                                            same_frac=conf['same_frac'],
+                                            sampling=False,
+                                            shuffle=True)
         
         train_batches = pretraining_records(os.path.join(opt.data, 'train'),
                                             opt.batch_size,
                                             max_obs=conf['max_obs'],
-                                            shuffle=True,
                                             msk_frac=conf['msk_frac'],
                                             rnd_frac=conf['rnd_frac'],
-                                            same_frac=conf['same_frac'])
+                                            same_frac=conf['same_frac'],
+                                            sampling=False,
+                                            shuffle=True)
         
         train_batches = train_batches.concatenate(test_batches)
         
         valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
                                             opt.batch_size,
                                             max_obs=conf['max_obs'],
-                                            shuffle=True,
                                             msk_frac=conf['msk_frac'],
                                             rnd_frac=conf['rnd_frac'],
-                                            same_frac=conf['same_frac'])
+                                            same_frac=conf['same_frac'],
+                                            sampling=False,
+                                            shuffle=True)
             
         
         # Training ASTROMER
