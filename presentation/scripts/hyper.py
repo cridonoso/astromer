@@ -77,13 +77,11 @@ def create_lstm_att(trial, n_classes):
     return model
 
 def create_mlp(trial, n_classes):
-    # 2. Suggest values of the hyperparameters using a trial object.
-    n_layers = trial.suggest_int('n_layers', 1, 3)
-            
+    # 2. Suggest values of the hyperparameters using a trial object.            
     inputs = tf.keras.Input(shape=(256))
     x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
     x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
-    x = (x - x_mean)/x_std
+    x = (inputs - x_mean)/x_std
     
     num_hidden_0 = trial.suggest_int(f'n_units_l0', 16, 2048, log=True)
     x = Dense(num_hidden_0, activation='relu')(x)

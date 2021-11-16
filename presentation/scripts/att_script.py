@@ -10,8 +10,8 @@ datasets = ['{}_20'.format(data_name),
             '{}_50'.format(data_name), 
             '{}_100'.format(data_name), 
             '{}_500'.format(data_name), 
-            '{}'.format(data_name)]
-
+            ]
+#'{}'.format(data_name)
 astroweights = './weights/astromer_10022021/finetuning'
 
 take = 5
