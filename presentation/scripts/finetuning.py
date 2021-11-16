@@ -13,6 +13,7 @@ from time import gmtime, strftime
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 
+
 def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"]=opt.gpu
     
@@ -69,7 +70,20 @@ def run(opt):
         with open(conf_file, 'w') as json_file:
             json.dump(varsdic, json_file, indent=4)
 
-        # Loading data                
+        # Loading data
+        dataset = pretraining_records('./data/records/alcock/train/', 16, max_obs=200, 
+                              msk_frac=0.5, rnd_frac=0.2, same_frac=0.2,
+                              sampling=True, shuffle=True)
+        
+        test_batches = pretraining_records(os.path.join(opt.data, 'test'),
+                                            opt.batch_size,
+                                            max_obs=conf['max_obs'],
+                                            msk_frac=conf['msk_frac'],
+                                            rnd_frac=conf['rnd_frac'],
+                                            same_frac=conf['same_frac'],
+                                            sampling=False,
+                                            shuffle=True)
+        
         train_batches = pretraining_records(os.path.join(opt.data, 'train'),
                                             opt.batch_size,
                                             max_obs=conf['max_obs'],
@@ -78,6 +92,8 @@ def run(opt):
                                             same_frac=conf['same_frac'],
                                             sampling=False,
                                             shuffle=True)
+        
+        train_batches = train_batches.concatenate(test_batches)
         
         valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
                                             opt.batch_size,

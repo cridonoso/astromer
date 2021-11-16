@@ -28,14 +28,19 @@ def load_embeddings(source):
     lc = np.concatenate([t, x], 2)
 
     y = hf['y'][()]
+    l = hf['id'][()]
     m = 1. - hf['m'][()]
-    return att, y, m, lc
+    return att, y, l, m, lc
 
 def create_lstm(trial, n_classes):
     # 2. Suggest values of the hyperparameters using a trial object.
 
     inputs = tf.keras.Input(shape=(200, 2), name='input')
     mask = tf.keras.Input(shape=(200, ), dtype=tf.bool, name='mask')
+
+    x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
+    x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
+    x = (inputs - x_mean)/x_std
     
     units_list_0 = trial.suggest_int('units_0', 16, 512)
     drop_list_0  = trial.suggest_float("dropout_0", 0, 0.5)
@@ -43,7 +48,7 @@ def create_lstm(trial, n_classes):
     units_list_1  = trial.suggest_int('units_1', 16, 512)
     drop_list_1   = trial.suggest_float("dropout_1", 0, 0.5)
     
-    x = LSTM(units_list_0, dropout=drop_list_0, return_sequences=True)(inputs, mask=mask)
+    x = LSTM(units_list_0, dropout=drop_list_0, return_sequences=True)(x, mask=mask)
     x = LayerNormalization()(x)
     x = LSTM(units_list_1, dropout=drop_list_1)(x, mask=mask)
     
@@ -59,6 +64,10 @@ def create_lstm_att(trial, n_classes):
 
     inputs = tf.keras.Input(shape=(200, 256), name='input')
     mask = tf.keras.Input(shape=(200, ), dtype=tf.bool, name='mask')
+
+    x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
+    x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
+    x = (inputs - x_mean)/x_std
     
     units_list_0 = trial.suggest_int(f'units_0', 16, 512)
     drop_list_0  = trial.suggest_float("dropout_0", 0, 0.5)
@@ -66,7 +75,7 @@ def create_lstm_att(trial, n_classes):
     units_list_1  = trial.suggest_int(f'units_1', 16, 512)
     drop_list_1   = trial.suggest_float("dropout_1", 0, 0.5)
     
-    x = LSTM(units_list_0, dropout=drop_list_0, return_sequences=True)(inputs, mask=mask)
+    x = LSTM(units_list_0, dropout=drop_list_0, return_sequences=True)(x, mask=mask)
     x = LayerNormalization()(x)
     x = LSTM(units_list_1, dropout=drop_list_1)(x, mask=mask)
     x = LayerNormalization()(x)
@@ -83,19 +92,13 @@ def create_mlp(trial, n_classes):
     inputs = tf.keras.Input(shape=(256))
     x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
     x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
-    x = (x - x_mean)/x_std
     
-    num_hidden_0 = trial.suggest_int(f'n_units_l0', 16, 2048, log=True)
-    x = Dense(num_hidden_0, activation='relu')(x)
-    
-    num_hidden_1 = trial.suggest_int(f'n_units_l1', 16, 2048, log=True)
-    x = Dense(num_hidden_1, activation='relu')(x)
-    
-    num_hidden_2 = trial.suggest_int(f'n_units_l2', 16, 2048, log=True)
-    x = Dense(num_hidden_2, activation='relu')(x)
-    x = LayerNormalization()(x)
+    x = (inputs - x_mean)/x_std
+    for i in range(n_layers):
+        num_hidden = trial.suggest_int(f'n_units_l{i}', 16, 2048, log=True)
+        x = Dense(num_hidden, activation='relu')(x)
+        
     x = Dense(n_classes)(x)
-    
     model = tf.keras.Model(inputs=inputs, outputs=x)
            
     return model
@@ -135,7 +138,7 @@ def learn(model, optimizer, x_train, y_train, x_val, y_val):
 
     _ = model.fit(x_train, y_train, 
                   epochs=100,
-                  batch_size=1000,
+                  batch_size=2048,
                   callbacks=[estop],
                   verbose=1,
                   validation_data=(x_val, y_val))
@@ -148,8 +151,8 @@ def learn(model, optimizer, x_train, y_train, x_val, y_val):
 def objective(trial, mode='lstm', datapath='.'):
     # Get data.
     
-    x_0, y_0, m_0, lc_0 = load_embeddings(os.path.join(datapath, 'train.h5'))
-    x_1, y_1, m_1, lc_1 = load_embeddings(os.path.join(datapath, 'val.h5'))
+    x_0, y_0, l_0, m_0, lc_0 = load_embeddings(os.path.join(datapath, 'train.h5'))
+    x_1, y_1, l_1, m_1, lc_1 = load_embeddings(os.path.join(datapath, 'val.h5'))
     
     n_classes = len(np.unique(y_0))
     y_train = tf.one_hot(y_0, n_classes)
