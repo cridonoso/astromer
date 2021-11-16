@@ -12,9 +12,9 @@ for mode in [ 'mlp_att']:
     print('{} on mode {}'.format(data_name, mode))
 
     command1 = 'python -m presentation.scripts.hyper \
-                    --data ./embeddings/{}/fold_0/{} \
+                    --data ./encoded/{} \
                     --gpu {} \
-                    --mode {} '.format(data_name, data_name,
+                    --mode {} '.format(data_name, 
                                     gpu,
                                     mode)
     try:
