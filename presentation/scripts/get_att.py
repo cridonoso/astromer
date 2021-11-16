@@ -8,7 +8,7 @@ import h5py
 import os
 
 from core.classifier import get_lstm_attention, get_lstm_no_attention, get_fc_attention, train
-from core.data  import clf_records
+from core.data  import pretraining_records
 from core.utils import get_folder_name
 from time import gmtime, strftime
 from core.astromer import get_ASTROMER
@@ -62,14 +62,14 @@ def run(opt):
         inp_vectors.append(batch['input'])
         time_vectors.append(batch['times'])
         mask_vectors.append(batch['mask_in'])
-        ids_vectors.append(batch['lcid'])
+#         ids_vectors.append(batch['lcid'])
 
     attention_vectors = tf.concat(attention_vectors, 0)
     inp_vectors       = tf.concat(inp_vectors, 0)
     time_vectors      = tf.concat(time_vectors, 0)
     labels_vectors    = tf.concat(labels_vectors, 0)
     mask_vectors      = tf.concat(mask_vectors, 0)
-    ids_vectors       = tf.concat(ids_vectors, 0)
+#     ids_vectors       = tf.concat(ids_vectors, 0)
     
     
     hf = h5py.File(opt.p, 'w')
@@ -77,7 +77,7 @@ def run(opt):
     hf.create_dataset('x', data=inp_vectors)
     hf.create_dataset('t', data=time_vectors)
     hf.create_dataset('y', data=labels_vectors)
-    hf.create_dataset('id', data=ids_vectors.numpy().astype('S'))
+#     hf.create_dataset('id', data=ids_vectors.numpy().astype('S'))
     hf.create_dataset('m', data=mask_vectors)
 
     return
@@ -104,8 +104,6 @@ if __name__ == '__main__':
                         help='Number of epochs')
     parser.add_argument('--patience', default=200, type=int,
                         help='batch size')
-    parser.add_argument('--take', default=-1, type=int,
-                        help='Number of balanced batches for training. -1 do not balance')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
     # RNN HIPERPARAMETERS
@@ -113,7 +111,6 @@ if __name__ == '__main__':
                         help='number of units for the RNN')
     parser.add_argument('--dropout', default=0.5 , type=float,
                         help='dropout_rate for the encoder')
-
     parser.add_argument('--mode', default=0, type=int,
                         help='Classifier model: 0: LSTM + ATT - 1: MLP + ATT - 2 LSTM')
 

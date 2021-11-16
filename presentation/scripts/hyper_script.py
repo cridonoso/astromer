@@ -12,9 +12,9 @@ for mode in ['lstm', 'lstm_att', 'mlp_att']:
     print('{} on mode {}'.format(data_name, mode))
 
     command1 = 'python -m presentation.scripts.hyper \
-                    --data ./encoded/{} \
+                    --data ./embeddings/{}/fold_0/{} \
                     --gpu {} \
-                    --mode {} '.format(data_name, 
+                    --mode {} '.format(data_name, data_name,
                                     gpu,
                                     mode)
     try:

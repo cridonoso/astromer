@@ -31,10 +31,8 @@ def load_embeddings(source):
 def build_lstm_att(unit_1=256, unit_2=256, drop_1=0.2, drop_2=0.2, n_classes=5):
     inputs = tf.keras.Input(shape=(200, 256), name='input')
     mask = tf.keras.Input(shape=(200, ), dtype=tf.bool, name='mask')
-    x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
-    x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
-    x = (inputs - x_mean)/x_std
-    x = LSTM(unit_1, dropout=drop_1, return_sequences=True)(x, mask=mask)
+    
+    x = LSTM(unit_1, dropout=drop_1, return_sequences=True)(inputs, mask=mask)
     x = LayerNormalization()(x)
     x = LSTM(unit_2, dropout=drop_2)(x, mask=mask)
     x = LayerNormalization()(x)
@@ -58,11 +56,8 @@ def build_lstm(unit_1=256, unit_2=256, drop_1=0.2, drop_2=0.2, n_classes=5):
     inputs = tf.keras.Input(shape=(200, 2), name='input')
     mask = tf.keras.Input(shape=(200, ), dtype=tf.bool, name='mask')
     
-    x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
-    x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
-    x = (inputs - x_mean)/x_std
     
-    x = LSTM(unit_1, dropout=drop_1, return_sequences=True)(x, mask=mask)
+    x = LSTM(unit_1, dropout=drop_1, return_sequences=True)(inputs, mask=mask)
     x = LayerNormalization()(x)
     x = LSTM(unit_2, dropout=drop_2)(x, mask=mask)
     x = LayerNormalization()(x)
@@ -75,21 +70,20 @@ def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"]=opt.gpu
     
     # Loading saved embeddings
-    x_0, y_0, m_0, lc_0 = load_embeddings(os.path.join(opt.data, 'train.h5'))
-    x_1, y_1, m_1, lc_1 = load_embeddings(os.path.join(opt.data, 'val.h5'))
+    x_0, y_train, m_0, lc_0 = load_embeddings(os.path.join(opt.data, 'train.h5'))
+    x_1, y_val, m_1, lc_1 = load_embeddings(os.path.join(opt.data, 'val.h5'))
     
-    n_classes = len(np.unique(y_0))
-    y_train = np.concatenate([y_0, y_1])
+    n_classes = len(np.unique(y_train))
+
     y_train = tf.one_hot(y_train, n_classes) # One-hot encoding
-    
+    y_val = tf.one_hot(y_val, n_classes) # One-hot encoding
     
     optimizer = Adam(learning_rate=opt.lr)        
     # Init. classifier
     if opt.mode == 0: # LSTM + ATT
         # Formatting data
-        x_train = np.concatenate([x_0, x_1])
-        m_train = np.concatenate([m_0, m_1])
-        x_train = [x_train, m_train]
+        x_train = [x_0, np.array(m_0, dtype='bool')]
+        x_val = [x_1, np.array(m_1, dtype='bool')]
         # Create model
         if os.path.isfile(opt.conf):
             print('[INFO] LOADING PREDEFINED CONFIG')
@@ -111,9 +105,10 @@ def run(opt):
         
     if opt.mode == 1: # MLP + ATT
         # Formatting data
-        mean_1 = np.sum(x_0*m_0, 1)/tf.reduce_sum(m_0)
-        mean_2 = np.sum(x_1*m_1, 1)/tf.reduce_sum(m_1)
-        x_train = np.concatenate([mean_1, mean_2])
+        mean_0 = np.sum(x_0*m_0, 1)/tf.reduce_sum(m_0)
+        mean_1 = np.sum(x_1*m_1, 1)/tf.reduce_sum(m_1)
+        x_train = mean_0
+        x_val = mean_1
 
         # Create model
         if os.path.isfile(opt.conf):
@@ -135,9 +130,8 @@ def run(opt):
         
     if opt.mode == 2: # LSTM
         # Formatting data
-        x_train = np.concatenate([lc_0, lc_1])
-        m_train = np.concatenate([m_0, m_1])
-        x_train = [x_train, m_train]
+        x_train = [lc_0, np.array(m_0, dtype='bool')]
+        x_val = [lc_1, np.array(m_1, dtype='bool')]
         
         # Create model
         if os.path.isfile(opt.conf):
@@ -186,7 +180,7 @@ def run(opt):
                   epochs=opt.epochs,
                   batch_size=opt.batch_size,
                   callbacks=[estop, tb],
-                  validation_split=0.2)
+                  validation_data=(x_val, y_val))
     
     model.save(os.path.join(target_dir, 'model'))
     
