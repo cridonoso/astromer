@@ -32,11 +32,15 @@ python -m presentation.scripts.train --data ./data/records/mis_datos
 To check the training arguments, please read the `train.py` script. Similarly, we should use the same command to execute other scripts, such as: `finetuning.py` and `classification.py`
 
 ### Jupyter notebook
-The Tensorflow image used to create the container already has jupyter notebook running behind it. To see the notebook html-token route use:
+To run jupyter notebook, first enter in an interactive session:
 ```
-docker logs -f astromer
+docker exec -it astromer bash
 ```
-Copy and paste the url as it it were locally. 
+then run jupyter notebook specifying `ip` and `root` permissions: 
+```
+jupyter notebook --ip 0.0.0.0 --allow-root
+```
+Copy and paste the url on your browser. 
 For example: 
 ```
 http://127.0.0.1:8888/?token=9f09b7fa0937e8fb25cc3095837b42063a4fa88b3920e6df
@@ -49,8 +53,3 @@ To create records, go to the notebook `presentation/notebooks/Records.ipynb`. (T
 
 ### Testing cases
 [CURRENTLY NOT WORKING]
-To run testing case use: 
-```
-python -m testing.data
-```
-where `data` correspond to the preprocessing testing cases. We also have `attention` and `losses` testing cases. In case of adding a new feature, we also suggest adding the respective test cases.
