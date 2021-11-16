@@ -16,6 +16,63 @@ from tqdm import tqdm
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 os.system('clear')
 
+class ASTROMER(Model):
+    def __init__(self,
+                 num_layers=2,
+                 d_model=200,
+                 num_heads=2,
+                 dff=256,
+                 base=10000,
+                 dropout=0.1,
+                 use_leak=False,
+                 no_train=True,
+                 maxlen=100,
+                 **kwargs):
+        super(ASTROMER, self).__init__(**kwargs)
+
+        self.num_layers  = num_layers
+        self.d_model     = d_model
+        self.num_heads   = num_heads
+        self.dff         = dff
+        self.base        = base
+        self.dropout     = dropout
+        self.use_leak    = use_leak
+        self.no_train    = no_train
+        self.maxlen      = maxlen
+
+        self.encoder = Encoder(num_layers,
+                               d_model,
+                               num_heads,
+                               dff,
+                               base=base,
+                               rate=dropout,
+                               use_leak=use_leak,
+                               name='encoder')
+        self.regressor = RegLayer(name='regression')
+
+    def call(self, inputs):
+        x = self.encoder(inputs)
+        x = self.regressor(x)
+        return x
+
+    def get_config(self):
+        config={
+            'num_layers':self.num_layers,
+            'd_model':self.d_model,
+            'num_heads':self.num_heads,
+            'dff':self.dff,
+            'base':self.base,
+            'dropout':self.dropout,
+            'use_leak':self.use_leak,
+            'no_train':self.no_train,
+            'maxlen':self.maxlen,
+        }
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
+
 def get_ASTROMER(num_layers=2,
                  d_model=200,
                  num_heads=2,
@@ -70,12 +127,12 @@ def get_ASTROMER(num_layers=2,
 def train_step(model, batch, opt):
     with tf.GradientTape() as tape:
         x_pred = model(batch)
-        
+
         mse = custom_rmse(y_true=batch['output'],
                          y_pred=x_pred,
                          mask=batch['mask_out'])
 
-       
+
     grads = tape.gradient(mse, model.trainable_weights)
     opt.apply_gradients(zip(grads, model.trainable_weights))
     return mse
