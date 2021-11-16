@@ -25,10 +25,9 @@ def step(model, batch):
 
 def run(opt):
     # Loading data
-    batches = clf_records(opt.data,
-                          opt.batch_size,
-                          max_obs=opt.max_obs,
-                          take=-1)
+    batches = pretraining_records(opt.data, opt.batch_size, max_obs=opt.max_obs, 
+                                  msk_frac=0., rnd_frac=0., same_frac=0.,
+                                  sampling=False, shuffle=False)
 
     
     conf_file = os.path.join(opt.w, 'conf.json')

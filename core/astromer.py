@@ -70,12 +70,12 @@ def get_ASTROMER(num_layers=2,
 def train_step(model, batch, opt):
     with tf.GradientTape() as tape:
         x_pred = model(batch)
-        
+
         mse = custom_rmse(y_true=batch['output'],
                          y_pred=x_pred,
                          mask=batch['mask_out'])
 
-       
+
     grads = tape.gradient(mse, model.trainable_weights)
     opt.apply_gradients(zip(grads, model.trainable_weights))
     return mse

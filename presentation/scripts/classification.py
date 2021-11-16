@@ -47,9 +47,12 @@ def build_mpl_att(n_layers=3, units=[1024,512,256], n_classes=5):
     x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
     x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
     x = (inputs - x_mean)/x_std
-    for i in range(n_layers):
-        x = Dense(units[i], activation='relu')(x)
-        x = LayerNormalization()(x)
+    
+
+    x = Dense(units[0], activation='relu')(x)
+    x = Dense(units[1], activation='relu')(x)
+    x = Dense(units[2], activation='relu')(x)
+    x = LayerNormalization()(x)
     x = Dense(n_classes)(x)
     model = tf.keras.Model(inputs=inputs, outputs=x)
     return model
@@ -57,12 +60,17 @@ def build_mpl_att(n_layers=3, units=[1024,512,256], n_classes=5):
 def build_lstm(unit_1=256, unit_2=256, drop_1=0.2, drop_2=0.2, n_classes=5):
     inputs = tf.keras.Input(shape=(200, 2), name='input')
     mask = tf.keras.Input(shape=(200, ), dtype=tf.bool, name='mask')
+<<<<<<< HEAD
+       
+    x = LSTM(unit_1, dropout=drop_1, return_sequences=True)(inputs, mask=mask)
+=======
     
     x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
     x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
     x = (inputs - x_mean)/x_std
     
     x = LSTM(unit_1, dropout=drop_1, return_sequences=True)(x, mask=mask)
+>>>>>>> 9bcc97efd06f32232aa85911a9c46b470b948a81
     x = LayerNormalization()(x)
     x = LSTM(unit_2, dropout=drop_2)(x, mask=mask)
     x = LayerNormalization()(x)
@@ -200,7 +208,7 @@ if __name__ == '__main__':
                         help='Dataset folder containing the records files')
     parser.add_argument('--p', default="./runs/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
-    parser.add_argument('--batch-size', default=2048, type=int,
+    parser.add_argument('--batch-size', default=512, type=int,
                         help='batch size')
     parser.add_argument('--epochs', default=10000, type=int,
                         help='Number of epochs')

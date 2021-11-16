@@ -47,7 +47,6 @@ class EncoderLayer(tf.keras.layers.Layer):
 
         return out2
 
-
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, num_layers, d_model, num_heads, dff,
                  base=10000, rate=0.1, use_leak=False, **kwargs):

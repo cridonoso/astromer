@@ -6,5 +6,5 @@ pydot
 scikit-learn
 seaborn
 googledrivedownloader
-dask[dataframe]
+notebook
 optuna
