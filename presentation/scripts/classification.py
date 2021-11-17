@@ -48,7 +48,6 @@ def build_mpl_att(n_layers=3, units=[1024,512,256], n_classes=5):
     x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
     x = (inputs - x_mean)/x_std
     
-
     x = Dense(units[0], activation='relu')(x)
     x = Dense(units[1], activation='relu')(x)
     x = Dense(units[2], activation='relu')(x)
@@ -59,18 +58,8 @@ def build_mpl_att(n_layers=3, units=[1024,512,256], n_classes=5):
 
 def build_lstm(unit_1=256, unit_2=256, drop_1=0.2, drop_2=0.2, n_classes=5):
     inputs = tf.keras.Input(shape=(200, 2), name='input')
-    mask = tf.keras.Input(shape=(200, ), dtype=tf.bool, name='mask')
-<<<<<<< HEAD
-       
+    mask = tf.keras.Input(shape=(200, ), dtype=tf.bool, name='mask')      
     x = LSTM(unit_1, dropout=drop_1, return_sequences=True)(inputs, mask=mask)
-=======
-    
-    x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
-    x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
-    x = (inputs - x_mean)/x_std
-    
-    x = LSTM(unit_1, dropout=drop_1, return_sequences=True)(x, mask=mask)
->>>>>>> 9bcc97efd06f32232aa85911a9c46b470b948a81
     x = LayerNormalization()(x)
     x = LSTM(unit_2, dropout=drop_2)(x, mask=mask)
     x = LayerNormalization()(x)
