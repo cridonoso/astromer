@@ -30,11 +30,8 @@ def load_embeddings(source):
 
 def build_lstm_att(unit_1=256, unit_2=256, drop_1=0.2, drop_2=0.2, n_classes=5):
     inputs = tf.keras.Input(shape=(200, 256), name='input')
-    mask = tf.keras.Input(shape=(200, ), dtype=tf.bool, name='mask')
-    x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
-    x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
-    x = (inputs - x_mean)/x_std
-    x = LSTM(unit_1, dropout=drop_1, return_sequences=True)(x, mask=mask)
+    mask = tf.keras.Input(shape=(200, ), dtype=tf.bool, name='mask')    
+    x = LSTM(unit_1, dropout=drop_1, return_sequences=True)(inputs, mask=mask)
     x = LayerNormalization()(x)
     x = LSTM(unit_2, dropout=drop_2)(x, mask=mask)
     x = LayerNormalization()(x)
@@ -43,7 +40,8 @@ def build_lstm_att(unit_1=256, unit_2=256, drop_1=0.2, drop_2=0.2, n_classes=5):
     return model 
 
 def build_mpl_att(n_layers=3, units=[1024,512,256], n_classes=5):
-    inputs = tf.keras.Input(shape=(256))
+    inputs = tf.keras.Input(shape=(200))
+    
     x_mean = tf.expand_dims(tf.reduce_mean(inputs, 1), 1)
     x_std = tf.expand_dims(tf.math.reduce_std(inputs, 1), 1)
     x = (inputs - x_mean)/x_std
@@ -51,7 +49,7 @@ def build_mpl_att(n_layers=3, units=[1024,512,256], n_classes=5):
     x = Dense(units[0], activation='relu')(x)
     x = Dense(units[1], activation='relu')(x)
     x = Dense(units[2], activation='relu')(x)
-    x = LayerNormalization()(x)
+#     x = LayerNormalization()(x)
     x = Dense(n_classes)(x)
     model = tf.keras.Model(inputs=inputs, outputs=x)
     return model
@@ -80,53 +78,29 @@ def run(opt):
     y_train = tf.one_hot(y_train, n_classes) # One-hot encoding
     
     
-    optimizer = Adam(learning_rate=opt.lr)        
+           
     # Init. classifier
     if opt.mode == 0: # LSTM + ATT
         # Formatting data
         x_train = np.concatenate([x_0, x_1])
         m_train = np.concatenate([m_0, m_1])
         x_train = [x_train, m_train]
+        
         # Create model
-        if os.path.isfile(opt.conf):
-            print('[INFO] LOADING PREDEFINED CONFIG')
-            with open(opt.conf, 'r') as f:
-                config = json.load(f)
-            print(config)
-            model = build_lstm_att(unit_1=config['units_0'], unit_2=config['units_1'], 
-                           drop_1=config['dropout_0'], drop_2=config['dropout_1'], 
-                           n_classes=n_classes)
-            if config['optimizer'] == 'Adam':
-                optimizer = Adam(learning_rate=config['adam_learning_rate'])
-            else:
-                optimizer = RMSprop(learning_rate=config['rmsprop_learning_rate'])
-        else:
-            model = build_lstm_att(n_classes=n_classes)
-            
+        model = build_lstm_att(n_classes=n_classes)
+        optimizer = Adam(learning_rate=opt.lr) 
         
         target_dir = os.path.join(opt.p, 'lstm_att')
         
     if opt.mode == 1: # MLP + ATT
         # Formatting data
-        mean_1 = np.sum(x_0*m_0, 1)/tf.reduce_sum(m_0)
-        mean_2 = np.sum(x_1*m_1, 1)/tf.reduce_sum(m_1)
+        mean_1 = np.mean(x_0, 2)#np.sum(x_0*m_0, 1)/tf.reduce_sum(m_0)
+        mean_2 = np.mean(x_1, 2)#np.sum(x_1*m_1, 1)/tf.reduce_sum(m_1)
         x_train = np.concatenate([mean_1, mean_2])
 
         # Create model
-        if os.path.isfile(opt.conf):
-            print('[INFO] LOADING PREDEFINED CONFIG')
-            with open(opt.conf, 'r') as f:
-                config = json.load(f) 
-            units = [val for key, val in config.items() if 'n_units'in key]
-            model = build_mpl_att(n_layers=config['n_layers'], units=units, n_classes=n_classes)
-            if config['optimizer'] == 'Adam':
-                optimizer = Adam(learning_rate=config['adam_learning_rate'])
-            else:
-                optimizer = RMSprop(learning_rate=config['rmsprop_learning_rate'])
-        else:
-            model = build_mpl_att(n_classes=n_classes)
-            
-        
+        model = build_mpl_att(n_classes=n_classes)
+        optimizer = Adam(learning_rate=opt.lr) 
         target_dir = os.path.join(opt.p, 'mlp_att')
         
         
@@ -137,23 +111,8 @@ def run(opt):
         x_train = [x_train, m_train]
         
         # Create model
-        if os.path.isfile(opt.conf):
-            print('[INFO] LOADING PREDEFINED CONFIG')
-            with open(opt.conf, 'r') as f:
-                config = json.load(f)
-            print(config)
-            model = build_lstm(unit_1=config['units_0'], unit_2=config['units_1'], 
-                                   drop_1=config['dropout_0'], drop_2=config['dropout_1'], 
-                                   n_classes=n_classes)
-            if config['optimizer'] == 'Adam':
-                optimizer = Adam(learning_rate=config['adam_learning_rate'])
-            else:
-                optimizer = RMSprop(learning_rate=config['rmsprop_learning_rate'])
-        else:
-            model = build_lstm(n_classes=n_classes)
-            
-
-
+        model = build_lstm(n_classes=n_classes)
+        optimizer = Adam(learning_rate=opt.lr) 
         target_dir = os.path.join(opt.p, 'lstm')
         
     # Creating (--p)royect directory

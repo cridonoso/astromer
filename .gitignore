@@ -9,3 +9,4 @@ runs
 .Trash-0/
 clf_runs
 docker-compose.yml
+weights

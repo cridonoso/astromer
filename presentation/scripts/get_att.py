@@ -7,8 +7,7 @@ import time
 import h5py
 import os
 
-from core.classifier import get_lstm_attention, get_lstm_no_attention, get_fc_attention, train
-from core.data  import clf_records
+from core.data  import pretraining_records
 from core.utils import get_folder_name
 from time import gmtime, strftime
 from core.astromer import get_ASTROMER
@@ -62,7 +61,7 @@ def run(opt):
         inp_vectors.append(batch['input'])
         time_vectors.append(batch['times'])
         mask_vectors.append(batch['mask_in'])
-        ids_vectors.append(batch['lcid'])
+        ids_vectors.append(batch['id'])
 
     attention_vectors = tf.concat(attention_vectors, 0)
     inp_vectors       = tf.concat(inp_vectors, 0)
