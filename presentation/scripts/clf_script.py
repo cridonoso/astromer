@@ -14,13 +14,14 @@ datasets = ['{}_20'.format(data_name),
             '{}_500'.format(data_name), 
             ]
 patience = 100
-#'{}'.format(data_name)
+# datasets = ['{}'.format(data_name)]
 for dataset in datasets:
     for mode in ['0', '1', '2']: 
         print('{} on mode {}'.format(dataset, mode))
         command1 = 'python -m presentation.scripts.classification \
                         --data ./embeddings/{}/fold_{}/{} \
-                        --p ./{}/{}/fold_{} \
+                        --p ./experiments_2/{}/{}/fold_{} \
+                        --batch-size 256 \
                         --mode {} \
                         --patience {} \
                         --gpu {}'.format(data_name, fold_n, dataset,

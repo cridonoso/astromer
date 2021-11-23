@@ -15,27 +15,26 @@ datasets = ['{}_20'.format(data_name),
 astroweights = './weights/astromer_10022021/finetuning'
 
 take = 5
-for dataset in datasets:
-    for name in ['train', 'val', 'test']:
-        if name == 'test':
-            take = -1
-        else:
-            take = 5
-            
-        start = time.time()
-        command1 = 'python -m presentation.scripts.get_att \
-                   --data ./data/records/{}/{} \
-                   --batch-size 2000 \
-                   --take {}\
-                   --w {}/{} \
-                   --p ./embeddings/{}/{}.h5 '.format(dataset,name,
-                                                      take,  
-                                                      astroweights, dataset,
-                                                      dataset, name)
-        try:
-            subprocess.call(command1, shell=True)
-        except Exception as e:
-            print(e)
+for fold_n in range(3):
+    for dataset in datasets:
+        for name in ['train', 'val', 'test']:
+            if name == 'test':
+                take = -1
+            else:
+                take = 5
 
-        end = time. time()
-        print('{} takes {:.2f} sec'.format(dataset, (end - start)))
+            start = time.time()
+            command1 = 'python -m presentation.scripts.get_att \
+                       --data ./data/records/{}/fold_{}/{}/{} \
+                       --batch-size 2000 \
+                       --w {}/{}_f1 \
+                       --p ./embeddings/{}/fold_{}/{}/{}.h5 '.format(data_name,fold_n,dataset, name,
+                                                                     astroweights, dataset,
+                                                                     data_name, fold_n, dataset, name)
+            try:
+                subprocess.call(command1, shell=True)
+            except Exception as e:
+                print(e)
+
+            end = time. time()
+            print('{} takes {:.2f} sec'.format(dataset, (end - start)))
