@@ -18,7 +18,7 @@ patience = 100
 # datasets = ['{}'.format(data_name)]
 for dataset in datasets:
     for fold_n in range(3):
-        for mode in ['0', '1', '2']: 
+        for mode in ['0', '1', '2']:
             print('{} on mode {}'.format(dataset, mode))
             command1 = 'python -m presentation.scripts.classification \
                             --data ./embeddings/{}/fold_{}/{} \
