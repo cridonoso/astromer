@@ -339,8 +339,18 @@ def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
 
     return input_dict
 
+def format_label(input_dict, num_cls):
+    x = {
+    'input':input_dict['input'],
+    'times':input_dict['times'],
+    'mask_in':input_dict['mask_in']
+    }
+    y = tf.one_hot(input_dict['label'], num_cls)
+    return x, y
+
 def pretraining_records(source, batch_size, max_obs=100, msk_frac=0.2,
-                        rnd_frac=0.1, same_frac=0.1, sampling=False, shuffle=False):
+                        rnd_frac=0.1, same_frac=0.1, sampling=False,
+                        shuffle=False, n_classes=-1):
     """
     Pretraining data loader.
     This method build the ASTROMER input format.
@@ -375,6 +385,11 @@ def pretraining_records(source, batch_size, max_obs=100, msk_frac=0.2,
     if not sampling:
         dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
     dataset = dataset.map(fn_1)
+    if n_classes!=-1:
+        print('[INFO] Processing labels')
+        fn_2 = adjust_fn(format_label, n_classes)
+        dataset = dataset.map(fn_2)
+
     dataset = dataset.padded_batch(batch_size).cache()
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
