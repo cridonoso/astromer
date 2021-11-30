@@ -38,9 +38,9 @@ def build_lstm(maxlen, n_classes):
     x_max = tf.reduce_max(x)
     x = (x - x_min)/(x_max-x_min)
 
-    x = LSTM(256, dropout=.5, return_sequences=True)(x, mask=mask)
+    x = LSTM(256, dropout=.2, return_sequences=True)(x, mask=mask)
     x = LayerNormalization()(x)
-    x = LSTM(256, dropout=.5)(x, mask=mask)
+    x = LSTM(256, dropout=.2)(x, mask=mask)
     x = LayerNormalization()(x)
     x = Dense(n_classes)(x)
     return Model(inputs=placeholder, outputs=x, name="FCATT")
@@ -59,10 +59,10 @@ def build_lstm_att(astromer, maxlen, n_classes, train_astromer=False):
 
     mask = tf.cast(1.-placeholder['mask_in'][...,0], dtype=tf.bool)
 
-    x = encoder(placeholder)
-    x = LSTM(256, dropout=.5, return_sequences=True)(x, mask=mask)
+    x = encoder(placeholder, training=False)
+    x = LSTM(256, dropout=.2, return_sequences=True)(x, mask=mask)
     x = LayerNormalization()(x)
-    x = LSTM(256, dropout=.5)(x, mask=mask)
+    x = LSTM(256, dropout=.2)(x, mask=mask)
     x = LayerNormalization()(x)
     x = Dense(n_classes)(x)
     return Model(inputs=placeholder, outputs=x, name="FCATT")
@@ -81,7 +81,7 @@ def build_mlp_att(astromer, maxlen, n_classes, train_astromer=False):
 
     mask = 1.-placeholder['mask_in']
 
-    x = encoder(placeholder)
+    x = encoder(placeholder, training=False)
     x = x * mask
     x = tf.reduce_sum(x, 1)/tf.reduce_sum(mask, 1)
 
@@ -201,7 +201,7 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--epochs', default=10000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=200, type=int,
+    parser.add_argument('--patience', default=30, type=int,
                         help='batch size')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
