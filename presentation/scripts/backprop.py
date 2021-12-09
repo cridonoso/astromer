@@ -20,9 +20,41 @@ from core.astromer import get_ASTROMER
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
+logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings\
 
+def normalize_batch(tensor):
+    min_ = tf.expand_dims(tf.reduce_min(tensor, 1), 1)
+    max_ = tf.expand_dims(tf.reduce_max(tensor, 1), 1)
+    tensor = tf.math.divide_no_nan(tensor - min_, max_ - min_)
+    return tensor
+
+class NormedLSTMCell(tf.keras.layers.Layer):
+
+    def __init__(self, units, **kwargs):
+        self.units = units
+        self.state_size = ((self.units, self.units), (self.units, self.units))
+
+        super(NormedLSTMCell, self).__init__(**kwargs)
+
+        self.cell_0 = tf.keras.layers.LSTMCell(self.units)
+        self.cell_1 = tf.keras.layers.LSTMCell(self.units)
+        self.bn = LayerNormalization(name='bn_step')
+
+    def call(self, inputs, states, training=False):
+        s0, s1 = states[0], states[1]
+        output, s0 = self.cell_0(inputs, states=s0, training=training)
+        output = self.bn(output, training=training)
+        output, s1 = self.cell_1(output, states=s1, training=training)
+        return output, [s0, s1]
+    
+    def get_config(self):
+        config = super(NormedLSTMCell, self).get_config().copy()
+        config.update({"units": self.units})
+        return config
+
+    
 def build_lstm(maxlen, n_classes):
+    print('[INFO] Building LSTM Baseline')
     serie  = Input(shape=(maxlen, 1), batch_size=None, name='input')
     times  = Input(shape=(maxlen, 1), batch_size=None, name='times')
     mask   = Input(shape=(maxlen, 1), batch_size=None, name='mask')
@@ -30,20 +62,25 @@ def build_lstm(maxlen, n_classes):
     placeholder = {'input':serie,
                    'mask_in':mask,
                    'times':times}
-    mask = tf.cast(1.-placeholder['mask_in'][...,0], dtype=tf.bool)
+    
+    m = tf.cast(1.-placeholder['mask_in'][...,0], tf.bool)
+    tim = normalize_batch(placeholder['times'])
+    inp = normalize_batch(placeholder['input'])
+    x = tf.concat([tim, inp], 2)
 
-    x = tf.concat([placeholder['times'], placeholder['input']], 2)
+    cell_0 = NormedLSTMCell(units=256)
+    dense  = Dense(n_classes, name='FCN')
 
-    x_min = tf.reduce_min(x)
-    x_max = tf.reduce_max(x)
-    x = (x - x_min)/(x_max-x_min)
+    s0 = [tf.zeros([tf.shape(x)[0], 256]),
+          tf.zeros([tf.shape(x)[0], 256])]
+    s1 = [tf.zeros([tf.shape(x)[0], 256]),
+          tf.zeros([tf.shape(x)[0], 256])]
 
-    x = LSTM(256, dropout=.2, return_sequences=True)(x, mask=mask)
-    x = LayerNormalization()(x)
-    x = LSTM(256, dropout=.2)(x, mask=mask)
-    x = LayerNormalization()(x)
-    x = Dense(n_classes)(x)
-    return Model(inputs=placeholder, outputs=x, name="FCATT")
+    rnn = tf.keras.layers.RNN(cell_0, return_sequences=False)
+    x = rnn(x, initial_state=[s0, s1], mask=m)
+    x = tf.nn.dropout(x, .3)
+    x = dense(x)
+    return Model(placeholder, outputs=x, name="LSTM")
 
 def build_lstm_att(astromer, maxlen, n_classes, train_astromer=False):
     serie  = Input(shape=(maxlen, 1), batch_size=None, name='input')
@@ -60,9 +97,11 @@ def build_lstm_att(astromer, maxlen, n_classes, train_astromer=False):
     mask = tf.cast(1.-placeholder['mask_in'][...,0], dtype=tf.bool)
 
     x = encoder(placeholder, training=False)
-    x = LSTM(256, dropout=.2, return_sequences=True)(x, mask=mask)
+    x = tf.math.divide_no_nan(x-tf.expand_dims(tf.reduce_mean(x, 1),1),
+                              tf.expand_dims(tf.math.reduce_std(x, 1), 1))        
+    x = LSTM(256, dropout=.3, return_sequences=True)(x, mask=mask)
     x = LayerNormalization()(x)
-    x = LSTM(256, dropout=.2)(x, mask=mask)
+    x = LSTM(256, dropout=.3)(x, mask=mask)
     x = LayerNormalization()(x)
     x = Dense(n_classes)(x)
     return Model(inputs=placeholder, outputs=x, name="FCATT")
@@ -92,6 +131,7 @@ def build_mlp_att(astromer, maxlen, n_classes, train_astromer=False):
     x = Dense(1024, activation='relu')(x)
     x = Dense(512, activation='relu')(x)
     x = Dense(256, activation='relu')(x)
+    x = LayerNormalization()(x)
     x = Dense(n_classes)(x)
     return Model(inputs=placeholder, outputs=x, name="FCATT")
 
@@ -165,7 +205,6 @@ def run(opt):
     tb = TensorBoard(log_dir=os.path.join(target_dir, 'logs'),
                      write_graph=False,
                      write_images=False,
-                     write_steps_per_second=False,
                      update_freq='epoch',
                      profile_batch=0,
                      embeddings_freq=0,
@@ -201,7 +240,7 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--epochs', default=10000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=30, type=int,
+    parser.add_argument('--patience', default=20, type=int,
                         help='batch size')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
