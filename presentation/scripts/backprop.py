@@ -124,10 +124,6 @@ def build_mlp_att(astromer, maxlen, n_classes, train_astromer=False):
     x = x * mask
     x = tf.reduce_sum(x, 1)/tf.reduce_sum(mask, 1)
 
-    x_mean = tf.expand_dims(tf.reduce_mean(x, 1), 1)
-    x_std = tf.expand_dims(tf.math.reduce_std(x, 1), 1)
-    x = (x - x_mean)/x_std
-
     x = Dense(1024, activation='relu')(x)
     x = Dense(512, activation='relu')(x)
     x = Dense(256, activation='relu')(x)
