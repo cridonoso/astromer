@@ -13,10 +13,11 @@ dataset_id = {
 		'gaia'  : '1VgG2RNi88VcVnpE_MgOYPFjS8A42KXTJ',
 		'css'   : '1ZgSMYetSss8hqLMEBXhVjgo2hCHFdMBf',
 		'asas'  : '1ouQmBedVok5LNH2u2aEQjAvl0KchrmTI',
-        'macho_xl':'1ZyGdqoW2Fg3x91GgS6zq57SPBar7ndqx'
+        'macho_xl':'1ZyGdqoW2Fg3x91GgS6zq57SPBar7ndqx',
+         'atlas':'183e7Hu6suc4lvHzbaD6nq6BdEfFv9BT1'
 	},
 	'record':{
-		'ztf'   : '',
+		'huge'   : '1u7DTElENnUOXq3w2a_n8nTaOZQZBRQ6s',
 		'wise'  : '1zfRvNtzBgdkM1l3_Drhq3BEJoGapp2R6',
 		'ogle'  : '',
 		'macho' : '1t2M7aqM4JiwapN-CR3Gd36AWwRE1efkB',

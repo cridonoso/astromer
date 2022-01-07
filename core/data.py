@@ -60,7 +60,7 @@ def get_example(lcid, label, lightcurve):
                                   feature_lists= element_lists)
     return ex
 
-def divide_training_subset(frame, train, val):
+def divide_training_subset(frame, train, val, test_meta):
     """
     Divide the dataset into train, validation and test subsets.
     Notice that:
@@ -77,52 +77,28 @@ def divide_training_subset(frame, train, val):
 
     frame = frame.sample(frac=1)
     n_samples = frame.shape[0]
+    
     n_train = int(n_samples*train)
     n_val = int(n_samples*val//2)
+    
+    if test_meta is not None:
+        sub_test = test_meta
+        sub_train = frame.iloc[:n_train]
+        sub_val   = frame.iloc[n_train:]
+    else:
+        sub_train = frame.iloc[:n_train]
+        sub_val   = frame.iloc[n_train:n_train+n_val]
+        sub_test  = frame.iloc[n_train+n_val:]
 
-    sub_train = frame.iloc[:n_train]
-    sub_val   = frame.iloc[n_train:n_train+n_val]
-    sub_test  = frame.iloc[n_train+n_val:]
-
-    return ('train', sub_train), ('val', sub_val), ('test', sub_test)
-
-def process_lc(row, source, unique_classes, writer):
-    """
-    Filter a sample according to our astronomical criteria and write
-    example in the corresponding record.
-
-    Args:
-        row (Pandas serie): Dataframe row containing information about
-                            a particular sample
-        source (string):  Lightcurves folder path
-        unique_classes (list): list with unique classes
-        writer (tf.writer) : record writer
-
-    """
-
-    path  = row['Path'].split('/')[-1]
-    label = list(unique_classes).index(row['Class'])
-    lc_path = os.path.join(source, path)
-    try:
-        observations = pd.read_csv(lc_path)
-
-        observations.columns = ['mjd', 'mag', 'errmag']
-        observations = observations.dropna()
-        observations.sort_values('mjd')
-        observations = observations.drop_duplicates(keep='last')
-        numpy_lc = observations.values
-        ex = get_example(row['ID'], label, numpy_lc)
-        writer.write(ex.SerializeToString())
-    except:
-        print('[ERROR] {} Lightcurve could not be processed.'.format(row['ID']))
+    return ('train', sub_train), ('val', sub_val), ('test', test_meta)
 
 @wrap_non_picklable_objects
-def process_lc2(row, source, unique_classes):
+def process_lc2(row, source, unique_classes, **kwargs):
     path  = row['Path'].split('/')[-1]
     label = list(unique_classes).index(row['Class'])
     lc_path = os.path.join(source, path)
 
-    observations = pd.read_csv(lc_path)
+    observations = pd.read_csv(lc_path, **kwargs)
     observations.columns = ['mjd', 'mag', 'errmag']
     observations = observations.dropna()
     observations.sort_values('mjd')
@@ -139,13 +115,13 @@ def process_lc3(lc_index, label, numpy_lc, writer):
     except:
         print('[INFO] {} could not be processed'.format(lc_index))
 
-def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None, max_obs=200):
+def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None, max_obs=200, **kwargs):
     # Get frames with fixed number of lightcurves
     collection = [frame.iloc[i:i+max_lcs_per_record] \
                   for i in range(0, frame.shape[0], max_lcs_per_record)]
 
     for counter, subframe in enumerate(collection):
-        var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique) \
+        var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique, **kwargs) \
                                     for k, row in subframe.iterrows())
 
         with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
@@ -157,7 +133,9 @@ def create_dataset(meta_df,
                    target='data/records/macho/',
                    n_jobs=None,
                    subsets_frac=(0.5, 0.25),
-                   max_lcs_per_record=100):
+                   test_subset=None,
+                   max_lcs_per_record=100,
+                   **kwargs): # kwargs contains additional arguments for the read_csv() function 
     os.makedirs(target, exist_ok=True)
 
     bands = meta_df['Band'].unique()
@@ -177,12 +155,13 @@ def create_dataset(meta_df,
     for cls_name, cls_meta in tqdm(cls_groups, total=len(cls_groups)):
         subsets = divide_training_subset(cls_meta,
                                          train=subsets_frac[0],
-                                         val=subsets_frac[0])
+                                         val=subsets_frac[0],
+                                         test_meta = test_subset)
 
         for subset_name, frame in subsets:
             dest = os.path.join(target, subset_name, cls_name)
             os.makedirs(dest, exist_ok=True)
-            write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs)
+            write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs, **kwargs)
 
 # ==============================
 # ====== LOADING FUNCTIONS =====

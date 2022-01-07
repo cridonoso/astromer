@@ -163,18 +163,18 @@ def run(opt):
 
     weights_path = '{}/weights'.format(opt.w)
     model.load_weights(weights_path)
-
+    print(opt.finetune)
     if opt.mode == 0:
         model = build_lstm_att(model,
                                maxlen=opt.max_obs,
                                n_classes=num_cls,
-                               train_astromer=False)
+                               train_astromer=opt.finetune)
         target_dir = os.path.join(opt.p, 'lstm_att')
     if opt.mode == 1:
         model = build_mlp_att(model,
                               maxlen=opt.max_obs,
                               n_classes=num_cls,
-                              train_astromer=False)
+                              train_astromer=opt.finetune)
         target_dir = os.path.join(opt.p, 'mlp_att')
 
     if opt.mode == 2:
@@ -225,7 +225,7 @@ if __name__ == '__main__':
     # ASTROMER
     parser.add_argument('--w', default="./runs/huge", type=str,
                         help='ASTROMER pretrained weights')
-
+    parser.add_argument('--finetune', action='store_true', default=False)
     # TRAINING PAREMETERS
     parser.add_argument('--data', default='./data/records/alcock', type=str,
                         help='Dataset folder containing the records files')

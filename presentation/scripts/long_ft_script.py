@@ -9,10 +9,7 @@ gpu = sys.argv[1]
 ds_name = sys.argv[2]
 print(ds_name)
 
-datasets = ['{}_20'.format(ds_name), 
-            '{}_50'.format(ds_name), 
-            '{}_100'.format(ds_name), 
-            '{}_500'.format(ds_name)]
+datasets = ['{}'.format(ds_name)]
 
 astroweights = './weights/astromer'
 
