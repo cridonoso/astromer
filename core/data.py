@@ -305,6 +305,9 @@ def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
         mask_fill = tf.ones([max_obs - time_steps, 1], dtype=tf.float32)
         mask_out  = tf.concat([mask_out, 1-mask_fill], 0)
         mask_in   = tf.concat([mask_in, mask_fill], 0)
+        seq_magn   = tf.concat([seq_magn, 1-mask_fill], 0)
+        seq_time   = tf.concat([seq_time, 1-mask_fill], 0)
+        orig_magn   = tf.concat([orig_magn, 1-mask_fill], 0)
 
     input_dict = dict()
     input_dict['output']   = orig_magn
@@ -347,9 +350,13 @@ def pretraining_records(source, batch_size, max_obs=100, msk_frac=0.2,
     Returns:
         Tensorflow Dataset: Iterator withg preprocessed batches
     """
-    rec_paths = [os.path.join(source, folder, x) for folder in os.listdir(source) \
-                 for x in os.listdir(os.path.join(source, folder))]
-
+    rec_paths = []
+    for folder in os.listdir(source):
+        if folder.endswith('.csv'):
+            continue
+        for x in os.listdir(os.path.join(source, folder)):
+            rec_paths.append(os.path.join(source, folder, x))
+                             
     if sampling:
         fn_0 = adjust_fn(sample_lc, max_obs)
     else:
@@ -361,9 +368,12 @@ def pretraining_records(source, batch_size, max_obs=100, msk_frac=0.2,
     if shuffle:
         dataset = dataset.shuffle(10000)
     dataset = dataset.map(fn_0)
+    
     if not sampling:
         dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
+    
     dataset = dataset.map(fn_1)
+    
     if n_classes!=-1:
         print('[INFO] Processing labels')
         fn_2 = adjust_fn(format_label, n_classes)
@@ -374,40 +384,13 @@ def pretraining_records(source, batch_size, max_obs=100, msk_frac=0.2,
 
     return dataset
 
-def _parse_normal(sample, max_obs):
-    '''
-    Specific task formater
-    '''
-    input_dict = deserialize(sample)
-
-    sequence = sample_lc(input_dict['input'], max_obs)
-
-    mask = tf.reduce_sum(sequence, 1)
-    curr_max_obs = tf.reduce_sum(mask, 0)
-    mask = 1.-tf.math.divide_no_nan(mask, mask)
-
-    sequence = standardize(sequence)
-    seq_time = tf.slice(sequence, [0, 0], [max_obs, 1])
-    seq_magn = tf.slice(sequence, [0, 1], [max_obs, 1])
-    seq_errs = tf.slice(sequence, [0, 2], [max_obs, 1])
-
-    mask = tf.reshape(mask, [max_obs, 1])
-
-    input_dict['input']    = seq_magn
-    input_dict['times']    = seq_time
-    input_dict['obserr']   = seq_errs
-    input_dict['mask_in']  = mask
-    input_dict['length']   = curr_max_obs
-
-    return input_dict
-
 def adjust_fn_clf(func, max_obs):
     def wrap(*args, **kwargs):
         result = func(*args, max_obs)
         return result
     return wrap
 
-def clf_records(source, batch_size, max_obs=100, take=1):
+def balanced_records(source, batch_size, n_classes, max_obs=200, sampling=False, take=1):
     """
     Classification data loader.
     It creates ASTROMER-like input but without masking
@@ -423,25 +406,28 @@ def clf_records(source, batch_size, max_obs=100, take=1):
         Tensorflow Dataset: Iterator withg preprocessed batches
     """
 
-    fn = adjust_fn_clf(_parse_normal, max_obs)
-    rec_paths = [os.path.join(source, folder, x) for folder in os.listdir(source) \
-                 for x in os.listdir(os.path.join(source, folder))]
-
-    if take < 0:
-        print('[INFO] No shuffle No Oversampling'.format(take))
-        dataset = tf.data.TFRecordDataset(rec_paths)
-        dataset = dataset.map(fn).cache()
-        dataset = dataset.batch(batch_size)
-        dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
-        return dataset
+    if sampling:
+        fn_0 = adjust_fn(sample_lc, max_obs)
     else:
-        print('[INFO] Taking {} balanced batches'.format(take))
-        datasets = [tf.data.TFRecordDataset(x) for x in rec_paths]
-        datasets = [dataset.repeat() for dataset in datasets]
-        dataset = tf.data.experimental.sample_from_datasets(datasets)
-        dataset = dataset.map(fn)
-        dataset = dataset.batch(batch_size)
-        dataset = dataset.take(take)
-        # dataset = dataset.cache()
-        dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-        return dataset
+        fn_0 = adjust_fn(get_windows, max_obs)
+    
+    fn_1 = adjust_fn(mask_sample, 0., 0., 0., max_obs)
+    fn_2 = adjust_fn(format_label, n_classes)
+        
+    rec_paths = []
+    for folder in os.listdir(source):
+        partial = []
+        for x in os.listdir(os.path.join(source, folder)):
+            partial.append(os.path.join(source, folder, x))
+        rec_paths.append(partial)
+
+    datasets = [tf.data.TFRecordDataset(x) for x in rec_paths]
+    datasets = [dataset.repeat() for dataset in datasets]
+    dataset = tf.data.experimental.sample_from_datasets(datasets)
+    dataset = dataset.map(fn_0)
+    dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
+    dataset = dataset.map(fn_1)
+    dataset = dataset.map(fn_2)
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch(buffer_size=2)
+    return dataset.take(take)

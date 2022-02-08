@@ -136,27 +136,27 @@ def run(opt):
     # Loading data
     num_cls = pd.read_csv(os.path.join(opt.data, 'objects.csv')).shape[0]
 
-    train_batches = balanced_records(os.path.join(opt.data, 'train'), 
-                                     opt.batch_size, 
-                                     n_classes=num_cls, 
-                                     max_obs=opt.max_obs,
-                                     take=1000)
-    val_batches = balanced_records(os.path.join(opt.data, 'val'), 
-                                     opt.batch_size, 
-                                     n_classes=num_cls, 
-                                     max_obs=opt.max_obs,
-                                     take=1000)
-#     train_batches = pretraining_records(os.path.join(opt.data, 'train'),
-#                                         opt.batch_size, max_obs=opt.max_obs,
-#                                         msk_frac=0., rnd_frac=0., same_frac=0.,
-#                                         sampling=False, shuffle=True,
-#                                         n_classes=num_cls)
+#     train_batches = balanced_records(os.path.join(opt.data, 'train'), 
+#                                      opt.batch_size, 
+#                                      n_classes=num_cls, 
+#                                      max_obs=opt.max_obs,
+#                                      take=1000)
+#     val_batches = balanced_records(os.path.join(opt.data, 'val'), 
+#                                      opt.batch_size, 
+#                                      n_classes=num_cls, 
+#                                      max_obs=opt.max_obs,
+#                                      take=1000)
+    train_batches = pretraining_records(os.path.join(opt.data, 'train'),
+                                        opt.batch_size, max_obs=opt.max_obs,
+                                        msk_frac=0., rnd_frac=0., same_frac=0.,
+                                        sampling=False, shuffle=True,
+                                        n_classes=num_cls)
 
-#     val_batches = pretraining_records(os.path.join(opt.data, 'val'),
-#                                       opt.batch_size, max_obs=opt.max_obs,
-#                                       msk_frac=0., rnd_frac=0., same_frac=0.,
-#                                       sampling=False, shuffle=False,
-#                                       n_classes=num_cls)
+    val_batches = pretraining_records(os.path.join(opt.data, 'val'),
+                                      opt.batch_size, max_obs=opt.max_obs,
+                                      msk_frac=0., rnd_frac=0., same_frac=0.,
+                                      sampling=False, shuffle=False,
+                                      n_classes=num_cls)
 
     conf_file = os.path.join(opt.w, 'conf.json')
     with open(conf_file, 'r') as handle:
