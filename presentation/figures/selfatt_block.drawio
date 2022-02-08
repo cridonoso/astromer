@@ -1,6 +1,6 @@
-<mxfile host="app.diagrams.net" modified="2021-12-28T14:14:43.526Z" agent="5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36" etag="Z6OvEE-hlllFUJ5CtIpF" version="16.1.0" type="github">
+<mxfile host="app.diagrams.net" modified="2022-02-08T03:59:50.786Z" agent="5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36" etag="lzUok9MbywvR5WPTB4tF" version="16.4.5" type="github">
   <diagram id="1RFPZSgYPdv8vxJ3tSGE" name="Page-1">
-    <mxGraphModel dx="1010" dy="1044" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="1" shadow="0">
+    <mxGraphModel dx="1106" dy="1044" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="1" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -103,7 +103,7 @@
         <mxCell id="Ks4agTKRWIQxYl3Itglz-32" value="" style="shape=waypoint;sketch=0;size=6;pointerEvents=1;points=[];fillColor=#000000;resizable=0;rotatable=0;perimeter=centerPerimeter;snapToPoint=1;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
           <mxGeometry x="220" y="435" width="40" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="Ks4agTKRWIQxYl3Itglz-54" value="$$\rm{Z} \in \mathbb{R}^{L\times d_k}$$" style="text;html=1;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Times New Roman;fontSize=11;strokeWidth=2;" parent="1" vertex="1">
+        <mxCell id="Ks4agTKRWIQxYl3Itglz-54" value="&lt;font style=&quot;font-size: 13px&quot;&gt;$$\rm{Z} \in \mathbb{R}^{L\times d_k}$$&lt;/font&gt;" style="text;html=1;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Times New Roman;fontSize=11;strokeWidth=2;" parent="1" vertex="1">
           <mxGeometry x="141" y="261" width="182" height="19" as="geometry" />
         </mxCell>
         <mxCell id="Ks4agTKRWIQxYl3Itglz-46" value="Scaled dot-product" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=2;fillColor=default;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
@@ -121,10 +121,10 @@
         <mxCell id="Ks4agTKRWIQxYl3Itglz-82" value="$$L-1$$" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
           <mxGeometry x="220" y="426" width="60" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="Ks4agTKRWIQxYl3Itglz-83" value="$$\mathrm{X} \in \mathbb{R}^{L\times &lt;br&gt;d_{pe}}$$" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+        <mxCell id="Ks4agTKRWIQxYl3Itglz-83" value="&lt;font style=&quot;font-size: 13px&quot;&gt;$$\mathrm{X} \in \mathbb{R}^{L\times &lt;br&gt;d_{pe}}$$&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
           <mxGeometry x="60" y="519" width="60" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="Ks4agTKRWIQxYl3Itglz-85" value="Normlize" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
+        <mxCell id="Ks4agTKRWIQxYl3Itglz-85" value="Normalize" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Times New Roman;fontSize=11;" parent="1" vertex="1">
           <mxGeometry x="239" y="291" width="60" height="30" as="geometry" />
         </mxCell>
       </root>
