@@ -10,3 +10,5 @@ runs
 clf_runs
 docker-compose.yml
 weights
+exp_jan2022/
+presentation/backup/
