@@ -42,14 +42,16 @@ def run(opt):
     train_batches = pretraining_records(os.path.join(opt.data, 'train'),
                                         opt.batch_size,
                                         max_obs=opt.max_obs,
-                                        no_shuffle=opt.no_shuffle,
+                                        shuffle=True,
+                                        sampling=True,
                                         msk_frac=opt.msk_frac,
                                         rnd_frac=opt.rnd_frac,
                                         same_frac=opt.same_frac)
     valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
                                         opt.batch_size,
                                         max_obs=opt.max_obs,
-                                        no_shuffle=opt.no_shuffle,
+                                        shuffle=False,
+                                        sampling=True,
                                         msk_frac=opt.msk_frac,
                                         rnd_frac=opt.rnd_frac,
                                         same_frac=opt.same_frac)
