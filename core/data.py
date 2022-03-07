@@ -8,7 +8,6 @@ import os
 from core.preprocess.masking import get_masked, set_random, pad_sequence
 from core.preprocess.records import write_records, deserialize
 from core.utils import standardize
-from joblib import wrap_non_picklable_objects
 from tqdm import tqdm
 from time import time
 
@@ -45,22 +44,6 @@ def divide_training_subset(frame, train, val, test_meta):
         sub_test  = frame.iloc[n_train+n_val:]
 
     return ('train', sub_train), ('val', sub_val), ('test', test_meta)
-
-@wrap_non_picklable_objects
-def process_lc2(row, source, unique_classes, **kwargs):
-    path  = row['Path'].split('/')[-1]
-    label = list(unique_classes).index(row['Class'])
-    lc_path = os.path.join(source, path)
-
-    observations = pd.read_csv(lc_path, **kwargs)
-    observations.columns = ['mjd', 'mag', 'errmag']
-    observations = observations.dropna()
-    observations.sort_values('mjd')
-    observations = observations.drop_duplicates(keep='last')
-
-    numpy_lc = observations.values
-
-    return row['ID'], label, numpy_lc
 
 def create_dataset(meta_df,
                    source='data/raw_data/macho/MACHO/LCs',

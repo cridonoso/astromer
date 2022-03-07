@@ -1,4 +1,5 @@
 import tensorflow as tf
+from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
 
 def _bytes_feature(value):
@@ -53,13 +54,29 @@ def write_serialized(lc_index, label, numpy_lc, writer):
     except:
         print('[INFO] {} could not be processed'.format(lc_index))
 
+@wrap_non_picklable_objects
+def process_lc(row, source, unique_classes, **kwargs):
+    path  = row['Path'].split('/')[-1]
+    label = list(unique_classes).index(row['Class'])
+    lc_path = os.path.join(source, path)
+
+    observations = pd.read_csv(lc_path, **kwargs)
+    observations.columns = ['mjd', 'mag', 'errmag']
+    observations = observations.dropna()
+    observations.sort_values('mjd')
+    observations = observations.drop_duplicates(keep='last')
+
+    numpy_lc = observations.values
+
+    return row['ID'], label, numpy_lc
+
 def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None, max_obs=200, **kwargs):
     # Get frames with fixed number of lightcurves
     collection = [frame.iloc[i:i+max_lcs_per_record] \
                   for i in range(0, frame.shape[0], max_lcs_per_record)]
 
     for counter, subframe in enumerate(collection):
-        var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique, **kwargs) \
+        var = Parallel(n_jobs=n_jobs)(delayed(process_lc)(row, source, unique, **kwargs) \
                                     for k, row in subframe.iterrows())
 
         with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
