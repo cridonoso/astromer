@@ -1,4 +1,7 @@
 import tensorflow as tf
+import pandas as pd
+import os
+
 from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
 
