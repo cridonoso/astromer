@@ -12,6 +12,7 @@ from core.training.losses import custom_rmse
 from core.astromer import ASTROMER
 
 def run(opt):
+    os.environ["CUDA_VISIBLE_DEVICES"]=opt.gpu
 
     train_ds = load_dataset(os.path.join(opt.data, 'train'))
     val_ds   = load_dataset(os.path.join(opt.data, 'val'))
@@ -96,6 +97,8 @@ if __name__ == '__main__':
                         help='Number of epochs')
     parser.add_argument('--patience', default=40, type=int,
                         help='batch size')
+    parser.add_argument('--gpu', default='0', type=str,
+                        help='GPU to use')
 
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=2, type=int,
