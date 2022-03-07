@@ -42,6 +42,9 @@ def run(opt):
     model.build({'input': [opt.batch_size, opt.max_obs, 1],
                  'mask_in': [opt.batch_size, opt.max_obs, 1],
                  'times': [opt.batch_size, opt.max_obs, 1]})
+    if opt.w != '':
+        print('[INFO] Loading pre-trained weights')
+        model.load_weights(os.path.join(opt.w, 'weights.h5'))
 
     model.compile(optimizer='adam',
                   loss_rec=custom_rmse,
@@ -60,7 +63,6 @@ def run(opt):
     tsb_callback = TensorBoard(
                     log_dir = os.path.join(opt.p, 'logs'),
                     write_graph=False)
-
 
     history = model.fit(train_ds,
                         epochs=opt.epochs,
@@ -86,6 +88,8 @@ if __name__ == '__main__':
                         help='Dataset folder containing the records files')
     parser.add_argument('--p', default="./runs/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
+    parser.add_argument('--w', default="", type=str,
+                        help='pre-trained weights')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
     parser.add_argument('--epochs', default=1000, type=int,
