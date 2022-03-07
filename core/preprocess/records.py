@@ -1,4 +1,5 @@
 import tensorflow as tf
+from joblib import Parallel, delayed
 
 def _bytes_feature(value):
     """Returns a bytes_list from a string / byte."""
