@@ -5,75 +5,76 @@ import json
 import time
 import os
 
-from core.astromer import get_ASTROMER, train
-from core.data  import pretraining_records
-from core.utils import get_folder_name
-from time import gmtime, strftime
-
-logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
-
+from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
+from core.data  import load_dataset, pretraining_pipeline
+from core.training.metrics import custom_r2
+from core.training.losses import custom_rmse
+from core.astromer import ASTROMER
 
 def run(opt):
-    # Get model
-    astromer = get_ASTROMER(num_layers=opt.layers,
-                            d_model=opt.head_dim,
-                            num_heads=opt.heads,
-                            dff=opt.dff,
-                            base=opt.base,
-                            dropout=opt.dropout,
-                            maxlen=opt.max_obs,
-                            use_leak=opt.use_leak,
-                            no_train=opt.no_train)
 
-    # Make sure we don't overwrite a previous training
-    opt.p = get_folder_name(opt.p, prefix='')
+    train_ds = load_dataset(os.path.join(opt.data, 'train'))
+    val_ds   = load_dataset(os.path.join(opt.data, 'val'))
 
-    # Creating (--p)royect directory
-    os.makedirs(opt.p, exist_ok=True)
+    train_ds = pretraining_pipeline(train_ds,
+                                    batch_size=opt.batch_size,
+                                    max_obs=opt.max_obs,
+                                    msk_frac=opt.msk_frac,
+                                    rnd_frac=opt.rnd_frac,
+                                    same_frac=opt.same_frac)
+    val_ds   = pretraining_pipeline(val_ds,
+                                    batch_size=opt.batch_size,
+                                    max_obs=opt.max_obs,
+                                    msk_frac=opt.msk_frac,
+                                    rnd_frac=opt.rnd_frac,
+                                    same_frac=opt.same_frac)
 
-    # Save Hyperparameters
-    conf_file = os.path.join(opt.p, 'conf.json')
-    varsdic = vars(opt)
-    varsdic['exp_date'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-    with open(conf_file, 'w') as json_file:
-        json.dump(varsdic, json_file, indent=4)
+    # Initialize model
+    model = ASTROMER(num_layers= opt.layers,
+                     d_model   = opt.head_dim,
+                     num_heads = opt.heads,
+                     dff       = opt.dff,
+                     base      = opt.base,
+                     dropout   = opt.dropout,
+                     use_leak  = opt.use_leak,
+                     maxlen    = opt.max_obs)
 
-    # Loading data
-    train_batches = pretraining_records(os.path.join(opt.data, 'train'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs,
-                                        shuffle=True,
-                                        sampling=True,
-                                        msk_frac=opt.msk_frac,
-                                        rnd_frac=opt.rnd_frac,
-                                        same_frac=opt.same_frac)
-    valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs,
-                                        shuffle=False,
-                                        sampling=True,
-                                        msk_frac=opt.msk_frac,
-                                        rnd_frac=opt.rnd_frac,
-                                        same_frac=opt.same_frac)
+    model.build({'input': [opt.batch_size, opt.max_obs, 1],
+                 'mask_in': [opt.batch_size, opt.max_obs, 1],
+                 'times': [opt.batch_size, opt.max_obs, 1]})
 
-    # Training ASTROMER
-    train(astromer, train_batches, valid_batches,
-          patience=opt.patience,
-          exp_path=opt.p,
-          epochs=opt.epochs,
-          lr=opt.lr,
-          verbose=0)
+    model.compile(optimizer='adam',
+                  loss_rec=custom_rmse,
+                  metric_rec=custom_r2)
+
+    ckp_callback = ModelCheckpoint(
+                    filepath=os.path.join(opt.p, 'weights.h5'),
+                    save_weights_only=True,
+                    monitor='val_loss',
+                    mode='min',
+                    save_best_only=True)
+    esp_callback = EarlyStopping(monitor ='val_loss',
+                                 mode = 'min',
+                                 patience = opt.patience,
+                                 restore_best_weights=True)
+    tsb_callback = TensorBoard(
+                    log_dir = os.path.join(opt.p, 'logs'),
+                    write_graph=False)
 
 
+    history = model.fit(train_ds,
+                        epochs=opt.epochs,
+                        validation_data=val_ds,
+                        callbacks=[ckp_callback, esp_callback, tsb_callback])
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # DATA
-    parser.add_argument('--max-obs', default=50, type=int,
+    parser.add_argument('--max-obs', default=200, type=int,
                     help='Max number of observations')
 
-    parser.add_argument('--msk-frac', default=0.7, type=float,
+    parser.add_argument('--msk-frac', default=0.5, type=float,
                         help='[MASKED] fraction')
     parser.add_argument('--rnd-frac', default=0.2, type=float,
                         help='Fraction of [MASKED] to be replaced by random values')
@@ -81,15 +82,15 @@ if __name__ == '__main__':
                         help='Fraction of [MASKED] to be replaced by same values')
 
     # TRAINING PAREMETERS
-    parser.add_argument('--data', default='./data/records/macho', type=str,
+    parser.add_argument('--data', default='./data/records/testing/fold_0/testing', type=str,
                         help='Dataset folder containing the records files')
     parser.add_argument('--p', default="./runs/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
-    parser.add_argument('--epochs', default=10000, type=int,
+    parser.add_argument('--epochs', default=1000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=200, type=int,
+    parser.add_argument('--patience', default=40, type=int,
                         help='batch size')
 
     # ASTROMER HIPERPARAMETERS
@@ -110,10 +111,6 @@ if __name__ == '__main__':
 
     parser.add_argument('--use-leak', default=False, action='store_true',
                         help='Add the input to the attention vector')
-    parser.add_argument('--no-train', default=False, action='store_true',
-                        help='Train self-attention layer')
-    parser.add_argument('--no-shuffle', default=False, action='store_true',
-                        help='No shuffle training and validation set')
 
     opt = parser.parse_args()
     run(opt)

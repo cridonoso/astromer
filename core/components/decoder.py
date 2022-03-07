@@ -9,9 +9,9 @@ class RegLayer(Layer):
 		self.reg_layer = Dense(1, name='RegLayer')
 		self.bn_0 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 
-	def call(self, inputs):
+	def call(self, inputs, training=False):
 		x = self.bn_0(inputs)
-		x = self.reg_layer(x)
+		x = self.reg_layer(x, training=training)
 		return x
 
 class SauceLayer(tf.keras.layers.Layer):

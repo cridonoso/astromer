@@ -5,60 +5,15 @@ import numpy as np
 import logging
 import os
 
-from core.masking import get_masked, set_random, get_padding_mask
+from core.preprocess.masking import get_masked, set_random, pad_sequence
+from core.preprocess.records import write_records, deserialize
 from core.utils import standardize
-from joblib import Parallel, delayed
-from tqdm import tqdm
 
+from joblib import Parallel, delayed, wrap_non_picklable_objects
+from tqdm import tqdm
 from time import time
-from joblib import wrap_non_picklable_objects
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
-
-def _bytes_feature(value):
-    """Returns a bytes_list from a string / byte."""
-    if isinstance(value, type(tf.constant(0))):
-        value = value.numpy() # BytesList won't unpack a string from an EagerTensor.
-    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
-
-def _float_feature(list_of_floats):  # float32
-    return tf.train.Feature(float_list=tf.train.FloatList(value=list_of_floats))
-
-def _int64_feature(value):
-    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
-
-def get_example(lcid, label, lightcurve):
-    """
-    Create a record example from numpy values.
-
-    Args:
-        lcid (string): object id
-        label (int): class code
-        lightcurve (numpy array): time, magnitudes and observational error
-
-    Returns:
-        tensorflow record
-    """
-
-    f = dict()
-
-    dict_features={
-    'id': tf.train.Feature(bytes_list=tf.train.BytesList(value=[str(lcid).encode()])),
-    'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label])),
-    'length': tf.train.Feature(int64_list=tf.train.Int64List(value=[lightcurve.shape[0]])),
-    }
-    element_context = tf.train.Features(feature = dict_features)
-
-    dict_sequence = {}
-    for col in range(lightcurve.shape[1]):
-        seqfeat = _float_feature(lightcurve[:, col])
-        seqfeat = tf.train.FeatureList(feature = [seqfeat])
-        dict_sequence['dim_{}'.format(col)] = seqfeat
-
-    element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
-    ex = tf.train.SequenceExample(context = element_context,
-                                  feature_lists= element_lists)
-    return ex
 
 def divide_training_subset(frame, train, val, test_meta):
     """
@@ -77,10 +32,10 @@ def divide_training_subset(frame, train, val, test_meta):
 
     frame = frame.sample(frac=1)
     n_samples = frame.shape[0]
-    
+
     n_train = int(n_samples*train)
     n_val = int(n_samples*val//2)
-    
+
     if test_meta is not None:
         sub_test = test_meta
         sub_train = frame.iloc[:n_train]
@@ -108,26 +63,6 @@ def process_lc2(row, source, unique_classes, **kwargs):
 
     return row['ID'], label, numpy_lc
 
-def process_lc3(lc_index, label, numpy_lc, writer):
-    try:
-        ex = get_example(lc_index, label, numpy_lc)
-        writer.write(ex.SerializeToString())
-    except:
-        print('[INFO] {} could not be processed'.format(lc_index))
-
-def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None, max_obs=200, **kwargs):
-    # Get frames with fixed number of lightcurves
-    collection = [frame.iloc[i:i+max_lcs_per_record] \
-                  for i in range(0, frame.shape[0], max_lcs_per_record)]
-
-    for counter, subframe in enumerate(collection):
-        var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique, **kwargs) \
-                                    for k, row in subframe.iterrows())
-
-        with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
-            for counter2, data_lc in enumerate(var):
-                process_lc3(*data_lc, writer)
-
 def create_dataset(meta_df,
                    source='data/raw_data/macho/MACHO/LCs',
                    target='data/records/macho/',
@@ -135,7 +70,7 @@ def create_dataset(meta_df,
                    subsets_frac=(0.5, 0.25),
                    test_subset=None,
                    max_lcs_per_record=100,
-                   **kwargs): # kwargs contains additional arguments for the read_csv() function 
+                   **kwargs): # kwargs contains additional arguments for the read_csv() function
     os.makedirs(target, exist_ok=True)
 
     bands = meta_df['Band'].unique()
@@ -172,67 +107,32 @@ def adjust_fn(func, *arguments):
         return result
     return wrap
 
-def deserialize(sample):
-    """
-    Read a serialized sample and convert it to tensor
-    Context and sequence features should match with the name used when writing.
-    Args:
-        sample (binary): serialized sample
-
-    Returns:
-        type: decoded sample
-    """
-    context_features = {'label': tf.io.FixedLenFeature([],dtype=tf.int64),
-                        'length': tf.io.FixedLenFeature([],dtype=tf.int64),
-                        'id': tf.io.FixedLenFeature([], dtype=tf.string)}
-    sequence_features = dict()
-    for i in range(3):
-        sequence_features['dim_{}'.format(i)] = tf.io.VarLenFeature(dtype=tf.float32)
-
-    context, sequence = tf.io.parse_single_sequence_example(
-                            serialized=sample,
-                            context_features=context_features,
-                            sequence_features=sequence_features
-                            )
-
-    input_dict = dict()
-    input_dict['lcid']   = tf.cast(context['id'], tf.string)
-    input_dict['length'] = tf.cast(context['length'], tf.int32)
-    input_dict['label']  = tf.cast(context['label'], tf.int32)
-
-    casted_inp_parameters = []
-    for i in range(3):
-        seq_dim = sequence['dim_{}'.format(i)]
-        seq_dim = tf.sparse.to_dense(seq_dim)
-        seq_dim = tf.cast(seq_dim, tf.float32)
-        casted_inp_parameters.append(seq_dim)
-
-
-    sequence = tf.stack(casted_inp_parameters, axis=2)[0]
-    input_dict['input'] = sequence
-    return input_dict
-
-def sample_lc(sample, max_obs):
+def sample_lc(input_dict, max_obs):
     '''
     Sample a random window of "max_obs" observations from the input sequence
     '''
-    input_dict = deserialize(sample)
     sequence = input_dict['input']
-
     serie_len = tf.shape(sequence)[0]
-
     pivot = 0
-    if tf.greater(serie_len, max_obs):
+
+    def fn_true():
         pivot = tf.random.uniform([],
                                   minval=0,
                                   maxval=serie_len-max_obs+1,
                                   dtype=tf.int32)
 
-        sequence = tf.slice(sequence, [pivot,0], [max_obs, -1])
-    else:
-        sequence = tf.slice(sequence, [0,0], [serie_len, -1])
+        return tf.slice(sequence, [pivot,0], [max_obs, -1])
 
-    input_dict['sequence'] = sequence
+
+    def fn_false():
+        return tf.slice(sequence, [0,0], [serie_len, -1])
+
+    sequence = tf.cond(
+                    tf.greater(serie_len, max_obs),
+                    true_fn=lambda: fn_true(),
+                    false_fn=lambda: fn_false()
+                )
+
     return sequence, input_dict['label'], input_dict['lcid']
 
 def get_window(sequence, length, pivot, max_obs):
@@ -243,9 +143,7 @@ def get_window(sequence, length, pivot, max_obs):
     sliced = tf.slice(sequence, [pivot, 0], [end, -1])
     return sliced
 
-def get_windows(sample, max_obs):
-    input_dict = deserialize(sample)
-
+def get_windows(input_dict, max_obs):
     sequence = input_dict['input']
     rest = input_dict['length']%max_obs
 
@@ -298,28 +196,36 @@ def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
 
     time_steps = tf.shape(seq_magn)[0]
 
-    mask_out = tf.reshape(mask_out, [time_steps, 1])
-    mask_in = tf.reshape(mask_in, [time_steps, 1])
-
-    if time_steps < max_obs:
-        mask_fill = tf.ones([max_obs - time_steps, 1], dtype=tf.float32)
-        mask_out  = tf.concat([mask_out, 1-mask_fill], 0)
-        mask_in   = tf.concat([mask_in, mask_fill], 0)
-        seq_magn   = tf.concat([seq_magn, 1-mask_fill], 0)
-        seq_time   = tf.concat([seq_time, 1-mask_fill], 0)
-        orig_magn   = tf.concat([orig_magn, 1-mask_fill], 0)
+    # Masked values should be 1, zero by default
+    mask_in  = 1. - tf.reshape(mask_in, [time_steps, 1])
+    mask_out = 1. - tf.reshape(mask_out, [time_steps, 1])
+    # Using 1s in the "mask_in" tensor implies
+    # not considering those values within the scaled dot product
+    mask_in   = pad_sequence(mask_in, max_obs=max_obs, value=1.)
+    # Using 1s in the "mask_out" tensor implies considering them
+    # for loss calculation
+    mask_out  = pad_sequence(mask_out, max_obs=max_obs, value=0.)
 
     input_dict = dict()
     input_dict['output']   = orig_magn
     input_dict['input']    = seq_magn
     input_dict['times']    = seq_time
-    input_dict['mask_out'] = mask_out
     input_dict['mask_in']  = mask_in
+    input_dict['mask_out'] = mask_out
     input_dict['length']   = time_steps
     input_dict['label']    = y
     input_dict['id']       = i
 
     return input_dict
+
+def format_pt(input_dict):
+    x = {
+    'input':input_dict['input'],
+    'times':input_dict['times'],
+    'mask_in':input_dict['mask_in']
+    }
+    y = (input_dict['output'], input_dict['mask_out'])
+    return x, y
 
 def format_label(input_dict, num_cls):
     x = {
@@ -330,65 +236,50 @@ def format_label(input_dict, num_cls):
     y = tf.one_hot(input_dict['label'], num_cls)
     return x, y
 
-def pretraining_records(source, batch_size, max_obs=100, msk_frac=0.2,
-                        rnd_frac=0.1, same_frac=0.1, sampling=False,
-                        shuffle=False, n_classes=-1):
-    """
-    Pretraining data loader.
-    This method build the ASTROMER input format.
-    ASTROMER format is based on the BERT masking strategy.
+def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_frac=0.2, same_frac=0.2):
+    print('[INFO] Pretraining mode. Random {}-len windows'.format(max_obs))
+    fn_0 = adjust_fn(sample_lc, max_obs)
+    fn_1 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac, max_obs)
 
-    Args:
-        source (string): Record folder
-        batch_size (int): Batch size
-        no_shuffle (bool): Do not shuffle training and validation dataset
-        max_obs (int): Max. number of observation per serie
-        msk_frac (float): fraction of values to be predicted ([MASK])
-        rnd_frac (float): fraction of [MASKED] values to replace with random values
-        same_frac (float): fraction of [MASKED] values to replace with true values
+    dataset = dataset.map(fn_0)
+    dataset = dataset.map(fn_1)
+    dataset = dataset.map(format_pt)
 
-    Returns:
-        Tensorflow Dataset: Iterator withg preprocessed batches
-    """
+    dataset = dataset.padded_batch(batch_size)
+    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+    return dataset
+
+def inference_pipeline(dataset, max_obs=200, n_classes=1, shuffle=False):
+    print('[INFO] Inference mode. Cutting {}-len windows'.format(max_obs))
+    fn_0 = adjust_fn(get_windows, max_obs)
+    fn_1 = adjust_fn(mask_sample, 0., 0., 0., max_obs)
+    fn_2 = adjust_fn(format_label, n_classes)
+
+    if shuffle:
+        dataset = dataset.shuffle(10000)
+    dataset = dataset.map(fn_0)
+    dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
+    dataset = dataset.map(fn_1)
+    dataset = dataset.map(fn_2)
+    dataset = dataset.padded_batch(batch_size)
+    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+    return dataset
+
+def load_dataset(source, shuffle=False, repeat=1):
     rec_paths = []
     for folder in os.listdir(source):
         if folder.endswith('.csv'):
             continue
         for x in os.listdir(os.path.join(source, folder)):
             rec_paths.append(os.path.join(source, folder, x))
-                             
-    if sampling:
-        fn_0 = adjust_fn(sample_lc, max_obs)
-    else:
-        fn_0 = adjust_fn(get_windows, max_obs)
-
-    fn_1 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac, max_obs)
 
     dataset = tf.data.TFRecordDataset(rec_paths)
+    dataset = dataset.map(deserialize)
     if shuffle:
+        print('[INFO] Shuffling')
         dataset = dataset.shuffle(10000)
-    dataset = dataset.map(fn_0)
-    
-    if not sampling:
-        dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
-    
-    dataset = dataset.map(fn_1)
-    
-    if n_classes!=-1:
-        print('[INFO] Processing labels')
-        fn_2 = adjust_fn(format_label, n_classes)
-        dataset = dataset.map(fn_2)
-
-    dataset = dataset.padded_batch(batch_size).cache()
-    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
-
+    dataset = dataset.repeat(repeat)
     return dataset
-
-def adjust_fn_clf(func, max_obs):
-    def wrap(*args, **kwargs):
-        result = func(*args, max_obs)
-        return result
-    return wrap
 
 def balanced_records(source, batch_size, n_classes, max_obs=200, sampling=False, take=1):
     """
@@ -410,10 +301,10 @@ def balanced_records(source, batch_size, n_classes, max_obs=200, sampling=False,
         fn_0 = adjust_fn(sample_lc, max_obs)
     else:
         fn_0 = adjust_fn(get_windows, max_obs)
-    
+
     fn_1 = adjust_fn(mask_sample, 0., 0., 0., max_obs)
     fn_2 = adjust_fn(format_label, n_classes)
-        
+
     rec_paths = []
     for folder in os.listdir(source):
         partial = []

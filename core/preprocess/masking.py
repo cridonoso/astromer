@@ -8,14 +8,14 @@ def create_look_ahead_mask(size):
     return mask  # (seq_len, seq_len)
 
 @tf.function
-def get_padding_mask(steps, lengths):
-    ''' Create mask given a tensor and true length '''
-    with tf.name_scope("get_padding_mask") as scope:
-        lengths_transposed = tf.expand_dims(lengths, 1, name='Lengths')
-        range_row = tf.expand_dims(tf.range(0, steps, 1), 0, name='Indices')
-        # Use the logical operations to create a mask
-        mask = tf.greater(range_row, lengths_transposed)
-        return tf.cast(mask, tf.float32, name='LengthMask')
+def pad_sequence(sequence, max_obs, value=0.):
+    time_steps = tf.shape(sequence)[0]
+    mask  = tf.zeros(
+        [tf.math.subtract(max_obs, time_steps), 1],
+        dtype=tf.float32)
+    mask += value
+    masked_seq  = tf.concat([sequence, mask], 0)
+    return masked_seq
 
 @tf.function
 def get_masked(tensor, frac=0.15):
