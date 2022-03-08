@@ -179,8 +179,8 @@ def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
     time_steps = tf.shape(seq_magn)[0]
 
     # Masked values should be 1, zero by default
-    mask_in  = 1. - tf.reshape(mask_in, [time_steps, 1])
-    mask_out = 1. - tf.reshape(mask_out, [time_steps, 1])
+    mask_in  = tf.reshape(mask_in, [time_steps, 1])
+    mask_out = tf.reshape(mask_out, [time_steps, 1])
     # Using 1s in the "mask_in" tensor implies
     # not considering those values within the scaled dot product
     mask_in   = pad_sequence(mask_in, max_obs=max_obs, value=1.)

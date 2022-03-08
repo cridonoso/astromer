@@ -66,9 +66,9 @@ class TestStringMethods(unittest.TestCase):
     def test_apply_masking_technique(self):
         input_dict = {
         'input': tf.transpose(
-                    tf.stack([tf.range(0, 50, dtype=tf.float32),
-                              tf.range(0, 50, dtype=tf.float32),
-                              tf.range(0, 50, dtype=tf.float32)], 0)),
+                    tf.stack([tf.range(0, 200, dtype=tf.float32),
+                              tf.range(0, 200, dtype=tf.float32),
+                              tf.range(0, 200, dtype=tf.float32)], 0)),
         'label': 0,
         'lcid': '0'
         }
@@ -76,11 +76,11 @@ class TestStringMethods(unittest.TestCase):
         input_dict = mask_sample(input_dict['input'],
                              input_dict['label'],
                              input_dict['lcid'],
-                             0.5, 0.2, 0.2, 200)
+                             0.2, 0.2, 0.2, 200)
 
         mask_out_count = tf.reduce_sum(input_dict['mask_out'])
-
-        self.assertTrue(mask_out_count >= 20,
+        print(mask_out_count)
+        self.assertTrue(mask_out_count == 40,
                         'not enough masked values')
 
 if __name__ == '__main__':
