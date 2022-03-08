@@ -12,12 +12,11 @@ def custom_rmse(y_true, y_pred, sample_weight=None, mask=None):
 
     if mask is not None:
         residuals = tf.multiply(residuals, mask)
-        
+
     residuals  = tf.reduce_sum(residuals, 1)
-    
-    mse_mean = tf.math.divide_no_nan(residuals,
+    mse_mean = tf.divide(residuals,
                          tf.reduce_sum(mask, 1))
-        
+
     mse_mean = tf.reduce_mean(mse_mean)
     return tf.math.sqrt(mse_mean)
 
