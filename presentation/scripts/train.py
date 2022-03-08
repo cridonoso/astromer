@@ -14,8 +14,9 @@ from core.astromer import ASTROMER
 def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"]=opt.gpu
 
-    train_ds = load_dataset(os.path.join(opt.data, 'train'))
-    val_ds   = load_dataset(os.path.join(opt.data, 'val'))
+    train_ds = load_dataset(os.path.join(opt.data, 'train'),
+                            repeat=opt.repeat, shuffle=True)
+    val_ds   = load_dataset(os.path.join(opt.data, 'val'), shuffle=False)
 
     train_ds = pretraining_pipeline(train_ds,
                                     batch_size=opt.batch_size,
@@ -37,7 +38,6 @@ def run(opt):
                      dff       = opt.dff,
                      base      = opt.base,
                      dropout   = opt.dropout,
-                     use_leak  = opt.use_leak,
                      maxlen    = opt.max_obs)
 
     model.build({'input': [opt.batch_size, opt.max_obs, 1],
@@ -76,7 +76,8 @@ if __name__ == '__main__':
     # DATA
     parser.add_argument('--max-obs', default=200, type=int,
                     help='Max number of observations')
-
+    parser.add_argument('--repeat', default=5, type=int,
+                        help='times to repeat the training set')
     parser.add_argument('--msk-frac', default=0.5, type=float,
                         help='[MASKED] fraction')
     parser.add_argument('--rnd-frac', default=0.2, type=float,
@@ -115,9 +116,6 @@ if __name__ == '__main__':
                         help='base of embedding')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
-
-    parser.add_argument('--use-leak', default=False, action='store_true',
-                        help='Add the input to the attention vector')
 
     opt = parser.parse_args()
     run(opt)
