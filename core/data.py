@@ -227,7 +227,7 @@ def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_fra
     dataset = dataset.map(fn_1)
     dataset = dataset.map(format_pt)
 
-    dataset = dataset.padded_batch(batch_size)
+    dataset = dataset.padded_batch(batch_size, padding_values=1)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
 
@@ -243,7 +243,7 @@ def inference_pipeline(dataset, max_obs=200, n_classes=1, shuffle=False):
     dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
     dataset = dataset.map(fn_1)
     dataset = dataset.map(fn_2)
-    dataset = dataset.padded_batch(batch_size, padding_values=1)
+    dataset = dataset.padded_batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
 
