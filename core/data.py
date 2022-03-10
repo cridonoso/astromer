@@ -262,3 +262,99 @@ def load_dataset(source, shuffle=False, repeat=1):
         dataset = dataset.shuffle(10000)
     dataset = dataset.repeat(repeat)
     return dataset
+
+def sample_lc_nsp(sample, max_obs):
+    '''
+    Sample a random window of "max_obs" observations from the input sequence
+    '''
+    input_dict = deserialize(sample)
+    sequence = input_dict['input']
+    
+    first = tf.split(sequence,2)[0]
+    second = tf.split(sequence,2)[1]
+
+    first_len = tf.shape(first)[0]
+    second_len = tf.shape(second)[0]
+    # print("Serie_len--------------------------->", tf.shape(sequence))
+    # print("seq----------------->", sequence)
+    # print("Serie_len--------------------------->", tf.shape(tf.split(sequence, 3)[0]))
+    # print("seq----------------->", tf.split(sequence, 3)[0])
+
+    pivot = 0
+    if tf.greater(first_len, max_obs):
+        pivot = tf.random.uniform([],
+                                  minval=0,
+                                  maxval=first_len-max_obs+1,
+                                  dtype=tf.int32)
+
+        first = tf.slice(first, [pivot,0], [max_obs, -1])
+    else:
+        first = tf.slice(first, [0,0], [first_len, -1])
+
+    if tf.greater(second_len, max_obs):
+        pivot = tf.random.uniform([],
+                                  minval=0,
+                                  maxval=second_len-max_obs+1,
+                                  dtype=tf.int32)
+
+        second = tf.slice(second, [pivot,0], [max_obs, -1])
+    else:
+        second = tf.slice(second, [0,0], [second_len, -1])
+
+    return first, second, input_dict['lcid']
+
+def nsp_parser(data1, data2, true_label_proba):
+    # avail_labels = ["IsNext", "IsNotNext"]
+    label = tf.random.categorical([[true_label_proba, 1-true_label_proba]], 1)
+    # label = tf.random.choice(avail_labels, p=[true_label_proba, 1-true_label_proba])
+    if label[0] == 1:
+        return data1[0], data1[1], label[0][0]
+    else:
+        return data1[0], data2[1], label[0][0]
+
+def load_records_nsp(source, batch_size, max_obs=100, true_label_proba = 0.5):
+    """
+    Pretraining data loader for next sentence prediction.
+    This method build the ASTROMER input format.
+    ASTROMER format is based on the BERT masking strategy.
+
+    Args:
+        source (string): Record folder
+        batch_size (int): Batch size
+        true_label_proba (float): Probability of getting true next sentence 
+        
+
+    Returns:
+        Tensorflow Dataset: Iterator withg preprocessed batches
+    """
+    rec_paths = []
+    for folder in os.listdir(source):
+        if not folder.endswith('.csv'):
+            for x in os.listdir(os.path.join(source, folder)):
+                if not x.endswith('.csv'):
+                    rec_paths.append(os.path.join(source, folder, x))
+
+
+    fn_0 = adjust_fn(sample_lc_nsp, max_obs)
+    fn_1 = adjust_fn(nsp_parser, true_label_proba)
+
+    # fn_1 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac, max_obs)
+
+    dataset1 = tf.data.TFRecordDataset(rec_paths)
+    dataset2 = tf.data.TFRecordDataset(rec_paths).shuffle(10000)
+
+    # if shuffle:
+    #     dataset = dataset.shuffle(10000)
+
+    dataset1 = dataset1.map(fn_0)
+    dataset2 = dataset2.map(fn_0)
+    # [(first, second, id), (first2, second2, id2)]
+    dataset = tf.data.Dataset.zip((dataset1, dataset2))
+    
+    dataset = dataset.map(fn_1).cache()
+ 
+
+    dataset = dataset.padded_batch(batch_size)
+    dataset = dataset.prefetch(1)
+
+    return dataset
