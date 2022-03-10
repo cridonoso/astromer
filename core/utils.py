@@ -2,6 +2,10 @@ import tensorflow as tf
 import os
 import seaborn as sns
 import numpy as np
+from tensorflow.core.util import event_pb2
+from tensorflow.python.lib.io import tf_record
+from tensorboard.backend.event_processing import event_accumulator
+
 
 def draw_graph(model, dataset, writer, logdir=''):
     '''Decorator that reports store fn graph.'''
@@ -111,3 +115,22 @@ def standardize(tensor, axis=0, return_mean=False):
         return z, mean_value
     else:
         return z
+
+def my_summary_iterator(path):
+    for r in tf_record.tf_record_iterator(path):
+        yield event_pb2.Event.FromString(r)
+
+def get_metrics(path_logs):
+    train_logs = [x for x in os.listdir(path_logs) if x.endswith('.v2')][0]
+    path_train = os.path.join(path_logs, train_logs)
+
+    ea = event_accumulator.EventAccumulator(path_train)
+    ea.Reload()
+
+    metrics = {tag:[] for tag in ea.Tags()['tensors']}
+    for e in my_summary_iterator(path_train):
+        for v in e.summary.value:
+            if v.tag == 'model': continue
+            value = tf.make_ndarray(v.tensor)
+            metrics[v.tag].append(value)
+    return metrics

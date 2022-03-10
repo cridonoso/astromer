@@ -13,9 +13,9 @@ os.system('clear')
 class ASTROMER(Model):
     def __init__(self,
                  num_layers=2,
-                 d_model=200,
-                 num_heads=2,
-                 dff=256,
+                 d_model=256,
+                 num_heads=4,
+                 dff=128,
                  base=10000,
                  dropout=0.1,
                  use_leak=False,
