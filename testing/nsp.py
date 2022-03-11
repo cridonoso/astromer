@@ -19,7 +19,11 @@ class TestStringMethods(unittest.TestCase):
                                            same_frac=0.2,
                                            nsp_proba=0.5)
         for x, (y, label, id) in dataset:
+            plt.figure(figsize=(6,3))
             plt.plot(x['times'][0], '.-')
+            plt.xlabel('TIME STEP')
+            plt.ylabel('MJD')
+            plt.title('stitch-fix')
             plt.show()
             break
 
