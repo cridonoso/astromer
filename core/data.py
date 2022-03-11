@@ -146,6 +146,50 @@ def get_windows(input_dict, max_obs):
 
     return splits, y, ids
 
+def randomize_lc(ds0, ds1, max_obs=200, proba=.5):
+    '''
+    cut sample and concat a random segment with some 'proba'bility
+    '''
+    seq_0, _, id_0 = ds0
+    seq_1, _, _ = ds1
+
+    # 0 = random / 1 = same
+    label = tf.random.categorical([[proba, 1-proba]], 1)
+    label = tf.squeeze(label)
+
+    first  = tf.slice(seq_0, [0, 0],
+                    [tf.minimum(max_obs//2, tf.shape(seq_0)[0]), -1])
+
+    # getting mean delta time for the stitch fix
+    times = tf.slice(first, [0, 0], [-1, 1])
+    delta = tf.reduce_mean(times[1:]-times[:-1])
+
+    def fn_true():
+        limit = tf.minimum(max_obs//2, tf.shape(seq_1)[0])
+
+        second_time = tf.slice(seq_1, [0, 0], [limit, 1])
+        second_rest = tf.slice(seq_1, [0, 1], [limit, -1])
+
+        # stitch fix
+        tau = times[-1] + delta
+        second_time = second_time - second_time[0] + tau
+
+        second = tf.concat([second_time, second_rest], 1)
+
+        return tf.concat([first, second], 0)
+
+
+    def fn_false():
+        return seq_0
+
+    seq_0 = tf.cond(
+                tf.math.equal(label, 0),
+                true_fn=lambda: fn_true(),
+                false_fn=lambda: fn_false()
+            )
+
+    return seq_0, label, id_0
+
 def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
     '''
     Pretraining formater
@@ -187,6 +231,10 @@ def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
     # Using 1s in the "mask_out" tensor implies considering them
     # for loss calculation
     mask_out  = pad_sequence(mask_out, max_obs=max_obs, value=0.)
+    # pad the rest
+    orig_magn = pad_sequence(orig_magn, max_obs=max_obs, value=1.)
+    seq_magn  = pad_sequence(seq_magn, max_obs=max_obs, value=1.)
+    seq_time  = pad_sequence(seq_time, max_obs=max_obs, value=1.)
 
     input_dict = dict()
     input_dict['output']   = orig_magn
@@ -206,7 +254,7 @@ def format_pt(input_dict):
     'times':input_dict['times'],
     'mask_in':input_dict['mask_in']
     }
-    y = (input_dict['output'], input_dict['mask_out'])
+    y = (input_dict['output'], input_dict['label'], input_dict['mask_out'])
     return x, y
 
 def format_label(input_dict, num_cls):
@@ -217,6 +265,33 @@ def format_label(input_dict, num_cls):
     }
     y = tf.one_hot(input_dict['label'], num_cls)
     return x, y
+
+def pretraining_pipeline_nsp(dataset_0, batch_size, max_obs=200, msk_frac=0.5,
+                             rnd_frac=0.2, same_frac=0.2, nsp_proba=.5):
+    '''
+    Pretraining pipeline including NSP
+    '''
+    print('[INFO] Pretraining mode. Random {}-len windows'.format(max_obs))
+    # Adjusting functionss
+    fn_0 = adjust_fn(sample_lc, max_obs)
+    fn_1 = adjust_fn(randomize_lc, max_obs, nsp_proba)
+    fn_2 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac, max_obs)
+
+    # Duplicate and shuffle the dataset to generate random segments
+    dataset_1 = dataset_0.shuffle(10000)
+
+    # get 200-len windows
+    dataset_0 = dataset_0.map(fn_0)
+    dataset_1 = dataset_1.map(fn_0)
+
+    # zip datasets
+    dataset = tf.data.Dataset.zip((dataset_0, dataset_1))
+    dataset = dataset.map(fn_1)
+    dataset = dataset.map(fn_2)
+    dataset = dataset.map(format_pt)
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+    return dataset
 
 def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_frac=0.2, same_frac=0.2):
     print('[INFO] Pretraining mode. Random {}-len windows'.format(max_obs))
@@ -261,100 +336,4 @@ def load_dataset(source, shuffle=False, repeat=1):
         print('[INFO] Shuffling')
         dataset = dataset.shuffle(10000)
     dataset = dataset.repeat(repeat)
-    return dataset
-
-def sample_lc_nsp(sample, max_obs):
-    '''
-    Sample a random window of "max_obs" observations from the input sequence
-    '''
-    input_dict = deserialize(sample)
-    sequence = input_dict['input']
-    
-    first = tf.split(sequence,2)[0]
-    second = tf.split(sequence,2)[1]
-
-    first_len = tf.shape(first)[0]
-    second_len = tf.shape(second)[0]
-    # print("Serie_len--------------------------->", tf.shape(sequence))
-    # print("seq----------------->", sequence)
-    # print("Serie_len--------------------------->", tf.shape(tf.split(sequence, 3)[0]))
-    # print("seq----------------->", tf.split(sequence, 3)[0])
-
-    pivot = 0
-    if tf.greater(first_len, max_obs):
-        pivot = tf.random.uniform([],
-                                  minval=0,
-                                  maxval=first_len-max_obs+1,
-                                  dtype=tf.int32)
-
-        first = tf.slice(first, [pivot,0], [max_obs, -1])
-    else:
-        first = tf.slice(first, [0,0], [first_len, -1])
-
-    if tf.greater(second_len, max_obs):
-        pivot = tf.random.uniform([],
-                                  minval=0,
-                                  maxval=second_len-max_obs+1,
-                                  dtype=tf.int32)
-
-        second = tf.slice(second, [pivot,0], [max_obs, -1])
-    else:
-        second = tf.slice(second, [0,0], [second_len, -1])
-
-    return first, second, input_dict['lcid']
-
-def nsp_parser(data1, data2, true_label_proba):
-    # avail_labels = ["IsNext", "IsNotNext"]
-    label = tf.random.categorical([[true_label_proba, 1-true_label_proba]], 1)
-    # label = tf.random.choice(avail_labels, p=[true_label_proba, 1-true_label_proba])
-    if label[0] == 1:
-        return data1[0], data1[1], label[0][0]
-    else:
-        return data1[0], data2[1], label[0][0]
-
-def load_records_nsp(source, batch_size, max_obs=100, true_label_proba = 0.5):
-    """
-    Pretraining data loader for next sentence prediction.
-    This method build the ASTROMER input format.
-    ASTROMER format is based on the BERT masking strategy.
-
-    Args:
-        source (string): Record folder
-        batch_size (int): Batch size
-        true_label_proba (float): Probability of getting true next sentence 
-        
-
-    Returns:
-        Tensorflow Dataset: Iterator withg preprocessed batches
-    """
-    rec_paths = []
-    for folder in os.listdir(source):
-        if not folder.endswith('.csv'):
-            for x in os.listdir(os.path.join(source, folder)):
-                if not x.endswith('.csv'):
-                    rec_paths.append(os.path.join(source, folder, x))
-
-
-    fn_0 = adjust_fn(sample_lc_nsp, max_obs)
-    fn_1 = adjust_fn(nsp_parser, true_label_proba)
-
-    # fn_1 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac, max_obs)
-
-    dataset1 = tf.data.TFRecordDataset(rec_paths)
-    dataset2 = tf.data.TFRecordDataset(rec_paths).shuffle(10000)
-
-    # if shuffle:
-    #     dataset = dataset.shuffle(10000)
-
-    dataset1 = dataset1.map(fn_0)
-    dataset2 = dataset2.map(fn_0)
-    # [(first, second, id), (first2, second2, id2)]
-    dataset = tf.data.Dataset.zip((dataset1, dataset2))
-    
-    dataset = dataset.map(fn_1).cache()
- 
-
-    dataset = dataset.padded_batch(batch_size)
-    dataset = dataset.prefetch(1)
-
     return dataset
