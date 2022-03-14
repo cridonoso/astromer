@@ -15,6 +15,7 @@ logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 def run(opt):
     # Get model
+    os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
     astromer = get_ASTROMER(num_layers=opt.layers,
                             d_model=opt.head_dim,
                             num_heads=opt.heads,
@@ -91,7 +92,9 @@ if __name__ == '__main__':
                         help='Number of epochs')
     parser.add_argument('--patience', default=200, type=int,
                         help='batch size')
-
+    parser.add_argument('--gpu', default='0', type=str,
+                        help='GPU to use')
+    
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=2, type=int,
                         help='Number of encoder layers')
