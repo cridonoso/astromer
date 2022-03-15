@@ -188,6 +188,10 @@ def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
     # for loss calculation
     mask_out  = pad_sequence(mask_out, max_obs=max_obs, value=0.)
 
+    orig_magn = pad_sequence(orig_magn, max_obs=max_obs, value=1.)
+    seq_magn  = pad_sequence(seq_magn, max_obs=max_obs, value=1.)
+    seq_time  = pad_sequence(seq_time, max_obs=max_obs, value=1.)
+
     input_dict = dict()
     input_dict['output']   = orig_magn
     input_dict['input']    = seq_magn
@@ -227,23 +231,23 @@ def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_fra
     dataset = dataset.map(fn_1)
     dataset = dataset.map(format_pt)
 
-    dataset = dataset.padded_batch(batch_size, padding_values=1.)
+    dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
 
-def inference_pipeline(dataset, max_obs=200, n_classes=1, shuffle=False):
+def inference_pipeline(dataset, batch_size, max_obs=200, n_classes=1, shuffle=False):
     print('[INFO] Inference mode. Cutting {}-len windows'.format(max_obs))
     fn_0 = adjust_fn(get_windows, max_obs)
     fn_1 = adjust_fn(mask_sample, 0., 0., 0., max_obs)
     fn_2 = adjust_fn(format_label, n_classes)
 
-    if shuffle:
-        dataset = dataset.shuffle(10000)
     dataset = dataset.map(fn_0)
     dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
     dataset = dataset.map(fn_1)
     dataset = dataset.map(fn_2)
-    dataset = dataset.padded_batch(batch_size)
+    if shuffle:
+        dataset = dataset.shuffle(100000)
+    dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
 
