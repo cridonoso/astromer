@@ -63,6 +63,7 @@ def run(opt):
                                  restore_best_weights=True)
     tsb_callback = TensorBoard(
                     log_dir = os.path.join(opt.p, 'logs'),
+                    histogram_freq=1,
                     write_graph=False)
 
     history = model.fit(train_ds,
