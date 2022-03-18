@@ -31,7 +31,9 @@ def get_masked(tensor, frac=0.15):
         nmask = tf.multiply(tf.cast(steps, tf.float32), frac)
         nmask = tf.cast(nmask, tf.int32, name='nmask')
 
-        indices = tf.range(steps)
+        # indices = tf.range(steps)
+        indices = tf.slice(tf.where(tensor>-98.), [0,0], [-1,1])
+        indices = tf.squeeze(indices)
         indices = tf.random.shuffle(indices)
         indices = tf.slice(indices, [0], [nmask])
 

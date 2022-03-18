@@ -6,10 +6,10 @@ import time
 import os
 
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
-from core.data  import load_dataset, pretraining_pipeline
+from core.data  import load_dataset, pretraining_pipeline_nsp
 from core.training.metrics import custom_r2
 from core.training.losses import custom_rmse
-from core.astromer import ASTROMER
+from core.astromer import ASTROMER_NSP
 from core.training.scheduler import CustomSchedule
 from datetime import datetime
 
@@ -19,31 +19,32 @@ def run(opt):
 
     train_ds = load_dataset(os.path.join(opt.data, 'train'),
                             repeat=opt.repeat, shuffle=True)
-    val_ds   = load_dataset(os.path.join(opt.data, 'val'), shuffle=True, repeat=3)
+    val_ds   = load_dataset(os.path.join(opt.data, 'val'),
+                            shuffle=True, repeat=3)
 
-    train_ds = pretraining_pipeline(train_ds,
-                                    batch_size=opt.batch_size,
-                                    max_obs=opt.max_obs,
-                                    msk_frac=opt.msk_frac,
-                                    rnd_frac=opt.rnd_frac,
-                                    same_frac=opt.same_frac,
-                                    cache=opt.cache)
-    val_ds   = pretraining_pipeline(val_ds,
-                                    batch_size=opt.batch_size,
-                                    max_obs=opt.max_obs,
-                                    msk_frac=opt.msk_frac,
-                                    rnd_frac=opt.rnd_frac,
-                                    same_frac=opt.same_frac,
-                                    cache=opt.cache)
+    train_ds = pretraining_pipeline_nsp(train_ds,
+                                        batch_size=opt.batch_size,
+                                        max_obs=opt.max_obs,
+                                        msk_frac=opt.msk_frac,
+                                        rnd_frac=opt.rnd_frac,
+                                        same_frac=opt.same_frac,
+                                        nsp_proba=0.5)
+    val_ds   = pretraining_pipeline_nsp(val_ds,
+                                        batch_size=opt.batch_size,
+                                        max_obs=opt.max_obs,
+                                        msk_frac=opt.msk_frac,
+                                        rnd_frac=opt.rnd_frac,
+                                        same_frac=opt.same_frac,
+                                        nsp_proba=0.5)
 
     # Initialize model
-    model = ASTROMER(num_layers= opt.layers,
-                     d_model   = opt.head_dim,
-                     num_heads = opt.heads,
-                     dff       = opt.dff,
-                     base      = opt.base,
-                     dropout   = opt.dropout,
-                     maxlen    = opt.max_obs)
+    model = ASTROMER_NSP(num_layers= opt.layers,
+                         d_model   = opt.head_dim,
+                         num_heads = opt.heads,
+                         dff       = opt.dff,
+                         base      = opt.base,
+                         dropout   = opt.dropout,
+                         maxlen    = opt.max_obs)
 
     model.build({'input': [opt.batch_size, opt.max_obs, 1],
                  'mask_in': [opt.batch_size, opt.max_obs, 1],
@@ -105,7 +106,7 @@ if __name__ == '__main__':
     # TRAINING PAREMETERS
     parser.add_argument('--data', default='./data/records/testing/fold_0/testing', type=str,
                         help='Dataset folder containing the records files')
-    parser.add_argument('--p', default="./runs/debug", type=str,
+    parser.add_argument('--p', default="./runs/debug_nsp", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--w', default="", type=str,
                         help='pre-trained weights')
