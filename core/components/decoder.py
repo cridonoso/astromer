@@ -18,7 +18,7 @@ class NSP_Regressor(Layer):
 	def __init__(self, **kwargs):
 		super(NSP_Regressor, self).__init__(**kwargs)
 		self.reg_layer = Dense(1, name='RegLayer')
-		self.clf_layer = Dense(2, name='RegLayer')
+		self.clf_layer = Dense(2, name='CLFLayer')
 		self.layernorm = LayerNormalization(epsilon=1e-6)
 
 	def call(self, inputs, training=False):
