@@ -115,8 +115,8 @@ class ASTROMER_NSP(Model):
             r2 = self.metric_rec(y, x_rec, mask=mask)
             bce = self.binary_ce(nsp_label, y_pred)
             acc = self.accuracy(nsp_label, y_pred)
-            
             loss = rmse + bce
+            
         # Compute gradients
         trainable_vars = self.trainable_variables
         gradients = tape.gradient(loss, trainable_vars)
@@ -124,8 +124,11 @@ class ASTROMER_NSP(Model):
         return {'loss': loss, 'rmse':rmse, 'r2':r2, 'acc':acc, 'bce':bce}
 
     def test_step(self, data):
-        x, (y, mask) = data
-        y_pred = self(x, training=False)
-        loss   = self.loss_rec(y, y_pred, mask=mask)
-        r2     = self.metric_rec(y, y_pred, mask=mask)
-        return {'loss': loss, 'r2':r2}
+        x, (y, nsp_label, mask) = data
+        x_rec, y_pred = self(x, training=False)  # Forward pass
+        rmse = self.loss_rec(y, x_rec, mask=mask)
+        r2 = self.metric_rec(y, x_rec, mask=mask)
+        bce = self.binary_ce(nsp_label, y_pred)
+        acc = self.accuracy(nsp_label, y_pred)
+        loss = rmse + bce
+        return {'loss': loss, 'rmse':rmse, 'r2':r2, 'acc':acc, 'bce':bce}

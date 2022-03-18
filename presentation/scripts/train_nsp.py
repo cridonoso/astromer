@@ -11,6 +11,7 @@ from core.training.metrics import custom_r2
 from core.training.losses import custom_rmse
 from core.astromer import ASTROMER_NSP
 from core.training.scheduler import CustomSchedule
+from tensorflow.keras.optimizers import Adam
 from datetime import datetime
 
 
@@ -63,7 +64,7 @@ def run(opt):
         json.dump(varsdic, json_file, indent=4)
 
     learning_rate = CustomSchedule(opt.head_dim)
-    optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
+    optimizer = Adam(learning_rate, beta_1=0.9, beta_2=0.98,
                                      epsilon=1e-9)
 
     model.compile(optimizer=optimizer)
