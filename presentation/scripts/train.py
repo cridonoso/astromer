@@ -10,6 +10,9 @@ from core.data  import load_dataset, pretraining_pipeline
 from core.training.metrics import custom_r2
 from core.training.losses import custom_rmse
 from core.astromer import ASTROMER
+from core.training.scheduler import CustomSchedule
+from datetime import datetime
+
 
 def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"]=opt.gpu
@@ -23,13 +26,15 @@ def run(opt):
                                     max_obs=opt.max_obs,
                                     msk_frac=opt.msk_frac,
                                     rnd_frac=opt.rnd_frac,
-                                    same_frac=opt.same_frac)
+                                    same_frac=opt.same_frac,
+                                    cache=opt.cache)
     val_ds   = pretraining_pipeline(val_ds,
                                     batch_size=opt.batch_size,
                                     max_obs=opt.max_obs,
                                     msk_frac=opt.msk_frac,
                                     rnd_frac=opt.rnd_frac,
-                                    same_frac=opt.same_frac)
+                                    same_frac=opt.same_frac,
+                                    cache=opt.cache)
 
     # Initialize model
     model = ASTROMER(num_layers= opt.layers,
@@ -47,7 +52,20 @@ def run(opt):
         print('[INFO] Loading pre-trained weights')
         model.load_weights(os.path.join(opt.w, 'weights.h5'))
 
-    model.compile(optimizer='adam',
+    # Save Hyperparameters
+    os.makedirs(opt.p, exist_ok=True)
+    conf_file = os.path.join(opt.p, 'conf.json')
+    varsdic = vars(opt)
+    now = datetime.now()
+    varsdic['exp_date'] = now.strftime("%d/%m/%Y %H:%M:%S")
+    with open(conf_file, 'w') as json_file:
+        json.dump(varsdic, json_file, indent=4)
+        
+    learning_rate = CustomSchedule(opt.head_dim)
+    optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
+                                     epsilon=1e-9)
+     
+    model.compile(optimizer=optimizer,
                   loss_rec=custom_rmse,
                   metric_rec=custom_r2)
 
@@ -117,6 +135,8 @@ if __name__ == '__main__':
                         help='base of embedding')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
+    parser.add_argument('--cache', default=False, action='store_true',
+                    help='Save batches while iterating over datasets')
 
     opt = parser.parse_args()
     run(opt)

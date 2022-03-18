@@ -222,7 +222,7 @@ def format_label(input_dict, num_cls):
     y = tf.one_hot(input_dict['label'], num_cls)
     return x, y
 
-def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_frac=0.2, same_frac=0.2):
+def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_frac=0.2, same_frac=0.2, cache=False, take=-1):
     print('[INFO] Pretraining mode. Random {}-len windows'.format(max_obs))
     fn_0 = adjust_fn(sample_lc, max_obs)
     fn_1 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac, max_obs)
@@ -230,8 +230,16 @@ def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_fra
     dataset = dataset.map(fn_0)
     dataset = dataset.map(fn_1)
     dataset = dataset.map(format_pt)
-
     dataset = dataset.batch(batch_size)
+    
+    if take != -1:
+        print('[INFO] Taking {} batches'.format(take))
+        dataset = dataset.take(take)
+        
+    if cache:
+        print('[INFO] Cache activated')
+        dataset = dataset.cache()
+        
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
 
@@ -264,5 +272,6 @@ def load_dataset(source, shuffle=False, repeat=1):
     if shuffle:
         print('[INFO] Shuffling')
         dataset = dataset.shuffle(10000)
+
     dataset = dataset.repeat(repeat)
     return dataset
