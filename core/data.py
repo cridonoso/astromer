@@ -236,6 +236,10 @@ def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
     seq_magn  = pad_sequence(seq_magn, max_obs=max_obs, value=1.)
     seq_time  = pad_sequence(seq_time, max_obs=max_obs, value=1.)
 
+    orig_magn = pad_sequence(orig_magn, max_obs=max_obs, value=1.)
+    seq_magn  = pad_sequence(seq_magn, max_obs=max_obs, value=1.)
+    seq_time  = pad_sequence(seq_time, max_obs=max_obs, value=1.)
+
     input_dict = dict()
     input_dict['output']   = orig_magn
     input_dict['input']    = seq_magn
@@ -292,8 +296,8 @@ def pretraining_pipeline_nsp(dataset_0, batch_size, max_obs=200, msk_frac=0.5,
     dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
-
-def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_frac=0.2, same_frac=0.2):
+  
+def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_frac=0.2, same_frac=0.2, cache=False, take=-1):
     print('[INFO] Pretraining mode. Random {}-len windows'.format(max_obs))
     fn_0 = adjust_fn(sample_lc, max_obs)
     fn_1 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac, max_obs)
@@ -301,24 +305,32 @@ def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_fra
     dataset = dataset.map(fn_0)
     dataset = dataset.map(fn_1)
     dataset = dataset.map(format_pt)
-
-    dataset = dataset.padded_batch(batch_size, padding_values=1.)
+    dataset = dataset.batch(batch_size)
+    
+    if take != -1:
+        print('[INFO] Taking {} batches'.format(take))
+        dataset = dataset.take(take)
+        
+    if cache:
+        print('[INFO] Cache activated')
+        dataset = dataset.cache()
+        
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
 
-def inference_pipeline(dataset, max_obs=200, n_classes=1, shuffle=False):
+def inference_pipeline(dataset, batch_size, max_obs=200, n_classes=1, shuffle=False):
     print('[INFO] Inference mode. Cutting {}-len windows'.format(max_obs))
     fn_0 = adjust_fn(get_windows, max_obs)
     fn_1 = adjust_fn(mask_sample, 0., 0., 0., max_obs)
     fn_2 = adjust_fn(format_label, n_classes)
 
-    if shuffle:
-        dataset = dataset.shuffle(10000)
     dataset = dataset.map(fn_0)
     dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
     dataset = dataset.map(fn_1)
     dataset = dataset.map(fn_2)
-    dataset = dataset.padded_batch(batch_size)
+    if shuffle:
+        dataset = dataset.shuffle(100000)
+    dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
 
@@ -335,5 +347,6 @@ def load_dataset(source, shuffle=False, repeat=1):
     if shuffle:
         print('[INFO] Shuffling')
         dataset = dataset.shuffle(10000)
+
     dataset = dataset.repeat(repeat)
     return dataset
