@@ -17,7 +17,8 @@ def run(opt):
 
     train_ds = load_dataset(os.path.join(opt.data, 'train'),
                             repeat=opt.repeat, shuffle=True)
-    val_ds   = load_dataset(os.path.join(opt.data, 'val'), shuffle=True, repeat=3)
+    val_ds   = load_dataset(os.path.join(opt.data, 'val'),
+                            shuffle=True, repeat=3)
 
     train_ds = pretraining_pipeline(train_ds,
                                     batch_size=opt.batch_size,

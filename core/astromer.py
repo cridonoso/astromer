@@ -124,5 +124,4 @@ class ASTROMER(Model):
                 foo = np.concatenate(att[indices], 0)
                 concat_att.append(foo)
             return concat_att
-
         return att
