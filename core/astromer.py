@@ -1,11 +1,17 @@
 import tensorflow as tf
 import logging
+import json
 import os, sys
+import pandas as pd
+import numpy as np
 
-from tensorflow.keras.layers import Input, Dense
-from core.components.decoder   import RegLayer
-from core.components.encoder   import Encoder
-from tensorflow.keras import Model
+from tensorflow.keras.layers  import Input, Dense
+from core.components.decoder  import RegLayer
+from core.components.encoder  import Encoder
+from core.training.losses     import custom_rmse
+from core.training.metrics    import custom_r2
+from tensorflow.keras         import Model
+from core.data                import load_numpy, inference_pipeline
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 os.system('clear')
@@ -32,11 +38,18 @@ class ASTROMER(Model):
                                name='encoder')
 
         self.regressor = RegLayer(name='regression')
+        self.maxlen = maxlen
+        self.build(max_obs=maxlen)
+
+    def build(self, batch_size=None, max_obs=200, inp_dim=1):
+        super(ASTROMER, self).build({'input': [batch_size, max_obs, 1],
+                                     'mask_in': [batch_size, max_obs, 1],
+                                     'times': [batch_size, max_obs, 1]})
 
     def compile(self, loss_rec=None, metric_rec=None, **kwargs):
         super(ASTROMER, self).compile(**kwargs)
-        self.loss_rec = loss_rec
-        self.metric_rec = metric_rec
+        self.loss_rec = custom_rmse
+        self.metric_rec = custom_r2
 
     def call(self, inputs, training=False):
         x = self.encoder(inputs, training)
@@ -44,7 +57,7 @@ class ASTROMER(Model):
         return x
 
     def train_step(self, data):
-        x, (y, mask) = data
+        x, (y, _, mask) = data
 
         with tf.GradientTape() as tape:
             y_pred = self(x, training=True)  # Forward pass
@@ -58,8 +71,58 @@ class ASTROMER(Model):
         return {'loss': loss, 'r2':r2}
 
     def test_step(self, data):
-        x, (y, mask) = data
+        x, (y, _, mask) = data
         y_pred = self(x, training=False)
         loss   = self.loss_rec(y, y_pred, mask=mask)
         r2     = self.metric_rec(y, y_pred, mask=mask)
         return {'loss': loss, 'r2':r2}
+
+    def load_weights(self, filepath, **kwargs):
+        self.load_json_config(filepath)
+        super(ASTROMER, self).load_weights(os.path.join(filepath, 'weights.h5'),
+                                           **kwargs)
+
+    def load_json_config(self, filepath):
+
+        conf_file = os.path.join(filepath, 'conf.json')
+        with open(conf_file, 'r') as handle:
+            conf = json.load(handle)
+
+        self.encoder = Encoder(conf['layers'],
+                               conf['head_dim'],
+                               conf['heads'],
+                               conf['dff'],
+                               base=conf['base'],
+                               rate=conf['dropout'],
+                               name='encoder')
+        self.regressor = RegLayer(name='regression')
+        self.build(max_obs=conf['max_obs'])
+
+    def predict_step(self, data):
+        x, _ = data
+        return self.encoder(x)
+
+    def encode(self, dataset, oids_list=None, labels=None, batch_size=50,
+               concatenate=False):
+
+        if isinstance(dataset, list):
+            print('[INFO] Loading numpy arrays')
+            dataset = load_numpy(dataset, ids=oids_list, labels=labels)
+            dataset = inference_pipeline(dataset, batch_size=batch_size,
+                                         max_obs=self.maxlen, drop_remainder=True)
+
+        att = self.predict(dataset)
+
+        if concatenate:
+            oids = tf.concat([oid for _, (_, oid) in dataset], axis=0)
+            oids = np.array([str(o.numpy().decode('utf8') )for o in oids])
+            unique_id = np.unique(oids)
+
+            concat_att = []
+            for id in unique_id:
+                indices = np.where(oids == id)
+                foo = np.concatenate(att[indices], 0)
+                concat_att.append(foo)
+            return concat_att
+
+        return att

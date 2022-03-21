@@ -261,14 +261,14 @@ def format_pt(input_dict):
     y = (input_dict['output'], input_dict['label'], input_dict['mask_out'])
     return x, y
 
-def format_label(input_dict, num_cls):
+def format_inference(input_dict, num_cls):
     x = {
     'input':input_dict['input'],
     'times':input_dict['times'],
     'mask_in':input_dict['mask_in']
     }
     y = tf.one_hot(input_dict['label'], num_cls)
-    return x, y
+    return x, (y, input_dict['id'])
 
 def pretraining_pipeline_nsp(dataset_0, batch_size, max_obs=200, msk_frac=0.5,
                              rnd_frac=0.2, same_frac=0.2, nsp_proba=.5):
@@ -296,7 +296,7 @@ def pretraining_pipeline_nsp(dataset_0, batch_size, max_obs=200, msk_frac=0.5,
     dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
-  
+
 def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_frac=0.2, same_frac=0.2, cache=False, take=-1):
     print('[INFO] Pretraining mode. Random {}-len windows'.format(max_obs))
     fn_0 = adjust_fn(sample_lc, max_obs)
@@ -306,23 +306,24 @@ def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_fra
     dataset = dataset.map(fn_1)
     dataset = dataset.map(format_pt)
     dataset = dataset.batch(batch_size)
-    
+
     if take != -1:
         print('[INFO] Taking {} batches'.format(take))
         dataset = dataset.take(take)
-        
+
     if cache:
         print('[INFO] Cache activated')
         dataset = dataset.cache()
-        
+
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
 
-def inference_pipeline(dataset, batch_size, max_obs=200, n_classes=1, shuffle=False):
+def inference_pipeline(dataset, batch_size, max_obs=200, n_classes=1,
+                       shuffle=False, drop_remainder=False):
     print('[INFO] Inference mode. Cutting {}-len windows'.format(max_obs))
     fn_0 = adjust_fn(get_windows, max_obs)
     fn_1 = adjust_fn(mask_sample, 0., 0., 0., max_obs)
-    fn_2 = adjust_fn(format_label, n_classes)
+    fn_2 = adjust_fn(format_inference, n_classes)
 
     dataset = dataset.map(fn_0)
     dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
@@ -330,8 +331,9 @@ def inference_pipeline(dataset, batch_size, max_obs=200, n_classes=1, shuffle=Fa
     dataset = dataset.map(fn_2)
     if shuffle:
         dataset = dataset.shuffle(100000)
-    dataset = dataset.batch(batch_size)
+    dataset = dataset.batch(batch_size, drop_remainder=drop_remainder)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+
     return dataset
 
 def load_dataset(source, shuffle=False, repeat=1):
@@ -344,6 +346,36 @@ def load_dataset(source, shuffle=False, repeat=1):
 
     dataset = tf.data.TFRecordDataset(rec_paths)
     dataset = dataset.map(deserialize)
+    if shuffle:
+        print('[INFO] Shuffling')
+        dataset = dataset.shuffle(10000)
+
+    dataset = dataset.repeat(repeat)
+    return dataset
+
+def create_generator(list_of_arrays, labels=None, ids=None):
+
+    if ids is None:
+        ids = list(range(len(list_of_arrays)))
+    if labels is None:
+        labels = list(range(len(list_of_arrays)))
+
+    for i, j, k in zip(list_of_arrays, labels, ids):
+        yield {'input': i,
+               'label':int(j),
+               'lcid':str(k),
+               'length':int(i.shape[0])}
+
+def load_numpy(samples, ids=None, labels=None, shuffle=False, repeat=1):
+    dataset = tf.data.Dataset.from_generator(lambda: create_generator(samples,labels,ids),
+                                         output_types= {'input':tf.float32,
+                                                        'label':tf.int32,
+                                                        'lcid':tf.string,
+                                                        'length':tf.int32},
+                                         output_shapes={'input':(None,3),
+                                                        'label':(),
+                                                        'lcid':(),
+                                                        'length':()})
     if shuffle:
         print('[INFO] Shuffling')
         dataset = dataset.shuffle(10000)

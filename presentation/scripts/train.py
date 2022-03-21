@@ -6,11 +6,9 @@ import time
 import os
 
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
-from core.data  import load_dataset, pretraining_pipeline
-from core.training.metrics import custom_r2
-from core.training.losses import custom_rmse
-from core.astromer import ASTROMER
 from core.training.scheduler import CustomSchedule
+from core.astromer import ASTROMER
+from core.data  import load_dataset, pretraining_pipeline
 from datetime import datetime
 
 
@@ -60,14 +58,12 @@ def run(opt):
     varsdic['exp_date'] = now.strftime("%d/%m/%Y %H:%M:%S")
     with open(conf_file, 'w') as json_file:
         json.dump(varsdic, json_file, indent=4)
-        
+
     learning_rate = CustomSchedule(opt.head_dim)
     optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
                                      epsilon=1e-9)
-     
-    model.compile(optimizer=optimizer,
-                  loss_rec=custom_rmse,
-                  metric_rec=custom_r2)
+
+    model.compile(optimizer=optimizer)
 
     ckp_callback = ModelCheckpoint(
                     filepath=os.path.join(opt.p, 'weights.h5'),
@@ -82,7 +78,7 @@ def run(opt):
     tsb_callback = TensorBoard(
                     log_dir = os.path.join(opt.p, 'logs'),
                     histogram_freq=1,
-                    write_graph=False)
+                    write_graph=True)
 
     history = model.fit(train_ds,
                         epochs=opt.epochs,
