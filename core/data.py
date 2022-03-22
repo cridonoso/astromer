@@ -268,7 +268,7 @@ def format_inference(input_dict, num_cls):
     'mask_in':input_dict['mask_in']
     }
     y = tf.one_hot(input_dict['label'], num_cls)
-    return x, (y, input_dict['id'])
+    return x, (input_dict['output'], y, input_dict['id'])
 
 def pretraining_pipeline_nsp(dataset_0, batch_size, max_obs=200, msk_frac=0.5,
                              rnd_frac=0.2, same_frac=0.2, nsp_proba=.5):

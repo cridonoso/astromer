@@ -1,4 +1,12 @@
-%%time
+import tensorflow as tf
+
+
+
+meta_v2 = meta[meta['Std']>0.1]
+meta_v2 = meta_v2[meta_v2['Skewness'].abs()>1]
+meta_v2 = meta_v2[meta_v2['Kurtosis']>10]
+meta_v2 = meta_v2[meta_v2['N']>20]
+
 
 for fold_n in range(3):
     test_meta  = pd.concat([frame.sample(n=100) for g, frame in meta.groupby('Class')])
