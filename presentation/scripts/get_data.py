@@ -9,6 +9,7 @@ dataset_id = {
 		'macho'  : '1vWEs_IRGItmxmpWktvCqNx53uzC4o3O3',
 		'alcock'  : '1JdEPQ3vaTEFscrZUiaKG24HV_9BDx90R',
 		'atlas' : '1ILHb_EMr09jyfWwyyqf0c2qglrnnSz59',
+		'naul':'1-p5XA9ioYqKUhNoIQNEx_ySjE1X3G4AT'
 	},
 	'record':{
 		'ogle'   : '1pQ88cI74fwxcBnE7TBXACawc7z0wvMpk',
