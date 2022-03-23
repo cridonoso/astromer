@@ -1,42 +1,47 @@
-from absl import app
-from absl import flags
+import argparse
+
 from google_drive_downloader import GoogleDriveDownloader as gdd
 
 
 dataset_id = {
 	'raw':{
-		'ogle'   : '',
-		'macho'  : '',
+		'ogle'   : '1BSOA8J78VsNLQ_HZ9wZGlEDC1Rh5BKHt',
+		'macho'  : '1vWEs_IRGItmxmpWktvCqNx53uzC4o3O3',
 		'alcock'  : '1JdEPQ3vaTEFscrZUiaKG24HV_9BDx90R',
-		'atlas' : '',
+		'atlas' : '1ILHb_EMr09jyfWwyyqf0c2qglrnnSz59',
 	},
 	'record':{
-		'ogle'   : '1RY3pwZ5uYJ9HvlNUlivt-DsIbBXHYWx2',
-		'macho'  : '1O-cFXWjuTMNNfWjVQCyEAa2IoAJFSPI6',
-		'alcock'  : '1whdP_2SdMSHcODu8ItTWfM0tI-frGhie',
-		'atlas' : '1zFkrP2TCYoGa3yWkrtymVDmWjLlViIpp',
+		'ogle'   : '1pQ88cI74fwxcBnE7TBXACawc7z0wvMpk',
+		'macho'  : '1ejnuissFNAdczjxSh5IFy6QC9XFnGgAG',
+		'alcock' : '1YpznRml85u_QSMH75lByMEHmNJQiCdcx',
+		'atlas'  : '1lIXWODXob5XwTqJ6rjFDdq5u-pliB4ML',
 	}
 }
 
-FLAGS = flags.FLAGS
-flags.DEFINE_boolean('record', False, 'Get record if available')
-flags.DEFINE_boolean('unzip', True, 'Unzip compressed file')
-flags.DEFINE_string("destination", ".", "Folder for saving files")
-flags.DEFINE_string("dataset", "macho", "Dataset to be downloaded (macho, linear, asas, wise, gaia, css, ogle)")
-
-def main(argv):
-	if FLAGS.record:
-		file_id = dataset_id['record'][FLAGS.dataset]
-		dest_path='./{}/records/{}/{}.zip'.format(FLAGS.destination, FLAGS.dataset, FLAGS.dataset)
+def run(opt):
+	if opt.records:
+		file_id = dataset_id['record'][opt.dataset]
+		dest_path='./{}/records/{}.zip'.format(opt.p, opt.dataset)
 	else:
 		file_id = dataset_id['raw'][FLAGS.dataset]
-		dest_path='./{}/raw_data/{}/{}.zip'.format(FLAGS.destination, FLAGS.dataset, FLAGS.dataset)
-
+		dest_path='./{}/raw_data/{}.zip'.format(opt.p, opt.dataset)
 
 	gdd.download_file_from_google_drive(file_id=file_id,
 										dest_path=dest_path,
-										unzip=FLAGS.unzip)
+										unzip=opt.zip)
 
 
 if __name__ == '__main__':
-	app.run(main)
+    parser = argparse.ArgumentParser()
+    # DATA
+    parser.add_argument('--dataset', default='macho', type=str,
+                        help='Dataset to be downloaded')
+    parser.add_argument('--p', default="./data/", type=str,
+                        help='Folder to store dataset')
+    parser.add_argument('--records', default=False, action='store_true',
+                        help='Get record if available')
+    parser.add_argument('--zip', default=True, action='store_false',
+                        help='Get record if available')
+
+    opt = parser.parse_args()
+    run(opt)
