@@ -24,8 +24,8 @@ os.environ["CUDA_VISIBLE_DEVICES"]=sys.argv[1]
 ds_name = sys.argv[2]
 # model_arch = sys.argv[3]
 max_obs = 200
-batch_size = 2048
-
+batch_size = 512
+print('BATCH_SIZE: ',batch_size)
 datasets = ['{}_20'.format(ds_name),
             '{}_50'.format(ds_name),
             '{}_100'.format(ds_name),
@@ -51,7 +51,7 @@ for model_arch in ['lstm', 'lstm_att', 'mlp_att']:
                                          max_obs=max_obs,
                                          n_classes=n_classes,
                                          shuffle=True)
-            target_dir = './presentation/experiments/clf/{}/fold_{}/{}/{}'.format(ds_name,
+            target_dir = './presentation/experiments/clf/{}_2/fold_{}/{}/{}'.format(ds_name,
                                                                                   fold_n,
                                                                                   ds,
                                                                                   model_arch)
