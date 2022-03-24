@@ -14,7 +14,7 @@ datasets = ['{}_20'.format(ds_name),
             '{}_100'.format(ds_name), 
             '{}_500'.format(ds_name)]
 
-astroweights = './runs/huge_2/'
+astroweights = './runs/macho/'
 
 for dataset in datasets:
     print(dataset)

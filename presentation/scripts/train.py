@@ -1,17 +1,13 @@
 import tensorflow as tf
 import argparse
-import logging
 import json
-import time
 import os
 
-from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
-from core.data  import load_dataset, pretraining_pipeline
-from core.training.metrics import custom_r2
-from core.training.losses import custom_rmse
-from core.astromer import ASTROMER
 from core.training.scheduler import CustomSchedule
-from datetime import datetime
+from core.astromer import ASTROMER
+from core.data  import load_dataset, pretraining_pipeline
+from core.training.callbacks import get_callbacks
+from core.utils import dict_to_json
 
 
 def run(opt):
@@ -19,7 +15,8 @@ def run(opt):
 
     train_ds = load_dataset(os.path.join(opt.data, 'train'),
                             repeat=opt.repeat, shuffle=True)
-    val_ds   = load_dataset(os.path.join(opt.data, 'val'), shuffle=True, repeat=3)
+    val_ds   = load_dataset(os.path.join(opt.data, 'val'),
+                            shuffle=True, repeat=3)
 
     train_ds = pretraining_pipeline(train_ds,
                                     batch_size=opt.batch_size,
@@ -45,52 +42,31 @@ def run(opt):
                      dropout   = opt.dropout,
                      maxlen    = opt.max_obs)
 
-    model.build({'input': [opt.batch_size, opt.max_obs, 1],
-                 'mask_in': [opt.batch_size, opt.max_obs, 1],
-                 'times': [opt.batch_size, opt.max_obs, 1]})
     if opt.w != '':
         print('[INFO] Loading pre-trained weights')
-        model.load_weights(os.path.join(opt.w, 'weights.h5'))
+        model.load_weights(opt.w)
 
     # Save Hyperparameters
-    os.makedirs(opt.p, exist_ok=True)
-    conf_file = os.path.join(opt.p, 'conf.json')
-    varsdic = vars(opt)
-    now = datetime.now()
-    varsdic['exp_date'] = now.strftime("%d/%m/%Y %H:%M:%S")
-    with open(conf_file, 'w') as json_file:
-        json.dump(varsdic, json_file, indent=4)
+    dict_to_json(opt, opt.p)
 
+    # Defining optimizer with custom scheduler for the learning rate
     learning_rate = CustomSchedule(opt.head_dim)
     optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
                                      epsilon=1e-9)
 
+    # Compile and train
     model.compile(optimizer=optimizer)
-
-    ckp_callback = ModelCheckpoint(
-                    filepath=os.path.join(opt.p, 'weights.h5'),
-                    save_weights_only=True,
-                    monitor='val_loss',
-                    mode='min',
-                    save_best_only=True)
-    esp_callback = EarlyStopping(monitor ='val_loss',
-                                 mode = 'min',
-                                 patience = opt.patience,
-                                 restore_best_weights=True)
-    tsb_callback = TensorBoard(
-                    log_dir = os.path.join(opt.p, 'logs'),
-                    histogram_freq=1,
-                    write_graph=False)
-
-    history = model.fit(train_ds,
-                        epochs=opt.epochs,
-                        validation_data=val_ds,
-                        callbacks=[ckp_callback, esp_callback, tsb_callback])
+    _ = model.fit(train_ds,
+                  epochs=opt.epochs,
+                  validation_data=val_ds,
+                  callbacks=get_callbacks(opt.p))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # DATA
+    parser.add_argument('--data', default='./data/records/testing/fold_0/testing', type=str,
+                        help='Dataset folder containing the records files')
     parser.add_argument('--max-obs', default=200, type=int,
                     help='Max number of observations')
     parser.add_argument('--repeat', default=5, type=int,
@@ -103,8 +79,6 @@ if __name__ == '__main__':
                         help='Fraction of [MASKED] to be replaced by same values')
 
     # TRAINING PAREMETERS
-    parser.add_argument('--data', default='./data/records/testing/fold_0/testing', type=str,
-                        help='Dataset folder containing the records files')
     parser.add_argument('--p', default="./runs/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--w', default="", type=str,
@@ -131,10 +105,6 @@ if __name__ == '__main__':
                         help='dropout_rate for the encoder')
     parser.add_argument('--base', default=1000, type=int,
                         help='base of embedding')
-    parser.add_argument('--lr', default=1e-3, type=float,
-                        help='optimizer initial learning rate')
-    parser.add_argument('--cache', default=False, action='store_true',
-                    help='Save batches while iterating over datasets')
 
     opt = parser.parse_args()
     run(opt)
