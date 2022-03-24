@@ -114,6 +114,8 @@ def sample_lc(input_dict, max_obs):
                     false_fn=lambda: fn_false()
                 )
 
+    sequence = standardize(sequence, return_mean=False)
+
     return sequence, input_dict['label'], input_dict['lcid']
 
 def get_window(sequence, length, pivot, max_obs):
@@ -145,7 +147,7 @@ def get_windows(input_dict, max_obs):
 
     return splits, y, ids
 
-def randomize_lc(ds0, ds1, max_obs=200, proba=.5):
+def randomize_lc(ds0, ds1, max_obs=200, proba=.5, inp_dim=3):
     '''
     cut sample and concat a random segment with some 'proba'bility
     '''
@@ -159,7 +161,11 @@ def randomize_lc(ds0, ds1, max_obs=200, proba=.5):
     first  = tf.slice(seq_0, [0, 0],
                     [tf.minimum(max_obs//2, tf.shape(seq_0)[0]), -1])
 
-    # getting mean delta time for the stitch fix
+    # tokens
+    cls_tkn = tf.constant(-98., shape=[1, inp_dim])
+    sep_tkn = tf.constant(-99., shape=[1, inp_dim])
+
+    # getting mean delta time for the stitch-fix
     times = tf.slice(first, [0, 0], [-1, 1])
     delta = tf.reduce_mean(times[1:]-times[:-1])
 
@@ -172,28 +178,26 @@ def randomize_lc(ds0, ds1, max_obs=200, proba=.5):
         # stitch fix
         tau = times[-1] + delta
         second_time = second_time - second_time[0] + tau
-
         second = tf.concat([second_time, second_rest], 1)
 
-        return tf.concat([first, second], 0)
+        return tf.concat([cls_tkn, first, sep_tkn, second, sep_tkn], 0)
 
 
     def fn_false():
-        return seq_0
+        return tf.concat([cls_tkn, seq_0, sep_tkn], 0)
 
-    seq_0 = tf.cond(
+    seq = tf.cond(
                 tf.math.equal(label, 0),
                 true_fn=lambda: fn_true(),
                 false_fn=lambda: fn_false()
             )
 
-    return seq_0, label, id_0
+    return seq, label, id_0
 
 def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
     '''
     Pretraining formater
     '''
-    x = standardize(x, return_mean=False)
 
     seq_time = tf.slice(x, [0, 0], [-1, 1])
     seq_magn = tf.slice(x, [0, 1], [-1, 1])
@@ -213,9 +217,11 @@ def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
                                    name='set_same')
 
     # [MASK] -> Random value
+    shuffled_seq = tf.random.normal(tf.shape(seq_magn), 0, 0.5)
+
     seq_magn, mask_in = set_random(seq_magn,
                                    mask_in,
-                                   tf.random.shuffle(seq_magn),
+                                   shuffled_seq,
                                    rnd_prob,
                                    name='set_random')
 
@@ -235,16 +241,12 @@ def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
     seq_magn  = pad_sequence(seq_magn, max_obs=max_obs, value=1.)
     seq_time  = pad_sequence(seq_time, max_obs=max_obs, value=1.)
 
-    orig_magn = pad_sequence(orig_magn, max_obs=max_obs, value=1.)
-    seq_magn  = pad_sequence(seq_magn, max_obs=max_obs, value=1.)
-    seq_time  = pad_sequence(seq_time, max_obs=max_obs, value=1.)
-
     input_dict = dict()
-    input_dict['output']   = orig_magn
+    input_dict['output']   = tf.slice(orig_magn, [1,0],[-1,-1])
     input_dict['input']    = seq_magn
     input_dict['times']    = seq_time
     input_dict['mask_in']  = mask_in
-    input_dict['mask_out'] = mask_out
+    input_dict['mask_out'] = tf.slice(mask_out, [1,0],[-1,-1])
     input_dict['length']   = time_steps
     input_dict['label']    = y
     input_dict['id']       = i
@@ -257,7 +259,8 @@ def format_pt(input_dict):
     'times':input_dict['times'],
     'mask_in':input_dict['mask_in']
     }
-    y = (input_dict['output'], input_dict['label'], input_dict['mask_out'])
+    lab_one_hot = tf.one_hot(input_dict['label'], 2)
+    y = (input_dict['output'], lab_one_hot, input_dict['mask_out'])
     return x, y
 
 def format_inference(input_dict, num_cls):
@@ -270,14 +273,15 @@ def format_inference(input_dict, num_cls):
     return x, (input_dict['output'], y, input_dict['id'])
 
 def pretraining_pipeline_nsp(dataset_0, batch_size, max_obs=200, msk_frac=0.5,
-                             rnd_frac=0.2, same_frac=0.2, nsp_proba=.5):
+                             rnd_frac=0.2, same_frac=0.2, nsp_proba=.5, inp_dim=3):
     '''
     Pretraining pipeline including NSP
     '''
     print('[INFO] Pretraining mode. Random {}-len windows'.format(max_obs))
     # Adjusting functionss
     fn_0 = adjust_fn(sample_lc, max_obs)
-    fn_1 = adjust_fn(randomize_lc, max_obs, nsp_proba)
+    fn_1 = adjust_fn(randomize_lc, max_obs, nsp_proba, inp_dim)
+    max_obs = max_obs+3 # +TOKENS
     fn_2 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac, max_obs)
 
     # Duplicate and shuffle the dataset to generate random segments
