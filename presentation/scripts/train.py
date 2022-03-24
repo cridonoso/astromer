@@ -1,80 +1,77 @@
 import tensorflow as tf
 import argparse
-import logging
 import json
-import time
 import os
 
-from core.astromer import get_ASTROMER, train
-from core.data  import pretraining_records
-from core.utils import get_folder_name
-from time import gmtime, strftime
-
-logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
+from core.training.scheduler import CustomSchedule
+from core.astromer import ASTROMER
+from core.data  import load_dataset, pretraining_pipeline
+from core.training.callbacks import get_callbacks
+from core.utils import dict_to_json
 
 
 def run(opt):
-    # Get model
-    os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
-    astromer = get_ASTROMER(num_layers=opt.layers,
-                            d_model=opt.head_dim,
-                            num_heads=opt.heads,
-                            dff=opt.dff,
-                            base=opt.base,
-                            dropout=opt.dropout,
-                            maxlen=opt.max_obs,
-                            use_leak=opt.use_leak,
-                            no_train=opt.no_train)
+    os.environ["CUDA_VISIBLE_DEVICES"]=opt.gpu
 
-    # Make sure we don't overwrite a previous training
-    opt.p = get_folder_name(opt.p, prefix='')
+    train_ds = load_dataset(os.path.join(opt.data, 'train'),
+                            repeat=opt.repeat, shuffle=True)
+    val_ds   = load_dataset(os.path.join(opt.data, 'val'),
+                            shuffle=True, repeat=3)
 
-    # Creating (--p)royect directory
-    os.makedirs(opt.p, exist_ok=True)
+    train_ds = pretraining_pipeline(train_ds,
+                                    batch_size=opt.batch_size,
+                                    max_obs=opt.max_obs,
+                                    msk_frac=opt.msk_frac,
+                                    rnd_frac=opt.rnd_frac,
+                                    same_frac=opt.same_frac,
+                                    cache=opt.cache)
+    val_ds   = pretraining_pipeline(val_ds,
+                                    batch_size=opt.batch_size,
+                                    max_obs=opt.max_obs,
+                                    msk_frac=opt.msk_frac,
+                                    rnd_frac=opt.rnd_frac,
+                                    same_frac=opt.same_frac,
+                                    cache=opt.cache)
+
+    # Initialize model
+    model = ASTROMER(num_layers= opt.layers,
+                     d_model   = opt.head_dim,
+                     num_heads = opt.heads,
+                     dff       = opt.dff,
+                     base      = opt.base,
+                     dropout   = opt.dropout,
+                     maxlen    = opt.max_obs)
+
+    if opt.w != '':
+        print('[INFO] Loading pre-trained weights')
+        model.load_weights(opt.w)
 
     # Save Hyperparameters
-    conf_file = os.path.join(opt.p, 'conf.json')
-    varsdic = vars(opt)
-    varsdic['exp_date'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-    with open(conf_file, 'w') as json_file:
-        json.dump(varsdic, json_file, indent=4)
+    dict_to_json(opt, opt.p)
 
-    # Loading data
-    train_batches = pretraining_records(os.path.join(opt.data, 'train'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs,
-                                        shuffle=True,
-                                        sampling=True,
-                                        msk_frac=opt.msk_frac,
-                                        rnd_frac=opt.rnd_frac,
-                                        same_frac=opt.same_frac)
-    valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs,
-                                        shuffle=False,
-                                        sampling=True,
-                                        msk_frac=opt.msk_frac,
-                                        rnd_frac=opt.rnd_frac,
-                                        same_frac=opt.same_frac)
+    # Defining optimizer with custom scheduler for the learning rate
+    learning_rate = CustomSchedule(opt.head_dim)
+    optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
+                                     epsilon=1e-9)
 
-    # Training ASTROMER
-    train(astromer, train_batches, valid_batches,
-          patience=opt.patience,
-          exp_path=opt.p,
-          epochs=opt.epochs,
-          lr=opt.lr,
-          verbose=0)
-
-
+    # Compile and train
+    model.compile(optimizer=optimizer)
+    _ = model.fit(train_ds,
+                  epochs=opt.epochs,
+                  validation_data=val_ds,
+                  callbacks=get_callbacks(opt.p))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # DATA
-    parser.add_argument('--max-obs', default=50, type=int,
+    parser.add_argument('--data', default='./data/records/testing/fold_0/testing', type=str,
+                        help='Dataset folder containing the records files')
+    parser.add_argument('--max-obs', default=200, type=int,
                     help='Max number of observations')
-
-    parser.add_argument('--msk-frac', default=0.7, type=float,
+    parser.add_argument('--repeat', default=5, type=int,
+                        help='times to repeat the training set')
+    parser.add_argument('--msk-frac', default=0.5, type=float,
                         help='[MASKED] fraction')
     parser.add_argument('--rnd-frac', default=0.2, type=float,
                         help='Fraction of [MASKED] to be replaced by random values')
@@ -82,19 +79,19 @@ if __name__ == '__main__':
                         help='Fraction of [MASKED] to be replaced by same values')
 
     # TRAINING PAREMETERS
-    parser.add_argument('--data', default='./data/records/macho', type=str,
-                        help='Dataset folder containing the records files')
     parser.add_argument('--p', default="./runs/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
+    parser.add_argument('--w', default="", type=str,
+                        help='pre-trained weights')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
-    parser.add_argument('--epochs', default=10000, type=int,
+    parser.add_argument('--epochs', default=1000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=200, type=int,
+    parser.add_argument('--patience', default=40, type=int,
                         help='batch size')
     parser.add_argument('--gpu', default='0', type=str,
                         help='GPU to use')
-    
+
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=2, type=int,
                         help='Number of encoder layers')
@@ -108,15 +105,6 @@ if __name__ == '__main__':
                         help='dropout_rate for the encoder')
     parser.add_argument('--base', default=1000, type=int,
                         help='base of embedding')
-    parser.add_argument('--lr', default=1e-3, type=float,
-                        help='optimizer initial learning rate')
-
-    parser.add_argument('--use-leak', default=False, action='store_true',
-                        help='Add the input to the attention vector')
-    parser.add_argument('--no-train', default=False, action='store_true',
-                        help='Train self-attention layer')
-    parser.add_argument('--no-shuffle', default=False, action='store_true',
-                        help='No shuffle training and validation set')
 
     opt = parser.parse_args()
     run(opt)
