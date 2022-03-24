@@ -1,4 +1,4 @@
-# ASTROMER: Building Light Curves Embeddings using Transfomers
+# ASTROMER 1.0.0: Building Light Curves Embeddings using Transfomers
 
 ![](https://github.com/cridonoso/astromer/blob/main/presentation/figures/banner.png?raw=true)
 
