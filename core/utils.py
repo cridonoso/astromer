@@ -1,11 +1,12 @@
 import tensorflow as tf
-import os
 import seaborn as sns
 import numpy as np
-from tensorflow.core.util import event_pb2
-from tensorflow.python.lib.io import tf_record
-from tensorboard.backend.event_processing import event_accumulator
+import os
 
+from tensorboard.backend.event_processing import event_accumulator
+from tensorflow.python.lib.io import tf_record
+from tensorflow.core.util import event_pb2
+from datetime import datetime
 
 def draw_graph(model, dataset, writer, logdir=''):
     '''Decorator that reports store fn graph.'''
@@ -134,3 +135,12 @@ def get_metrics(path_logs):
             value = tf.make_ndarray(v.tensor)
             metrics[v.tag].append(value)
     return metrics
+
+def dict_to_json(dictonary, project_path):
+    os.makedirs(project_path, exist_ok=True)
+    conf_file = os.path.join(project_path, 'conf.json')
+    varsdic = vars(dictonary)
+    now = datetime.now()
+    varsdic['exp_date'] = now.strftime("%d/%m/%Y %H:%M:%S")
+    with open(conf_file, 'w') as json_file:
+        json.dump(varsdic, json_file, indent=4)

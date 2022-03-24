@@ -1,4 +1,3 @@
-import multiprocessing as mp
 import tensorflow as tf
 import pandas as pd
 import numpy as np
@@ -146,6 +145,50 @@ def get_windows(input_dict, max_obs):
 
     return splits, y, ids
 
+def randomize_lc(ds0, ds1, max_obs=200, proba=.5):
+    '''
+    cut sample and concat a random segment with some 'proba'bility
+    '''
+    seq_0, _, id_0 = ds0
+    seq_1, _, _ = ds1
+
+    # 0 = random / 1 = same
+    label = tf.random.categorical([[proba, 1-proba]], 1)
+    label = tf.squeeze(label)
+
+    first  = tf.slice(seq_0, [0, 0],
+                    [tf.minimum(max_obs//2, tf.shape(seq_0)[0]), -1])
+
+    # getting mean delta time for the stitch fix
+    times = tf.slice(first, [0, 0], [-1, 1])
+    delta = tf.reduce_mean(times[1:]-times[:-1])
+
+    def fn_true():
+        limit = tf.minimum(max_obs//2, tf.shape(seq_1)[0])
+
+        second_time = tf.slice(seq_1, [0, 0], [limit, 1])
+        second_rest = tf.slice(seq_1, [0, 1], [limit, -1])
+
+        # stitch fix
+        tau = times[-1] + delta
+        second_time = second_time - second_time[0] + tau
+
+        second = tf.concat([second_time, second_rest], 1)
+
+        return tf.concat([first, second], 0)
+
+
+    def fn_false():
+        return seq_0
+
+    seq_0 = tf.cond(
+                tf.math.equal(label, 0),
+                true_fn=lambda: fn_true(),
+                false_fn=lambda: fn_false()
+            )
+
+    return seq_0, label, id_0
+
 def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
     '''
     Pretraining formater
@@ -187,6 +230,10 @@ def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
     # Using 1s in the "mask_out" tensor implies considering them
     # for loss calculation
     mask_out  = pad_sequence(mask_out, max_obs=max_obs, value=0.)
+    # pad the rest
+    orig_magn = pad_sequence(orig_magn, max_obs=max_obs, value=1.)
+    seq_magn  = pad_sequence(seq_magn, max_obs=max_obs, value=1.)
+    seq_time  = pad_sequence(seq_time, max_obs=max_obs, value=1.)
 
     orig_magn = pad_sequence(orig_magn, max_obs=max_obs, value=1.)
     seq_magn  = pad_sequence(seq_magn, max_obs=max_obs, value=1.)
@@ -210,17 +257,44 @@ def format_pt(input_dict):
     'times':input_dict['times'],
     'mask_in':input_dict['mask_in']
     }
-    y = (input_dict['output'], input_dict['mask_out'])
+    y = (input_dict['output'], input_dict['label'], input_dict['mask_out'])
     return x, y
 
-def format_label(input_dict, num_cls):
+def format_inference(input_dict, num_cls):
     x = {
     'input':input_dict['input'],
     'times':input_dict['times'],
     'mask_in':input_dict['mask_in']
     }
     y = tf.one_hot(input_dict['label'], num_cls)
-    return x, y
+    return x, (input_dict['output'], y, input_dict['id'])
+
+def pretraining_pipeline_nsp(dataset_0, batch_size, max_obs=200, msk_frac=0.5,
+                             rnd_frac=0.2, same_frac=0.2, nsp_proba=.5):
+    '''
+    Pretraining pipeline including NSP
+    '''
+    print('[INFO] Pretraining mode. Random {}-len windows'.format(max_obs))
+    # Adjusting functionss
+    fn_0 = adjust_fn(sample_lc, max_obs)
+    fn_1 = adjust_fn(randomize_lc, max_obs, nsp_proba)
+    fn_2 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac, max_obs)
+
+    # Duplicate and shuffle the dataset to generate random segments
+    dataset_1 = dataset_0.shuffle(10000)
+
+    # get 200-len windows
+    dataset_0 = dataset_0.map(fn_0)
+    dataset_1 = dataset_1.map(fn_0)
+
+    # zip datasets
+    dataset = tf.data.Dataset.zip((dataset_0, dataset_1))
+    dataset = dataset.map(fn_1)
+    dataset = dataset.map(fn_2)
+    dataset = dataset.map(format_pt)
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+    return dataset
 
 def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_frac=0.2, same_frac=0.2, cache=False, take=-1):
     print('[INFO] Pretraining mode. Random {}-len windows'.format(max_obs))
@@ -231,23 +305,24 @@ def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_fra
     dataset = dataset.map(fn_1)
     dataset = dataset.map(format_pt)
     dataset = dataset.batch(batch_size)
-    
+
     if take != -1:
         print('[INFO] Taking {} batches'.format(take))
         dataset = dataset.take(take)
-        
+
     if cache:
         print('[INFO] Cache activated')
         dataset = dataset.cache()
-        
+
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
 
-def inference_pipeline(dataset, batch_size, max_obs=200, n_classes=1, shuffle=False):
+def inference_pipeline(dataset, batch_size, max_obs=200, n_classes=1,
+                       shuffle=False, drop_remainder=False):
     print('[INFO] Inference mode. Cutting {}-len windows'.format(max_obs))
     fn_0 = adjust_fn(get_windows, max_obs)
     fn_1 = adjust_fn(mask_sample, 0., 0., 0., max_obs)
-    fn_2 = adjust_fn(format_label, n_classes)
+    fn_2 = adjust_fn(format_inference, n_classes)
 
     dataset = dataset.map(fn_0)
     dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
@@ -255,8 +330,9 @@ def inference_pipeline(dataset, batch_size, max_obs=200, n_classes=1, shuffle=Fa
     dataset = dataset.map(fn_2)
     if shuffle:
         dataset = dataset.shuffle(100000)
-    dataset = dataset.batch(batch_size)
+    dataset = dataset.batch(batch_size, drop_remainder=drop_remainder)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+
     return dataset
 
 def load_dataset(source, shuffle=False, repeat=1):
@@ -269,6 +345,36 @@ def load_dataset(source, shuffle=False, repeat=1):
 
     dataset = tf.data.TFRecordDataset(rec_paths)
     dataset = dataset.map(deserialize)
+    if shuffle:
+        print('[INFO] Shuffling')
+        dataset = dataset.shuffle(10000)
+
+    dataset = dataset.repeat(repeat)
+    return dataset
+
+def create_generator(list_of_arrays, labels=None, ids=None):
+
+    if ids is None:
+        ids = list(range(len(list_of_arrays)))
+    if labels is None:
+        labels = list(range(len(list_of_arrays)))
+
+    for i, j, k in zip(list_of_arrays, labels, ids):
+        yield {'input': i,
+               'label':int(j),
+               'lcid':str(k),
+               'length':int(i.shape[0])}
+
+def load_numpy(samples, ids=None, labels=None, shuffle=False, repeat=1):
+    dataset = tf.data.Dataset.from_generator(lambda: create_generator(samples,labels,ids),
+                                         output_types= {'input':tf.float32,
+                                                        'label':tf.int32,
+                                                        'lcid':tf.string,
+                                                        'length':tf.int32},
+                                         output_shapes={'input':(None,3),
+                                                        'label':(),
+                                                        'lcid':(),
+                                                        'length':()})
     if shuffle:
         print('[INFO] Shuffling')
         dataset = dataset.shuffle(10000)
