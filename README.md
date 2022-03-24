@@ -7,7 +7,7 @@
 
 
 ## Requirements 
-- Tensorflow < 2.4
+- Tensorflow > 2.4
 
 ## To-do
 - Multi-GPU training
