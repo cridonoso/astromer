@@ -1,13 +1,11 @@
 import argparse
-
 from google_drive_downloader import GoogleDriveDownloader as gdd
-
 
 dataset_id = {
 	'raw':{
 		'ogle'   : '1BSOA8J78VsNLQ_HZ9wZGlEDC1Rh5BKHt',
 		'macho'  : '1vWEs_IRGItmxmpWktvCqNx53uzC4o3O3',
-		'alcock'  : '1JdEPQ3vaTEFscrZUiaKG24HV_9BDx90R',
+		'alcock'  : '1ISAlSKVDcULt9TJR3cPYs1sCx0w8KTwB',
 		'atlas' : '1ILHb_EMr09jyfWwyyqf0c2qglrnnSz59',
 		'naul':'1-p5XA9ioYqKUhNoIQNEx_ySjE1X3G4AT'
 	},
@@ -24,7 +22,7 @@ def run(opt):
 		file_id = dataset_id['record'][opt.dataset]
 		dest_path='./{}/records/{}.zip'.format(opt.p, opt.dataset)
 	else:
-		file_id = dataset_id['raw'][FLAGS.dataset]
+		file_id = dataset_id['raw'][opt.dataset]
 		dest_path='./{}/raw_data/{}.zip'.format(opt.p, opt.dataset)
 
 	gdd.download_file_from_google_drive(file_id=file_id,
