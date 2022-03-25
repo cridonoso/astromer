@@ -1,14 +1,8 @@
 import tensorflow as tf
-
+import horovod.tensorflow.keras as hvd
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
 
 def get_callbacks(project_dir):
-    ckp_callback = ModelCheckpoint(
-                    filepath=os.path.join(project_dir, 'weights.h5'),
-                    save_weights_only=True,
-                    monitor='val_loss',
-                    mode='min',
-                    save_best_only=True)
     esp_callback = EarlyStopping(monitor ='val_loss',
                                  mode = 'min',
                                  patience = opt.patience,
@@ -18,4 +12,6 @@ def get_callbacks(project_dir):
                     histogram_freq=1,
                     write_graph=True)
 
-    return [ckp_callback, esp_callback, tsb_callback]
+    hvd_callback = hvd.callbacks.BroadcastGlobalVariablesCallback(0)
+
+    return [ckp_callback, esp_callback, tsb_callback, hvd_callback]

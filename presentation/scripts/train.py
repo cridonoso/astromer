@@ -8,7 +8,17 @@ from core.astromer import ASTROMER
 from core.data  import load_dataset, pretraining_pipeline
 from core.training.callbacks import get_callbacks
 from core.utils import dict_to_json
+import horovod.tensorflow.keras as hvd
+from tensorflow.keras.callbacks import ModelCheckpoint
 
+hvd.init()
+
+# Pin GPU to be used to process local rank (one GPU per process)
+gpus = tf.config.experimental.list_physical_devices('GPU')
+for gpu in gpus:
+    tf.config.experimental.set_memory_growth(gpu, True)
+if gpus:
+    tf.config.experimental.set_visible_devices(gpus[hvd.local_rank()], 'GPU')
 
 def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"]=opt.gpu
@@ -51,15 +61,24 @@ def run(opt):
 
     # Defining optimizer with custom scheduler for the learning rate
     learning_rate = CustomSchedule(opt.head_dim)
-    optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
+    optimizer = tf.keras.optimizers.Adam(learning_rate * hvd.size(), beta_1=0.9, beta_2=0.98,
                                      epsilon=1e-9)
-
+    optimizer = hvd.DistributedOptimizer(optimizer)
+    
+    callbacks = get_callbacks(opt.p)
+    if hvd.rank() == 0:
+        callbacks.append(ModelCheckpoint(
+                    filepath=os.path.join(opt.p, 'weights.h5'),
+                    save_weights_only=True,
+                    monitor='val_loss',
+                    mode='min',
+                    save_best_only=True))
     # Compile and train
     model.compile(optimizer=optimizer)
     _ = model.fit(train_ds,
                   epochs=opt.epochs,
                   validation_data=val_ds,
-                  callbacks=get_callbacks(opt.p))
+                  callbacks=callbacks)
 
 
 if __name__ == '__main__':
