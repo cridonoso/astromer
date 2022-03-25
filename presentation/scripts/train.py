@@ -34,14 +34,14 @@ def run(opt):
                                     msk_frac=opt.msk_frac,
                                     rnd_frac=opt.rnd_frac,
                                     same_frac=opt.same_frac,
-                                    cache=opt.cache)
+                                    )
     val_ds   = pretraining_pipeline(val_ds,
                                     batch_size=opt.batch_size,
                                     max_obs=opt.max_obs,
                                     msk_frac=opt.msk_frac,
                                     rnd_frac=opt.rnd_frac,
                                     same_frac=opt.same_frac,
-                                    cache=opt.cache)
+                                    )
 
     # Initialize model
     model = ASTROMER(num_layers= opt.layers,
@@ -61,7 +61,7 @@ def run(opt):
 
     # Defining optimizer with custom scheduler for the learning rate
     learning_rate = CustomSchedule(opt.head_dim)
-    optimizer = tf.keras.optimizers.Adam(learning_rate * hvd.size(), beta_1=0.9, beta_2=0.98,
+    optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
                                      epsilon=1e-9)
     optimizer = hvd.DistributedOptimizer(optimizer)
     
