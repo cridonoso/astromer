@@ -1,8 +1,9 @@
 import tensorflow as tf
+import os
 
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
 
-def get_callbacks(project_dir):
+def get_callbacks(project_dir, patience=40):
     ckp_callback = ModelCheckpoint(
                     filepath=os.path.join(project_dir, 'weights.h5'),
                     save_weights_only=True,
@@ -11,7 +12,7 @@ def get_callbacks(project_dir):
                     save_best_only=True)
     esp_callback = EarlyStopping(monitor ='val_loss',
                                  mode = 'min',
-                                 patience = opt.patience,
+                                 patience = patience,
                                  restore_best_weights=True)
     tsb_callback = TensorBoard(
                     log_dir = os.path.join(project_dir, 'logs'),

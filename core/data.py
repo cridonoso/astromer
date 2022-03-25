@@ -242,25 +242,32 @@ def mask_sample(x, y , i, msk_prob, rnd_prob, same_prob, max_obs):
     seq_time  = pad_sequence(seq_time, max_obs=max_obs, value=1.)
 
     input_dict = dict()
-    input_dict['output']   = tf.slice(orig_magn, [1,0],[-1,-1])
+    input_dict['output']   = orig_magn
     input_dict['input']    = seq_magn
     input_dict['times']    = seq_time
     input_dict['mask_in']  = mask_in
-    input_dict['mask_out'] = tf.slice(mask_out, [1,0],[-1,-1])
+    input_dict['mask_out'] = mask_out
     input_dict['length']   = time_steps
     input_dict['label']    = y
     input_dict['id']       = i
 
     return input_dict
 
-def format_pt(input_dict):
+def format_pt(input_dict, nsp=False):
     x = {
     'input':input_dict['input'],
     'times':input_dict['times'],
     'mask_in':input_dict['mask_in']
     }
     lab_one_hot = tf.one_hot(input_dict['label'], 2)
-    y = (input_dict['output'], lab_one_hot, input_dict['mask_out'])
+    if nsp:
+        mask_out = tf.slice(input_dict['mask_out'], [1,0],[-1,-1])
+        orig_magn = tf.slice(input_dict['output'], [1,0],[-1,-1])
+    else:
+        orig_magn = input_dict['output']
+        mask_out = input_dict['mask_out']
+
+    y = (orig_magn, lab_one_hot, mask_out)
     return x, y
 
 def format_inference(input_dict, num_cls):

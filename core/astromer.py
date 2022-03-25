@@ -83,7 +83,7 @@ class ASTROMER(Model):
         r2     = self.metric_rec(y, y_pred, mask=mask)
         return {'loss': loss, 'r2':r2}
 
-   def load_weights(self, filepath, **kwargs):
+    def load_weights(self, filepath, **kwargs):
         self.load_json_config(filepath)
         super(ASTROMER, self).load_weights(os.path.join(filepath, 'weights.h5'),
                                            **kwargs)
@@ -177,7 +177,7 @@ class ASTROMER_NSP(Model):
             bce = self.binary_ce(nsp_label, y_pred)
             acc = self.accuracy(nsp_label, y_pred)
             loss = rmse + bce
-            
+
         # Compute gradients
         trainable_vars = self.trainable_variables
         gradients = tape.gradient(loss, trainable_vars)

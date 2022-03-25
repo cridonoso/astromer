@@ -59,7 +59,7 @@ def run(opt):
     _ = model.fit(train_ds,
                   epochs=opt.epochs,
                   validation_data=val_ds,
-                  callbacks=get_callbacks(opt.p))
+                  callbacks=get_callbacks(opt.p, opt.patience))
 
 
 if __name__ == '__main__':
@@ -105,6 +105,7 @@ if __name__ == '__main__':
                         help='dropout_rate for the encoder')
     parser.add_argument('--base', default=1000, type=int,
                         help='base of embedding')
-
+    parser.add_argument('--cache', default=False, action='store_true',
+                    help='Save batches while iterating over datasets')
     opt = parser.parse_args()
     run(opt)
