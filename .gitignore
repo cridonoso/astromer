@@ -12,3 +12,6 @@ docker-compose.yml
 weights
 exp_jan2022/
 presentation/backup/
+Untitled.ipynb
+big_atlas.zip
+presentation/scripts/nsp_train.py
