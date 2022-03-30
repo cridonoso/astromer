@@ -270,14 +270,19 @@ def format_pt(input_dict, nsp=False):
     y = (orig_magn, lab_one_hot, mask_out)
     return x, y
 
-def format_inference(input_dict, num_cls):
+def format_inference(input_dict, num_cls, mode='clf'):
     x = {
     'input':input_dict['input'],
     'times':input_dict['times'],
     'mask_in':input_dict['mask_in']
     }
     y = tf.one_hot(input_dict['label'], num_cls)
+    if mode == 'clf':
+        return x,y
     return x, (input_dict['output'], y, input_dict['id'])
+
+
+
 
 def pretraining_pipeline_nsp(dataset_0, batch_size, max_obs=200, msk_frac=0.5,
                              rnd_frac=0.2, same_frac=0.2, nsp_proba=.5, inp_dim=3):
@@ -329,11 +334,11 @@ def pretraining_pipeline(dataset, batch_size, max_obs=200, msk_frac=0.5, rnd_fra
     return dataset
 
 def inference_pipeline(dataset, batch_size, max_obs=200, n_classes=1,
-                       shuffle=False, drop_remainder=False):
+                       shuffle=False, drop_remainder=False, mode='pt'):
     print('[INFO] Inference mode. Cutting {}-len windows'.format(max_obs))
     fn_0 = adjust_fn(get_windows, max_obs)
     fn_1 = adjust_fn(mask_sample, 0., 0., 0., max_obs)
-    fn_2 = adjust_fn(format_inference, n_classes)
+    fn_2 = adjust_fn(format_inference, n_classes, mode)
 
     dataset = dataset.map(fn_0)
     dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
