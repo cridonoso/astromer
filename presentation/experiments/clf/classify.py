@@ -94,9 +94,9 @@ for model_arch in ['lstm_att', 'lstm', 'mlp_att']:
                              embeddings_freq=0,
                              embeddings_metadata=None)
 
-            _ = model.fit(train_batches.take(1),
-                          epochs=1,
+            _ = model.fit(train_batches,
+                          epochs=10000,
                           callbacks=[estop, tb],
-                          validation_data=val_batches.take(1))
+                          validation_data=val_batches)
 
             model.save(os.path.join(target_dir, 'weights'))
