@@ -277,12 +277,7 @@ def format_inference(input_dict, num_cls, mode='clf'):
     'mask_in':input_dict['mask_in']
     }
     y = tf.one_hot(input_dict['label'], num_cls)
-    if mode == 'clf':
-        return x,y
-    return x, (input_dict['output'], y, input_dict['id'])
-
-
-
+    return x, y
 
 def pretraining_pipeline_nsp(dataset_0, batch_size, max_obs=200, msk_frac=0.5,
                              rnd_frac=0.2, same_frac=0.2, nsp_proba=.5, inp_dim=3):
@@ -364,7 +359,6 @@ def load_dataset(source, shuffle=False, repeat=1):
     if shuffle:
         print('[INFO] Shuffling')
         dataset = dataset.shuffle(10000)
-
     dataset = dataset.repeat(repeat)
     return dataset
 
