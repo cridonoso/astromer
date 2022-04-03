@@ -32,7 +32,7 @@ def classification(data, gpu):
 
 def run(opt):
 
-    # finetuning(opt.data, opt.w, opt.gpu)
+    finetuning(opt.data, opt.w, opt.gpu)
 
     classification(opt.data, opt.gpu)
 
