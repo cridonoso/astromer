@@ -21,9 +21,6 @@ class TestStringMethods(unittest.TestCase):
 
 
         model = ASTROMER()
-        model.build({'input': [None, 200, 1],
-                     'mask_in': [None, 200, 1],
-                     'times': [None, 200, 1]})
         model.load_weights('./testing/weights.h5')
         model.compile(optimizer='adam',
                       loss_rec=custom_rmse,
