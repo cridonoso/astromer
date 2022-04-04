@@ -24,7 +24,7 @@ ds_name = sys.argv[2]
 
 project_dir = './presentation/experiments/clf/finetuning/{}/'.format(ds_name)
 data_path   = './data/records/{}/'.format(ds_name)
-exp_name    = './presentation/experiments/clf/classifiers/{}/'.format(ds_name)
+exp_name    = './presentation/experiments/clf/classifiers/{}_2/'.format(ds_name)
 
 max_obs = 200
 batch_size = 512
@@ -59,14 +59,12 @@ for model_arch in ['lstm_att', 'lstm', 'mlp_att']:
 
             if model_arch == 'mlp_att':
                 astromer = ASTROMER()
-                astromer.build(max_obs=max_obs)
                 astromer.load_weights(astroweights)
                 model = build_mlp_att(astromer, max_obs, n_classes=n_classes,
                                       train_astromer=False)
 
             if model_arch == 'lstm_att':
                 astromer = ASTROMER()
-                astromer.build(max_obs=max_obs)
                 astromer.load_weights(astroweights)
                 model = build_lstm_att(astromer, max_obs, n_classes=n_classes,
                                        train_astromer=False)
