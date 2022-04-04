@@ -161,6 +161,6 @@ class ASTROMER(BaseASTROMER):
 
     def from_pretrained(self, name):
         url = 'https://github.com/astromer-science/weights/raw/main/{}.zip'.format(name)
-        target = 'core/weights'
+        target = './weights'
         self.download_weights(url, os.path.join(target, name))
         self.load_weights(os.path.join(target, name))
