@@ -5,6 +5,4 @@ graphviz
 pydot
 scikit-learn
 seaborn
-googledrivedownloader
 notebook
-optuna
