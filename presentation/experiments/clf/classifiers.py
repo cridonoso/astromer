@@ -45,7 +45,7 @@ class NormedLSTMCell(tf.keras.layers.Layer):
         return config
 
     
-def build_lstm(maxlen, n_classes):
+def build_lstm(maxlen, n_classes, state_dim=256):
     print('[INFO] Building LSTM Baseline')
     serie  = Input(shape=(maxlen, 1), batch_size=None, name='input')
     times  = Input(shape=(maxlen, 1), batch_size=None, name='times')
@@ -60,13 +60,13 @@ def build_lstm(maxlen, n_classes):
     inp = normalize_batch(placeholder['input'])
     x = tf.concat([tim, inp], 2)
 
-    cell_0 = NormedLSTMCell(units=256)
+    cell_0 = NormedLSTMCell(units=state_dim)
     dense  = Dense(n_classes, name='FCN')
 
-    s0 = [tf.zeros([tf.shape(x)[0], 256]),
-          tf.zeros([tf.shape(x)[0], 256])]
-    s1 = [tf.zeros([tf.shape(x)[0], 256]),
-          tf.zeros([tf.shape(x)[0], 256])]
+    s0 = [tf.zeros([tf.shape(x)[0], state_dim]),
+          tf.zeros([tf.shape(x)[0], state_dim])]
+    s1 = [tf.zeros([tf.shape(x)[0], state_dim]),
+          tf.zeros([tf.shape(x)[0], state_dim])]
 
     rnn = tf.keras.layers.RNN(cell_0, return_sequences=False)
     x = rnn(x, initial_state=[s0, s1], mask=m)
@@ -118,7 +118,7 @@ def build_mlp_att(astromer, maxlen, n_classes, train_astromer=False):
 
     x = Dense(1024, activation='relu')(x)
     x = Dense(512, activation='relu')(x)
-    x = Dense(256, activation='relu')(x)
+    x = Dense(512, activation='relu')(x)
     x = LayerNormalization()(x)
     x = Dense(n_classes)(x)
     return Model(inputs=placeholder, outputs=x, name="FCATT")

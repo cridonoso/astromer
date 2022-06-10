@@ -21,20 +21,22 @@ def finetuning(data, astroweights, gpu):
     command1 = 'python -m presentation.experiments.clf.finetuning \
                {} \
                {} \
-               {}'.format(gpu, data, astroweights)
+               {} \
+               {} '.format(gpu, data, astroweights, case)
     subprocess.call(command1, shell=True)
 
-def classification(data, gpu):
+def classification(data, gpu, case):
     command1 = 'python -m presentation.experiments.clf.classify \
                         {} \
-                        {}'.format(gpu, data)
+                        {} \
+                        {} '.format(gpu, data, case)
     subprocess.call(command1, shell=True)
 
 def run(opt):
 
-    #finetuning(opt.data, opt.w, opt.gpu)
+#     finetuning(opt.data, opt.w, opt.gpu)
 
-    classification(opt.data, opt.gpu)
+    classification(opt.data, opt.gpu, opt.case)
 
 
 
@@ -44,6 +46,8 @@ if __name__ == '__main__':
     # DATA
     parser.add_argument('--data', default='alcock', type=str,
                         help='Dataset name')
+    parser.add_argument('--case', default='a', type=str,
+                        help='experiment scenario')
     parser.add_argument('--w', default='./weights/macho', type=str,
                         help='ASTROMER pretrained weights')
     parser.add_argument('--gpu', default='0', type=str,
