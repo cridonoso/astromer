@@ -74,29 +74,36 @@ def build_lstm(maxlen, n_classes, state_dim=256):
     x = dense(x)
     return Model(placeholder, outputs=x, name="LSTM")
 
-def build_lstm_att(astromer, maxlen, n_classes, train_astromer=False):
+def build_lstm_att(astromer, maxlen, n_classes, train_astromer=False, state_dim=256):
     serie  = Input(shape=(maxlen, 1), batch_size=None, name='input')
     times  = Input(shape=(maxlen, 1), batch_size=None, name='times')
     mask   = Input(shape=(maxlen, 1), batch_size=None, name='mask')
 
     placeholder = {'input':serie,
-                   'mask_in':mask,
-                   'times':times}
+               'mask_in':mask,
+               'times':times}
 
     encoder = astromer.get_layer('encoder')
     encoder.trainable = train_astromer
 
-    mask = tf.cast(1.-placeholder['mask_in'][...,0], dtype=tf.bool)
+    m = tf.cast(1.-placeholder['mask_in'][...,0], dtype=tf.bool)
 
-    x = encoder(placeholder, training=False)
-    x = tf.math.divide_no_nan(x-tf.expand_dims(tf.reduce_mean(x, 1),1),
-                              tf.expand_dims(tf.math.reduce_std(x, 1), 1))        
-    x = LSTM(256, dropout=.3, return_sequences=True)(x, mask=mask)
-    x = LayerNormalization()(x)
-    x = LSTM(256, dropout=.3)(x, mask=mask)
-    x = LayerNormalization()(x)
-    x = Dense(n_classes)(x)
-    return Model(inputs=placeholder, outputs=x, name="FCATT")
+    cell_0 = NormedLSTMCell(units=state_dim)
+    rnn    = tf.keras.layers.RNN(cell_0, return_sequences=False)
+    dense  = Dense(n_classes, name='FCN')
+    
+    
+    x = encoder(placeholder, training=train_astromer)
+    s0 = [tf.zeros([tf.shape(x)[0], state_dim]),
+          tf.zeros([tf.shape(x)[0], state_dim])]
+    s1 = [tf.zeros([tf.shape(x)[0], state_dim]),
+          tf.zeros([tf.shape(x)[0], state_dim])]
+    
+    x = rnn(x, initial_state=[s0, s1], mask=m)
+    x = tf.nn.dropout(x, .3)
+    x = dense(x)
+    return Model(placeholder, outputs=x, name="LSTM_ATT")
+
 
 def build_mlp_att(astromer, maxlen, n_classes, train_astromer=False):
     serie  = Input(shape=(maxlen, 1), batch_size=None, name='input')

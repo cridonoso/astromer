@@ -14,7 +14,7 @@ case = sys.argv[4]
 
 
 if case == 'c':
-    project_path = './presentation/experiments/clf/finetuning_2/c/{}'.format(ds_name)
+    project_path = './presentation/experiments/clf/finetuning/c/{}'.format(ds_name)
     start = time.time()
     command1 = 'python -m presentation.scripts.train \
                --data ./data/records/{}/fold_{}/{} \
@@ -34,7 +34,7 @@ if case == 'c':
     print('{} takes {:.2f} sec'.format(ds_name, (end - start)))
 
 else:
-    project_path = './presentation/experiments/clf/finetuning_2/ab/{}'.format(ds_name)
+    project_path = './presentation/experiments/clf/finetuning/ab/{}'.format(ds_name)
     datasets = ['{}_20'.format(ds_name),
                 '{}_50'.format(ds_name),
                 '{}_100'.format(ds_name),

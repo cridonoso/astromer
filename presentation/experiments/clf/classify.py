@@ -23,9 +23,9 @@ os.environ["CUDA_VISIBLE_DEVICES"]=sys.argv[1]
 ds_name = sys.argv[2]
 case = sys.argv[3]
 
-project_dir = './presentation/experiments/clf/finetuning_2/{}/'.format(ds_name)
+project_dir = './presentation/experiments/clf/finetuning/ab/{}/'.format(ds_name)
 data_path   = './data/records/{}/'.format(ds_name)
-exp_name    = './presentation/experiments/clf/classifiers_2/{}/{}/'.format(case, ds_name)
+exp_name    = './presentation/experiments/clf/classifiers/{}/{}/'.format(case, ds_name)
 
 max_obs = 200
 batch_size = 512
@@ -40,12 +40,13 @@ datasets = ['{}_500'.format(ds_name),
 if case == 'a':
     print('[INFO] No training ASTROMER')
     train_astromer = False
-    models_arch = ['lstm', 'mlp_att', 'lstm_att']
+    models_arch = ['lstm_att', 'mlp_att', 'lstm']
 else:
     train_astromer = True
     models_arch = ['mlp_att', 'lstm_att']
     
 for model_arch in models_arch:
+    print(model_arch)
     for ds in datasets:
         for fold_n in range(3):
             astroweights = '{}/fold_{}/{}'.format(project_dir, fold_n, ds)
@@ -65,7 +66,7 @@ for model_arch in models_arch:
                                              batch_size=batch_size,
                                              max_obs=max_obs,
                                              n_classes=n_classes,
-                                             shuffle=False)
+                                             shuffle=True)
 
 
             if model_arch == 'mlp_att':
@@ -77,8 +78,10 @@ for model_arch in models_arch:
             if model_arch == 'lstm_att':
                 astromer = ASTROMER()
                 astromer.load_weights(astroweights)
-                model = build_lstm_att(astromer, max_obs, n_classes=n_classes,
-                                       train_astromer=train_astromer)
+#                 model = build_lstm_att(astromer, max_obs, n_classes=n_classes,
+#                                        train_astromer=train_astromer)
+                model = build_lstm_att(astromer, max_obs, n_classes, 
+                                       train_astromer=train_astromer, state_dim=256)
 
             if model_arch == 'lstm':
                 model = build_lstm(max_obs, n_classes=n_classes,
@@ -86,7 +89,7 @@ for model_arch in models_arch:
                 
             os.makedirs(target_dir, exist_ok=True)
             
-            optim = tf.keras.optimizers.Adam(learning_rate=0.001)
+            optim = tf.keras.optimizers.Adam(learning_rate=1e-3)
             model.compile(optimizer=optim,
                           loss=CategoricalCrossentropy(from_logits=True),
                           metrics='accuracy')

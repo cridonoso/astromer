@@ -124,6 +124,7 @@ def get_window(sequence, length, pivot, max_obs):
     end = tf.minimum(length, max_obs)
 
     sliced = tf.slice(sequence, [pivot, 0], [end, -1])
+    sliced = standardize(sliced, return_mean=False)
     return sliced
 
 def get_windows(input_dict, max_obs):
