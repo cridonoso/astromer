@@ -77,10 +77,10 @@ def divide_training_subset(frame, train, val, test_meta):
 
     frame = frame.sample(frac=1)
     n_samples = frame.shape[0]
-    
+
     n_train = int(n_samples*train)
     n_val = int(n_samples*val//2)
-    
+
     if test_meta is not None:
         sub_test = test_meta
         sub_train = frame.iloc[:n_train]
@@ -135,7 +135,7 @@ def create_dataset(meta_df,
                    subsets_frac=(0.5, 0.25),
                    test_subset=None,
                    max_lcs_per_record=100,
-                   **kwargs): # kwargs contains additional arguments for the read_csv() function 
+                   **kwargs): # kwargs contains additional arguments for the read_csv() function
     os.makedirs(target, exist_ok=True)
 
     bands = meta_df['Band'].unique()
@@ -356,7 +356,7 @@ def pretraining_records(source, batch_size, max_obs=100, msk_frac=0.2,
             continue
         for x in os.listdir(os.path.join(source, folder)):
             rec_paths.append(os.path.join(source, folder, x))
-                             
+
     if sampling:
         fn_0 = adjust_fn(sample_lc, max_obs)
     else:
@@ -368,12 +368,12 @@ def pretraining_records(source, batch_size, max_obs=100, msk_frac=0.2,
     if shuffle:
         dataset = dataset.shuffle(10000)
     dataset = dataset.map(fn_0)
-    
+
     if not sampling:
         dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
-    
+
     dataset = dataset.map(fn_1)
-    
+
     if n_classes!=-1:
         print('[INFO] Processing labels')
         fn_2 = adjust_fn(format_label, n_classes)
@@ -410,10 +410,10 @@ def balanced_records(source, batch_size, n_classes, max_obs=200, sampling=False,
         fn_0 = adjust_fn(sample_lc, max_obs)
     else:
         fn_0 = adjust_fn(get_windows, max_obs)
-    
+
     fn_1 = adjust_fn(mask_sample, 0., 0., 0., max_obs)
     fn_2 = adjust_fn(format_label, n_classes)
-        
+
     rec_paths = []
     for folder in os.listdir(source):
         partial = []
