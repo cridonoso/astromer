@@ -6,6 +6,12 @@ from scipy.stats import skew, kurtosis
 from joblib import Parallel, delayed
 np.seterr(divide='ignore', invalid='ignore')
 
+def adjust_fn(func, *arguments):
+    def wrap(*args, **kwargs):
+        result = func(*args, *arguments)
+        return result
+    return wrap
+    
 def var_index(magnitudes, times):
     '''
     Variability index (Kim et al. 2014)
