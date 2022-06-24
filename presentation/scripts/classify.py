@@ -46,13 +46,13 @@ class NormedLSTMCell(tf.keras.layers.Layer):
         output = self.bn(output, training=training)
         output, s1 = self.cell_1(output, states=s1, training=training)
         return output, [s0, s1]
-    
+
     def get_config(self):
         config = super(NormedLSTMCell, self).get_config().copy()
         config.update({"units": self.units})
         return config
 
-    
+
 def build_lstm(maxlen, n_classes):
     print('[INFO] Building LSTM Baseline')
     serie  = Input(shape=(maxlen, 1), batch_size=None, name='input')
@@ -62,7 +62,7 @@ def build_lstm(maxlen, n_classes):
     placeholder = {'input':serie,
                    'mask_in':mask,
                    'times':times}
-    
+
     m = tf.cast(1.-placeholder['mask_in'][...,0], tf.bool)
     tim = normalize_batch(placeholder['times'])
     inp = normalize_batch(placeholder['input'])
@@ -98,7 +98,7 @@ def build_lstm_att(astromer, maxlen, n_classes, train_astromer=False):
 
     x = encoder(placeholder, training=False)
     x = tf.math.divide_no_nan(x-tf.expand_dims(tf.reduce_mean(x, 1),1),
-                              tf.expand_dims(tf.math.reduce_std(x, 1), 1))        
+                              tf.expand_dims(tf.math.reduce_std(x, 1), 1))
     x = LSTM(256, dropout=.3, return_sequences=True)(x, mask=mask)
     x = LayerNormalization()(x)
     x = LSTM(256, dropout=.3)(x, mask=mask)
@@ -124,9 +124,9 @@ def build_mlp_att(astromer, maxlen, n_classes, train_astromer=False):
     x = x * mask
     x = tf.reduce_sum(x, 1)/tf.reduce_sum(mask, 1)
 
-    x = Dense(1024, activation='relu')(x)
-    x = Dense(512, activation='relu')(x)
-    x = Dense(256, activation='relu')(x)
+    x = Dense(1024, activation='relu',kernel_regularizer='l1')(x)
+    x = Dense(512, activation='relu',kernel_regularizer='l1')(x)
+    x = Dense(256, activation='relu',kernel_regularizer='l1')(x)
     x = LayerNormalization()(x)
     x = Dense(n_classes)(x)
     return Model(inputs=placeholder, outputs=x, name="FCATT")
@@ -134,18 +134,9 @@ def build_mlp_att(astromer, maxlen, n_classes, train_astromer=False):
 def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"]=opt.gpu
     # Loading data
+
     num_cls = pd.read_csv(os.path.join(opt.data, 'objects.csv')).shape[0]
 
-#     train_batches = balanced_records(os.path.join(opt.data, 'train'), 
-#                                      opt.batch_size, 
-#                                      n_classes=num_cls, 
-#                                      max_obs=opt.max_obs,
-#                                      take=1000)
-#     val_batches = balanced_records(os.path.join(opt.data, 'val'), 
-#                                      opt.batch_size, 
-#                                      n_classes=num_cls, 
-#                                      max_obs=opt.max_obs,
-#                                      take=1000)
     train_batches = pretraining_records(os.path.join(opt.data, 'train'),
                                         opt.batch_size, max_obs=opt.max_obs,
                                         msk_frac=0., rnd_frac=0., same_frac=0.,
@@ -162,7 +153,7 @@ def run(opt):
     with open(conf_file, 'r') as handle:
         conf = json.load(handle)
 
-    model = get_ASTROMER(num_layers=conf['layers'],
+    astromer = get_ASTROMER(num_layers=conf['layers'],
                          d_model   =conf['head_dim'],
                          num_heads =conf['heads'],
                          dff       =conf['dff'],
@@ -172,27 +163,27 @@ def run(opt):
                          use_leak  =conf['use_leak'])
 
     weights_path = '{}/weights'.format(opt.w)
-    model.load_weights(weights_path)
-    print(opt.finetune)
-    if opt.mode == 0:
-        model = build_lstm_att(model,
+    astromer.load_weights(weights_path)
+    print('[INFO] Data: {}'.format(opt.data))
+    print('[INFO] ASTROMER weights: {}'.format(weights_path))
+    print('[INFO] Training astromer? ', opt.finetune)
+
+    if opt.mode == 'lstm_att':
+        model = build_lstm_att(astromer,
                                maxlen=opt.max_obs,
                                n_classes=num_cls,
                                train_astromer=opt.finetune)
-        target_dir = os.path.join(opt.p, 'lstm_att')
-    if opt.mode == 1:
-        model = build_mlp_att(model,
+    if opt.mode == 'mlp_att':
+        model = build_mlp_att(astromer,
                               maxlen=opt.max_obs,
                               n_classes=num_cls,
                               train_astromer=opt.finetune)
-        target_dir = os.path.join(opt.p, 'mlp_att')
-
-    if opt.mode == 2:
+    if opt.mode == 'lstm':
         model = build_lstm(maxlen=opt.max_obs,
                            n_classes=num_cls)
-        target_dir = os.path.join(opt.p, 'lstm')
+    print('[INFO] {} created '.format(opt.mode))
 
-
+    target_dir = os.path.join(opt.p, opt.mode)
     optimizer = Adam(learning_rate=opt.lr)
 
     os.makedirs(target_dir, exist_ok=True)
@@ -224,9 +215,6 @@ def run(opt):
 
     model.save(os.path.join(target_dir, 'model'))
 
-    return
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # DATA
@@ -252,8 +240,8 @@ if __name__ == '__main__':
                         help='optimizer initial learning rate')
 
     # RNN HIPERPARAMETERS
-    parser.add_argument('--mode', default=0, type=int,
-                        help='Classifier model: 0: LSTM + ATT - 1: MLP + ATT - 2 LSTM')
+    parser.add_argument('--mode', default='lstm', type=str,
+                        help='Classifier lstm, lstm_att, or mlp_att')
 
     parser.add_argument('--gpu', default='0', type=str,
                         help='GPU number to be used')
