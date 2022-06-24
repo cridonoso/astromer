@@ -188,6 +188,7 @@ def pretraining_pipeline(source, batch_size, max_obs=100, msk_frac=0.2,
     dataset = tf.data.TFRecordDataset(rec_paths)
     if shuffle:
         dataset = dataset.shuffle(10000)
+        
     dataset = dataset.map(fn_0)
 
     if not sampling:

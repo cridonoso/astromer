@@ -5,38 +5,29 @@ import argparse
 import json
 import os, sys
 
-from tensorflow.keras.callbacks import EarlyStopping, TensorBoard
-from tensorflow.keras.losses import CategoricalCrossentropy
-from tensorflow.keras.optimizers import Adam
 
-from core.data import load_dataset, inference_pipeline
-
-from presentation.experiments.clf.classifiers import build_lstm, \
-                                                     build_lstm_att, \
-                                                     build_mlp_att
-from core.astromer import ASTROMER
-
-
-def finetuning(data, astroweights, gpu):
+def finetuning(data, astroweights, gpu, case, astromer_size):
     command1 = 'python -m presentation.experiments.clf.finetuning \
                {} \
                {} \
                {} \
-               {} '.format(gpu, data, astroweights, case)
+               {} \
+               {}'.format(gpu, data, astroweights, case, astromer_size)
     subprocess.call(command1, shell=True)
 
-def classification(data, gpu, case):
+def classification(data, gpu, case, astromer_size):
     command1 = 'python -m presentation.experiments.clf.classify \
                         {} \
                         {} \
-                        {} '.format(gpu, data, case)
+                        {} \
+                        {}'.format(gpu, data, case, astromer_size)
     subprocess.call(command1, shell=True)
 
 def run(opt):
 
-#     finetuning(opt.data, opt.w, opt.gpu)
+    finetuning(opt.data, opt.w, opt.gpu, opt.case, opt.size)
 
-    classification(opt.data, opt.gpu, opt.case)
+#     classification(opt.data, opt.gpu, opt.case, opt.size)
 
 
 
@@ -52,5 +43,7 @@ if __name__ == '__main__':
                         help='ASTROMER pretrained weights')
     parser.add_argument('--gpu', default='0', type=str,
                         help='GPU to use')
+    parser.add_argument('--size', default='256', type=str,
+                        help='ASTROMER SIZE')
     opt = parser.parse_args()
     run(opt)

@@ -22,10 +22,11 @@ from core.astromer import ASTROMER
 os.environ["CUDA_VISIBLE_DEVICES"]=sys.argv[1]
 ds_name = sys.argv[2]
 case = sys.argv[3]
+astromer_size = sys.argv[4]
 
-project_dir = './presentation/experiments/clf/finetuning/ab/{}/'.format(ds_name)
+project_dir = './presentation/experiments/clf/finetuning/{}/ab/{}/'.format(astromer_size, ds_name)
 data_path   = './data/records/{}/'.format(ds_name)
-exp_name    = './presentation/experiments/clf/classifiers/{}/{}/'.format(case, ds_name)
+exp_name    = './presentation/experiments/clf/classifiers/{}/{}/{}/'.format(astromer_size, case, ds_name)
 
 max_obs = 200
 batch_size = 512
@@ -54,19 +55,18 @@ for model_arch in models_arch:
             target_dir = '{}/fold_{}/{}/{}'.format(exp_name, fold_n, ds, model_arch)
 
             n_classes = pd.read_csv(os.path.join(ds_path, 'objects.csv')).shape[0]
-            dataset = load_dataset(os.path.join(ds_path, 'train'),repeat=1)
-            train_batches = inference_pipeline(dataset,
-                                               batch_size=batch_size,
-                                               max_obs=max_obs,
-                                               n_classes=n_classes,
-                                               shuffle=True)
 
-            dataset = load_dataset(os.path.join(ds_path, 'val'),repeat=1)
-            val_batches = inference_pipeline(dataset,
-                                             batch_size=batch_size,
-                                             max_obs=max_obs,
-                                             n_classes=n_classes,
-                                             shuffle=True)
+            train_batches = pretraining_records(os.path.join(ds_path, 'train'),
+                                                batch_size, max_obs=max_obs,
+                                                msk_frac=0., rnd_frac=0., same_frac=0.,
+                                                sampling=False, shuffle=True,
+                                                n_classes=n_classes)
+
+            val_batches = pretraining_records(os.path.join(ds_path, 'val'),
+                                              batch_size, max_obs=max_obs,
+                                              msk_frac=0., rnd_frac=0., same_frac=0.,
+                                              sampling=False, shuffle=False,
+                                              n_classes=n_classes)
 
 
             if model_arch == 'mlp_att':
@@ -78,8 +78,6 @@ for model_arch in models_arch:
             if model_arch == 'lstm_att':
                 astromer = ASTROMER()
                 astromer.load_weights(astroweights)
-#                 model = build_lstm_att(astromer, max_obs, n_classes=n_classes,
-#                                        train_astromer=train_astromer)
                 model = build_lstm_att(astromer, max_obs, n_classes, 
                                        train_astromer=train_astromer, state_dim=256)
 
