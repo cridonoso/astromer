@@ -7,14 +7,20 @@ import os, sys
 
 gpu = sys.argv[1]
 ds_name = sys.argv[2]
-print(ds_name)
+science_case = sys.argv[3]
 
-datasets = ['{}_20'.format(ds_name), 
-            '{}_50'.format(ds_name), 
-            '{}_100'.format(ds_name), 
-            '{}_500'.format(ds_name)]
+astromer_dim = 256
+astroweights = './weights/astromer_10022021'
+batch_size = 256
 
-astroweights = './weights/astromer'
+if science_case == 'c':
+    datasets = [ds_name]
+else:
+    science_case = 'ab'
+    datasets = ['{}_20'.format(ds_name),
+                '{}_50'.format(ds_name),
+                '{}_100'.format(ds_name),
+                '{}_500'.format(ds_name)]
 
 conf_file = os.path.join(astroweights, 'conf.json')
 with open(conf_file, 'r') as handle:
@@ -24,14 +30,22 @@ for dataset in datasets:
     print(dataset)
     for fold_n in range(3):
         start = time.time()
+        project_path = './runs/astromer_{}/{}/{}/fold_{}/{}'.format(astromer_dim,
+                                                                    science_case,
+                                                                    ds_name,
+                                                                    fold_n,
+                                                                    dataset)
+
         command1 = 'python -m presentation.scripts.finetuning \
                    --data ./data/records/{}/fold_{}/{} \
+                   --w {} \
                    --p {} \
-                   --prefix {}_f{} \
-                   --gpu {}'.format(ds_name, fold_n, dataset,
+                   --gpu {}\
+                   --batch-size {}'.format(ds_name, fold_n, dataset,
                                     astroweights,
-                                    dataset,fold_n,
-                                    gpu)
+                                    project_path,
+                                    gpu,
+                                    batch_size)
         try:
             subprocess.call(command1, shell=True)
         except Exception as e:
@@ -39,4 +53,3 @@ for dataset in datasets:
 
         end = time. time()
         print('{} takes {:.2f} sec'.format(dataset, (end - start)))
-

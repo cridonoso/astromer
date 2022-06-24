@@ -16,7 +16,7 @@ logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
 def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"]=opt.gpu
-    
+
     # Get model
     astromer = get_ASTROMER(num_layers=opt.layers,
                             d_model=opt.head_dim,
@@ -29,9 +29,11 @@ def run(opt):
                             no_train=opt.no_train)
 
     # Check for pretrained weigths
-    if os.path.isfile(os.path.join(opt.p, 'checkpoint')):
+    if os.path.isfile(os.path.join(opt.w, 'checkpoint')):
+        os.makedirs(opt.p, exist_ok=True)
+
         print('[INFO] Pretrained model detected! - Finetuning...')
-        conf_file = os.path.join(opt.p, 'conf.json')
+        conf_file = os.path.join(opt.w, 'conf.json')
         with open(conf_file, 'r') as handle:
             conf = json.load(handle)
         # Loading hyperparameters of the pretrained model
@@ -46,16 +48,11 @@ def run(opt):
                                 no_train=conf['no_train'])
 
         # Loading pretrained weights
-        weights_path = '{}/weights'.format(opt.p)
+        weights_path = '{}/weights'.format(opt.w)
         astromer.load_weights(weights_path)
         # Defining a new ()--p)roject folder
-        opt.p = os.path.join(opt.p, 'finetuning')
-        os.makedirs(opt.p, exist_ok=True)
-        # Make sure we don't overwrite a previous training
-        opt.p = get_folder_name(opt.p, prefix=opt.prefix)
 
-        # Creating (--p)royect directory
-        os.makedirs(opt.p, exist_ok=True)
+
 
         # Save Hyperparameters
         conf_file = os.path.join(opt.p, 'conf.json')
@@ -70,7 +67,7 @@ def run(opt):
         with open(conf_file, 'w') as json_file:
             json.dump(varsdic, json_file, indent=4)
 
-        # Loading data                
+        # Loading data
         train_batches = pretraining_records(os.path.join(opt.data, 'train'),
                                             opt.batch_size,
                                             max_obs=conf['max_obs'],
@@ -79,7 +76,7 @@ def run(opt):
                                             same_frac=conf['same_frac'],
                                             sampling=False,
                                             shuffle=True)
-                
+
         valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
                                             opt.batch_size,
                                             max_obs=conf['max_obs'],
@@ -88,8 +85,8 @@ def run(opt):
                                             same_frac=conf['same_frac'],
                                             sampling=False,
                                             shuffle=True)
-            
-        
+
+
         # Training ASTROMER
         train(astromer, train_batches, valid_batches,
               patience=opt.patience,
@@ -112,8 +109,8 @@ if __name__ == '__main__':
                         help='Dataset folder containing the records files')
     parser.add_argument('--p', default="./runs/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
-    parser.add_argument('--prefix', default="model", type=str,
-                        help='prefix for the folder of the finetuned model')
+    parser.add_argument('--w', default="./weights/astromer_10022021", type=str,
+                        help='astromer weigths')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
     parser.add_argument('--epochs', default=10000, type=int,
