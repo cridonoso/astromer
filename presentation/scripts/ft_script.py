@@ -9,9 +9,9 @@ gpu = sys.argv[1]
 ds_name = sys.argv[2]
 science_case = sys.argv[3]
 
-astromer_dim = 256
-astroweights = './weights/astromer_10022021'
-batch_size = 256
+astromer_dim = sys.argv[4]
+astroweights = './weights/macho_{}'.format(astromer_dim)
+batch_size = 2500
 
 if science_case == 'c':
     datasets = [ds_name]

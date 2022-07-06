@@ -71,10 +71,10 @@ def run(opt):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # DATA
-    parser.add_argument('--max-obs', default=50, type=int,
+    parser.add_argument('--max-obs', default=200, type=int,
                     help='Max number of observations')
 
-    parser.add_argument('--msk-frac', default=0.7, type=float,
+    parser.add_argument('--msk-frac', default=0.5, type=float,
                         help='[MASKED] fraction')
     parser.add_argument('--rnd-frac', default=0.2, type=float,
                         help='Fraction of [MASKED] to be replaced by random values')
@@ -90,7 +90,7 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--epochs', default=10000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=200, type=int,
+    parser.add_argument('--patience', default=40, type=int,
                         help='batch size')
     parser.add_argument('--gpu', default='0', type=str,
                         help='GPU to use')
