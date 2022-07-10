@@ -19,7 +19,7 @@ def run(opt):
                                     msk_frac=opt.msk_frac,
                                     rnd_frac=opt.rnd_frac,
                                     same_frac=opt.same_frac,
-                                    shuffle=False,
+                                    shuffle=True,
                                     sampling=True,
                                     )
     val_ds   = pretraining_pipeline(os.path.join(opt.data, 'val'),
@@ -49,9 +49,9 @@ def run(opt):
     dict_to_json(opt, opt.p)
 
     # Defining optimizer with custom scheduler for the learning rate
-#     learning_rate = CustomSchedule(opt.head_dim)
-    optimizer = tf.keras.optimizers.Adam(1e-3)
-    
+    learning_rate = CustomSchedule(opt.head_dim)
+    optimizer = tf.keras.optimizers.Adam(learning_rate)
+
     callbacks = get_callbacks(opt.p, opt.patience)
 
     # Compile and train
@@ -60,7 +60,8 @@ def run(opt):
                   epochs=opt.epochs,
                   validation_data=val_ds.take(1),
                   callbacks=callbacks)
-    model.save_weights('./weights/macho_10022021/weights_new.h5')
+
+    model.save_weights('./weights/candidate_macho')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
