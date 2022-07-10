@@ -29,7 +29,7 @@ for astromer_dim in [256, 128, 64]:
         
         for dataset in datasets:
             for fold_n in range(3):
-                for mode in ['lstm_att', 'mlp_att', 'lstm']:
+                for mode in ['lstm', 'lstm_att', 'mlp_att']:
                     print('sc:{} - {} on mode {}'.format(science_case, dataset, mode))
 
                     if science_case == 'c':
@@ -51,7 +51,7 @@ for astromer_dim in [256, 128, 64]:
                                                                                             fold_n,
                                                                                             dataset)
 
-                    command1 = 'python -m presentation.scripts.classify \
+                    command1 = 'python -m presentation.scripts.testing \
                                     --data ./data/records/{}/fold_{}/{} \
                                     --p {} \
                                     --w {} \
@@ -63,8 +63,6 @@ for astromer_dim in [256, 128, 64]:
                                                      batch_size,
                                                      mode,
                                                      gpu)
-                    if train_astromer:
-                        command1 += ' --finetune'
 
                     try:
                         subprocess.call(command1, shell=True)

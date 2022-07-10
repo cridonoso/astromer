@@ -125,8 +125,8 @@ def build_mlp_att(astromer, maxlen, n_classes, train_astromer=False):
     x = tf.reduce_sum(x, 1)/tf.reduce_sum(mask, 1)
 
     x = Dense(1024, activation='relu',kernel_regularizer='l1')(x)
-    x = Dense(512, activation='relu',kernel_regularizer='l1')(x)
-    x = Dense(256, activation='relu',kernel_regularizer='l1')(x)
+    x = Dense(512, activation='relu', kernel_regularizer='l1')(x)
+    x = Dense(256, activation='relu', kernel_regularizer='l1')(x)
     x = LayerNormalization()(x)
     x = Dense(n_classes)(x)
     return Model(inputs=placeholder, outputs=x, name="FCATT")

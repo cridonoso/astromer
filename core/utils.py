@@ -1,5 +1,10 @@
 import tensorflow as tf
+import pandas as pd
 import os
+
+from tensorboard.backend.event_processing import event_accumulator
+from tensorflow.python.lib.io import tf_record
+from tensorflow.core.util import event_pb2
 
 
 def get_folder_name(path, prefix=''):
@@ -50,3 +55,19 @@ def standardize(tensor, axis=0, return_mean=False):
         return z, mean_value
     else:
         return z
+    
+def my_summary_iterator(path):
+    for r in tf_record.tf_record_iterator(path):
+        yield event_pb2.Event.FromString(r)
+        
+def get_metrics(path_logs, metric_name='epoch_loss'):
+    train_logs = [x for x in os.listdir(path_logs) if x.endswith('.v2')][0]
+    path_train = os.path.join(path_logs, train_logs)
+
+    ea = event_accumulator.EventAccumulator(path_train)
+    ea.Reload()   
+#     print(ea.Tags())
+    
+    metrics = pd.DataFrame([(w,s,tf.make_ndarray(t))for w,s,t in ea.Tensors(metric_name)],
+                columns=['wall_time', 'step', 'value'])
+    return metrics
