@@ -49,16 +49,16 @@ def run(opt):
     dict_to_json(opt, opt.p)
 
     # Defining optimizer with custom scheduler for the learning rate
-    learning_rate = CustomSchedule(opt.head_dim)
-    optimizer = tf.keras.optimizers.Adam(learning_rate)
+    # learning_rate = CustomSchedule(opt.head_dim)
+    optimizer = tf.keras.optimizers.Adam(opt.lr)
 
     callbacks = get_callbacks(opt.p, opt.patience)
 
     # Compile and train
     model.compile(optimizer=optimizer)
-    _ = model.fit(train_ds.take(5),
+    _ = model.fit(train_ds,
                   epochs=opt.epochs,
-                  validation_data=val_ds.take(1),
+                  validation_data=val_ds,
                   callbacks=callbacks)
 
     model.save_weights('./weights/candidate_macho')
@@ -90,6 +90,8 @@ if __name__ == '__main__':
                         help='Number of epochs')
     parser.add_argument('--patience', default=200, type=int,
                         help='batch size')
+    parser.add_argument('--lr', default=1e-3, type=float,
+                        help='Learning rate')
     parser.add_argument('--gpu', default='0', type=str,
                         help='GPU to use')
 

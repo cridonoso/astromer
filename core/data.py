@@ -155,7 +155,7 @@ def format_inference(input_dict, num_cls, get_ids=False):
 
 def pretraining_pipeline(source, batch_size, max_obs=100, msk_frac=0.2,
                         rnd_frac=0.1, same_frac=0.1, sampling=False,
-                        shuffle=False, n_classes=-1):
+                        shuffle=False, n_classes=-1, repeat=1):
     """
     Pretraining data loader.
     This method build the ASTROMER input format.
@@ -187,8 +187,9 @@ def pretraining_pipeline(source, batch_size, max_obs=100, msk_frac=0.2,
 
     dataset = tf.data.TFRecordDataset(rec_paths)
     if shuffle:
+        dataset = dataset.repeat(repeat)
         dataset = dataset.shuffle(10000)
-        
+
     dataset = dataset.map(fn_0)
 
     if not sampling:
