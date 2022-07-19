@@ -21,6 +21,7 @@ def run(opt):
                                     same_frac=opt.same_frac,
                                     shuffle=True,
                                     sampling=True,
+                                    repeat=opt.repeat,
                                     )
     val_ds   = pretraining_pipeline(os.path.join(opt.data, 'val'),
                                     batch_size=opt.batch_size,
