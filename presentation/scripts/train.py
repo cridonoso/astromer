@@ -62,8 +62,6 @@ def run(opt):
                   validation_data=val_ds,
                   callbacks=callbacks)
 
-    model.save_weights('./weights/candidate_macho')
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # DATA
