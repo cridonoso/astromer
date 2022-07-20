@@ -42,10 +42,6 @@ def run(opt):
                      dropout   = opt.dropout,
                      maxlen    = opt.max_obs)
 
-    if opt.w != '':
-        print('[INFO] Loading pre-trained weights')
-        model.load_weights(opt.w)
-
     # Save Hyperparameters
     dict_to_json(opt, opt.p)
 
@@ -55,8 +51,13 @@ def run(opt):
 
     callbacks = get_callbacks(opt.p, opt.patience)
 
-    # Compile and train
+    # Compile
     model.compile(optimizer=optimizer)
+
+    if opt.w != '':
+        print('[INFO] Loading pre-trained weights')
+        model.load_weights(opt.w)
+
     _ = model.fit(train_ds,
                   epochs=opt.epochs,
                   validation_data=val_ds,
