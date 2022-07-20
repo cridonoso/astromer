@@ -84,15 +84,6 @@ def train_step(model, batch, opt):
 def valid_step(model, batch, return_pred=False, normed=False):
     with tf.GradientTape() as tape:
         x_pred = model(batch)
-        # if normed:
-        #     mean_x = tf.reshape(batch['mean'][:, 1], [-1, 1, 1])
-        #     x_true = batch['output'] + mean_x
-        #     x_pred = x_pred + mean_x
-        #
-        #     mse = custom_rmse(y_true=x_true,
-        #                       y_pred=x_pred,
-        #                       mask=batch['mask_out'])
-        # else:
         x_true = batch['output']
         mse = custom_rmse(y_true=x_true,
                           y_pred=x_pred,
@@ -162,7 +153,7 @@ def train(model,
         if valid_mse.result() < best_loss:
             best_loss = valid_mse.result()
             es_count = 0.
-            model.save_weights(exp_path+'/weights')
+            model.save_weights(os.path.join(exp_path, 'weights.h5'))
         else:
             es_count+=1.
         if es_count == patience:
