@@ -5,7 +5,7 @@ import os
 
 from core.training.scheduler import CustomSchedule
 from core.astromer import ASTROMER
-from core.data  import load_dataset, pretraining_pipeline
+from core.data  import pretraining_pipeline
 from core.training.callbacks import get_callbacks
 from core.utils import dict_to_json
 from tensorflow.keras.callbacks import ModelCheckpoint
@@ -13,23 +13,23 @@ from tensorflow.keras.callbacks import ModelCheckpoint
 def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"]=opt.gpu
 
-    train_ds = load_dataset(os.path.join(opt.data, 'train'),
-                            repeat=opt.repeat, shuffle=True)
-    val_ds   = load_dataset(os.path.join(opt.data, 'val'),
-                            shuffle=True, repeat=3)
-
-    train_ds = pretraining_pipeline(train_ds,
+    train_ds = pretraining_pipeline(os.path.join(opt.data, 'train'),
                                     batch_size=opt.batch_size,
                                     max_obs=opt.max_obs,
                                     msk_frac=opt.msk_frac,
                                     rnd_frac=opt.rnd_frac,
                                     same_frac=opt.same_frac,
+                                    shuffle=True,
+                                    sampling=True,
+                                    repeat=opt.repeat,
                                     )
-    val_ds   = pretraining_pipeline(val_ds,
+    val_ds   = pretraining_pipeline(os.path.join(opt.data, 'val'),
                                     batch_size=opt.batch_size,
                                     max_obs=opt.max_obs,
                                     msk_frac=opt.msk_frac,
                                     rnd_frac=opt.rnd_frac,
+                                    shuffle=False,
+                                    sampling=True,
                                     same_frac=opt.same_frac,
                                     )
 
@@ -42,27 +42,26 @@ def run(opt):
                      dropout   = opt.dropout,
                      maxlen    = opt.max_obs)
 
-    if opt.w != '':
-        print('[INFO] Loading pre-trained weights')
-        model.load_weights(opt.w)
-
     # Save Hyperparameters
     dict_to_json(opt, opt.p)
 
     # Defining optimizer with custom scheduler for the learning rate
-    learning_rate = CustomSchedule(opt.head_dim)
-    optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
-                                     epsilon=1e-9)
+    # learning_rate = CustomSchedule(opt.head_dim)
+    optimizer = tf.keras.optimizers.Adam(opt.lr)
 
     callbacks = get_callbacks(opt.p, opt.patience)
 
-    # Compile and train
+    # Compile
     model.compile(optimizer=optimizer)
+
+    if opt.w != '':
+        print('[INFO] Loading pre-trained weights')
+        model.load_weights(opt.w)
+
     _ = model.fit(train_ds,
                   epochs=opt.epochs,
                   validation_data=val_ds,
                   callbacks=callbacks)
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -89,8 +88,10 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--epochs', default=1000, type=int,
                         help='Number of epochs')
-    parser.add_argument('--patience', default=40, type=int,
+    parser.add_argument('--patience', default=200, type=int,
                         help='batch size')
+    parser.add_argument('--lr', default=1e-3, type=float,
+                        help='Learning rate')
     parser.add_argument('--gpu', default='0', type=str,
                         help='GPU to use')
 
