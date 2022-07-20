@@ -1,167 +1,191 @@
 import tensorflow as tf
 import logging
-import json
 import os, sys
-import pandas as pd
-import numpy as np
 
-from tensorflow.keras.layers  import Input, Dense
-from tensorflow.keras         import Model
+from core.output    import RegLayer
+from core.tboard    import save_scalar, draw_graph
+from core.losses    import custom_rmse, custom_bce
+from core.metrics   import custom_acc
+from core.encoder   import Encoder
 
-from core.data                import load_numpy, inference_pipeline
-from core.components.decoder  import RegLayer, NSP_Regressor
-from core.training.losses     import custom_rmse
-from core.training.metrics    import custom_r2
-from core.components.encoder  import Encoder
-
-from tensorflow.keras.losses  import BinaryCrossentropy
-from core.utils               import download_weights
-from tensorflow.keras.metrics import BinaryAccuracy
-from core.training.losses     import custom_rmse
-from core.training.metrics    import custom_r2
-
+from tensorflow.keras.layers import Input, Dense
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import Model
+from tqdm import tqdm
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 os.system('clear')
 
-
-class BaseASTROMER(Model):
-    def __init__(self, **kwargs):
-        super(BaseASTROMER, self).__init__(**kwargs)
-
-    def build(self, batch_size=None, max_obs=200, inp_dim=1):
-        super(BaseASTROMER, self).build({'input': [batch_size, max_obs, 1],
-                                     'mask_in': [batch_size, max_obs, 1],
-                                     'times': [batch_size, max_obs, 1]})
-
-    def call(self, inputs, training=False):
-        raise NotImplementedError("Please Implement this method")
-
-    def train_step(self, data):
-        raise NotImplementedError("Please Implement this method")
-
-    def test_step(self, data):
-        raise NotImplementedError("Please Implement this method")
-
-    def predict_step(self, data):
-        raise NotImplementedError("Please Implement this method")
-
-    def load_weights(self, filepath, **kwargs):
-        self.load_json_config(filepath)
-        super(BaseASTROMER, self).load_weights(os.path.join(filepath, 'weights.h5'),
-                                                **kwargs)
-
-    def load_json_config(self, filepath):
-        conf_file = os.path.join(filepath, 'conf.json')
-        with open(conf_file, 'r') as handle:
-            conf = json.load(handle)
-
-        self.encoder = Encoder(conf['layers'],
-                               conf['head_dim'],
-                               conf['heads'],
-                               conf['dff'],
-                               base=conf['base'],
-                               rate=conf['dropout'],
-                               name='encoder')
-        self.regressor = RegLayer(name='regression')
-        self.build(max_obs=conf['max_obs'])
-
-    def encode(self, dataset, oids_list=None, labels=None, batch_size=50,
-               concatenate=False):
-
-        if isinstance(dataset, list):
-            print('[INFO] Loading numpy arrays')
-            dataset = load_numpy(dataset, ids=oids_list, labels=labels)
-            dataset = inference_pipeline(dataset, batch_size=batch_size,
-                                         max_obs=self.maxlen, drop_remainder=True,
-                                         get_ids=True)
-
-        att = self.predict(dataset)
-
-        if concatenate:
-            oids = tf.concat([oid for _, (_, oid) in dataset], axis=0)
-            oids = np.array([str(o.numpy().decode('utf8') )for o in oids])
-            unique_id = np.unique(oids)
-
-            concat_att = []
-            for id in unique_id:
-                indices = np.where(oids == id)
-                foo = np.concatenate(att[indices], 0)
-                concat_att.append(foo)
-            return concat_att
-        return att
-
-    def download_weights(self, remote, local):
-        if not os.path.isdir(local):
-            download_weights(remote, local)
-        else:
-            print('[INFO] Weights already downloaded')
-
-    def from_pretrained(self):
-        raise NotImplementedError("Please Implement this method")
-
-class ASTROMER(BaseASTROMER):
-    def __init__(self,
-                 num_layers=2,
-                 d_model=256,
-                 num_heads=4,
-                 dff=128,
+def get_ASTROMER(num_layers=2,
+                 d_model=200,
+                 num_heads=2,
+                 dff=256,
                  base=10000,
                  dropout=0.1,
                  use_leak=False,
-                 maxlen=200):
+                 no_train=True,
+                 maxlen=100,
+                 batch_size=None):
 
-        super(ASTROMER, self).__init__()
-        self.encoder = Encoder(num_layers,
-                               d_model,
-                               num_heads,
-                               dff,
-                               base=base,
-                               rate=dropout,
-                               use_leak=use_leak,
-                               name='encoder')
+    serie  = Input(shape=(maxlen, 1),
+                  batch_size=None,
+                  name='input')
+    times  = Input(shape=(maxlen, 1),
+                  batch_size=None,
+                  name='times')
+    mask   = Input(shape=(maxlen, 1),
+                  batch_size=None,
+                  name='mask')
+    length = Input(shape=(maxlen,),
+                  batch_size=None,
+                  dtype=tf.int32,
+                  name='length')
 
-        self.regressor = RegLayer(name='regression')
-        self.maxlen = maxlen
-        self.build(max_obs=maxlen)
+    placeholder = {'input':serie,
+                   'mask_in':mask,
+                   'times':times,
+                   'length':length}
 
-    def compile(self, loss_rec=None, metric_rec=None, **kwargs):
-        super(ASTROMER, self).compile(**kwargs)
-        self.loss_rec = custom_rmse
-        self.metric_rec = custom_r2
+    encoder = Encoder(num_layers,
+                d_model,
+                num_heads,
+                dff,
+                base=base,
+                rate=dropout,
+                use_leak=use_leak,
+                name='encoder')
 
-    def call(self, inputs, training=False):
-        x = self.encoder(inputs, training)
-        x = self.regressor(x)
-        return x
+    if no_train:
+        encoder.trainable = False
 
-    def train_step(self, data):
-        x, (y, _, mask) = data
+    x = encoder(placeholder)
 
-        with tf.GradientTape() as tape:
-            y_pred = self(x, training=True)  # Forward pass
-            loss = self.loss_rec(y, y_pred, mask=mask)
-            r2 = self.metric_rec(y, y_pred, mask=mask)
+    x = RegLayer(name='regression')(x)
 
-        # Compute gradients
-        trainable_vars = self.trainable_variables
-        gradients = tape.gradient(loss, trainable_vars)
-        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
-        return {'loss': loss, 'r2':r2}
+    return Model(inputs=placeholder,
+                 outputs=x,
+                 name="ASTROMER")
 
-    def test_step(self, data):
-        x, (y, _, mask) = data
-        y_pred = self(x, training=False)
-        loss   = self.loss_rec(y, y_pred, mask=mask)
-        r2     = self.metric_rec(y, y_pred, mask=mask)
-        return {'loss': loss, 'r2':r2}
+@tf.function
+def train_step(model, batch, opt):
+    with tf.GradientTape() as tape:
+        x_pred = model(batch)
 
-    def predict_step(self, data):
-        x, _ = data
-        return self.encoder(x)
+        mse = custom_rmse(y_true=batch['output'],
+                         y_pred=x_pred,
+                         mask=batch['mask_out'])
 
-    def from_pretrained(self, name):
-        url = 'https://github.com/astromer-science/weights/raw/main/{}.zip'.format(name)
-        target = './weights'
-        self.download_weights(url, os.path.join(target, name))
-        self.load_weights(os.path.join(target, name))
+
+    grads = tape.gradient(mse, model.trainable_weights)
+    opt.apply_gradients(zip(grads, model.trainable_weights))
+    return mse
+
+@tf.function
+def valid_step(model, batch, return_pred=False, normed=False):
+    with tf.GradientTape() as tape:
+        x_pred = model(batch)
+        x_true = batch['output']
+        mse = custom_rmse(y_true=x_true,
+                          y_pred=x_pred,
+                          mask=batch['mask_out'])
+
+    if return_pred:
+        return mse, x_pred, x_true
+    return mse
+
+def train(model,
+          train_dataset,
+          valid_dataset,
+          patience=20,
+          exp_path='./experiments/test',
+          epochs=1,
+          finetuning=False,
+          use_random=True,
+          num_cls=2,
+          lr=1e-3,
+          verbose=1):
+
+    os.makedirs(exp_path, exist_ok=True)
+
+    # Tensorboard
+    train_writter = tf.summary.create_file_writer(
+                                    os.path.join(exp_path, 'logs', 'train'))
+    valid_writter = tf.summary.create_file_writer(
+                                    os.path.join(exp_path, 'logs', 'valid'))
+
+    batch = [t for t in train_dataset.take(1)][0]
+    draw_graph(model, batch, train_writter, exp_path)
+
+    # Optimizer
+    optimizer = tf.keras.optimizers.Adam(lr,
+                                         beta_1=0.9,
+                                         beta_2=0.98,
+                                         epsilon=1e-9)
+    # To save metrics
+    train_mse  = tf.keras.metrics.Mean(name='train_mse')
+    valid_mse  = tf.keras.metrics.Mean(name='valid_mse')
+
+    # Training Loop
+    best_loss = 999999.
+    es_count = 0
+    pbar = tqdm(range(epochs), desc='epoch')
+    for epoch in pbar:
+        for train_batch in train_dataset:
+            mse = train_step(model, train_batch, optimizer)
+            train_mse.update_state(mse)
+
+        for valid_batch in valid_dataset:
+            mse = valid_step(model, valid_batch)
+            valid_mse.update_state(mse)
+
+        msg = 'EPOCH {} - ES COUNT: {}/{} train mse: {:.4f} - val mse: {:.4f}'.format(epoch,
+                                                                                      es_count,
+                                                                                      patience,
+                                                                                      train_mse.result(),
+                                                                                      valid_mse.result())
+
+        pbar.set_description(msg)
+
+        save_scalar(train_writter, train_mse, epoch, name='mse')
+        save_scalar(valid_writter, valid_mse, epoch, name='mse')
+
+
+        if valid_mse.result() < best_loss:
+            best_loss = valid_mse.result()
+            es_count = 0.
+            model.save_weights(os.path.join(exp_path, 'weights.h5'))
+        else:
+            es_count+=1.
+        if es_count == patience:
+            print('[INFO] Early Stopping Triggered')
+            break
+
+        train_mse.reset_states()
+        valid_mse.reset_states()
+
+def predict(model,
+            dataset,
+            conf,
+            predic_proba=False):
+
+    total_mse, inputs, reconstructions = [], [], []
+    masks, times = [], []
+    for step, batch in tqdm(enumerate(dataset), desc='prediction'):
+        mse, x_pred, x_true = valid_step(model,
+                                         batch,
+                                         return_pred=True,
+                                         normed=True)
+
+        total_mse.append(mse)
+        times.append(batch['times'])
+        inputs.append(x_true)
+        reconstructions.append(x_pred)
+        masks.append(batch['mask_out'])
+
+    res = {'mse':tf.reduce_mean(total_mse).numpy(),
+           'x_pred': tf.concat(reconstructions, 0),
+           'x_true': tf.concat(inputs, 0),
+           'mask': tf.concat(masks, 0),
+           'time': tf.concat(times, 0)}
+
+    return res
