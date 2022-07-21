@@ -1,5 +1,8 @@
-
 # ASTROMER
+
+<p align="center">
+  <img src="https://github.com/cridonoso/astromer/blob/main/presentation/figures/astromer_logo.png?raw=true" width="1300" title="hover text">
+</p>
 
 Welcome to the main repository of the ASTROMER project. This is the **stable
 version 0** where you can find all the resources associated to the article: 
