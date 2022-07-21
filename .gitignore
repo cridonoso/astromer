@@ -1,15 +1,11 @@
 *ted_hrlr_translate_pt_en_converter*
 *__pycache__
-experiments
-docker-compose-cpu.yml
 data/raw_data
 data/records
 .ipynb_checkpoints/
 runs
 .Trash-0/
-clf_runs
-docker-compose.yml
 weights
-exp_jan2022/
 presentation/backup/
+big_atlas.zip
 user

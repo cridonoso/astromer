@@ -71,6 +71,7 @@ def run(opt):
     print('[INFO] {} created '.format(opt.mode))
         
     target_dir = os.path.join(opt.p, '{}_2'.format(opt.mode))
+
     model.compile(optimizer=Adam(learning_rate=opt.lr),
                   loss=CategoricalCrossentropy(from_logits=True),
                   metrics='accuracy')

@@ -212,11 +212,15 @@ def deserialize(sample):
     input_dict['input'] = sequence
     return input_dict
 
-def sample_lc(sample, max_obs):
+def sample_lc(sample, max_obs, binary=True):
     '''
     Sample a random window of "max_obs" observations from the input sequence
     '''
-    input_dict = deserialize(sample)
+    if binary:
+        input_dict = deserialize(sample)
+    else:
+        input_dict = sample
+        
     sequence = input_dict['input']
 
     serie_len = tf.shape(sequence)[0]
@@ -243,8 +247,11 @@ def get_window(sequence, length, pivot, max_obs):
     sliced = tf.slice(sequence, [pivot, 0], [end, -1])
     return sliced
 
-def get_windows(sample, max_obs):
-    input_dict = deserialize(sample)
+def get_windows(sample, max_obs, binary=True):
+    if binary:
+        input_dict = deserialize(sample)
+    else:
+        input_dict = sample
 
     sequence = input_dict['input']
     rest = input_dict['length']%max_obs
@@ -332,7 +339,7 @@ def format_label(input_dict, num_cls):
 
 def pretraining_records(source, batch_size, max_obs=100, msk_frac=0.2,
                         rnd_frac=0.1, same_frac=0.1, sampling=False,
-                        shuffle=False, n_classes=-1):
+                        shuffle=False, repeat=1, n_classes=-1):
     """
     Pretraining data loader.
     This method build the ASTROMER input format.
@@ -365,6 +372,7 @@ def pretraining_records(source, batch_size, max_obs=100, msk_frac=0.2,
     fn_1 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac, max_obs)
 
     dataset = tf.data.TFRecordDataset(rec_paths)
+    dataset = dataset.repeat(repeat)
     if shuffle:
         dataset = dataset.shuffle(10000)
     dataset = dataset.map(fn_0)
@@ -390,44 +398,53 @@ def adjust_fn_clf(func, max_obs):
         return result
     return wrap
 
-def balanced_records(source, batch_size, n_classes, max_obs=200, sampling=False, take=1):
-    """
-    Classification data loader.
-    It creates ASTROMER-like input but without masking
+def create_generator(list_of_arrays, labels=None, ids=None):
 
-    Args:
-        source (string): Record folder
-        batch_size (int): Batch size
-        max_obs (int): Max. number of observation per serie
-        take (int):  Number of batches.
-                     If 'take' is -1 then it returns the whole dataset without
-                     shuffle and oversampling (i.e., testing case)
-    Returns:
-        Tensorflow Dataset: Iterator withg preprocessed batches
-    """
+    if ids is None:
+        ids = list(range(len(list_of_arrays)))
+    if labels is None:
+        labels = list(range(len(list_of_arrays)))
 
+    for i, j, k in zip(list_of_arrays, labels, ids):
+        yield {'input': i,
+               'label':int(j),
+               'lcid':str(k),
+               'length':int(i.shape[0])}
+
+def load_numpy(samples,
+               ids=None,
+               labels=None,
+               batch_size=1,
+               shuffle=False,
+               sampling=False,
+               max_obs=100,
+               msk_frac=0.,
+               rnd_frac=0.,
+               same_frac=0.,
+               repeat=1):
     if sampling:
-        fn_0 = adjust_fn(sample_lc, max_obs)
+        fn_0 = adjust_fn(sample_lc, max_obs, False)
     else:
-        fn_0 = adjust_fn(get_windows, max_obs)
+        fn_0 = adjust_fn(get_windows, max_obs, False)
 
-    fn_1 = adjust_fn(mask_sample, 0., 0., 0., max_obs)
-    fn_2 = adjust_fn(format_label, n_classes)
+    fn_1 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac, max_obs)
 
-    rec_paths = []
-    for folder in os.listdir(source):
-        partial = []
-        for x in os.listdir(os.path.join(source, folder)):
-            partial.append(os.path.join(source, folder, x))
-        rec_paths.append(partial)
-
-    datasets = [tf.data.TFRecordDataset(x) for x in rec_paths]
-    datasets = [dataset.repeat() for dataset in datasets]
-    dataset = tf.data.experimental.sample_from_datasets(datasets)
+    dataset = tf.data.Dataset.from_generator(lambda: create_generator(samples,labels,ids),
+                                         output_types= {'input':tf.float32,
+                                                        'label':tf.int32,
+                                                        'lcid':tf.string,
+                                                        'length':tf.int32},
+                                         output_shapes={'input':(None,3),
+                                                        'label':(),
+                                                        'lcid':(),
+                                                        'length':()})
+    dataset = dataset.repeat(repeat)
+    if shuffle:
+        dataset = dataset.shuffle(10000)
     dataset = dataset.map(fn_0)
-    dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
+    if not sampling:
+        dataset = dataset.flat_map(lambda x,y,i: tf.data.Dataset.from_tensor_slices((x,y,i)))
     dataset = dataset.map(fn_1)
-    dataset = dataset.map(fn_2)
-    dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch(buffer_size=2)
-    return dataset.take(take)
+    dataset = dataset.padded_batch(batch_size).cache()
+    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+    return dataset

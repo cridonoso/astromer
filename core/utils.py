@@ -68,8 +68,8 @@ def get_metrics(path_logs, metric_name='epoch_loss', full_logs=True):
         ea = event_accumulator.EventAccumulator(path_train, size_guidance={'tensors': 0})
     else:
         ea = event_accumulator.EventAccumulator(path_train)
+
     ea.Reload()   
-#     print(ea.Tags())
     
     metrics = pd.DataFrame([(w,s,tf.make_ndarray(t))for w,s,t in ea.Tensors(metric_name)],
                 columns=['wall_time', 'step', 'value'])

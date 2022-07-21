@@ -1,55 +1,98 @@
-# ASTROMER: Building Light Curves Embeddings using Transfomers
+# ASTROMER
 
-![](https://github.com/cridonoso/astromer/blob/main/presentation/figures/banner.png?raw=true)
+<p align="center">
+  <img src="https://github.com/cridonoso/astromer/blob/main/presentation/figures/astromer_logo.png?raw=true" width="1300" title="hover text">
+</p>
 
-ASTROMER is a deep learning model trained on million of stars. It is inspired by NLP architecture BERT which combine different tasks to create a useful representation of the input. This representation corresponds to the **attention vector** which we can then use to train another models.
+Welcome to the main repository of the ASTROMER project. This is the **stable
+version 0** where you can find all the resources associated to the article: 
+[ASTROMER: A transformer-based embedding for the representation of light curves](https://arxiv.org/abs/2205.01677).
 
-## About the design pattern
-We use an extention of the "clean architecture" pattern. This technique allows the communication in one sense (from outside to inside), improving the long-term scale capacity of the code. [Template and more information here!](https://github.com/cridonoso/tf2_base.git)
+ASTROMER is a transformer-based model that learns **light curves representations** 
+using millions of light curves. 
 
-## Requirements
-- [Docker](https://docs.docker.com/engine/install/)
-- [Docker-compose](https://docs.docker.com/compose/install/)
+Representation are then used for extracting 
+useful **embeddings** that we can use for training another downstream tasks.
 
-## Usage
-##### Container building
-All the commands mentioned must be executed in the root directory (i.e., where `docker-compose.yml` and `Dockerfile` are located)
-1. To build the container use: `docker-compose build`
-2. To start the container in detached mode (`-d`): `docker-compose up -d`
-3. Check that the container is already runing by typing: `docker container ls`
 
-### Interactive Session
-To train and run scripts, we need to access the container interactively. Please type:
-```docker exec -it astromer bash``` 
-where `-it` means (`i`)nteractive session on the (`t`)agged container. Notice we make the command line `bash` explicit.
 
-### Scripts
-The scripts are stored in the `/presentation/scripts/` folder. 
-To execute scripts we need to run them as python modules. For example:
+
+
+
+## Features
+
+- Pre-trained weights from MACHO R-band light curves
+- Visualization jupyter notebooks (`/presentation/notebooks/*`)
+- Scripts for training, finetuning and classify using ASTROMER (`/presentation/scripts/*`)
+- Model implementation (`/core/astromer.py` and related)
+- Data preprocessing, saving and reading [tf.Records](https://www.tensorflow.org/tutorials/load_data/tfrecord) (`/core/data.py`)
+- Dockerfile and scripts for building (`build_container.sh`) and run (`run_container.sh`) the ASTROMER container
+
+## Get started
+
+We recomend to use [Docker](https://docs.docker.com/get-docker/) since it provides a **kernel-isolated** 
+and **identical environment** to the one used by the authors
+
+The `Dockerfile` contains all the configuration for running ASTROMER model. No need to touch it,
+`build_container.sh` and `run_container.sh` make the work for you :slightly_smiling_face:	
+
+The first step is to build the container,
+```bash
+  bash build_container.sh
 ```
-python -m presentation.scripts.train --data ./data/records/mis_datos
-``` 
-To check the training arguments, please read the `train.py` script. Similarly, we should use the same command to execute other scripts, such as: `finetuning.py` and `classification.py`
+It creates a "virtual machine", named `astromer`, containing all the dependencies such as python, tensorflow, among others. 
 
-### Jupyter notebook
-To run jupyter notebook, first enter in an interactive session:
+The next and final step is running the ASTROMER container,
 ```
-docker exec -it astromer bash
+  bash run_container.sh
 ```
-then run jupyter notebook specifying `ip` and `root` permissions: 
-```
-jupyter notebook --ip 0.0.0.0 --allow-root
-```
-Copy and paste the url on your browser. 
-For example: 
-```
-http://127.0.0.1:8888/?token=9f09b7fa0937e8fb25cc3095837b42063a4fa88b3920e6df
-``` 
+The above script looks for the container named `astromer` and run it on top of [your kernel](https://www.techtarget.com/searchdatacenter/definition/kernel#:~:text=The%20kernel%20is%20the%20essential,systems%2C%20device%20control%20and%20networking.).
+Automatically, the script recognizes if there are GPUs, making them visible inside the container.
 
-Note that if you are running the container remotely you have to change the **ip address** (i.e., `127.0.0.1` by `my_server.cl`)
+By default the `run_container.sh` script opens the ports `8888` and `6006` 
+for **jupyter notebook** and [**tensorboard**](https://github.com/cridonoso/tensorboard_tutorials), resepectively.
+To run them, use the usal commands but adding the following lines:
 
-### Creating Records
-To create records, go to the notebook `presentation/notebooks/Records.ipynb`. (Tutorial in progress...)
+For Jupyter Notebook 
+```
+jupyter notebook --ip 0.0.0.0
+```
+(Optionally) You can add the `--no-browser` tag in order to avoid warnings.
 
-### Testing cases
-[CURRENTLY NOT WORKING]
+For Tensorboard
+```
+tensorboard --logdir <my-logs-folder> --host 0.0.0.0
+```
+
+Finally, **if you do not want to use Docker** the `requirements.txt` file contains 
+all the packages needed to run ASTROMER.
+Use `pip install -r requirements.txt` on your local python to install them.
+## Usage/Examples
+
+We recomend to save data in tf.Records format.
+For creating records jump to the [create records tutorial](https://github.com/cridonoso/astromer/blob/main/presentation/notebooks/create_records.ipynb)
+
+Otherwise, if you have numpy-based light curves, use [`load_numpy()`](https://github.com/cridonoso/astromer/blob/main/core/data.py) function.
+
+For pre-training run [`train.py`](https://github.com/cridonoso/astromer/blob/main/presentation/scripts/train.py)
+```
+python -m presentation.scripts.train --data ./data/records/macho
+```
+To see the `--tag` options use `--help`. For example, 
+```
+python -m presentation.scripts.finetuning --help
+```
+The [pre-training](https://github.com/cridonoso/astromer/blob/main/presentation/scripts/train.py), 
+[finetuning](https://github.com/cridonoso/astromer/blob/main/presentation/scripts/finetuning.py), 
+and [classification](https://github.com/cridonoso/astromer/blob/main/presentation/scripts/classify.py) 
+scripts work in the same way.
+
+## Contributing
+
+Contributions are always welcome!
+
+Issues and featuring can be directly published in this repository
+via [Pull Request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests). 
+Similarly, New pre-trained weights must be uploaded to the [weights repo](https://github.com/astromer-science/weights) using the same mechanism.
+
+Look at [this tutorial](https://cridonoso.github.io/articles/github.html) for more information about pull requests

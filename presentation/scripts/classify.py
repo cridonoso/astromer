@@ -104,7 +104,6 @@ def build_lstm_att(astromer, maxlen, n_classes, train_astromer=False):
     encoder.trainable = train_astromer
 
     mask = tf.cast(1.-placeholder['mask_in'][...,0], dtype=tf.bool)
-
     x = encoder(placeholder, training=train_astromer)
     x = tf.math.divide_no_nan(x-tf.expand_dims(tf.reduce_mean(x, 1),1),
                               tf.expand_dims(tf.math.reduce_std(x, 1), 1))
