@@ -212,11 +212,15 @@ def deserialize(sample):
     input_dict['input'] = sequence
     return input_dict
 
-def sample_lc(sample, max_obs):
+def sample_lc(sample, max_obs, binary=True):
     '''
     Sample a random window of "max_obs" observations from the input sequence
     '''
-    input_dict = deserialize(sample)
+    if binary:
+        input_dict = deserialize(sample)
+    else:
+        input_dict = sample
+        
     sequence = input_dict['input']
 
     serie_len = tf.shape(sequence)[0]
@@ -243,8 +247,11 @@ def get_window(sequence, length, pivot, max_obs):
     sliced = tf.slice(sequence, [pivot, 0], [end, -1])
     return sliced
 
-def get_windows(sample, max_obs):
-    input_dict = deserialize(sample)
+def get_windows(sample, max_obs, binary=True):
+    if binary:
+        input_dict = deserialize(sample)
+    else:
+        input_dict = sample
 
     sequence = input_dict['input']
     rest = input_dict['length']%max_obs
@@ -332,7 +339,7 @@ def format_label(input_dict, num_cls):
 
 def pretraining_records(source, batch_size, max_obs=100, msk_frac=0.2,
                         rnd_frac=0.1, same_frac=0.1, sampling=False,
-                        shuffle=False, n_classes=-1):
+                        shuffle=False, repeat=1, n_classes=-1):
     """
     Pretraining data loader.
     This method build the ASTROMER input format.
@@ -365,6 +372,7 @@ def pretraining_records(source, batch_size, max_obs=100, msk_frac=0.2,
     fn_1 = adjust_fn(mask_sample, msk_frac, rnd_frac, same_frac, max_obs)
 
     dataset = tf.data.TFRecordDataset(rec_paths)
+    dataset = dataset.repeat(repeat)
     if shuffle:
         dataset = dataset.shuffle(10000)
     dataset = dataset.map(fn_0)

@@ -31,13 +31,6 @@ def run(opt):
     with open(conf_file, 'r') as handle:
         conf = json.load(handle)
     
-    test_batches = pretraining_records(os.path.join(opt.data, 'test'),
-                                      opt.batch_size, max_obs=conf['max_obs'],
-                                      msk_frac=conf['msk_frac'], 
-                                      rnd_frac=conf['rnd_frac'], 
-                                      same_frac=conf['same_frac'],
-                                      sampling=True, shuffle=False)
-
     astromer = get_ASTROMER(num_layers=conf['layers'],
                          d_model   =conf['head_dim'],
                          num_heads =conf['heads'],
@@ -49,12 +42,8 @@ def run(opt):
 
     weights_path = '{}/weights'.format(opt.w)
     astromer.load_weights(weights_path)
-   
-    
-    print('[INFO] Data: {}'.format(opt.data))
+ 
     print('[INFO] ASTROMER weights: {}'.format(weights_path))
-    
-    ft_results = predict(astromer, test_batches, conf)
 
     # =======================
     # TESTING CLASSIFICATION
@@ -81,7 +70,8 @@ def run(opt):
                            n_classes=num_cls)
     print('[INFO] {} created '.format(opt.mode))
         
-    target_dir = os.path.join(opt.p, opt.mode)
+    target_dir = os.path.join(opt.p, '{}_2'.format(opt.mode))
+
     model.compile(optimizer=Adam(learning_rate=opt.lr),
                   loss=CategoricalCrossentropy(from_logits=True),
                   metrics='accuracy')
@@ -105,7 +95,6 @@ def run(opt):
     clf_metrics = {'prec': prec, 'rec': rec, 'f1': f1, 'time':dt, 'y_pred':y_pred, 'y_true':y_true}
     
     out_dic = {
-        'finetuning':ft_results,
         'classification':clf_metrics
     }
     with open(os.path.join(target_dir, 'summary.pkl'), "wb") as output_file:
