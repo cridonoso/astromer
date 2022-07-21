@@ -88,13 +88,13 @@ if __name__ == '__main__':
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
-    parser.add_argument('--epochs', default=10000, type=int,
+    parser.add_argument('--epochs', default=10, type=int,
                         help='Number of epochs')
     parser.add_argument('--patience', default=40, type=int,
                         help='batch size')
     parser.add_argument('--gpu', default='0', type=str,
                         help='GPU to use')
-    
+
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=2, type=int,
                         help='Number of encoder layers')
