@@ -60,11 +60,14 @@ def my_summary_iterator(path):
     for r in tf_record.tf_record_iterator(path):
         yield event_pb2.Event.FromString(r)
         
-def get_metrics(path_logs, metric_name='epoch_loss'):
+def get_metrics(path_logs, metric_name='epoch_loss', full_logs=True):
     train_logs = [x for x in os.listdir(path_logs) if x.endswith('.v2')][0]
     path_train = os.path.join(path_logs, train_logs)
-
-    ea = event_accumulator.EventAccumulator(path_train)
+    
+    if full_logs:
+        ea = event_accumulator.EventAccumulator(path_train, size_guidance={'tensors': 0})
+    else:
+        ea = event_accumulator.EventAccumulator(path_train)
     ea.Reload()   
 #     print(ea.Tags())
     

@@ -86,25 +86,32 @@ def build_lstm_att(astromer, maxlen, n_classes, train_astromer=False):
     serie  = Input(shape=(maxlen, 1), batch_size=None, name='input')
     times  = Input(shape=(maxlen, 1), batch_size=None, name='times')
     mask   = Input(shape=(maxlen, 1), batch_size=None, name='mask')
-
+    print('BUILDING NEW LSTM + ATT')
     placeholder = {'input':serie,
                    'mask_in':mask,
                    'times':times}
+    
+    cell_0 = NormedLSTMCell(units=256)
+    dense  = Dense(n_classes, name='FCN')
 
+    s0 = [tf.zeros([tf.shape(placeholder['input'])[0], 256]),
+          tf.zeros([tf.shape(placeholder['input'])[0], 256])]
+    s1 = [tf.zeros([tf.shape(placeholder['input'])[0], 256]),
+          tf.zeros([tf.shape(placeholder['input'])[0], 256])]
+    rnn = tf.keras.layers.RNN(cell_0, return_sequences=False)
+    
     encoder = astromer.get_layer('encoder')
     encoder.trainable = train_astromer
 
     mask = tf.cast(1.-placeholder['mask_in'][...,0], dtype=tf.bool)
 
-    x = encoder(placeholder, training=False)
+    x = encoder(placeholder, training=train_astromer)
     x = tf.math.divide_no_nan(x-tf.expand_dims(tf.reduce_mean(x, 1),1),
                               tf.expand_dims(tf.math.reduce_std(x, 1), 1))
-    x = LSTM(256, dropout=.3, return_sequences=True)(x, mask=mask)
-    x = LayerNormalization()(x)
-    x = LSTM(256, dropout=.3)(x, mask=mask)
-    x = LayerNormalization()(x)
-    x = Dense(n_classes)(x)
-    return Model(inputs=placeholder, outputs=x, name="FCATT")
+    x = rnn(x, initial_state=[s0, s1], mask=mask)
+    x = tf.nn.dropout(x, .3)
+    x = dense(x)
+    return Model(placeholder, outputs=x, name="LSTM_ATT")
 
 def build_mlp_att(astromer, maxlen, n_classes, train_astromer=False):
     serie  = Input(shape=(maxlen, 1), batch_size=None, name='input')
@@ -124,9 +131,9 @@ def build_mlp_att(astromer, maxlen, n_classes, train_astromer=False):
     x = x * mask
     x = tf.reduce_sum(x, 1)/tf.reduce_sum(mask, 1)
 
-    x = Dense(1024, activation='relu',kernel_regularizer='l1')(x)
-    x = Dense(512, activation='relu', kernel_regularizer='l1')(x)
-    x = Dense(256, activation='relu', kernel_regularizer='l1')(x)
+    x = Dense(1024, activation='relu')(x)
+    x = Dense(512, activation='relu')(x)
+    x = Dense(256, activation='relu')(x)
     x = LayerNormalization()(x)
     x = Dense(n_classes)(x)
     return Model(inputs=placeholder, outputs=x, name="FCATT")
@@ -183,7 +190,7 @@ def run(opt):
                            n_classes=num_cls)
     print('[INFO] {} created '.format(opt.mode))
 
-    target_dir = os.path.join(opt.p, opt.mode)
+    target_dir = os.path.join(opt.p, '{}_2'.format(opt.mode))
     optimizer = Adam(learning_rate=opt.lr)
 
     os.makedirs(target_dir, exist_ok=True)
