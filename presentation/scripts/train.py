@@ -2,13 +2,12 @@ import tensorflow as tf
 import argparse
 import logging
 import json
-import time
 import os
 
-from core.astromer import get_ASTROMER, train
+from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
+from core.utils import get_folder_name, dict_to_json
 from core.data  import pretraining_records
-from core.utils import get_folder_name
-from time import gmtime, strftime
+from core.models import get_ASTROMER
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
@@ -16,56 +15,93 @@ logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 def run(opt):
     # Get model
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
-    astromer = get_ASTROMER(num_layers=opt.layers,
-                            d_model=opt.head_dim,
-                            num_heads=opt.heads,
-                            dff=opt.dff,
-                            base=opt.base,
-                            dropout=opt.dropout,
-                            maxlen=opt.max_obs,
-                            use_leak=opt.use_leak,
-                            no_train=opt.no_train)
 
     # Make sure we don't overwrite a previous training
     opt.p = get_folder_name(opt.p, prefix='')
 
-    # Creating (--p)royect directory
+    # Creating (--p)roject directory
     os.makedirs(opt.p, exist_ok=True)
 
-    # Save Hyperparameters
-    conf_file = os.path.join(opt.p, 'conf.json')
+    # Check if there is pretraining weights to be loaded
     varsdic = vars(opt)
-    varsdic['exp_date'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-    with open(conf_file, 'w') as json_file:
-        json.dump(varsdic, json_file, indent=4)
+    if opt.w !='':
+        print('[INFO] Pretrained model detected! - Finetuning...')
+        conf_file = os.path.join(opt.w, 'conf.json')
+        with open(conf_file, 'r') as handle:
+            conf = json.load(handle)
+        # Changing "opt" hyperparameters
+        for key in conf.keys():
+            # Don't include parameters exclusive to this training
+            if key in ['batch_size', 'p', 'repeat', 'data', 'patience',
+                       'msk_frac', 'rnd_frac', 'same_frac']:
+                continue
+            varsdic[key] = conf[key]
 
-    # Loading data
-    train_batches = pretraining_records(os.path.join(opt.data, 'train'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs,
+    # Saving new updated conf_file
+    conf_file = os.path.join(varsdic['p'], 'conf.json')
+    dict_to_json(varsdic, conf_file)
+
+    # Instance the model
+    astromer = get_ASTROMER(num_layers=varsdic['layers'],
+                            d_model=varsdic['head_dim'],
+                            num_heads=varsdic['heads'],
+                            dff=varsdic['dff'],
+                            base=varsdic['base'],
+                            rate=varsdic['dropout'],
+                            maxlen=varsdic['max_obs'])
+    # Load weights if exist
+    if varsdic['w'] != '':
+        astromer.load_weights(os.path.join(varsdic['w'], 'weights'))
+
+    # Compile model
+    # Losses and metrics have been already included in core.models.zero
+    optimizer = tf.keras.optimizers.Adam(varsdic['lr'],
+                                         beta_1=0.9,
+                                         beta_2=0.98,
+                                         epsilon=1e-9)
+    astromer.compile(optimizer=optimizer)
+
+    # Loading and formating data
+    train_batches = pretraining_records(os.path.join(varsdic['data'], 'train'),
+                                        varsdic['batch_size'],
+                                        max_obs=varsdic['max_obs'],
                                         shuffle=True,
                                         sampling=True,
-                                        msk_frac=opt.msk_frac,
-                                        rnd_frac=opt.rnd_frac,
-                                        same_frac=opt.same_frac)
-    valid_batches = pretraining_records(os.path.join(opt.data, 'val'),
-                                        opt.batch_size,
-                                        max_obs=opt.max_obs,
+                                        msk_frac=varsdic['msk_frac'],
+                                        rnd_frac=varsdic['rnd_frac'],
+                                        same_frac=varsdic['same_frac'])
+    valid_batches = pretraining_records(os.path.join(varsdic['data'], 'val'),
+                                        varsdic['batch_size'],
+                                        max_obs=varsdic['max_obs'],
                                         shuffle=False,
                                         sampling=True,
-                                        msk_frac=opt.msk_frac,
-                                        rnd_frac=opt.rnd_frac,
-                                        same_frac=opt.same_frac)
+                                        msk_frac=varsdic['msk_frac'],
+                                        rnd_frac=varsdic['rnd_frac'],
+                                        same_frac=varsdic['same_frac'])
 
-    # Training ASTROMER
-    train(astromer, train_batches, valid_batches,
-          patience=opt.patience,
-          exp_path=opt.p,
-          epochs=opt.epochs,
-          lr=opt.lr,
-          verbose=0)
+    # Setting up callbacks
+    callbacks = [
+            ModelCheckpoint(
+                    filepath=os.path.join(varsdic['p'], 'weights'),
+                    save_weights_only=True,
+                    monitor='val_loss',
+                    mode='min',
+                    save_best_only=True),
+            EarlyStopping(monitor ='val_loss',
+                          mode = 'min',
+                          patience = varsdic['patience'],
+                          restore_best_weights=True),
+            TensorBoard(
+                    log_dir = os.path.join(varsdic['p'], 'logs'),
+                    histogram_freq=1,
+                    write_graph=True)
+    ]
 
-
+    # Training
+    astromer.fit(train_batches,
+                 epochs=varsdic['epochs'],
+                 validation_data=valid_batches,
+                 callbacks=callbacks)
 
 
 if __name__ == '__main__':
@@ -86,6 +122,8 @@ if __name__ == '__main__':
                         help='Dataset folder containing the records files')
     parser.add_argument('--p', default="./runs/debug", type=str,
                         help='Proyect path. Here will be stored weights and metrics')
+    parser.add_argument('--w', default="", type=str,
+                        help='[OPTIONAL] pre-training weights')
     parser.add_argument('--batch-size', default=256, type=int,
                         help='batch size')
     parser.add_argument('--epochs', default=10, type=int,
@@ -110,13 +148,6 @@ if __name__ == '__main__':
                         help='base of embedding')
     parser.add_argument('--lr', default=1e-3, type=float,
                         help='optimizer initial learning rate')
-
-    parser.add_argument('--use-leak', default=False, action='store_true',
-                        help='Add the input to the attention vector')
-    parser.add_argument('--no-train', default=False, action='store_true',
-                        help='Train self-attention layer')
-    parser.add_argument('--no-shuffle', default=False, action='store_true',
-                        help='No shuffle training and validation set')
 
     opt = parser.parse_args()
     run(opt)

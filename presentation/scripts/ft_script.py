@@ -36,7 +36,7 @@ for dataset in datasets:
                                                                     fold_n,
                                                                     dataset)
 
-        command1 = 'python -m presentation.scripts.finetuning \
+        command1 = 'python -m presentation.scripts.train \
                    --data ./data/records/{}/fold_{}/{} \
                    --w {} \
                    --p {} \

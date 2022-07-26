@@ -5,13 +5,13 @@ import numpy as np
 import logging
 import os
 
-from core.masking import get_masked, set_random, get_padding_mask
-from core.utils import standardize
+from core.data.masking import get_masked, set_random, get_padding_mask
+from core.data.transform import standardize
+
+from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
 from tqdm import tqdm
-
 from time import time
-from joblib import wrap_non_picklable_objects
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
@@ -220,7 +220,7 @@ def sample_lc(sample, max_obs, binary=True):
         input_dict = deserialize(sample)
     else:
         input_dict = sample
-        
+
     sequence = input_dict['input']
 
     serie_len = tf.shape(sequence)[0]
