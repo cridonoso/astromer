@@ -98,14 +98,14 @@ def run(opt):
             TensorBoard(
                     log_dir = os.path.join(varsdic['p'], 'logs'),
                     histogram_freq=1,
-                    profile_batch='15,20',
+                    # profile_batch='15,20',
                     write_graph=True)
     ]
 
     # Training
-    astromer.fit(train_batches.take(30),
+    astromer.fit(train_batches,
                  epochs=varsdic['epochs'],
-                 validation_data=valid_batches.take(30),
+                 validation_data=valid_batches,
                  callbacks=callbacks)
 
 
