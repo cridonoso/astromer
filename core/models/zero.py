@@ -1,9 +1,10 @@
 import tensorflow as tf
 
+from core.layers             import Encoder, RegLayer
+from core.losses             import custom_rmse
+from core.metrics            import custom_r2
 from tensorflow.keras.layers import Input
-from tensorflow.keras import Model
-from core.layers import Encoder, RegLayer
-from core.losses    import custom_rmse
+from tensorflow.keras        import Model
 
 def build_input(length):
     serie  = Input(shape=(length, 1),
@@ -15,15 +16,10 @@ def build_input(length):
     mask   = Input(shape=(length, 1),
                   batch_size=None,
                   name='mask')
-    length = Input(shape=(length,),
-                  batch_size=None,
-                  dtype=tf.int32,
-                  name='length')
 
     return {'input':serie,
             'mask_in':mask,
-            'times':times,
-            'length':length}
+            'times':times}
 
 def get_ASTROMER(num_layers=2,
                  d_model=200,
@@ -59,20 +55,23 @@ class CustomModel(tf.keras.Model):
     Custom functional model
     '''
     def train_step(self, data):
+        x, y = data
         with tf.GradientTape() as tape:
-            x_pred = self(data)
-            mse = custom_rmse(y_true=data['output'],
+            x_pred = self(x)
+            mse = custom_rmse(y_true=y['target'],
                               y_pred=x_pred,
-                              mask=data['mask_out'])
+                              mask=y['mask_out'])
+            r2_value = custom_r2(y['target'], x_pred, y['mask_out'])
         grads = tape.gradient(mse, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
-        return {'loss': mse}
+        return {'loss': mse, 'r_square':r2_value}
 
     def test_step(self, data):
+        x, y = data
         with tf.GradientTape() as tape:
-            x_pred = model(data)
-            x_true = data['output']
-            mse = custom_rmse(y_true=x_true,
+            x_pred = self(data)
+            mse = custom_rmse(y_true=y['target'],
                               y_pred=x_pred,
-                              mask=data['mask_out'])
-        return {'loss': mse}
+                              mask=y['mask_out'])
+            r2_value = custom_r2(y['target'], x_pred, y['mask_out'])
+        return {'loss': mse, 'r_square':r2_value}

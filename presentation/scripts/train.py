@@ -6,7 +6,7 @@ import os
 
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
 from core.utils import get_folder_name, dict_to_json
-from core.data  import pretraining_records
+from core.data  import pretraining_pipeline
 from core.models import get_ASTROMER
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
@@ -33,7 +33,7 @@ def run(opt):
         for key in conf.keys():
             # Don't include parameters exclusive to this training
             if key in ['batch_size', 'p', 'repeat', 'data', 'patience',
-                       'msk_frac', 'rnd_frac', 'same_frac']:
+                       'msk_frac', 'rnd_frac', 'same_frac', 'epochs']:
                 continue
             varsdic[key] = conf[key]
 
@@ -62,22 +62,26 @@ def run(opt):
     astromer.compile(optimizer=optimizer)
 
     # Loading and formating data
-    train_batches = pretraining_records(os.path.join(varsdic['data'], 'train'),
-                                        varsdic['batch_size'],
-                                        max_obs=varsdic['max_obs'],
-                                        shuffle=True,
-                                        sampling=True,
-                                        msk_frac=varsdic['msk_frac'],
-                                        rnd_frac=varsdic['rnd_frac'],
-                                        same_frac=varsdic['same_frac'])
-    valid_batches = pretraining_records(os.path.join(varsdic['data'], 'val'),
-                                        varsdic['batch_size'],
-                                        max_obs=varsdic['max_obs'],
-                                        shuffle=False,
-                                        sampling=True,
-                                        msk_frac=varsdic['msk_frac'],
-                                        rnd_frac=varsdic['rnd_frac'],
-                                        same_frac=varsdic['same_frac'])
+    train_batches = pretraining_pipeline(os.path.join(varsdic['data'], 'train'),
+                                         batch_size=varsdic['batch_size'],
+                                         shuffle=True,
+                                         repeat=varsdic['repeat'],
+                                         cache=True,
+                                         window_size=varsdic['max_obs'],
+                                         sampling=True,
+                                         msk_frac=varsdic['msk_frac'],
+                                         rnd_frac=varsdic['rnd_frac'],
+                                         same_frac=varsdic['same_frac'])
+    valid_batches = pretraining_pipeline(os.path.join(varsdic['data'], 'val'),
+                                         batch_size=varsdic['batch_size'],
+                                         shuffle=False,
+                                         repeat=varsdic['repeat'],
+                                         cache=True,
+                                         window_size=varsdic['max_obs'],
+                                         sampling=True,
+                                         msk_frac=varsdic['msk_frac'],
+                                         rnd_frac=varsdic['rnd_frac'],
+                                         same_frac=varsdic['same_frac'])
 
     # Setting up callbacks
     callbacks = [
@@ -94,13 +98,14 @@ def run(opt):
             TensorBoard(
                     log_dir = os.path.join(varsdic['p'], 'logs'),
                     histogram_freq=1,
+                    profile_batch='15,20',
                     write_graph=True)
     ]
 
     # Training
-    astromer.fit(train_batches,
+    astromer.fit(train_batches.take(30),
                  epochs=varsdic['epochs'],
-                 validation_data=valid_batches,
+                 validation_data=valid_batches.take(30),
                  callbacks=callbacks)
 
 
@@ -109,7 +114,8 @@ if __name__ == '__main__':
     # DATA
     parser.add_argument('--max-obs', default=200, type=int,
                     help='Max number of observations')
-
+    parser.add_argument('--repeat', default=1, type=int,
+                        help='Repeat each lightcurve')
     parser.add_argument('--msk-frac', default=0.5, type=float,
                         help='[MASKED] fraction')
     parser.add_argument('--rnd-frac', default=0.2, type=float,
