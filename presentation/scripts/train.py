@@ -4,10 +4,14 @@ import logging
 import json
 import os
 
-from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
-from core.utils import get_folder_name, dict_to_json
-from core.data  import pretraining_pipeline
-from core.models import get_ASTROMER
+from tensorflow.keras.callbacks import (ModelCheckpoint,
+                                        EarlyStopping,
+                                        TensorBoard)
+from core.data                  import pretraining_pipeline
+from core.utils                 import (get_folder_name,
+                                        dict_to_json)
+from core.training              import CustomSchedule
+from core.models                import get_ASTROMER
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
@@ -55,7 +59,12 @@ def run(opt):
 
     # Compile model
     # Losses and metrics have been already included in core.models.zero
-    optimizer = tf.keras.optimizers.Adam(varsdic['lr'],
+    if varsdic['scheduler']:
+        lrate = CustomSchedule(varsdic['head_dim'])
+    else:
+        lrate = varsdic['lr']
+
+    optimizer = tf.keras.optimizers.Adam(lrate,
                                          beta_1=0.9,
                                          beta_2=0.98,
                                          epsilon=1e-9)
@@ -138,6 +147,8 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--gpu', default='0', type=str,
                         help='GPU to use')
+    parser.add_argument('--schedule', default=False, action='store_true',
+                        help='If use scheduler to control the learning rate')
 
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=2, type=int,
