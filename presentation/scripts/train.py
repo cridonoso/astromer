@@ -147,7 +147,7 @@ if __name__ == '__main__':
                         help='batch size')
     parser.add_argument('--gpu', default='0', type=str,
                         help='GPU to use')
-    parser.add_argument('--schedule', default=False, action='store_true',
+    parser.add_argument('--scheduler', default=False, action='store_true',
                         help='If use scheduler to control the learning rate')
 
     # ASTROMER HIPERPARAMETERS
