@@ -1,1 +1,1 @@
-from core.trainig.scheduler import CustomSchedule
+from core.training.scheduler import CustomSchedule
