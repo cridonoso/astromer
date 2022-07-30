@@ -56,7 +56,9 @@ def mask_batch(batch, msk_frac, rnd_frac, same_frac):
     magnitudes = tf.slice(batch['input'], [0,0,1], [-1,-1, 1])
 
     # Choose random values and replace masked ones
-    rnd_elem = tf.random.normal(tf.shape(rnd_mask), 0, tf.math.reduce_std(magnitudes, 1))
+    # rnd_elem = tf.random.normal(tf.shape(rnd_mask), 0, tf.math.reduce_std(magnitudes, 1))
+    rnd_elem = tf.map_fn(lambda x: tf.random.shuffle(x), magnitudes)
+    rnd_elem = tf.reshape(rnd_elem, [tf.shape(rnd_elem)[0], tf.shape(rnd_elem)[1]])
     rnd_elem = tf.multiply(rnd_elem, rnd_mask)
 
     # Reeplace random values in the magnitudes
