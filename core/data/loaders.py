@@ -3,7 +3,7 @@ import os
 
 from core.data.record import deserialize
 from core.data.preprocessing import to_windows, standardize
-from core.data.masking import mask_dataset
+from core.data.masking import mask_dataset, mask_sample
 
 def load_records(records_dir):
     """
@@ -80,7 +80,8 @@ def pretraining_pipeline(dataset,
                          rnd_frac=.2,
                          same_frac=.2,
                          return_ids=False,
-                         return_lengths=False):
+                         return_lengths=False,
+                         per_sample_mask=False):
     """
     Pretraining pipeline.
     Create an ad-hoc ASTROMER dataset
@@ -120,12 +121,21 @@ def pretraining_pipeline(dataset,
                          window_size=window_size,
                          sampling=sampling)
 
+    if per_sample_mask:
+        dataset = mask_dataset(dataset,
+                               msk_frac=msk_frac,
+                               rnd_frac=rnd_frac,
+                               same_frac=same_frac,
+                               per_sample_mask=True,
+                               window_size=window_size)
+
     # CREATE BATCHES
     dataset = dataset.padded_batch(batch_size)
 
     # NORMALICE WINDOWS
-    dataset = dataset.map(standardize,
-                          num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    if not per_sample_mask:
+        dataset = dataset.map(standardize,
+                              num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     if shuffle:
         SHUFFLE_BUFFER = 100
@@ -134,12 +144,12 @@ def pretraining_pipeline(dataset,
     if cache:
         dataset = dataset.cache()
 
-
     # MASKING
-    dataset = mask_dataset(dataset,
-                           msk_frac=msk_frac,
-                           rnd_frac=rnd_frac,
-                           same_frac=same_frac)
+    if not per_sample_mask:
+        dataset = mask_dataset(dataset,
+                               msk_frac=msk_frac,
+                               rnd_frac=rnd_frac,
+                               same_frac=same_frac)
 
     # FORMAT INPUT DICTONARY
     dataset = dataset.map(lambda x: format_inp_astromer(x,

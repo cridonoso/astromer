@@ -80,7 +80,8 @@ def run(opt):
                                          sampling=True,
                                          msk_frac=varsdic['msk_frac'],
                                          rnd_frac=varsdic['rnd_frac'],
-                                         same_frac=varsdic['same_frac'])
+                                         same_frac=varsdic['same_frac'],
+                                         per_sample_mask=True)
     valid_batches = pretraining_pipeline(os.path.join(varsdic['data'], 'val'),
                                          batch_size=varsdic['batch_size'],
                                          shuffle=False,
@@ -90,7 +91,8 @@ def run(opt):
                                          sampling=True,
                                          msk_frac=varsdic['msk_frac'],
                                          rnd_frac=varsdic['rnd_frac'],
-                                         same_frac=varsdic['same_frac'])
+                                         same_frac=varsdic['same_frac'],
+                                         per_sample_mask=True)
 
     # Setting up callbacks
     callbacks = [
