@@ -8,6 +8,7 @@ shopt -s nocasematch
 if [[ $gpu == *' nvidia '* ]]; then
   echo GPU found
   docker run -it --rm \
+    --privileged=true \
     --mount "type=bind,src=$(pwd),dst=/home/" \
     --workdir /home/ \
     -p 8888:8888 \
@@ -16,6 +17,7 @@ if [[ $gpu == *' nvidia '* ]]; then
     astromer bash
 else
   docker run -it --rm \
+    --privileged=true \
     --mount "type=bind,src=$(pwd),dst=/home/" \
     --workdir /home/ \
     -p 8888:8888 \

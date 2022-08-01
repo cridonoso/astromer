@@ -19,6 +19,7 @@ WORKDIR /home/
 ADD ./requirements.txt ./requirements.txt
 # ==== INSTALL PYTHON REQUIREMENTS ====
 RUN pip install -r requirements.txt --no-cache-dir
+ENV PATH=$PATH:~/.local/bin
 # ==== EXPOSE PORTS ====
 EXPOSE 8888
 EXPOSE 6006
