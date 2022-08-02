@@ -2,7 +2,7 @@ import tensorflow as tf
 
 from core.data.record import deserialize
 
-def standardize(batch, on='input'):
+def standardize(batch, on='input', axis=0):
     """
     Standardize input tensor given a dataset batch
     Args:
@@ -11,9 +11,8 @@ def standardize(batch, on='input'):
     Returns:
         type: tf.Dataset
     """
-    mean_value = tf.reduce_mean(batch[on], 1,
-                                name='mean_value')
-    batch[on] = batch[on] - tf.expand_dims(mean_value, 1)
+    mean_value = tf.reduce_mean(batch['input'], axis, name='mean_value')
+    batch['input'] = batch['input'] - tf.expand_dims(mean_value, axis)
     return batch
 
 def divide_training_subset(frame, train, val, test_meta):

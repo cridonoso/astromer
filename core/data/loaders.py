@@ -121,6 +121,8 @@ def pretraining_pipeline(dataset,
                          window_size=window_size,
                          sampling=sampling)
 
+    dataset = dataset.map(standardize)
+
     if per_sample_mask:
         dataset = mask_dataset(dataset,
                                msk_frac=msk_frac,
@@ -131,18 +133,6 @@ def pretraining_pipeline(dataset,
 
     # CREATE BATCHES
     dataset = dataset.padded_batch(batch_size)
-
-    # NORMALICE WINDOWS
-    if not per_sample_mask:
-        dataset = dataset.map(standardize,
-                              num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
-    if shuffle:
-        SHUFFLE_BUFFER = 100
-        dataset = dataset.shuffle(SHUFFLE_BUFFER)
-
-    if cache:
-        dataset = dataset.cache()
 
     # MASKING
     if not per_sample_mask:
@@ -156,6 +146,13 @@ def pretraining_pipeline(dataset,
                                                         return_ids,
                                                         return_lengths),
                           num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    if shuffle:
+        SHUFFLE_BUFFER = 100
+        dataset = dataset.shuffle(SHUFFLE_BUFFER)
+
+    if cache:
+        dataset = dataset.cache()
 
     #PREFETCH BATCHES
     dataset = dataset.prefetch(2)

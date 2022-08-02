@@ -6,7 +6,7 @@ import sys
 sys.path.append('/home')
 
 from core.data import load_records, load_numpy, pretraining_pipeline
-from core.data import mask_dataset, to_windows
+from core.data import mask_dataset, to_windows, mask_batch
 
 def test_load_records():
     rec_dir = './data/records/alcock/fold_0/alcock_20/test'
@@ -63,6 +63,41 @@ def test_to_windows():
 
     return dataset
 
+
+
+def test_old_new():
+    samples = [
+    np.vstack([np.arange(100),
+               np.arange(100),
+               np.arange(100)]).T,
+    np.vstack([np.arange(8),
+               np.arange(8),
+               np.arange(8)]).T,
+    np.vstack([np.arange(10),
+               np.arange(10),
+               np.arange(10)]).T
+    ]
+
+    data_old = pretraining_pipeline(samples,
+                                    batch_size=2,
+                                    window_size=10,
+                                    rnd_frac=0.,
+                                    shuffle=False,
+                                    per_sample_mask=True)
+    data_new = pretraining_pipeline(samples,
+                                    batch_size=2,
+                                    window_size=10,
+                                    rnd_frac=0.,
+                                    shuffle=False,
+                                    per_sample_mask=False)
+
+    for (x_old, y_old), (x_new, y_new) in zip(data_old.take(1),
+                                              data_new.take(1)):
+        v0 = x_old['input']
+        v1 = x_new['input']
+        print(v0)
+        print(v1)
+
 def test_mask_dataset(test_to_windows):
     dataset = mask_dataset(test_to_windows)
     for step, x in enumerate(dataset):
@@ -74,8 +109,10 @@ def test_mask_dataset(test_to_windows):
 
 def test_pretraining_pipeline():
     rec_dir = './data/records/alcock/fold_0/alcock_20/test'
-    dataset = pretraining_pipeline(rec_dir,batch_size=16)
-    dataset_1 = pretraining_pipeline(rec_dir,batch_size=16, repeat=2)
+    dataset = pretraining_pipeline(rec_dir,batch_size=2,
+                                   per_sample_mask=True)
+    dataset_1 = pretraining_pipeline(rec_dir,batch_size=2, repeat=2,
+                                   per_sample_mask=False)
 
     num_elements   = sum([1 for _ in dataset])
     num_elements_2 = sum([1 for _ in dataset_1])

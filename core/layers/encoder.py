@@ -1,7 +1,8 @@
 import tensorflow as tf
 
 from core.layers.attention import MultiHeadAttention
-from core.data import positional_encoding, reshape_mask
+from core.layers.positional import positional_encoding
+from core.data import reshape_mask
 
 def point_wise_feed_forward_network(d_model, dff):
     return tf.keras.Sequential([
@@ -62,11 +63,10 @@ class Encoder(tf.keras.layers.Layer):
     def call(self, data, training=False):
         # adding embedding and position encoding.
         x_pe = positional_encoding(data['times'], self.d_model, mjd=True)
-        # x_pe = self.pe_emb(data['times'])
 
         x_transformed = self.inp_transform(data['input'])
-
         transformed_input = x_transformed + x_pe
+
         x = self.dropout(transformed_input, training=training)
 
         for i in range(self.num_layers):

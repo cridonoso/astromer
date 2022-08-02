@@ -79,8 +79,6 @@ def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
     '''
     OLD VERSION
     '''
-    mean_value = tf.reduce_mean(input_dict['input'], 0, name='mean_value')
-    input_dict['input'] = input_dict['input'] - tf.expand_dims(mean_value, 0)
     x = input_dict['input']
 
     seq_time = tf.slice(x, [0, 0], [-1, 1])
@@ -159,8 +157,8 @@ def mask_batch(batch, msk_frac, rnd_frac, same_frac):
                 dtype=tf.int32, name='mask_to_same')
 
     # From all the indices we select n_rnd and n_sme to replace
-    same_inds = tf.slice(indices, [0,0],[-1, n_sme])
-    rand_inds = tf.slice(indices, [0,n_sme],[-1, n_rnd])
+    rand_inds = tf.slice(indices, [0,0],[-1, n_rnd])
+    same_inds = tf.slice(indices, [0,n_rnd],[-1, n_sme])
 
     # Creates same/random binary masks
     same_mask = tf.one_hot(same_inds, input_shape[1])
@@ -171,14 +169,13 @@ def mask_batch(batch, msk_frac, rnd_frac, same_frac):
 
     # Change values in original mask to be visible
     mask_in_rnd_sme = tf.minimum(same_mask + rnd_mask, 1.)
-    mask_in_rnd_sme  = tf.minimum(mask_out, 1.-mask_in_rnd_sme)
+    mask_in_rnd_sme = tf.minimum(mask_out, 1.-mask_in_rnd_sme)
 
     # We take only what we need (FOR FUTURE WORKS ON MULTIBAND CHANGE THIS)
     magnitudes = tf.slice(batch['input'], [0,0,1], [-1,-1, 1])
 
     # Choose random values and replace masked ones
-    # rnd_elem = tf.random.normal(tf.shape(rnd_mask), 0, tf.math.reduce_std(magnitudes, 1))
-    rnd_elem = tf.map_fn(lambda x: tf.random.shuffle(x), magnitudes)
+    rnd_elem = tf.random.normal(tf.shape(rnd_mask), 0, tf.math.reduce_std(magnitudes, 1))
     rnd_elem = tf.reshape(rnd_elem, [tf.shape(rnd_elem)[0], tf.shape(rnd_elem)[1]])
     rnd_elem = tf.multiply(rnd_elem, rnd_mask)
 
@@ -193,7 +190,7 @@ def mask_batch(batch, msk_frac, rnd_frac, same_frac):
     mask_in_rnd_sme = tf.maximum(1.-padd_mask, mask_in_rnd_sme)
 
     # Concat the randomized input with real times
-    batch['input_modified'] = magnitudes_copy
+    batch['input_modified'] = tf.expand_dims(magnitudes_copy, 2)
     batch['mask_in']  = tf.expand_dims(mask_in_rnd_sme, 2)
     batch['mask_out'] = tf.expand_dims(mask_out, 2)
 

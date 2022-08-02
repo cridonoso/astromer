@@ -34,13 +34,13 @@ def get_ASTROMER(num_layers=2,
     placeholder = build_input(maxlen)
 
     encoder = Encoder(num_layers,
-                d_model,
-                num_heads,
-                dff,
-                base=base,
-                rate=rate,
-                use_leak=False,
-                name='encoder')
+                      d_model,
+                      num_heads,
+                      dff,
+                      base=base,
+                      rate=rate,
+                      use_leak=False,
+                      name='encoder')
 
     x = encoder(placeholder)
 
@@ -62,6 +62,7 @@ class CustomModel(tf.keras.Model):
                               y_pred=x_pred,
                               mask=y['mask_out'])
             r2_value = custom_r2(y['target'], x_pred, y['mask_out'])
+
         grads = tape.gradient(mse, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         return {'loss': mse, 'r_square':r2_value}
