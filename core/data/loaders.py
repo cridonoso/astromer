@@ -148,7 +148,7 @@ def pretraining_pipeline(dataset,
                           num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     if shuffle:
-        SHUFFLE_BUFFER = 100
+        SHUFFLE_BUFFER = 10000
         dataset = dataset.shuffle(SHUFFLE_BUFFER)
 
     if cache:
