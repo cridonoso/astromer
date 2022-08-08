@@ -7,6 +7,7 @@ from core.tboard    import save_scalar, draw_graph
 from core.losses    import custom_rmse, custom_bce
 from core.metrics   import custom_acc
 from core.encoder   import Encoder
+from core.scheduler import CustomSchedule
 
 from tensorflow.keras.layers import Input, Dense
 from tensorflow.keras.optimizers import Adam
@@ -117,10 +118,14 @@ def train(model,
     draw_graph(model, batch, train_writter, exp_path)
 
     # Optimizer
-    optimizer = tf.keras.optimizers.Adam(lr,
+    
+    custom_lr = CustomSchedule(model.get_layer('encoder').d_model)
+    
+    optimizer = tf.keras.optimizers.Adam(custom_lr,
                                          beta_1=0.9,
                                          beta_2=0.98,
                                          epsilon=1e-9)
+    
     # To save metrics
     train_mse  = tf.keras.metrics.Mean(name='train_mse')
     valid_mse  = tf.keras.metrics.Mean(name='valid_mse')
@@ -153,7 +158,7 @@ def train(model,
         if valid_mse.result() < best_loss:
             best_loss = valid_mse.result()
             es_count = 0.
-            model.save_weights(os.path.join(exp_path, 'weights.h5'))
+            model.save_weights(os.path.join(exp_path, 'weights'))
         else:
             es_count+=1.
         if es_count == patience:

@@ -1,14 +1,14 @@
 #!/bin/bash
 declare -A dictionary
-dictionary["alcock"]="1ISAlSKVDcULt9TJR3cPYs1sCx0w8KTwB"
-dictionary["macho"]="1vWEs_IRGItmxmpWktvCqNx53uzC4o3O3"
-dictionary["ogle"]="1BSOA8J78VsNLQ_HZ9wZGlEDC1Rh5BKHt"
+dictionary["alcock"]="18a4DGPlyJ21DI9HrKS-jJtaA2iIqFDQO"
+dictionary["macho"]="1ReqDHn9jKPIS_g8Xm0ThYUDM-XaLcUP3"
+dictionary["ogle"]="1L1oiq9pRRGpOVm13b2dyCQhMiVFn3o7x"
 dictionary["atlas"]="1ILHb_EMr09jyfWwyyqf0c2qglrnnSz59"
 
-dictionary["alcock-record"]="1YpznRml85u_QSMH75lByMEHmNJQiCdcx"
-dictionary["macho-record"]="1ejnuissFNAdczjxSh5IFy6QC9XFnGgAG"
-dictionary["ogle-record"]="1pQ88cI74fwxcBnE7TBXACawc7z0wvMpk"
-dictionary["atlas-record"]="1lIXWODXob5XwTqJ6rjFDdq5u-pliB4ML"
+dictionary["alcock-record"]="1bEETbIgsVjhpkfR0LdYxnYQ8eeaq4wol"
+dictionary["macho-record"]="1QLXAsTkaryYUqhjKAM0wh6XKh3tG1M0k"
+dictionary["ogle-record"]="1Ei5PZ13LjJ44tA2iBOkDHPueGbLlTl2C"
+dictionary["atlas-record"]="1pMzeL9BAwMXqra9iFUHLpGyclJzz-VM9"
 
 FILEID=${dictionary[$1]}
 echo $FILEID

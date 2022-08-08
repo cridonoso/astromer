@@ -45,6 +45,7 @@ def run(opt):
                                         max_obs=opt.max_obs,
                                         shuffle=True,
                                         sampling=True,
+                                        repeat=opt.repeat,
                                         msk_frac=opt.msk_frac,
                                         rnd_frac=opt.rnd_frac,
                                         same_frac=opt.same_frac)
@@ -57,6 +58,7 @@ def run(opt):
                                         rnd_frac=opt.rnd_frac,
                                         same_frac=opt.same_frac)
 
+    
     # Training ASTROMER
     train(astromer, train_batches, valid_batches,
           patience=opt.patience,
@@ -73,7 +75,8 @@ if __name__ == '__main__':
     # DATA
     parser.add_argument('--max-obs', default=200, type=int,
                     help='Max number of observations')
-
+    parser.add_argument('--repeat', default=1, type=int,
+                    help='Number of times for sampling windows from single LC')
     parser.add_argument('--msk-frac', default=0.5, type=float,
                         help='[MASKED] fraction')
     parser.add_argument('--rnd-frac', default=0.2, type=float,

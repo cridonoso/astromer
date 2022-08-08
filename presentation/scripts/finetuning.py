@@ -29,7 +29,7 @@ def run(opt):
                             no_train=opt.no_train)
 
     # Check for pretrained weigths
-    if os.path.isfile(os.path.join(opt.w, 'checkpoint')):
+    if os.path.isfile(os.path.join(opt.w, 'weights.h5')):
         os.makedirs(opt.p, exist_ok=True)
 
         print('[INFO] Pretrained model detected! - Finetuning...')
@@ -48,7 +48,7 @@ def run(opt):
                                 no_train=conf['no_train'])
 
         # Loading pretrained weights
-        weights_path = '{}/weights'.format(opt.w)
+        weights_path = '{}/weights.h5'.format(opt.w)
         astromer.load_weights(weights_path)
         # Defining a new ()--p)roject folder
 
