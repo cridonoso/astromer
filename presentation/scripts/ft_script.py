@@ -8,8 +8,8 @@ import os, sys
 gpu = sys.argv[1]
 ds_name = sys.argv[2]
 science_case = sys.argv[3]
-
 astromer_dim = sys.argv[4]
+
 astroweights = './weights/macho_{}'.format(astromer_dim)
 batch_size = 2500
 

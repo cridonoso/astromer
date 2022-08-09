@@ -84,7 +84,7 @@ def my_summary_iterator(path):
     for r in tf_record.tf_record_iterator(path):
         yield event_pb2.Event.FromString(r)
 
-def get_metrics(path_logs, metric_name='epoch_loss', full_logs=True):
+def get_metrics(path_logs, metric_name='epoch_loss', full_logs=True, show_keys=False):
     train_logs = [x for x in os.listdir(path_logs) if x.endswith('.v2')][0]
     path_train = os.path.join(path_logs, train_logs)
 
@@ -95,6 +95,9 @@ def get_metrics(path_logs, metric_name='epoch_loss', full_logs=True):
 
     ea.Reload()
 
+    if show_keys:
+        print(ea.Tags())
+    
     metrics = pd.DataFrame([(w,s,tf.make_ndarray(t))for w,s,t in ea.Tensors(metric_name)],
                 columns=['wall_time', 'step', 'value'])
     return metrics

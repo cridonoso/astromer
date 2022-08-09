@@ -13,9 +13,10 @@ from tensorflow.keras.callbacks import EarlyStopping, TensorBoard
 from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam, RMSprop
 
-from core.data  import pretraining_records
+from core.data                  import pretraining_pipeline
+from core.models                import get_ASTROMER
+
 from core.utils import get_metrics
-from core.astromer import get_ASTROMER, predict
 from presentation.scripts.classify import build_lstm, build_lstm_att, build_mlp_att
 from sklearn.metrics import precision_recall_fscore_support
 
@@ -36,9 +37,8 @@ def run(opt):
                          num_heads =conf['heads'],
                          dff       =conf['dff'],
                          base      =conf['base'],
-                         dropout   =conf['dropout'],
-                         maxlen    =conf['max_obs'],
-                         use_leak  =conf['use_leak'])
+                         rate      =conf['dropout'],
+                         maxlen    =conf['max_obs'])
 
     weights_path = '{}/weights'.format(opt.w)
     astromer.load_weights(weights_path)
@@ -49,11 +49,18 @@ def run(opt):
     # TESTING CLASSIFICATION
     # =======================
     num_cls = pd.read_csv(os.path.join(opt.data, 'objects.csv')).shape[0]
-    test_batches = pretraining_records(os.path.join(opt.data, 'test'),
-                                      opt.batch_size, max_obs=opt.max_obs,
-                                      msk_frac=0., rnd_frac=0., same_frac=0.,
-                                      sampling=False, shuffle=False,
-                                      n_classes=num_cls)
+    test_batches = pretraining_pipeline(os.path.join(opt.data, 'test'),
+                                      batch_size=conf['batch_size'],
+                                         shuffle=False,
+                                         repeat=conf['repeat'],
+                                         cache=True,
+                                         window_size=conf['max_obs'],
+                                         sampling=True,
+                                         msk_frac=conf['msk_frac'],
+                                         rnd_frac=conf['rnd_frac'],
+                                         same_frac=conf['same_frac'],
+                                         per_sample_mask=True,
+                                         num_cls=num_cls)
     
     if opt.mode == 'lstm_att':
         model = build_lstm_att(astromer,
@@ -70,7 +77,7 @@ def run(opt):
                            n_classes=num_cls)
     print('[INFO] {} created '.format(opt.mode))
         
-    target_dir = os.path.join(opt.p, '{}_2'.format(opt.mode))
+    target_dir = os.path.join(opt.p, '{}'.format(opt.mode))
 
     model.compile(optimizer=Adam(learning_rate=opt.lr),
                   loss=CategoricalCrossentropy(from_logits=True),

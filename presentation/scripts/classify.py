@@ -9,16 +9,16 @@ import h5py
 import os
 
 import tensorflow as tf
-from tensorflow.keras.layers import BatchNormalization, Dense, LSTM, LayerNormalization
-from tensorflow.keras import Input, Model
-from tensorflow.keras.callbacks import EarlyStopping, TensorBoard
-from tensorflow.keras.losses import CategoricalCrossentropy
+from tensorflow.keras.layers     import BatchNormalization, Dense, LSTM, LayerNormalization
+from tensorflow.keras.callbacks  import EarlyStopping, TensorBoard
+from tensorflow.keras.losses     import CategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam, RMSprop
+from tensorflow.keras            import Input, Model
 
-from core.data  import pretraining_records, balanced_records
-from core.astromer import get_ASTROMER
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+from core.data     import pretraining_pipeline
+from core.models   import get_ASTROMER
+
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings\
 
@@ -86,7 +86,7 @@ def build_lstm_att(astromer, maxlen, n_classes, train_astromer=False):
     serie  = Input(shape=(maxlen, 1), batch_size=None, name='input')
     times  = Input(shape=(maxlen, 1), batch_size=None, name='times')
     mask   = Input(shape=(maxlen, 1), batch_size=None, name='mask')
-    print('BUILDING NEW LSTM + ATT')
+    print('BUILDING LSTM + ATT')
     placeholder = {'input':serie,
                    'mask_in':mask,
                    'times':times}
@@ -116,7 +116,8 @@ def build_mlp_att(astromer, maxlen, n_classes, train_astromer=False):
     serie  = Input(shape=(maxlen, 1), batch_size=None, name='input')
     times  = Input(shape=(maxlen, 1), batch_size=None, name='times')
     mask   = Input(shape=(maxlen, 1), batch_size=None, name='mask')
-
+    print('BUILDING MLP + ATT')
+    
     placeholder = {'input':serie,
                    'mask_in':mask,
                    'times':times}
@@ -126,7 +127,7 @@ def build_mlp_att(astromer, maxlen, n_classes, train_astromer=False):
 
     mask = 1.-placeholder['mask_in']
 
-    x = encoder(placeholder, training=False)
+    x = encoder(placeholder, training=train_astromer)
     x = x * mask
     x = tf.reduce_sum(x, 1)/tf.reduce_sum(mask, 1)
 
@@ -143,17 +144,29 @@ def run(opt):
 
     num_cls = pd.read_csv(os.path.join(opt.data, 'objects.csv')).shape[0]
 
-    train_batches = pretraining_records(os.path.join(opt.data, 'train'),
-                                        opt.batch_size, max_obs=opt.max_obs,
-                                        msk_frac=0., rnd_frac=0., same_frac=0.,
-                                        sampling=False, shuffle=True,
-                                        n_classes=num_cls)
+    train_batches = pretraining_pipeline(os.path.join(opt.data, 'train'),
+                                         batch_size=opt.batch_size,
+                                         shuffle=True,
+                                         cache=True,
+                                         window_size=opt.max_obs,
+                                         sampling=False,
+                                         msk_frac=0.,
+                                         rnd_frac=0.,
+                                         same_frac=0.,
+                                         per_sample_mask=True,
+                                         num_cls=num_cls)
 
-    val_batches = pretraining_records(os.path.join(opt.data, 'val'),
-                                      opt.batch_size, max_obs=opt.max_obs,
-                                      msk_frac=0., rnd_frac=0., same_frac=0.,
-                                      sampling=False, shuffle=False,
-                                      n_classes=num_cls)
+    val_batches = pretraining_pipeline(os.path.join(opt.data, 'val'),
+                                         batch_size=opt.batch_size,
+                                         shuffle=True,
+                                         cache=True,
+                                         window_size=opt.max_obs,
+                                         sampling=False,
+                                         msk_frac=0.,
+                                         rnd_frac=0.,
+                                         same_frac=0.,
+                                         per_sample_mask=True,
+                                         num_cls=num_cls)
 
     conf_file = os.path.join(opt.w, 'conf.json')
     with open(conf_file, 'r') as handle:
@@ -164,9 +177,8 @@ def run(opt):
                          num_heads =conf['heads'],
                          dff       =conf['dff'],
                          base      =conf['base'],
-                         dropout   =conf['dropout'],
-                         maxlen    =conf['max_obs'],
-                         use_leak  =conf['use_leak'])
+                         rate      =conf['dropout'],
+                         maxlen    =conf['max_obs'])
 
     weights_path = '{}/weights'.format(opt.w)
     astromer.load_weights(weights_path)
@@ -189,7 +201,7 @@ def run(opt):
                            n_classes=num_cls)
     print('[INFO] {} created '.format(opt.mode))
 
-    target_dir = os.path.join(opt.p, '{}_2'.format(opt.mode))
+    target_dir = os.path.join(opt.p, '{}'.format(opt.mode))
     optimizer = Adam(learning_rate=opt.lr)
 
     os.makedirs(target_dir, exist_ok=True)

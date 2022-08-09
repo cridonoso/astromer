@@ -135,10 +135,11 @@ def to_windows(dataset,
                               num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
         dataset = dataset.flat_map(lambda w,x,y,z: tf.data.Dataset.from_tensor_slices((w,x,y,z)))
-        dataset = dataset.map(lambda x: {'input':x[0],
-                                         'label':x[1],
-                                         'lcid':x[2],
-                                         'length':x[3]},
+        
+        dataset = dataset.map(lambda w,x,y,z: {'input':w,
+                                               'label':x,
+                                               'lcid':y,
+                                               'length':z},
                               num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     dataset = dataset.map(lambda x: {'input' :x['input'],

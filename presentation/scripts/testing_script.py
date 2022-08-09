@@ -14,8 +14,8 @@ datasets = ['{}_20'.format(ds_name),
             '{}_100'.format(ds_name),
             '{}_500'.format(ds_name),
             ]
-for astromer_dim in [256, 128, 64]:
-    for science_case in ['a', 'b', 'c']:
+for astromer_dim in ['256_rf']:
+    for science_case in ['a', 'b']:
         
         if science_case == 'a':
             train_astromer = False

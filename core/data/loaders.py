@@ -81,7 +81,8 @@ def pretraining_pipeline(dataset,
                          same_frac=.2,
                          return_ids=False,
                          return_lengths=False,
-                         per_sample_mask=False):
+                         per_sample_mask=False,
+                         num_cls=None):
     """
     Pretraining pipeline.
     Create an ad-hoc ASTROMER dataset
@@ -112,6 +113,10 @@ def pretraining_pipeline(dataset,
     if isinstance(dataset, str):
         dataset = load_records(dataset)
 
+    if shuffle:
+        SHUFFLE_BUFFER = 10000
+        dataset = dataset.shuffle(SHUFFLE_BUFFER)
+        
     # REPEAT LIGHT CURVES
     if repeat is not None:
         dataset = dataset.repeat(repeat)
@@ -123,6 +128,11 @@ def pretraining_pipeline(dataset,
 
     dataset = dataset.map(standardize)
 
+    shapes = {'input' :[None, 3],
+              'lcid'  :(),
+              'length':(),
+              'mask'  :[None, ],
+              'label' :()}
     if per_sample_mask:
         dataset = mask_dataset(dataset,
                                msk_frac=msk_frac,
@@ -130,9 +140,11 @@ def pretraining_pipeline(dataset,
                                same_frac=same_frac,
                                per_sample_mask=True,
                                window_size=window_size)
-
-    # CREATE BATCHES
-    dataset = dataset.padded_batch(batch_size)
+        shapes['input_modified'] = [None, None]
+        shapes['mask_in'] = [None, None]
+        shapes['mask_out'] = [None, None]
+        
+    dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
 
     # MASKING
     if not per_sample_mask:
@@ -143,13 +155,10 @@ def pretraining_pipeline(dataset,
 
     # FORMAT INPUT DICTONARY
     dataset = dataset.map(lambda x: format_inp_astromer(x,
-                                                        return_ids,
-                                                        return_lengths),
+                                                        return_ids=return_ids,
+                                                        return_lengths=return_lengths,
+                                                        num_cls=num_cls),
                           num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
-    if shuffle:
-        SHUFFLE_BUFFER = 10000
-        dataset = dataset.shuffle(SHUFFLE_BUFFER)
 
     if cache:
         dataset = dataset.cache()
@@ -159,7 +168,7 @@ def pretraining_pipeline(dataset,
 
     return dataset
 
-def format_inp_astromer(batch, return_ids=False, return_lengths=False):
+def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=None):
     """
     Buildng ASTROMER input
 
@@ -175,10 +184,13 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False):
         'times': tf.slice(batch['input'], [0,0,0], [-1,-1,1]),
         'mask_in': batch['mask_in']
     }
-    outputs = {
-        'target': tf.slice(batch['input'], [0,0,1], [-1,-1,1]),
-        'mask_out': batch['mask_out']
-    }
+    if num_cls is not None:
+        outputs = tf.one_hot(batch['label'], num_cls)
+    else:
+        outputs = {
+            'target': tf.slice(batch['input'], [0,0,1], [-1,-1,1]),
+            'mask_out': batch['mask_out']
+        }
 
     if return_ids:
         inputs['ids'] = batch['ids']

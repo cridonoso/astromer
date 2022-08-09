@@ -29,7 +29,7 @@ def run(opt):
     # Check if there is pretraining weights to be loaded
     varsdic = vars(opt)
     if opt.w !='':
-        print('[INFO] Pretrained model detected! - Finetuning...')
+        print('[INFO] Pretrained model detected!')
         conf_file = os.path.join(opt.w, 'conf.json')
         with open(conf_file, 'r') as handle:
             conf = json.load(handle)
@@ -37,7 +37,7 @@ def run(opt):
         for key in conf.keys():
             # Don't include parameters exclusive to this training
             if key in ['batch_size', 'p', 'repeat', 'data', 'patience',
-                       'msk_frac', 'rnd_frac', 'same_frac', 'epochs']:
+                       'msk_frac', 'rnd_frac', 'same_frac', 'epochs', 'w']:
                 continue
             varsdic[key] = conf[key]
 
@@ -53,9 +53,6 @@ def run(opt):
                             base=varsdic['base'],
                             rate=varsdic['dropout'],
                             maxlen=varsdic['max_obs'])
-    # Load weights if exist
-    if varsdic['w'] != '':
-        astromer.load_weights(os.path.join(varsdic['w'], 'weights'))
 
     # Compile model
     # Losses and metrics have been already included in core.models.zero
@@ -69,7 +66,13 @@ def run(opt):
                                          beta_2=0.98,
                                          epsilon=1e-9)
     astromer.compile(optimizer=optimizer)
-
+    
+    # Load weights if exist
+    
+    if varsdic['w'] != '':
+        print('[INFO] Loading pre-trained weigths')
+        astromer.load_weights(os.path.join(varsdic['w'], 'weights'))
+        
     # Loading and formating data
     train_batches = pretraining_pipeline(os.path.join(varsdic['data'], 'train'),
                                          batch_size=varsdic['batch_size'],
