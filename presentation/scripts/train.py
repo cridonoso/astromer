@@ -53,7 +53,9 @@ def run(opt):
         print('[INFO] Distributed training activated')
         devices = ["/gpu:{}".format(i) for i in range(num_rep)]
         print('[INFO] Devices: ', devices)
-        mirrored_strategy = tf.distribute.MirroredStrategy(devices=devices)
+        mirrored_strategy = tf.distribute.MirroredStrategy(
+                    devices=devices,
+                    cross_device_ops=tf.distribute.HierarchicalCopyAllReduce())
 
     # Make sure we don't overwrite a previous training
     opt.p = get_folder_name(opt.p, prefix='')
