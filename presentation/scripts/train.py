@@ -15,10 +15,45 @@ from core.models                import get_ASTROMER
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
+def build_model(varsdic):
+    # Instance the model
+    astromer = get_ASTROMER(num_layers=varsdic['layers'],
+                            d_model=varsdic['head_dim'],
+                            num_heads=varsdic['heads'],
+                            dff=varsdic['dff'],
+                            base=varsdic['base'],
+                            rate=varsdic['dropout'],
+                            maxlen=varsdic['max_obs'])
+    # Compile model
+    # Losses and metrics have been already included in core.models.zero
+    if varsdic['scheduler']:
+        lrate = CustomSchedule(varsdic['head_dim'])
+    else:
+        lrate = varsdic['lr']
+
+    optimizer = tf.keras.optimizers.Adam(lrate,
+                                         beta_1=0.9,
+                                         beta_2=0.98,
+                                         epsilon=1e-9)
+    astromer.compile(optimizer=optimizer)
+
+    # Load weights if exist
+
+    if varsdic['w'] != '':
+        print('[INFO] Loading pre-trained weigths')
+        astromer.load_weights(os.path.join(varsdic['w'], 'weights'))
+
+    return astromer
 
 def run(opt):
     # Get model
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
+    num_rep = len(tf.config.list_physical_devices('GPU'))
+    if num_rep>1:
+        print('[INFO] Distributed training activated')
+        devices = ["/gpu:{}".format(i) for i in range(num_rep)]
+        print('[INFO] Devices: ', devices)
+        mirrored_strategy = tf.distribute.MirroredStrategy(devices=devices)
 
     # Make sure we don't overwrite a previous training
     opt.p = get_folder_name(opt.p, prefix='')
@@ -45,34 +80,15 @@ def run(opt):
     conf_file = os.path.join(varsdic['p'], 'conf.json')
     dict_to_json(varsdic, conf_file)
 
-    # Instance the model
-    astromer = get_ASTROMER(num_layers=varsdic['layers'],
-                            d_model=varsdic['head_dim'],
-                            num_heads=varsdic['heads'],
-                            dff=varsdic['dff'],
-                            base=varsdic['base'],
-                            rate=varsdic['dropout'],
-                            maxlen=varsdic['max_obs'])
-
-    # Compile model
-    # Losses and metrics have been already included in core.models.zero
-    if varsdic['scheduler']:
-        lrate = CustomSchedule(varsdic['head_dim'])
+    if num_rep>1:
+        with mirrored_strategy.scope():
+            astromer = build_model(varsdic)
+            varsdic['batch_size'] = varsdic['batch_size']*num_rep
+            print('[INFO] Batch size updated: {}'.format(varsdic['batch_size']))
     else:
-        lrate = varsdic['lr']
+        astromer = build_model(varsdic)
 
-    optimizer = tf.keras.optimizers.Adam(lrate,
-                                         beta_1=0.9,
-                                         beta_2=0.98,
-                                         epsilon=1e-9)
-    astromer.compile(optimizer=optimizer)
-    
-    # Load weights if exist
-    
-    if varsdic['w'] != '':
-        print('[INFO] Loading pre-trained weigths')
-        astromer.load_weights(os.path.join(varsdic['w'], 'weights'))
-        
+
     # Loading and formating data
     train_batches = pretraining_pipeline(os.path.join(varsdic['data'], 'train'),
                                          batch_size=varsdic['batch_size'],
