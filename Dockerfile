@@ -9,7 +9,8 @@ RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
 RUN apt-get update
 RUN apt install -y graphviz
-RUN apt install nano htop wget
+RUN apt install nano htop wget sudo
+RUN echo "user:user" | chpasswd && adduser user sudo
 # ==== PIP SETUP ====
 RUN python -m pip install --upgrade pip
 RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install dvipng texlive-latex-extra texlive-fonts-recommended cm-super

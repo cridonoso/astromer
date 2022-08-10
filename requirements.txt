@@ -6,5 +6,6 @@ graphviz
 seaborn
 joblib
 pandas
+optuna
 pydot
 tqdm

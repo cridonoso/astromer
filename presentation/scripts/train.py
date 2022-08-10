@@ -18,12 +18,13 @@ logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 def build_model(varsdic):
     # Instance the model
     astromer = get_ASTROMER(num_layers=varsdic['layers'],
-                            d_model=varsdic['head_dim'],
+                            d_model=varsdic['head_dim']*varsdic['heads'],
                             num_heads=varsdic['heads'],
                             dff=varsdic['dff'],
                             base=varsdic['base'],
                             rate=varsdic['dropout'],
                             maxlen=varsdic['max_obs'])
+
     # Compile model
     # Losses and metrics have been already included in core.models.zero
     if varsdic['scheduler']:
@@ -139,7 +140,6 @@ def run(opt):
                  epochs=varsdic['epochs'],
                  validation_data=valid_batches,
                  callbacks=callbacks)
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
