@@ -23,7 +23,8 @@ def build_model(varsdic):
                             dff=varsdic['dff'],
                             base=varsdic['base'],
                             rate=varsdic['dropout'],
-                            maxlen=varsdic['max_obs'])
+                            maxlen=varsdic['max_obs'],
+                            pe_v2=varsdic['pe_v2'])
 
     # Compile model
     # Losses and metrics have been already included in core.models.zero
@@ -172,6 +173,8 @@ if __name__ == '__main__':
                         help='GPU to use')
     parser.add_argument('--scheduler', default=False, action='store_true',
                         help='If use scheduler to control the learning rate')
+    parser.add_argument('--lr', default=1e-3, type=float,
+                        help='Optimizer initial learning rate - If scheduler is activated lr is not considered')
 
     # ASTROMER HIPERPARAMETERS
     parser.add_argument('--layers', default=2, type=int,
@@ -186,8 +189,8 @@ if __name__ == '__main__':
                         help='dropout_rate for the encoder')
     parser.add_argument('--base', default=1000, type=int,
                         help='base of embedding')
-    parser.add_argument('--lr', default=1e-3, type=float,
-                        help='optimizer initial learning rate')
+    parser.add_argument('--pe-v2', default='0', type=str,
+                        help='Use new positional encoding code')
 
     opt = parser.parse_args()
     run(opt)

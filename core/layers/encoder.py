@@ -49,12 +49,13 @@ class EncoderLayer(tf.keras.layers.Layer):
 
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, num_layers, d_model, num_heads, dff,
-                 base=10000, rate=0.1, use_leak=False, **kwargs):
+                 base=10000, rate=0.1, use_leak=False, pe_v2=False, **kwargs):
         super(Encoder, self).__init__(**kwargs)
 
         self.d_model = d_model
         self.num_layers = num_layers
         self.base = base
+        self.pe_v2 = pe_v2
         self.inp_transform = tf.keras.layers.Dense(d_model)
         self.enc_layers = [EncoderLayer(d_model, num_heads, dff, rate, use_leak)
                             for _ in range(num_layers)]
@@ -62,7 +63,11 @@ class Encoder(tf.keras.layers.Layer):
 
     def call(self, data, training=False):
         # adding embedding and position encoding.
-        x_pe = positional_encoding(data['times'], self.d_model, mjd=True)
+        x_pe = positional_encoding(data['times'],
+                                   self.d_model,
+                                   base=self.base,
+                                   mjd=True,
+                                   v2=self.pe_v2)
 
         x_transformed = self.inp_transform(data['input'])
         transformed_input = x_transformed + x_pe

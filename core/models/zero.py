@@ -29,7 +29,8 @@ def get_ASTROMER(num_layers=2,
                  rate=0.1,
                  use_leak=False,
                  maxlen=100,
-                 batch_size=None):
+                 batch_size=None,
+                 pe_v2=False):
 
     placeholder = build_input(maxlen)
 
@@ -39,7 +40,8 @@ def get_ASTROMER(num_layers=2,
                       dff,
                       base=base,
                       rate=rate,
-                      use_leak=False,
+                      use_leak=use_leak,
+                      pe_v2=pe_v2,
                       name='encoder')
 
     x = encoder(placeholder)
