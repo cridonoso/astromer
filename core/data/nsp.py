@@ -1,5 +1,4 @@
 import tensorflow as tf
-import tensorflow_probability as tfp
 
 
 def get_mean_and_std(tensor, N):
