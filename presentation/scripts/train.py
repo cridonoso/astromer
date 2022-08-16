@@ -189,7 +189,7 @@ if __name__ == '__main__':
                         help='dropout_rate for the encoder')
     parser.add_argument('--base', default=1000, type=int,
                         help='base of embedding')
-    parser.add_argument('--pe-v2', default='0', type=str,
+    parser.add_argument('--pe-v2', default=False, action='store_true',
                         help='Use new positional encoding code')
 
     opt = parser.parse_args()
