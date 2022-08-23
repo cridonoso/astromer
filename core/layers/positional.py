@@ -32,6 +32,9 @@ def get_angles_original(times, d_model, base=10000):
 
 @tf.function
 def get_angles_original_v2(times, d_model, base=10000):
+    '''
+    Original version
+    '''
     with tf.name_scope("Get_Angles") as scope:
         dim_indices = tf.range(d_model//2, dtype=tf.float32)
         dim_indices = tf.repeat(dim_indices, 2)

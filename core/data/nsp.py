@@ -33,12 +33,25 @@ def randomize_segment(batch, frac, prob=.5):
     inp_shape = tf.shape(input)
     n_random = tf.math.ceil(tf.cast(inp_shape[1], tf.float32)*frac)
 
-    prob = tf.random.categorical(tf.math.log([[prob, 1.-prob]]), 1)
-    if tf.squeeze(prob):
-        first_part = tf.slice(input, [0,0,0], [-1,n_random,-1])
+    prob = tf.random.categorical(tf.math.log([[prob, 1.-prob]]), inp_shape[0],
+                                 dtype=tf.int32)
 
-    else:
-        print('0')
+    mask_random = tf.one_hot(tf.range(n_random, inp_shape[1], dtype=tf.int32),
+                             inp_shape[1], dtype=tf.int32)
+    mask_random = tf.expand_dims(tf.reduce_sum(mask_random, 0), 0)
+    mask_random = tf.tile(mask_random, [inp_shape[0], 1])
+    mask_random = tf.multiply(mask_random, tf.transpose(prob))
+    mask_random = tf.expand_dims(tf.cast(mask_random,tf.float32), 2)
+
+    rnd_inp  = tf.random.shuffle(input)
+    masked_x = tf.multiply(input, 1.-mask_random)
+    masked_r = tf.multiply(rnd_inp, mask_random)
+
+    new_input = tf.add(masked_x, masked_r)
+
+    print(masked_x[0])
+    print(masked_r[0])
+    print(new_input[0])
 
     return batch
 
