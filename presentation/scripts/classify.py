@@ -15,7 +15,7 @@ from tensorflow.keras.callbacks import EarlyStopping, TensorBoard
 from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam, RMSprop
 
-from core.data  import pretraining_records, balanced_records
+from core.data  import pretraining_records
 from core.astromer import get_ASTROMER
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -90,7 +90,7 @@ def build_lstm_att(astromer, maxlen, n_classes, train_astromer=False):
     placeholder = {'input':serie,
                    'mask_in':mask,
                    'times':times}
-    
+
     cell_0 = NormedLSTMCell(units=256)
     dense  = Dense(n_classes, name='FCN')
 
@@ -99,7 +99,7 @@ def build_lstm_att(astromer, maxlen, n_classes, train_astromer=False):
     s1 = [tf.zeros([tf.shape(placeholder['input'])[0], 256]),
           tf.zeros([tf.shape(placeholder['input'])[0], 256])]
     rnn = tf.keras.layers.RNN(cell_0, return_sequences=False)
-    
+
     encoder = astromer.get_layer('encoder')
     encoder.trainable = train_astromer
 
@@ -136,6 +136,26 @@ def build_mlp_att(astromer, maxlen, n_classes, train_astromer=False):
     x = LayerNormalization()(x)
     x = Dense(n_classes)(x)
     return Model(inputs=placeholder, outputs=x, name="FCATT")
+
+def build_mini_mlp_att(astromer, maxlen, n_classes, train_astromer=False):
+    serie  = Input(shape=(maxlen, 1), batch_size=None, name='input')
+    times  = Input(shape=(maxlen, 1), batch_size=None, name='times')
+    mask   = Input(shape=(maxlen, 1), batch_size=None, name='mask')
+
+    placeholder = {'input':serie,
+                   'mask_in':mask,
+                   'times':times}
+
+    encoder = astromer.get_layer('encoder')
+    encoder.trainable = train_astromer
+
+    mask = 1.-placeholder['mask_in']
+
+    x = encoder(placeholder, training=False)
+    x = x * mask
+    x = tf.reduce_sum(x, 1)/tf.reduce_sum(mask, 1)
+    x = Dense(n_classes)(x)
+    return Model(inputs=placeholder, outputs=x, name="MLP_ATT_MINI")
 
 def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"]=opt.gpu
@@ -179,6 +199,12 @@ def run(opt):
                                maxlen=opt.max_obs,
                                n_classes=num_cls,
                                train_astromer=opt.finetune)
+    if opt.mode == 'mini_mlp_att':
+        model = build_mini_mlp_att(astromer,
+                                   maxlen=opt.max_obs,
+                                   n_classes=num_cls,
+                                   train_astromer=True)
+
     if opt.mode == 'mlp_att':
         model = build_mlp_att(astromer,
                               maxlen=opt.max_obs,

@@ -16,7 +16,7 @@ datasets = ['{}_20'.format(ds_name),
             ]
 for astromer_dim in [256, 128, 64]:
     for science_case in ['a', 'b', 'c']:
-        
+
         if science_case == 'a':
             train_astromer = False
             sc_ft = 'ab'
@@ -26,7 +26,7 @@ for astromer_dim in [256, 128, 64]:
         if science_case == 'c':
             train_astromer = True
             sc_ft = 'c'
-        
+
         for dataset in datasets:
             for fold_n in range(3):
                 for mode in ['lstm_att', 'mlp_att', 'lstm']:
