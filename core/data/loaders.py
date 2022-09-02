@@ -82,7 +82,8 @@ def pretraining_pipeline(dataset,
                          return_ids=False,
                          return_lengths=False,
                          per_sample_mask=False,
-                         num_cls=None):
+                         num_cls=None,
+                         normalize=True):
     """
     Pretraining pipeline.
     Create an ad-hoc ASTROMER dataset
@@ -116,7 +117,7 @@ def pretraining_pipeline(dataset,
     if shuffle:
         SHUFFLE_BUFFER = 10000
         dataset = dataset.shuffle(SHUFFLE_BUFFER)
-        
+
     # REPEAT LIGHT CURVES
     if repeat is not None:
         dataset = dataset.repeat(repeat)
@@ -126,32 +127,25 @@ def pretraining_pipeline(dataset,
                          window_size=window_size,
                          sampling=sampling)
 
-    dataset = dataset.map(standardize)
+    if normalize:
+        dataset = dataset.map(standardize)
+
+    dataset = mask_dataset(dataset,
+                           msk_frac=msk_frac,
+                           rnd_frac=rnd_frac,
+                           same_frac=same_frac,
+                           window_size=window_size)
 
     shapes = {'input' :[None, 3],
               'lcid'  :(),
               'length':(),
               'mask'  :[None, ],
-              'label' :()}
-    if per_sample_mask:
-        dataset = mask_dataset(dataset,
-                               msk_frac=msk_frac,
-                               rnd_frac=rnd_frac,
-                               same_frac=same_frac,
-                               per_sample_mask=True,
-                               window_size=window_size)
-        shapes['input_modified'] = [None, None]
-        shapes['mask_in'] = [None, None]
-        shapes['mask_out'] = [None, None]
-        
-    dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
+              'label' :(),
+              'input_modified': [None, None],
+              'mask_in': [None, None],
+              'mask_out': [None, None]}
 
-    # MASKING
-    if not per_sample_mask:
-        dataset = mask_dataset(dataset,
-                               msk_frac=msk_frac,
-                               rnd_frac=rnd_frac,
-                               same_frac=same_frac)
+    dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
 
     # FORMAT INPUT DICTONARY
     dataset = dataset.map(lambda x: format_inp_astromer(x,

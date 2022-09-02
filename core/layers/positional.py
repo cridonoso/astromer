@@ -18,7 +18,7 @@ def get_angles(times, d_model):
         return angle_rates
 
 @tf.function
-def get_angles_original(times, d_model, base=10000):
+def get_angles_astromer(times, d_model, base=10000):
     with tf.name_scope("Get_Angles") as scope:
         dim_indices = tf.range(d_model, dtype=tf.float32)
 
@@ -31,7 +31,20 @@ def get_angles_original(times, d_model, base=10000):
         return angle_rates
 
 @tf.function
-def get_angles_original_v2(times, d_model, base=10000):
+def get_angles_astromer_v2(times, d_model, base=10000):
+    with tf.name_scope("Get_Angles") as scope:
+        dim_indices = tf.range(d_model, dtype=tf.float32)
+
+        exponent = tf.divide(dim_indices,
+                             tf.cast(d_model, tf.float32))
+
+        angle_rates = tf.pow(tf.cast(base, dtype=tf.float32), exponent)
+        angle_rates = tf.math.reciprocal(angle_rates)
+        angle_rates = times * angle_rates
+        return angle_rates
+
+@tf.function
+def get_angles_vaswani(times, d_model, base=10000):
     '''
     Original version
     '''
@@ -59,9 +72,9 @@ def positional_encoding(times, d_model, base=10000,
 
         if v2:
             print('[INFO] Using PE')
-            angle_rads = get_angles_original_v2(indices, d_model)
+            angle_rads = get_angles_astromer_v2(indices, d_model)
         else:
-            angle_rads = get_angles_original(indices, d_model)
+            angle_rads = get_angles_astromer(indices, d_model)
 
         # SIN AND COS
         def fn(x):

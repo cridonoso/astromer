@@ -21,47 +21,84 @@ def get_mean_and_std(tensor, N):
                 )
     return mean_, std_
 
-def randomize_segment(batch, frac, prob=.5):
-    input = batch['input_modified']
-    times = tf.slice(batch['input'], [0,0,0], [-1,-1,1])
-    dt    = times[:, 1:, :] - times[:, :-1, :]
+def get_random(tensor_0, tensor_1, pivot, rnd_seq_size):
+    inp_length = tf.shape(tensor_0)[0]
 
-    n_obs = tf.expand_dims(tf.reduce_sum(batch['mask'], 1), 1)
-    mean_dt, std_dt = get_mean_and_std(dt, n_obs)
+    rand_msk = tf.range(pivot, pivot+rnd_seq_size)
+    rand_msk = tf.one_hot(rand_msk, inp_length)
+    rand_msk = tf.reduce_sum(rand_msk, 0)
+    rand_msk = tf.expand_dims(rand_msk, 1)
 
+    tensor_1 = tensor_1 * rand_msk
+    tensor_0 = tensor_0 * (1.-rand_msk)
+    tensor_2 = tensor_0 + tensor_1
 
-    inp_shape = tf.shape(input)
-    n_random = tf.math.ceil(tf.cast(inp_shape[1], tf.float32)*frac)
+    a = tf.range(0, pivot)
+    b = tf.range(pivot+1, pivot+rnd_seq_size+1)
+    c = tf.range(pivot+rnd_seq_size+2, inp_length+2)
+    indices = tf.concat([a,b,c], axis=0)
+    indices = tf.expand_dims(indices, 1)
+    base     = tf.zeros([inp_length+2, 1])
+    tensor_3 = tf.tensor_scatter_nd_add(base,
+                                        indices,
+                                        tensor_2)
+    return tensor_3
 
-    prob = tf.random.categorical(tf.math.log([[prob, 1.-prob]]), inp_shape[0],
-                                 dtype=tf.int32)
+def add_tokens(tensor, sep_token, cls_token):
+    msk     = tf.cast(tensor, tf.bool)
+    msk     = tf.cast(tf.logical_not(msk), tf.float32)
+    tokens  = msk*tf.cast(sep_token, tf.float32)
+    scatter = tensor+tokens
+    scatter = tf.concat([[[cls_token]], scatter], 0)
+    return scatter
 
-    mask_random = tf.one_hot(tf.range(n_random, inp_shape[1], dtype=tf.int32),
-                             inp_shape[1], dtype=tf.int32)
-    mask_random = tf.expand_dims(tf.reduce_sum(mask_random, 0), 0)
-    mask_random = tf.tile(mask_random, [inp_shape[0], 1])
-    mask_random = tf.multiply(mask_random, tf.transpose(prob))
-    mask_random = tf.expand_dims(tf.cast(mask_random,tf.float32), 2)
+def randomize_segment(batch, random_sample, frac=.5, prob=.5, sep_token=-98, cls_token=-99):
 
-    rnd_inp  = tf.random.shuffle(input)
-    masked_x = tf.multiply(input, 1.-mask_random)
-    masked_r = tf.multiply(rnd_inp, mask_random)
+    nsp_label = tf.random.uniform(shape=(), minval=0, maxval=2, dtype=tf.int32)
 
-    new_input = tf.add(masked_x, masked_r)
+    inp_length = tf.shape(batch['input_modified'])[0]
+    rnd_seq_size = tf.cast(tf.cast(inp_length, tf.float32)*frac, tf.int32)
 
-    print(masked_x[0])
-    print(masked_r[0])
-    print(new_input[0])
+    pivot = tf.random.uniform(shape=(),
+                              minval=0,
+                              maxval=inp_length-rnd_seq_size,
+                              dtype=tf.int32)
+
+    random_sequence = tf.random.shuffle(random_sample['input_modified'])
+
+    random_input = get_random(batch['input_modified'],
+                              random_sequence,
+                              pivot,
+                              rnd_seq_size)
+    random_input = add_tokens(random_input, sep_token, cls_token)
+
+    original_input  = tf.slice(random_sample['input'], [0,1],[-1, 1])
+    random_original = get_random(original_input,
+                                 random_sequence,
+                                 pivot,
+                                 rnd_seq_size)
+    random_original = add_tokens(random_original, sep_token, cls_token)
+
+    print(random_original)
+    # indices = tf.constant([[4], [3], [1], [7]])
+    # print(indices.shape)
+    # updates = tf.constant([9, 10, 11, 12])
+    # shape = tf.constant([inp_length])
+    # scatter = tf.scatter_nd(indices, tf.squeeze(), shape=shape)
+
+    # print(scatter)
 
     return batch
 
 
-def nsp_dataset(dataset, frac=.5):
+def nsp_dataset(dataset, prob=.5, frac=.5):
 
-    # dataset = dataset.map(lambda x: randomize_segment(x, frac=frac))
+    #dataset = dataset.map(lambda x: randomize_segment(x, frac=frac))
 
-    for b in dataset:
-        randomize_segment(b, frac=frac)
+    random_sample = dataset.shuffle(5000)
+
+    for b, r in zip(dataset, random_sample):
+        randomize_segment(b, random_sample=r, frac=frac, prob=prob)
         break
 
     return dataset

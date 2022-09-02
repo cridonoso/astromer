@@ -14,12 +14,13 @@ RUN echo "user:user" | chpasswd && adduser user sudo
 # ==== PIP SETUP ====
 RUN python -m pip install --upgrade pip
 RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install dvipng texlive-latex-extra texlive-fonts-recommended cm-super
+# ==== INSTALL PYTHON REQUIREMENTS ====
+ADD ./requirements.txt ./requirements.txt
+RUN pip install -r requirements.txt --no-cache-dir
+RUN apt-get install -y libmysqlclient-dev
 # ==== BUILDING WORKING DIR ====
 USER user
 WORKDIR /home/
-ADD ./requirements.txt ./requirements.txt
-# ==== INSTALL PYTHON REQUIREMENTS ====
-RUN pip install -r requirements.txt --no-cache-dir
 ENV PATH=$PATH:~/.local/bin
 # ==== EXPOSE PORTS ====
 EXPOSE 8888
