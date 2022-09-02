@@ -155,7 +155,7 @@ def create_dataset(meta_df,
     for cls_name, cls_meta in tqdm(cls_groups, total=len(cls_groups)):
         subsets = divide_training_subset(cls_meta,
                                          train=subsets_frac[0],
-                                         val=subsets_frac[0],
+                                         val=subsets_frac[1],
                                          test_meta = test_subset)
 
         for subset_name, frame in subsets:
@@ -220,7 +220,7 @@ def sample_lc(sample, max_obs, binary=True):
         input_dict = deserialize(sample)
     else:
         input_dict = sample
-        
+
     sequence = input_dict['input']
 
     serie_len = tf.shape(sequence)[0]
