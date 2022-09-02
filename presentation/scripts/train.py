@@ -15,7 +15,7 @@ from core.models                import get_ASTROMER
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
-def build_model(varsdic):
+def build_model(varsdic, scale=0):
     # Instance the model
     astromer = get_ASTROMER(num_layers=varsdic['layers'],
                             d_model=varsdic['head_dim']*varsdic['heads'],
@@ -29,7 +29,8 @@ def build_model(varsdic):
     # Compile model
     # Losses and metrics have been already included in core.models.zero
     if varsdic['scheduler']:
-        lrate = CustomSchedule(varsdic['head_dim'])
+        lrate = CustomSchedule(varsdic['head_dim'],
+                               scale=scale)
     else:
         lrate = varsdic['lr']
 
@@ -86,9 +87,10 @@ def run(opt):
 
     if num_rep>1:
         with mirrored_strategy.scope():
-            astromer = build_model(varsdic)
+            astromer = build_model(varsdic, scale=num_rep-1)
             varsdic['batch_size'] = varsdic['batch_size']*num_rep
             print('[INFO] Batch size updated: {}'.format(varsdic['batch_size']))
+            print('[INFO] Scaling scheduler: {}'.format(num_rep-1))
     else:
         astromer = build_model(varsdic)
 
