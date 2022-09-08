@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-
+@tf.function
 def get_mean_and_std(tensor, N):
     """
     Return the mean and standard deviation of a padded batch.
@@ -21,6 +21,7 @@ def get_mean_and_std(tensor, N):
                 )
     return mean_, std_
 
+@tf.function
 def add_segment_to_tensor(tensor_0, tensor_1, pivot, rnd_seq_size, cls_tkn=-99., sep_tkn=-98.):
     """
         Add a random segment in a tensor sequence. (user for NSP task)
@@ -42,7 +43,7 @@ def add_segment_to_tensor(tensor_0, tensor_1, pivot, rnd_seq_size, cls_tkn=-99.,
     """
 
     inp_length = tf.shape(tensor_0)[0]
-    inp_dim = tf.shape(tensor_0)[1]
+    inp_dim = tf.shape(tensor_0)[-1]
 
     rand_msk = tf.range(pivot, pivot+rnd_seq_size)
     rand_msk = tf.one_hot(rand_msk, inp_length)
@@ -69,8 +70,8 @@ def add_segment_to_tensor(tensor_0, tensor_1, pivot, rnd_seq_size, cls_tkn=-99.,
     tensor_3 = tf.concat([tf.tile([[cls_tkn]], [1,inp_dim]), tensor_3], 0)
     return tensor_3
 
-
-def randomize_segment(batch, random_sample, frac=.5, prob=.5, sep_token=-98, cls_token=-99):
+# @tf.function
+def randomize_segment(batch, random_sample, frac=.5, sep_token=-98, cls_token=-99):
 
     nsp_label = tf.random.uniform(shape=(), minval=0, maxval=2, dtype=tf.int32)
 
@@ -111,6 +112,14 @@ def randomize_segment(batch, random_sample, frac=.5, prob=.5, sep_token=-98, cls
                                 1)
 
     # Add 0s to mask_in to be included in the self-attention op
+    batch['mask']  = add_segment_to_tensor(batch['mask'],
+                                           random_sample['mask'],
+                                           pivot,
+                                           rnd_seq_size,
+                                           cls_tkn=0.,
+                                           sep_tkn=0.)
+
+    # Add 0s to mask_in to be included in the self-attention op
     batch['mask_in']  = add_segment_to_tensor(batch['mask_in'],
                                               random_sample['mask_in'],
                                               pivot,
@@ -126,17 +135,30 @@ def randomize_segment(batch, random_sample, frac=.5, prob=.5, sep_token=-98, cls
                                               cls_tkn=0.,
                                               sep_tkn=0.)
     batch['nsp_label'] = nsp_label
-
     return batch
 
 
 def nsp_dataset(dataset, prob=.5, frac=.5, buffer_shuffle=5000):
+    """
+    Add random next sentence with probability 1-prob
+
+    Args:
+        dataset: tf.dataset with light curves sequences (use after masking)
+        prob: probability of not adding random segment
+        frac: fraction of the sequence to change. The random window size depends on this.
+        buffer_shuffle: buffer for shuffling the same dataset and get random segments
+
+    Returns:
+        dataset: tf.dataset that includes <nsp_label>. After use this function,
+                 all sequences will be modified to incorporate [CLS] and [SEP] tokens
+                 i.e., input, input_modified, mask, mask_in, mask_out....
+
+    """
 
     shuffle_dataset = dataset.shuffle(buffer_shuffle)
 
     dataset = tf.data.Dataset.zip((dataset, shuffle_dataset))
     dataset = dataset.map(lambda x, y: randomize_segment(x,
                                                          random_sample=y,
-                                                         frac=frac,
-                                                         prob=prob))
+                                                         frac=frac))
     return dataset

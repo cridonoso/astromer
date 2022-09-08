@@ -4,6 +4,7 @@ import os
 from core.data.record import deserialize
 from core.data.preprocessing import to_windows, standardize
 from core.data.masking import mask_dataset, mask_sample
+from core.data.nsp import nsp_dataset
 
 def load_records(records_dir):
     """
@@ -82,6 +83,8 @@ def pretraining_pipeline(dataset,
                          return_ids=False,
                          return_lengths=False,
                          per_sample_mask=False,
+                         nsp_prob=1.,
+                         nsp_frac=0.,
                          num_cls=None,
                          normalize=True):
     """
@@ -139,11 +142,19 @@ def pretraining_pipeline(dataset,
     shapes = {'input' :[None, 3],
               'lcid'  :(),
               'length':(),
-              'mask'  :[None, ],
+              'mask'  :[None, None],
               'label' :(),
               'input_modified': [None, None],
               'mask_in': [None, None],
               'mask_out': [None, None]}
+
+    if nsp_frac>0. and nsp_prob<1.:
+        print('[INFO] Using NSP')
+        dataset = nsp_dataset(dataset,
+                              prob=nsp_prob,
+                              frac=nsp_frac,
+                              buffer_shuffle=5000)
+        shapes['nsp_label'] = ()
 
     dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
 
