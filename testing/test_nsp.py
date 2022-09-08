@@ -18,7 +18,7 @@ def test_mask_dataset():
                            rnd_frac=.2,
                            same_frac=.2,
                            window_size=10)
-                           
+
     dataset = nsp_dataset(dataset)
 
     shapes = {'input' :[None, 3],
@@ -26,6 +26,9 @@ def test_mask_dataset():
               'length':(),
               'mask'  :[None, ],
               'label' :(),
+              'nsp_label':(),
               'input_modified': [None, None],
               'mask_in': [None, None],
               'mask_out': [None, None]}
+
+    dataset = dataset.padded_batch(10, padded_shapes=shapes)
