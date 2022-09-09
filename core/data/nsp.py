@@ -80,7 +80,9 @@ def randomize_segment(batch, random_sample, frac=.5, sep_token=-98, cls_token=-9
         random_sample = batch
 
     inp_length = tf.shape(batch['input_modified'])[0]
-    rnd_seq_size = tf.cast(tf.cast(inp_length, tf.float32)*frac, tf.int32)
+    size = tf.cast(inp_length, tf.float32)*frac
+    print(size)
+    rnd_seq_size = tf.cast(size, tf.int32)
 
     # Where the random segment start
     pivot = tf.random.uniform(shape=(),
@@ -89,10 +91,10 @@ def randomize_segment(batch, random_sample, frac=.5, sep_token=-98, cls_token=-9
                               dtype=tf.int32)
 
     # Put a random segment in the input_modified sequence (masked input)
-    random_input = add_segment_to_tensor(batch['input_modified'],
-                                         random_sample['input_modified'],
-                                         pivot,
-                                         rnd_seq_size)
+    batch['input_modified'] = add_segment_to_tensor(batch['input_modified'],
+                                                    random_sample['input_modified'],
+                                                    pivot,
+                                                    rnd_seq_size)
 
     # Add tokens to the original times
     original_times  = tf.slice(batch['input'], [0,0],[-1, 1])

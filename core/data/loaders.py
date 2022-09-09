@@ -194,7 +194,8 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
     else:
         outputs = {
             'target': tf.slice(batch['input'], [0,0,1], [-1,-1,1]),
-            'mask_out': batch['mask_out']
+            'mask_out': batch['mask_out'],
+            'nsp_label': batch['nsp_label']
         }
 
     if return_ids:
