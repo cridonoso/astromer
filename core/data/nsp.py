@@ -41,9 +41,12 @@ def add_segment_to_tensor(tensor_0, tensor_1, pivot, rnd_seq_size, cls_tkn=-99.,
               comes from adding [CLS] and 2x[SEP]
 
     """
+    if tf.rank(tensor_0) < 2:
+        tensor_0 = tf.expand_dims(tensor_0, 1)
+        tensor_1 = tf.expand_dims(tensor_1, 1)
 
     inp_length = tf.shape(tensor_0)[0]
-    inp_dim = tf.shape(tensor_0)[-1]
+    inp_dim    = tf.shape(tensor_0)[-1]
 
     rand_msk = tf.range(pivot, pivot+rnd_seq_size)
     rand_msk = tf.one_hot(rand_msk, inp_length)
@@ -51,6 +54,12 @@ def add_segment_to_tensor(tensor_0, tensor_1, pivot, rnd_seq_size, cls_tkn=-99.,
     rand_msk = tf.expand_dims(rand_msk, 1)
     rand_msk = tf.tile(rand_msk, [1, inp_dim])
 
+    if tf.shape(tensor_1)[0] < inp_length:
+        k = tf.math.ceil(tf.divide(inp_length,
+                                   tf.shape(tensor_1)[0]))
+        tensor_1 = tf.tile(tensor_1, [k, 1])
+
+    tensor_1 = tf.slice(tensor_1, [0, 0], [inp_length, -1])
     tensor_1 = tensor_1 * rand_msk
     tensor_0 = tensor_0 * (1.-rand_msk)
     tensor_2 = tensor_0 + tensor_1
@@ -68,28 +77,34 @@ def add_segment_to_tensor(tensor_0, tensor_1, pivot, rnd_seq_size, cls_tkn=-99.,
                                            tensor_2)
 
     tensor_3 = tf.concat([tf.tile([[cls_tkn]], [1,inp_dim]), tensor_3], 0)
+
     return tensor_3
 
 # @tf.function
-def randomize_segment(batch, random_sample, frac=.5, sep_token=-98, cls_token=-99):
-
-    nsp_label = tf.random.uniform(shape=(), minval=0, maxval=2, dtype=tf.int32)
+def randomize_segment(batch, random_sample, frac=.5, prob=.5, sep_token=-98, cls_token=-99, moving_window=False):
+    nsp_label = tf.random.categorical(tf.math.log([[prob, 1-prob]]), 1)
+    nsp_label = tf.squeeze(nsp_label)
+    # nsp_label = tf.where(proba>0.5, 1., 0.)
+    # print(nsp_label)
+    # nsp_label = tf.random.uniform(shape=(), minval=0, maxval=2, dtype=tf.int32)
 
     # IF nsp is 1 then don't change the sequence but add the tokens anyways
     if tf.cast(nsp_label, tf.bool):
         random_sample = batch
 
-    inp_length = tf.shape(batch['input_modified'])[0]
+    inp_length = tf.shape(batch['input'])[0]
     size = tf.cast(inp_length, tf.float32)*frac
-    print(size)
     rnd_seq_size = tf.cast(size, tf.int32)
 
     # Where the random segment start
-    pivot = tf.random.uniform(shape=(),
-                              minval=0,
-                              maxval=inp_length-rnd_seq_size,
-                              dtype=tf.int32)
-
+    if moving_window:
+        pivot = tf.random.uniform(shape=(),
+                                  minval=0,
+                                  maxval=inp_length-rnd_seq_size,
+                                  dtype=tf.int32)
+    else:
+        pivot = inp_length-rnd_seq_size
+        
     # Put a random segment in the input_modified sequence (masked input)
     batch['input_modified'] = add_segment_to_tensor(batch['input_modified'],
                                                     random_sample['input_modified'],
@@ -102,6 +117,11 @@ def randomize_segment(batch, random_sample, frac=.5, sep_token=-98, cls_token=-9
                                             original_times,
                                             pivot,
                                             rnd_seq_size)
+
+    batch['original_input'] = add_segment_to_tensor(batch['input'],
+                                                    batch['input'],
+                                                    pivot,
+                                                    rnd_seq_size)
 
     # Put a random segment in the original input
     batch['input'] = add_segment_to_tensor(batch['input'],
@@ -137,18 +157,20 @@ def randomize_segment(batch, random_sample, frac=.5, sep_token=-98, cls_token=-9
                                               cls_tkn=0.,
                                               sep_tkn=0.)
     batch['nsp_label'] = nsp_label
+
     return batch
 
 
-def nsp_dataset(dataset, prob=.5, frac=.5, buffer_shuffle=5000):
+def nsp_dataset(dataset, prob=.5, frac=.5, buffer_shuffle=5000, moving_window=False):
     """
     Add random next sentence with probability 1-prob
 
     Args:
         dataset: tf.dataset with light curves sequences (use after masking)
-        prob: probability of not adding random segment
+        prob: probability of adding random segment
         frac: fraction of the sequence to change. The random window size depends on this.
         buffer_shuffle: buffer for shuffling the same dataset and get random segments
+        moving_window: if the window can be added in a random part within the light curve
 
     Returns:
         dataset: tf.dataset that includes <nsp_label>. After use this function,
@@ -159,8 +181,14 @@ def nsp_dataset(dataset, prob=.5, frac=.5, buffer_shuffle=5000):
 
     shuffle_dataset = dataset.shuffle(buffer_shuffle)
 
+    # # UNCOMMENT FOR TESTING
+    # for x, y in zip(dataset, shuffle_dataset):
+    #     randomize_segment(x, random_sample=y, frac=frac)
+
     dataset = tf.data.Dataset.zip((dataset, shuffle_dataset))
     dataset = dataset.map(lambda x, y: randomize_segment(x,
                                                          random_sample=y,
-                                                         frac=frac))
+                                                         frac=frac,
+                                                         prob=prob,
+                                                         moving_window=moving_window))
     return dataset

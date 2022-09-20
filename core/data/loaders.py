@@ -86,7 +86,9 @@ def pretraining_pipeline(dataset,
                          nsp_prob=1.,
                          nsp_frac=0.,
                          num_cls=None,
-                         normalize=True):
+                         normalize=True,
+                         nsp_test=False,
+                         moving_window=False):
     """
     Pretraining pipeline.
     Create an ad-hoc ASTROMER dataset
@@ -142,19 +144,22 @@ def pretraining_pipeline(dataset,
     shapes = {'input' :[None, 3],
               'lcid'  :(),
               'length':(),
-              'mask'  :[None, None],
+              'mask'  :[None, ],
               'label' :(),
               'input_modified': [None, None],
               'mask_in': [None, None],
               'mask_out': [None, None]}
 
-    if nsp_frac>0. and nsp_prob<1.:
+    if nsp_frac>0. and nsp_prob<=1.:
         print('[INFO] Using NSP')
         dataset = nsp_dataset(dataset,
                               prob=nsp_prob,
                               frac=nsp_frac,
+                              moving_window=moving_window,
                               buffer_shuffle=5000)
         shapes['nsp_label'] = ()
+        shapes['mask'] = (None, None)
+        shapes['original_input'] = (None, 3)
 
     dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
 
@@ -162,7 +167,8 @@ def pretraining_pipeline(dataset,
     dataset = dataset.map(lambda x: format_inp_astromer(x,
                                                         return_ids=return_ids,
                                                         return_lengths=return_lengths,
-                                                        num_cls=num_cls),
+                                                        num_cls=num_cls,
+                                                        nsp_test=nsp_test),
                           num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     if cache:
@@ -173,7 +179,7 @@ def pretraining_pipeline(dataset,
 
     return dataset
 
-def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=None):
+def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=None, nsp_test=False):
     """
     Buildng ASTROMER input
 
@@ -195,9 +201,12 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
         outputs = {
             'target': tf.slice(batch['input'], [0,0,1], [-1,-1,1]),
             'mask_out': batch['mask_out'],
-            'nsp_label': batch['nsp_label']
         }
+    if 'nsp_label' in batch.keys():
+        outputs['nsp_label'] = batch['nsp_label']
 
+    if nsp_test:
+        inputs['original_input'] = batch['original_input']
     if return_ids:
         inputs['ids'] = batch['ids']
     if return_lengths:

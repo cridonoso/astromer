@@ -11,24 +11,28 @@ from core.data import mask_dataset, to_windows, nsp_dataset
 def test_mask_dataset():
     rec_dir = './data/records/alcock/fold_0/alcock_20/test'
     dataset = load_records(rec_dir)
-    dataset = to_windows(dataset, window_size=10, sampling=True)
+    dataset = to_windows(dataset, window_size=200, sampling=True)
     dataset = dataset.map(standardize)
     dataset = mask_dataset(dataset,
                            msk_frac=.5,
                            rnd_frac=.2,
                            same_frac=.2,
-                           window_size=10)
+                           window_size=200)
 
     dataset = nsp_dataset(dataset)
 
     shapes = {'input' :[None, 3],
               'lcid'  :(),
               'length':(),
-              'mask'  :[None, ],
+              'mask'  :[None, None],
               'label' :(),
               'nsp_label':(),
               'input_modified': [None, None],
               'mask_in': [None, None],
               'mask_out': [None, None]}
+    shapes['nsp_label'] = ()
+    shapes['mask'] = (None, None)
+    shapes['original_input'] = (None, 3)
+
 
     dataset = dataset.padded_batch(10, padded_shapes=shapes)
