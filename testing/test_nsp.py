@@ -7,6 +7,7 @@ sys.path.append('/home')
 
 from core.data import load_records, standardize
 from core.data import mask_dataset, to_windows, nsp_dataset
+from core.models import get_ASTROMER_nsp
 
 def test_mask_dataset():
     rec_dir = './data/records/alcock/fold_0/alcock_20/test'
@@ -36,3 +37,7 @@ def test_mask_dataset():
 
 
     dataset = dataset.padded_batch(10, padded_shapes=shapes)
+
+def test_model():
+    model = get_ASTROMER_nsp(d_model=256, maxlen=100)
+    model.summary()

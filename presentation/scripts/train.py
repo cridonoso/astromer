@@ -11,20 +11,25 @@ from core.data                  import pretraining_pipeline
 from core.utils                 import (get_folder_name,
                                         dict_to_json)
 from core.training              import CustomSchedule
-from core.models                import get_ASTROMER
+from core.models                import get_ASTROMER, get_ASTROMER_nsp
 
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # suppress warnings
 
-def build_model(varsdic, scale=0):
+def build_model(varsdic, scale=0, nsp=False):
     # Instance the model
-    astromer = get_ASTROMER(num_layers=varsdic['layers'],
-                            d_model=varsdic['head_dim']*varsdic['heads'],
-                            num_heads=varsdic['heads'],
-                            dff=varsdic['dff'],
-                            base=varsdic['base'],
-                            rate=varsdic['dropout'],
-                            maxlen=varsdic['max_obs'],
-                            pe_v2=varsdic['pe_v2'])
+    if nsp:
+        get_model = get_ASTROMER_nsp
+    else:
+        get_model = get_ASTROMER
+
+    astromer = get_model(num_layers=varsdic['layers'],
+                         d_model=varsdic['head_dim']*varsdic['heads'],
+                         num_heads=varsdic['heads'],
+                         dff=varsdic['dff'],
+                         base=varsdic['base'],
+                         rate=varsdic['dropout'],
+                         maxlen=varsdic['max_obs'],
+                         pe_v2=varsdic['pe_v2'])
 
     # Compile model
     # Losses and metrics have been already included in core.models.zero
@@ -87,12 +92,12 @@ def run(opt):
 
     if num_rep>1:
         with mirrored_strategy.scope():
-            astromer = build_model(varsdic, scale=num_rep-1)
+            astromer = build_model(varsdic, nsp=varsdic['nsp'], scale=num_rep-1)
             varsdic['batch_size'] = varsdic['batch_size']*num_rep
             print('[INFO] Batch size updated: {}'.format(varsdic['batch_size']))
             print('[INFO] Scaling scheduler: {}'.format(num_rep-1))
     else:
-        astromer = build_model(varsdic)
+        astromer = build_model(varsdic, nsp=varsdic['nsp'])
 
 
     # Loading and formating data
@@ -106,18 +111,25 @@ def run(opt):
                                          msk_frac=varsdic['msk_frac'],
                                          rnd_frac=varsdic['rnd_frac'],
                                          same_frac=varsdic['same_frac'],
-                                         per_sample_mask=True)
+                                         per_sample_mask=True,
+                                         moving_window=varsdic['nsp_mw'],
+                                         nsp_prob=.5 if varsdic['nsp'] else 0.,
+                                         nsp_frac=.5 if varsdic['nsp'] else 0.)
+
     valid_batches = pretraining_pipeline(os.path.join(varsdic['data'], 'val'),
                                          batch_size=varsdic['batch_size'],
                                          shuffle=False,
-                                         repeat=varsdic['repeat'],
+                                         repeat=1,
                                          cache=True,
                                          window_size=varsdic['max_obs'],
                                          sampling=True,
                                          msk_frac=varsdic['msk_frac'],
                                          rnd_frac=varsdic['rnd_frac'],
                                          same_frac=varsdic['same_frac'],
-                                         per_sample_mask=True)
+                                         per_sample_mask=True,
+                                         moving_window=varsdic['nsp_mw'],
+                                         nsp_prob=.5 if varsdic['nsp'] else 0.,
+                                         nsp_frac=.5 if varsdic['nsp'] else 0.)
 
     # Setting up callbacks
     callbacks = [
@@ -165,7 +177,7 @@ if __name__ == '__main__':
                         help='Proyect path. Here will be stored weights and metrics')
     parser.add_argument('--w', default="", type=str,
                         help='[OPTIONAL] pre-training weights')
-    parser.add_argument('--batch-size', default=256, type=int,
+    parser.add_argument('--batch-size', default=16, type=int,
                         help='batch size')
     parser.add_argument('--epochs', default=10, type=int,
                         help='Number of epochs')
@@ -183,7 +195,7 @@ if __name__ == '__main__':
                         help='Number of encoder layers')
     parser.add_argument('--heads', default=4, type=int,
                         help='Number of self-attention heads')
-    parser.add_argument('--head-dim', default=256, type=int,
+    parser.add_argument('--head-dim', default=32, type=int,
                         help='Head-attention Dimensionality ')
     parser.add_argument('--dff', default=128, type=int,
                         help='Dimensionality of the middle  dense layer at the end of the encoder')
@@ -193,6 +205,10 @@ if __name__ == '__main__':
                         help='base of embedding')
     parser.add_argument('--pe-v2', default=False, action='store_true',
                         help='Use new positional encoding code')
+    parser.add_argument('--nsp', default=False, action='store_true',
+                        help='if use NSP')
+    parser.add_argument('--nsp-mw', default=False, action='store_true',
+                        help='NSP moving window')
 
     opt = parser.parse_args()
     run(opt)

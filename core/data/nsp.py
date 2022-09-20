@@ -84,9 +84,6 @@ def add_segment_to_tensor(tensor_0, tensor_1, pivot, rnd_seq_size, cls_tkn=-99.,
 def randomize_segment(batch, random_sample, frac=.5, prob=.5, sep_token=-98, cls_token=-99, moving_window=False):
     nsp_label = tf.random.categorical(tf.math.log([[prob, 1-prob]]), 1)
     nsp_label = tf.squeeze(nsp_label)
-    # nsp_label = tf.where(proba>0.5, 1., 0.)
-    # print(nsp_label)
-    # nsp_label = tf.random.uniform(shape=(), minval=0, maxval=2, dtype=tf.int32)
 
     # IF nsp is 1 then don't change the sequence but add the tokens anyways
     if tf.cast(nsp_label, tf.bool):
@@ -104,7 +101,7 @@ def randomize_segment(batch, random_sample, frac=.5, prob=.5, sep_token=-98, cls
                                   dtype=tf.int32)
     else:
         pivot = inp_length-rnd_seq_size
-        
+
     # Put a random segment in the input_modified sequence (masked input)
     batch['input_modified'] = add_segment_to_tensor(batch['input_modified'],
                                                     random_sample['input_modified'],

@@ -152,6 +152,7 @@ def pretraining_pipeline(dataset,
 
     if nsp_frac>0. and nsp_prob<=1.:
         print('[INFO] Using NSP')
+        print('[INFO] Mov. win: ',moving_window)
         dataset = nsp_dataset(dataset,
                               prob=nsp_prob,
                               frac=nsp_frac,
@@ -202,8 +203,11 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
             'target': tf.slice(batch['input'], [0,0,1], [-1,-1,1]),
             'mask_out': batch['mask_out'],
         }
+
     if 'nsp_label' in batch.keys():
         outputs['nsp_label'] = batch['nsp_label']
+        outputs['target'] = tf.slice(outputs['target'], [0,1,0], [-1,-1,-1])
+        outputs['mask_out'] = tf.slice(outputs['mask_out'], [0,1,0], [-1,-1,-1])
 
     if nsp_test:
         inputs['original_input'] = batch['original_input']
