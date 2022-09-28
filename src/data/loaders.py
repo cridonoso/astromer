@@ -1,10 +1,10 @@
 import tensorflow as tf
 import os
 
-from core.data.record import deserialize
-from core.data.preprocessing import to_windows, standardize
-from core.data.masking import mask_dataset, mask_sample
-from core.data.nsp import nsp_dataset
+from src.data.record import deserialize
+from src.data.preprocessing import to_windows, standardize
+from src.data.masking import mask_dataset, mask_sample
+from src.data.nsp import nsp_dataset
 
 def load_records(records_dir):
     """

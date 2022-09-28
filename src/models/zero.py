@@ -1,8 +1,8 @@
 import tensorflow as tf
 
-from core.layers             import Encoder, RegLayer
-from core.losses             import custom_rmse
-from core.metrics            import custom_r2
+from src.layers             import Encoder, RegLayer
+from src.losses             import custom_rmse
+from src.metrics            import custom_r2
 from tensorflow.keras.layers import Input
 from tensorflow.keras        import Model
 

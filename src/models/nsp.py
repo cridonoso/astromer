@@ -1,9 +1,9 @@
 import tensorflow as tf
 
-from core.layers             import Encoder, RegLayer
+from src.layers             import Encoder, RegLayer
 from tensorflow.keras.layers import Input, Dense
-from core.losses             import custom_rmse, custom_bce
-from core.metrics            import custom_r2, custom_acc
+from src.losses             import custom_rmse, custom_bce
+from src.metrics            import custom_r2, custom_acc
 from tensorflow.keras        import Model
 
 def build_input(length):

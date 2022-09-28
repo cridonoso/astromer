@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from core.data.record import deserialize
+from src.data.record import deserialize
 
 def standardize(batch, on='input', axis=0):
     """
@@ -135,7 +135,7 @@ def to_windows(dataset,
                               num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
         dataset = dataset.flat_map(lambda w,x,y,z: tf.data.Dataset.from_tensor_slices((w,x,y,z)))
-        
+
         dataset = dataset.map(lambda w,x,y,z: {'input':w,
                                                'label':x,
                                                'lcid':y,
