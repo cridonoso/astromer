@@ -26,8 +26,9 @@ def get_ASTROMER(num_layers=2,
                  num_heads=2,
                  dff=256,
                  base=10000,
-                 rate=0.1,
+                 dropout=0.1,
                  use_leak=False,
+                 no_train=True, # WARNING
                  maxlen=100,
                  batch_size=None,
                  pe_v2=False):
@@ -39,10 +40,13 @@ def get_ASTROMER(num_layers=2,
                       num_heads,
                       dff,
                       base=base,
-                      rate=rate,
+                      rate=dropout,
                       use_leak=use_leak,
                       pe_v2=pe_v2,
                       name='encoder')
+
+    if no_train:
+        encoder.trainable = False
 
     x = encoder(placeholder)
 

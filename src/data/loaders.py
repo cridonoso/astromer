@@ -72,23 +72,22 @@ def load_numpy(samples,
 
 def pretraining_pipeline(dataset,
                          batch_size=None,
-                         shuffle=False,
-                         repeat=1,
-                         cache=False,
                          window_size=200,
-                         sampling=True,
                          msk_frac=.5,
                          rnd_frac=.2,
                          same_frac=.2,
-                         return_ids=False,
-                         return_lengths=False,
-                         per_sample_mask=False,
-                         nsp_prob=1.,
-                         nsp_frac=0.,
+                         sampling=True,
+                         shuffle=False,
+                         repeat=1,
                          num_cls=None,
                          normalize=True,
-                         nsp_test=False,
-                         moving_window=False):
+                         cache=False,
+                         return_ids=False,
+                         return_lengths=False,
+                         nsp_prob=1.,
+                         nsp_frac=0.,
+                         moving_window=False,
+                         nsp_test=False):
     """
     Pretraining pipeline.
     Create an ad-hoc ASTROMER dataset
@@ -106,6 +105,7 @@ def pretraining_pipeline(dataset,
         same_frac: fraction from masked values to be replace by same values
         return_ids: Not necessary when training.
         return_lengths: Not necessary when training.
+        moving_window: Random sengement prediction
 
     Returns:
         type: tf.Dataset
@@ -125,6 +125,7 @@ def pretraining_pipeline(dataset,
 
     # REPEAT LIGHT CURVES
     if repeat is not None:
+        print(repeat)
         dataset = dataset.repeat(repeat)
 
     # CREATE WINDOWS
