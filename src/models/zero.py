@@ -60,6 +60,7 @@ class CustomModel(tf.keras.Model):
     '''
     Custom functional model
     '''
+    @tf.function
     def train_step(self, data):
         x, y = data
         with tf.GradientTape() as tape:
@@ -73,6 +74,7 @@ class CustomModel(tf.keras.Model):
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         return {'loss': mse, 'r_square':r2_value}
 
+    @tf.function
     def test_step(self, data):
         x, y = data
         with tf.GradientTape() as tape:
