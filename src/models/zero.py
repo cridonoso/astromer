@@ -64,7 +64,7 @@ class CustomModel(tf.keras.Model):
     def train_step(self, data):
         x, y = data
         with tf.GradientTape() as tape:
-            x_pred = self(x)
+            x_pred = self(x, training=False)
             mse = custom_rmse(y_true=y['target'],
                               y_pred=x_pred,
                               mask=y['mask_out'])
@@ -78,7 +78,7 @@ class CustomModel(tf.keras.Model):
     def test_step(self, data):
         x, y = data
         with tf.GradientTape() as tape:
-            x_pred = self(x)
+            x_pred = self(x, training=False)
             mse = custom_rmse(y_true=y['target'],
                               y_pred=x_pred,
                               mask=y['mask_out'])
