@@ -40,7 +40,7 @@ def get_ASTROMER(num_layers=2,
                       num_heads,
                       dff,
                       base=base,
-                      rate=dropout,
+                      dropout=dropout,
                       use_leak=use_leak,
                       pe_v2=pe_v2,
                       name='encoder')

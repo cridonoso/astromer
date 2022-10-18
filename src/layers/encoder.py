@@ -49,7 +49,7 @@ class EncoderLayer(tf.keras.layers.Layer):
 
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, num_layers, d_model, num_heads, dff,
-                 base=10000, rate=0.1, use_leak=False, pe_v2=False, **kwargs):
+                 base=10000, dropout=0.1, use_leak=False, pe_v2=False, **kwargs):
         super(Encoder, self).__init__(**kwargs)
 
         self.d_model = d_model
@@ -57,9 +57,9 @@ class Encoder(tf.keras.layers.Layer):
         self.base = base
         self.pe_v2 = pe_v2
         self.inp_transform = tf.keras.layers.Dense(d_model)
-        self.enc_layers = [EncoderLayer(d_model, num_heads, dff, rate, use_leak)
+        self.enc_layers = [EncoderLayer(d_model, num_heads, dff, dropout, use_leak)
                             for _ in range(num_layers)]
-        self.dropout = tf.keras.layers.Dropout(rate)
+        self.dropout = tf.keras.layers.Dropout(dropout)
 
     def call(self, data, training=False):
         # adding embedding and position encoding.
@@ -78,3 +78,14 @@ class Encoder(tf.keras.layers.Layer):
             x = self.enc_layers[i](x, training, data['mask_in'])
 
         return x  # (batch_size, input_seq_len, d_model)
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "d_model": self.d_model,
+            "num_layers": self.num_layers,
+            "base": self.base,
+            "pe_v2": self.pe_v2,
+            "dropout": self.dropout
+        })
+        return config

@@ -9,3 +9,5 @@ pandas
 optuna
 pydot
 tqdm
+tomli
+tomli_w

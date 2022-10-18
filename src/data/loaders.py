@@ -125,7 +125,7 @@ def pretraining_pipeline(dataset,
 
     # REPEAT LIGHT CURVES
     if repeat is not None:
-        print(repeat)
+        print('[INFO] Repeating dataset x{} times'.format(repeat))
         dataset = dataset.repeat(repeat)
 
     # CREATE WINDOWS

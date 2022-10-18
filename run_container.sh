@@ -14,6 +14,7 @@ if [[ $gpu == *' nvidia '* ]]; then
     -p 8888:8888 \
     -p 6006:6006 \
     --gpus all \
+    -e HOST="$(whoami)" \
     astromer bash
 else
   docker run -it --rm \
@@ -22,5 +23,6 @@ else
     --workdir /home/ \
     -p 8888:8888 \
     -p 6006:6006 \
+    -e HOST="$(whoami)" \
     astromer bash
 fi
