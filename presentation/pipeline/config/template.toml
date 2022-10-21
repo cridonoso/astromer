@@ -27,7 +27,7 @@ scheduler     = true # if true then "lr" is not considered
 epochs        = 10000
 patience      = 20
 [pretraining.data]
-path          = './data/records/datest'
+path          = './data/records/macho'
 batch_size    = 512
 repeat        = 4 # Train subset only
 sampling      = true

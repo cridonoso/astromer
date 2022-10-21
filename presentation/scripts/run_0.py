@@ -178,7 +178,7 @@ def classify(config_file, history_path, pipeline_id=None):
         save_metrics(metrics, path=os.path.join(exp_path_clf, 'metrics.csv'))
 
     df = report_history(df, history_path, id=id,
-                        status='clf_done'.format(clf_model),
+                        status='clf_done',
                         config_file=config_file,
                         elapsed=time() - start)
     return id
@@ -188,14 +188,12 @@ if __name__ == '__main__':
     directory = sys.argv[1]
     if os.path.isdir(directory):
         for config_file in os.listdir(directory):
-
-            # id = train(os.path.join(directory, config_file),
-            #            history_path='./results/history.csv',
-            #            step='finetuning')
-
-            id= classify(os.path.join(directory, config_file),
-                         history_path='./results/history.csv',
-                         pipeline_id=id)
+            id = train(os.path.join(directory, config_file),
+                       history_path='./results/history.csv',
+                       step='finetuning')
+            # id= classify(os.path.join(directory, config_file),
+            #              history_path='./results/history.csv',
+            #              pipeline_id=id)
     else:
         id = classify(directory,
                       history_path='./results/history.csv',
