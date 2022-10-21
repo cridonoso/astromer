@@ -149,7 +149,7 @@ def classify(config_file, history_path, pipeline_id=None):
                              monitor='val_loss', extra=clf_name)
 
         history = clf_model.fit(data['train'],
-                                epochs=2,#config['classification']['epochs'],
+                                epochs=config['classification']['epochs'],
                                 callbacks=cbks,
                                 validation_data=data['val'])
 
