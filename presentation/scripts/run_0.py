@@ -137,7 +137,8 @@ def classify(config_file, history_path, pipeline_id=None):
 
         # Compile and train
         optimizer = Adam(learning_rate=config['classification']['lr'])
-        os.makedirs(config['classification']['exp_path'], exist_ok=True)
+        exp_path_clf = os.path.join(config['classification']['exp_path'], clf_name)
+        os.makedirs(exp_path_clf, exist_ok=True)
 
         clf_model.compile(optimizer=optimizer,
                           loss=CategoricalCrossentropy(from_logits=True),
@@ -151,7 +152,7 @@ def classify(config_file, history_path, pipeline_id=None):
                           callbacks=cbks,
                           validation_data=data['val'])
 
-        clf_model.save(os.path.join(config['classification']['exp_path'],
+        clf_model.save(os.path.join(exp_path_clf,
                        clf_name, 'model'))
 
         # Evaluate
@@ -163,9 +164,7 @@ def classify(config_file, history_path, pipeline_id=None):
         loss, acc = clf_model.evaluate(data['test'])
         metrics = {'loss':loss, 'acc':acc}
         # Save metrics
-        save_metrics(metrics,
-                     path=os.path.join(config['classification']['exp_path'],
-                                       'metrics.csv'))
+        save_metrics(metrics, path=os.path.join(exp_path_clf, 'metrics.csv'))
 
     df = report_history(df, history_path, id=id,
                         status='clf_done'.format(clf_model),
@@ -176,7 +175,7 @@ def classify(config_file, history_path, pipeline_id=None):
 if __name__ == '__main__':
 
     directory = sys.argv[1]
-    
+
     for config_file in os.listdir(directory):
 
         id = train(os.path.join(directory, config_file),
