@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from src.layers.attention import MultiHeadAttention
+from src.layers.attention import HeadAttentionMulti
 from src.layers.positional import positional_encoding
 from src.data import reshape_mask
 
@@ -14,7 +14,7 @@ class EncoderLayer(tf.keras.layers.Layer):
     def __init__(self, d_model, num_heads, dff, rate=0.1, use_leak=False, **kwargs):
         super(EncoderLayer, self).__init__(**kwargs)
 
-        self.mha = MultiHeadAttention(d_model, num_heads)
+        self.mha = HeadAttentionMulti(d_model, num_heads)
         self.ffn = point_wise_feed_forward_network(d_model, dff)
 
         self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)

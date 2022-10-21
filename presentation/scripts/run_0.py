@@ -15,6 +15,7 @@ from tensorflow.keras.callbacks  import EarlyStopping, TensorBoard
 from tensorflow.keras.losses     import CategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
 
+from sklearn.metrics import precision_recall_fscore_support
 
 os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[2]
 
@@ -147,10 +148,10 @@ def classify(config_file, history_path, pipeline_id=None):
         cbks = get_callbacks(config, step='classification',
                              monitor='val_loss', extra=clf_name)
 
-        _ = clf_model.fit(data['train'],
-                          epochs=config['classification']['epochs'],
-                          callbacks=cbks,
-                          validation_data=data['val'])
+        history = clf_model.fit(data['train'],
+                                epochs=2,#config['classification']['epochs'],
+                                callbacks=cbks,
+                                validation_data=data['val'])
 
         clf_model.save(os.path.join(exp_path_clf, clf_name, 'model'))
 
@@ -160,9 +161,20 @@ def classify(config_file, history_path, pipeline_id=None):
                             config_file=config_file,
                             elapsed=time() - start)
 
-        loss, acc = clf_model.evaluate(data['test'])
-        metrics = {'loss':loss, 'acc':acc, 'model': clf_name}
-        # Save metrics
+        y_pred = clf_model.predict(data['test'])
+        y_true = tf.concat([y for _, y in data['test']], 0)
+
+        pred_labels = tf.argmax(y_pred, 1)
+        true_labels = tf.argmax(y_true, 1)
+
+        p, r, f, _ = precision_recall_fscore_support(true_labels,
+                                                     pred_labels,
+                                                     average='macro')
+        metrics = {'precision':p, 'recall':r, 'f1': f,
+                   'val_acc': tf.reduce_max(history.history['val_accuracy']).numpy(),
+                   'val_loss': tf.reduce_min(history.history['val_loss']).numpy(),
+                   'model':clf_name}
+        # # Save metrics
         save_metrics(metrics, path=os.path.join(exp_path_clf, 'metrics.csv'))
 
     df = report_history(df, history_path, id=id,
@@ -174,13 +186,17 @@ def classify(config_file, history_path, pipeline_id=None):
 if __name__ == '__main__':
 
     directory = sys.argv[1]
+    if os.path.isdir(directory):
+        for config_file in os.listdir(directory):
 
-    for config_file in os.listdir(directory):
+            # id = train(os.path.join(directory, config_file),
+            #            history_path='./results/history.csv',
+            #            step='finetuning')
 
-        id = train(os.path.join(directory, config_file),
-                   history_path='./results/history.csv',
-                   step='finetuning')
-
-        id= classify(os.path.join(directory, config_file),
-                     history_path='./results/history.csv',
-                     pipeline_id=id)
+            id= classify(os.path.join(directory, config_file),
+                         history_path='./results/history.csv',
+                         pipeline_id=id)
+    else:
+        id = classify(directory,
+                      history_path='./results/history.csv',
+                      pipeline_id=id)
