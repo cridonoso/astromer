@@ -137,7 +137,7 @@ def classify(config_file, history_path, pipeline_id=None):
 
         # Compile and train
         optimizer = Adam(learning_rate=config['classification']['lr'])
-        exp_path_clf = os.path.join(config['classification']['exp_path'], clf_name)
+        exp_path_clf = config['classification']['exp_path']
         os.makedirs(exp_path_clf, exist_ok=True)
 
         clf_model.compile(optimizer=optimizer,
@@ -152,8 +152,7 @@ def classify(config_file, history_path, pipeline_id=None):
                           callbacks=cbks,
                           validation_data=data['val'])
 
-        clf_model.save(os.path.join(exp_path_clf,
-                       clf_name, 'model'))
+        clf_model.save(os.path.join(exp_path_clf, clf_name, 'model'))
 
         # Evaluate
         df = report_history(df, history_path, id=id,
@@ -162,7 +161,7 @@ def classify(config_file, history_path, pipeline_id=None):
                             elapsed=time() - start)
 
         loss, acc = clf_model.evaluate(data['test'])
-        metrics = {'loss':loss, 'acc':acc}
+        metrics = {'loss':loss, 'acc':acc, 'model': clf_name}
         # Save metrics
         save_metrics(metrics, path=os.path.join(exp_path_clf, 'metrics.csv'))
 

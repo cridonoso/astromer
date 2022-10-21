@@ -15,7 +15,6 @@ from src.models.zero import get_ASTROMER
 from src.data import pretraining_pipeline
 from src.training import CustomSchedule
 
-print('AQUIIII::::: ',os.getcwd())
 
 def create_or_load_history(path='./results/history.csv', id=None):
     """
