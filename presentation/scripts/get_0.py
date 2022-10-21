@@ -5,12 +5,12 @@ from datetime import datetime
 # ==============================================================================
 # GENERAL ======================================================================
 # ==============================================================================
-template_path  = './presentation/pipeline/config/template.toml'
-pretrained_weights = './weights/rf_macho'
+template_path  = './presentation/pipeline/config/pretraining.toml'
+pretrained_weights = './weights/rf_atlas'
 # ==============================================================================
 # DATA INFO ====================================================================
 # ==============================================================================
-dataset_name    = 'alcock'
+dataset_name    = 'atlas'
 data_finetuning = './data/records/{}'.format(dataset_name)
 data_classification = data_finetuning
 # ==============================================================================
@@ -49,7 +49,6 @@ for sci_case in ['a', 'b', 'c']:
                                     '{}_{}'.format(dataset_name, samples_per_class))
 
             ft_path  = os.path.join(save_weights_finetuning,
-                                    sci_case,
                                     '{}_{}_f{}'.format(dataset_name, samples_per_class,fold_n))
             clf_path = os.path.join(save_weights_classification,
                                     sci_case,

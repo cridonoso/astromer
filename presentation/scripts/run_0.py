@@ -186,6 +186,8 @@ def classify(config_file, history_path, pipeline_id=None):
 if __name__ == '__main__':
 
     directory = sys.argv[1]
+    history_path = sys.argv[3]
+    
     if os.path.isdir(directory):
         for config_file in os.listdir(directory):
             id = train(os.path.join(directory, config_file),
@@ -195,6 +197,6 @@ if __name__ == '__main__':
             #              history_path='./results/history.csv',
             #              pipeline_id=id)
     else:
-        id = classify(directory,
-                      history_path='./results/history.csv',
-                      pipeline_id=id)
+        id = train(directory,
+                   history_path=history_path,
+                   step='pretraining')

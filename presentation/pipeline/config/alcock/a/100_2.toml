@@ -1,6 +1,6 @@
 [general]
 code_root = "."
-creation_date = "2022-10-20"
+creation_date = "2022-10-21"
 gpu = 0
 
 [astromer]
@@ -28,7 +28,7 @@ epochs = 10000
 patience = 20
 
 [pretraining.data]
-path = "./data/records/datest"
+path = "./data/records/macho"
 batch_size = 512
 repeat = 4
 sampling = true
@@ -41,7 +41,7 @@ cache_val = true
 cache_test = false
 
 [finetuning]
-exp_path = "./results/finetuning/alcock/a/alcock_100_f2"
+exp_path = "./results/finetuning/alcock/alcock_100_f2"
 weights = "./weights/rf_macho"
 lr = 0.001
 scheduler = true
@@ -64,7 +64,7 @@ cache_test = false
 
 [classification]
 exp_path = "./results/classification/alcock/a/alcock_100_f2"
-weights = "./results/finetuning/alcock/a/alcock_100_f2"
+weights = "./results/finetuning/alcock/alcock_100_f2"
 train_astromer = false
 lr = 0.001
 epochs = 10000
