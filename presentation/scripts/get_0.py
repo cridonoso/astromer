@@ -11,7 +11,7 @@ pretrained_weights = './weights/rf_macho'
 # DATA INFO ====================================================================
 # ==============================================================================
 dataset_name    = 'alcock'
-data_finetuning = './data/records/'.format(dataset_name)
+data_finetuning = './data/records/{}'.format(dataset_name)
 data_classification = data_finetuning
 # ==============================================================================
 # FOLDERS ======================================================================

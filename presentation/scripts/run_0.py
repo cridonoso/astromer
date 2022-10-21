@@ -4,7 +4,7 @@ https://arxiv.org/abs/2205.01677
 '''
 import pandas as pd
 import tomli
-import os
+import os, sys
 
 from src.models.classifiers.paper_0 import get_classifier_by_name
 from src.data import pretraining_pipeline
@@ -15,6 +15,8 @@ from tensorflow.keras.callbacks  import EarlyStopping, TensorBoard
 from tensorflow.keras.losses     import CategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
 
+
+os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[2]
 
 def train(config_file, history_path='', step='pretraining', pipeline_id=None):
     '''
@@ -173,16 +175,14 @@ def classify(config_file, history_path, pipeline_id=None):
 
 if __name__ == '__main__':
 
-    config_file = './pipeline/config/template.toml'
+    directory = sys.argv[1]
+    
+    for config_file in os.listdir(directory):
 
-    # id = train(config_file,
-    #            history_path='./results/history.csv',
-    #            step='pretraining')
+        id = train(os.path.join(directory, config_file),
+                   history_path='./results/history.csv',
+                   step='finetuning')
 
-    id = train(config_file,
-               history_path='./results/history.csv',
-               step='finetuning')
-
-    id= classify(config_file,
-                 history_path='./results/history.csv',
-                 pipeline_id=id)
+        id= classify(os.path.join(directory, config_file),
+                     history_path='./results/history.csv',
+                     pipeline_id=id)
