@@ -8,7 +8,8 @@ import os, sys
 
 from src.models.classifiers.paper_0 import get_classifier_by_name
 from src.data import pretraining_pipeline
-from presentation.pipeline.base import *
+from src.pipeline import base
+from src.models import get_ASTROMER_skip
 from time import gmtime, strftime, time
 
 from tensorflow.keras.callbacks  import EarlyStopping, TensorBoard
@@ -27,12 +28,12 @@ def train(config_file, step='pretraining'):
     with open(config_file, mode="rb") as fp:
         config = tomli.load(fp)
 
-    create_target_directory(config_file=config_file,
+    base.create_target_directory(config_file=config_file,
                             path=config[step]['exp_path'])
 
     # Creating ASTROMER
     d_model = config['astromer']['head_dim']*config['astromer']['heads']
-    astromer =  get_ASTROMER(num_layers=config['astromer']['layers'],
+    astromer =  get_ASTROMER_skip(num_layers=config['astromer']['layers'],
                              d_model=d_model,
                              num_heads=config['astromer']['heads'],
                              dff=config['astromer']['dff'],
@@ -40,13 +41,13 @@ def train(config_file, step='pretraining'):
                              dropout=config['astromer']['dropout'],
                              maxlen=config['astromer']['window_size'],
                              no_train=False)
-    astromer = compile_astromer(config, astromer, step=step)
+    astromer = base.compile_astromer(config, astromer, step=step)
 
     # Get callbacks
-    cbks = get_callbacks(config, step=step, monitor='val_loss')
+    cbks = base.get_callbacks(config, step=step, monitor='val_loss')
 
     # Loading data
-    data = load_pt_data(config, subsets=['train', 'val', 'test'], step=step)
+    data = base.load_pt_data(config, subsets=['train', 'val', 'test'], step=step)
 
     # Train ASTROMER
     _ = astromer.fit(data['train'],
@@ -57,7 +58,7 @@ def train(config_file, step='pretraining'):
     # Getting metrics
     loss, r2 = astromer.evaluate(data['test'])
     metrics = {'rmse':loss, 'r_square':r2}
-    save_metrics(metrics,
+    base.save_metrics(metrics,
                  path=os.path.join(config[step]['exp_path'],
                                    'metrics.csv'))
 
@@ -66,17 +67,17 @@ def classify(config_file):
     with open(config_file, mode="rb") as fp:
         config = tomli.load(fp)
 
-    create_target_directory(config_file=config_file,
+    base.create_target_directory(config_file=config_file,
                             path=config['classification']['exp_path'])
 
     # Load data for classification
-    data = load_clf_data(config)
+    data = base.load_clf_data(config)
 
     for clf_name in ['mlp_att', 'lstm_att', 'lstm']:
         print('[INFO] Training {}'.format(clf_name))
         # Load pre-trained model
         d_model = config['astromer']['head_dim']*config['astromer']['heads']
-        astromer =  get_ASTROMER(num_layers=config['astromer']['layers'],
+        astromer =  get_ASTROMER_skip(num_layers=config['astromer']['layers'],
                                  d_model=d_model,
                                  num_heads=config['astromer']['heads'],
                                  dff=config['astromer']['dff'],
@@ -85,10 +86,10 @@ def classify(config_file):
                                  maxlen=config['astromer']['window_size'],
                                  no_train=False)
 
-        astromer = compile_astromer(config, astromer, step='classification')
-        
+        astromer = base.compile_astromer(config, astromer, step='classification')
+
         # Create classifier
-        clf_model = get_classifier_by_name(clf_name,
+        clf_model = base.get_classifier_by_name(clf_name,
                     config,
                     astromer=astromer,
                     train_astromer=config['classification']['train_astromer'])
@@ -102,7 +103,7 @@ def classify(config_file):
                           loss=CategoricalCrossentropy(from_logits=True),
                           metrics='accuracy')
 
-        cbks = get_callbacks(config, step='classification',
+        cbks = base.get_callbacks(config, step='classification',
                              monitor='val_loss', extra=clf_name)
 
         history = clf_model.fit(data['train'],
@@ -127,20 +128,19 @@ def classify(config_file):
                    'val_loss': tf.reduce_min(history.history['val_loss']).numpy(),
                    'model':clf_name}
         # # Save metrics
-        save_metrics(metrics, path=os.path.join(exp_path_clf, 'metrics.csv'))
+        base.save_metrics(metrics, path=os.path.join(exp_path_clf, 'metrics.csv'))
 
 
 if __name__ == '__main__':
 
     directory = sys.argv[1]
-    mode = sys.argv[3] # pretraining - finetuning - classification 
-    print('[INFO] Mode: {}'.format(mode))  
+    mode = sys.argv[3] # pretraining - finetuning - classification
+    print('[INFO] Mode: {}'.format(mode))
     if not os.path.isdir(directory):
         directory = [directory]
-        
+
     for config_file in os.listdir(directory):
         if mode == 'classification':
             classify(os.path.join(directory, config_file))
         else:
             train(os.path.join(directory, config_file), step=mode)
-
