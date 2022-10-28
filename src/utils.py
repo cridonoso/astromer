@@ -97,7 +97,7 @@ def get_metrics(path_logs, metric_name='epoch_loss', full_logs=True, show_keys=F
 
     if show_keys:
         print(ea.Tags())
-    
+
     metrics = pd.DataFrame([(w,s,tf.make_ndarray(t))for w,s,t in ea.Tensors(metric_name)],
                 columns=['wall_time', 'step', 'value'])
     return metrics
