@@ -88,3 +88,23 @@ def positional_encoding(times, d_model, base=10000,
         x_transpose = tf.map_fn(lambda x: fn(x),  (x_transpose, indices))[0]
         pos_encoding = tf.transpose(x_transpose, [2, 1, 0])
         return tf.cast(pos_encoding, dtype=tf.float32)
+
+class PositionalEncoder(tf.keras.layers.Layer):
+    def __init__(self, d_model, base=1000):
+        super(PositionalEncoder, self).__init__()
+        self.d_model = d_model
+        self.base = base
+
+    def call(self, inputs):
+        angle_rads = get_angles_astromer(inputs, self.d_model, base=self.base)
+        def fn(x):
+            if x[1] % 2 == 0:
+                return (tf.sin(x[0]), x[1])
+            else:
+                return (tf.cos(x[0]), x[1])
+
+        x_transpose = tf.transpose(angle_rads, [2,1,0])
+        indices = tf.range(0, tf.shape(x_transpose)[0])
+        x_transpose = tf.map_fn(lambda x: fn(x),  (x_transpose, indices))[0]
+        pos_encoding = tf.transpose(x_transpose, [2, 1, 0])
+        return tf.cast(pos_encoding, dtype=tf.float32)
