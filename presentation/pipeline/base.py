@@ -142,7 +142,7 @@ def compile_astromer(config, model, step='pretraining'):
 
     optimizer = Adam(lr, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
     model.compile(optimizer=optimizer)
-    if step == 'finetuning':
+    if step == 'finetuning' or step == 'classification':
         print('[INFO] Pretrained weights: {}'.format(config[step]['weights']))
         model.load_weights(os.path.join(config[step]['weights'], 'weights'))
     return model

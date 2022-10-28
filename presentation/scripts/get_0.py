@@ -5,12 +5,12 @@ from datetime import datetime
 # ==============================================================================
 # GENERAL ======================================================================
 # ==============================================================================
-template_path  = './presentation/pipeline/config/pretraining.toml'
+template_path  = './presentation/pipeline/config/template.toml'
 pretrained_weights = './weights/rf_atlas'
 # ==============================================================================
 # DATA INFO ====================================================================
 # ==============================================================================
-dataset_name    = 'atlas'
+dataset_name    = 'ogle'
 data_finetuning = './data/records/{}'.format(dataset_name)
 data_classification = data_finetuning
 # ==============================================================================

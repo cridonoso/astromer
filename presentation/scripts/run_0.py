@@ -19,7 +19,7 @@ from sklearn.metrics import precision_recall_fscore_support
 
 os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[2]
 
-def train(config_file, history_path='', step='pretraining', pipeline_id=None):
+def train(config_file, step='pretraining'):
     '''
     pretraining/finetuning pipeline
     '''
@@ -29,13 +29,6 @@ def train(config_file, history_path='', step='pretraining', pipeline_id=None):
 
     create_target_directory(config_file=config_file,
                             path=config[step]['exp_path'])
-
-    df, id = create_or_load_history(path=history_path, id=pipeline_id)
-    df = report_history(df, history_path,
-                        id=id,
-                        status='init_{}'.format(step),
-                        config_file=config_file,
-                        elapsed=time() - start)
 
     # Creating ASTROMER
     d_model = config['astromer']['head_dim']*config['astromer']['heads']
@@ -48,32 +41,18 @@ def train(config_file, history_path='', step='pretraining', pipeline_id=None):
                              maxlen=config['astromer']['window_size'],
                              no_train=False)
     astromer = compile_astromer(config, astromer, step=step)
-    df = report_history(df, history_path,
-                        id=id,
-                        status='astromer_created',
-                        config_file=config_file,
-                        elapsed=time() - start)
+
     # Get callbacks
-    cbks = get_callbacks(config, monitor='val_loss')
+    cbks = get_callbacks(config, step=step, monitor='val_loss')
 
     # Loading data
     data = load_pt_data(config, subsets=['train', 'val', 'test'], step=step)
-    df = report_history(df, history_path,
-                        id=id,
-                        status='data_loaded',
-                        config_file=config_file,
-                        elapsed=time() - start)
 
     # Train ASTROMER
     _ = astromer.fit(data['train'],
                   epochs=config[step]['epochs'],
                   validation_data=data['val'],
                   callbacks=cbks)
-    df = report_history(df, history_path,
-                        id=id,
-                        status='{}_done'.format(step),
-                        config_file=config_file,
-                        elapsed=time()-start)
 
     # Getting metrics
     loss, r2 = astromer.evaluate(data['test'])
@@ -81,14 +60,8 @@ def train(config_file, history_path='', step='pretraining', pipeline_id=None):
     save_metrics(metrics,
                  path=os.path.join(config[step]['exp_path'],
                                    'metrics.csv'))
-    df = report_history(df, history_path,
-                        id=id,
-                        status='test_{}_done'.format(step),
-                        config_file=config_file,
-                        elapsed=time() - start)
-    return id
 
-def classify(config_file, history_path, pipeline_id=None):
+def classify(config_file):
     start = time()
     with open(config_file, mode="rb") as fp:
         config = tomli.load(fp)
@@ -96,41 +69,25 @@ def classify(config_file, history_path, pipeline_id=None):
     create_target_directory(config_file=config_file,
                             path=config['classification']['exp_path'])
 
-    df, id = create_or_load_history(path=history_path, id=pipeline_id)
-    df = report_history(df, history_path, id=id,
-                        status='clf_init',
-                        config_file=config_file,
-                        elapsed=time() - start)
-
     # Load data for classification
     data = load_clf_data(config)
-    df = report_history(df, history_path, id=id,
-                        status='data_loaded',
-                        config_file=config_file,
-                        elapsed=time() - start)
-
-    # Load pre-trained model
-    d_model = config['astromer']['head_dim']*config['astromer']['heads']
-    astromer =  get_ASTROMER(num_layers=config['astromer']['layers'],
-                             d_model=d_model,
-                             num_heads=config['astromer']['heads'],
-                             dff=config['astromer']['dff'],
-                             base=config['positional']['base'],
-                             dropout=config['astromer']['dropout'],
-                             maxlen=config['astromer']['window_size'],
-                             no_train=False)
-    astromer = compile_astromer(config, astromer, step='classification')
-    df = report_history(df, history_path, id=id,
-                        status='astromer_created',
-                        config_file=config_file,
-                        elapsed=time() - start)
 
     for clf_name in ['mlp_att', 'lstm_att', 'lstm']:
         print('[INFO] Training {}'.format(clf_name))
-        df = report_history(df, history_path, id=id,
-                            status='training_{}'.format(clf_name),
-                            config_file=config_file,
-                            elapsed=time() - start)
+        # Load pre-trained model
+        d_model = config['astromer']['head_dim']*config['astromer']['heads']
+        astromer =  get_ASTROMER(num_layers=config['astromer']['layers'],
+                                 d_model=d_model,
+                                 num_heads=config['astromer']['heads'],
+                                 dff=config['astromer']['dff'],
+                                 base=config['positional']['base'],
+                                 dropout=config['astromer']['dropout'],
+                                 maxlen=config['astromer']['window_size'],
+                                 no_train=False)
+
+        astromer = compile_astromer(config, astromer, step='classification')
+        
+        # Create classifier
         clf_model = get_classifier_by_name(clf_name,
                     config,
                     astromer=astromer,
@@ -156,11 +113,6 @@ def classify(config_file, history_path, pipeline_id=None):
         clf_model.save(os.path.join(exp_path_clf, clf_name, 'model'))
 
         # Evaluate
-        df = report_history(df, history_path, id=id,
-                            status='testing_{}'.format(clf_name),
-                            config_file=config_file,
-                            elapsed=time() - start)
-
         y_pred = clf_model.predict(data['test'])
         y_true = tf.concat([y for _, y in data['test']], 0)
 
@@ -177,26 +129,18 @@ def classify(config_file, history_path, pipeline_id=None):
         # # Save metrics
         save_metrics(metrics, path=os.path.join(exp_path_clf, 'metrics.csv'))
 
-    df = report_history(df, history_path, id=id,
-                        status='clf_done',
-                        config_file=config_file,
-                        elapsed=time() - start)
-    return id
 
 if __name__ == '__main__':
 
     directory = sys.argv[1]
-    history_path = sys.argv[3]
-    
-    if os.path.isdir(directory):
-        for config_file in os.listdir(directory):
-            id = train(os.path.join(directory, config_file),
-                       history_path='./results/history.csv',
-                       step='finetuning')
-            # id= classify(os.path.join(directory, config_file),
-            #              history_path='./results/history.csv',
-            #              pipeline_id=id)
-    else:
-        id = train(directory,
-                   history_path=history_path,
-                   step='pretraining')
+    mode = sys.argv[3] # pretraining - finetuning - classification 
+    print('[INFO] Mode: {}'.format(mode))  
+    if not os.path.isdir(directory):
+        directory = [directory]
+        
+    for config_file in os.listdir(directory):
+        if mode == 'classification':
+            classify(os.path.join(directory, config_file))
+        else:
+            train(os.path.join(directory, config_file), step=mode)
+
