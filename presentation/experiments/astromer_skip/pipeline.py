@@ -39,8 +39,7 @@ def train(config_file, step='pretraining'):
                              dff=config['astromer']['dff'],
                              base=config['positional']['base'],
                              dropout=config['astromer']['dropout'],
-                             maxlen=config['astromer']['window_size'],
-                             no_train=False)
+                             maxlen=config['astromer']['window_size'])
     astromer = base.compile_astromer(config, astromer, step=step)
 
     # Get callbacks
@@ -83,8 +82,7 @@ def classify(config_file):
                                  dff=config['astromer']['dff'],
                                  base=config['positional']['base'],
                                  dropout=config['astromer']['dropout'],
-                                 maxlen=config['astromer']['window_size'],
-                                 no_train=False)
+                                 maxlen=config['astromer']['window_size'])
 
         astromer = base.compile_astromer(config, astromer, step='classification')
 
@@ -137,10 +135,13 @@ if __name__ == '__main__':
     mode = sys.argv[3] # pretraining - finetuning - classification
     print('[INFO] Mode: {}'.format(mode))
     if directory.endswith('.toml'):
-        directory = [directory]
-
-    for config_file in os.listdir(directory):
+        print('[INFO] Single file recieved')
+        conf_files = [directory]
+    else:
+        conf_files = [os.path.join(directory, d) for d in os.listdir(directory)]
+        
+    for config_file in conf_files:
         if mode == 'classification':
-            classify(os.path.join(directory, config_file))
+            classify(config_file)
         else:
-            train(os.path.join(directory, config_file), step=mode)
+            train(config_file, step=mode)
