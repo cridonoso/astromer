@@ -13,7 +13,12 @@ def point_wise_feed_forward_network(d_model, dff):
 class EncoderLayer(tf.keras.layers.Layer):
     def __init__(self, d_model, num_heads, dff, rate=0.1, use_leak=False, **kwargs):
         super(EncoderLayer, self).__init__(**kwargs)
-
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.dff = dff
+        self.rate = rate
+        self.use_leak = use_leak
+        # = ======================== = ======================== =
         self.mha = HeadAttentionMulti(d_model, num_heads)
         self.ffn = point_wise_feed_forward_network(d_model, dff)
 
@@ -46,6 +51,17 @@ class EncoderLayer(tf.keras.layers.Layer):
             out2 = self.layernorm2(ffn_output)
 
         return out2
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "d_model": self.d_model,
+            "num_heads": self.num_heads,
+            "dff": self.dff,
+            "rate": self.rate,
+            "use_leak": self.use_leak
+        })
+        return config
 
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, num_layers, d_model, num_heads, dff,
