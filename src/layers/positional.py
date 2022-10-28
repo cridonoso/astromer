@@ -108,3 +108,11 @@ class PositionalEncoder(tf.keras.layers.Layer):
         x_transpose = tf.map_fn(lambda x: fn(x),  (x_transpose, indices))[0]
         pos_encoding = tf.transpose(x_transpose, [2, 1, 0])
         return tf.cast(pos_encoding, dtype=tf.float32)
+        
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "d_model": self.d_model,
+            "base": self.base,
+        })
+        return config
