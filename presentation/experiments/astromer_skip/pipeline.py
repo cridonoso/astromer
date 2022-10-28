@@ -136,7 +136,7 @@ if __name__ == '__main__':
     directory = sys.argv[1]
     mode = sys.argv[3] # pretraining - finetuning - classification
     print('[INFO] Mode: {}'.format(mode))
-    if not os.path.isdir(directory):
+    if directory.endswith('.toml'):
         directory = [directory]
 
     for config_file in os.listdir(directory):
