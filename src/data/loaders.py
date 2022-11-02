@@ -213,7 +213,7 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
     if nsp_test:
         inputs['original_input'] = batch['original_input']
     if return_ids:
-        inputs['ids'] = batch['ids']
+        inputs['ids'] = batch['lcid']
     if return_lengths:
         inputs['length'] = batch['length']
 

@@ -1,6 +1,7 @@
 import multiprocessing as mp
 import tensorflow as tf
 import pandas as pd
+import numpy as np
 import os
 
 from joblib import wrap_non_picklable_objects
@@ -75,6 +76,38 @@ def process_lc3(lc_index, label, numpy_lc, writer):
     except:
         print('[INFO] {} could not be processed'.format(lc_index))
 
+def divide_training_subset(frame, train, val, test_meta):
+    """
+    Divide the dataset into train, validation and test subsets.
+    Notice that:
+        test = 1 - (train + val)
+
+    Args:
+        frame (Dataframe): Dataframe following the astro-standard format
+        dest (string): Record destination.
+        train (float): train fraction
+        val (float): validation fraction
+    Returns:
+        tuple x3 : (name of subset, subframe with metadata)
+    """
+
+    frame = frame.sample(frac=1)
+    n_samples = frame.shape[0]
+
+    n_train = int(n_samples*train)
+    n_val = int(n_samples*val//2)
+
+    if test_meta is not None:
+        sub_test = test_meta
+        sub_train = frame.iloc[:n_train]
+        sub_val   = frame.iloc[n_train:]
+    else:
+        sub_train = frame.iloc[:n_train]
+        sub_val   = frame.iloc[n_train:n_train+n_val]
+        sub_test  = frame.iloc[n_train+n_val:]
+
+    return ('train', sub_train), ('val', sub_val), ('test', sub_test)
+
 def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None, max_obs=200, **kwargs):
     # Get frames with fixed number of lightcurves
     collection = [frame.iloc[i:i+max_lcs_per_record] \
@@ -111,14 +144,23 @@ def create_dataset(meta_df,
 
     # Separate by class
     cls_groups = meta_df.groupby('Class')
-
+    
+    test_already_written = False
+    if test_subset is not None:
+        for cls_name, frame in test_subset.groupby('Class'):
+            dest = os.path.join(target, 'test', cls_name)
+            os.makedirs(dest, exist_ok=True)
+            write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs, **kwargs)
+        test_already_written = True
+    
     for cls_name, cls_meta in tqdm(cls_groups, total=len(cls_groups)):
         subsets = divide_training_subset(cls_meta,
                                          train=subsets_frac[0],
-                                         val=subsets_frac[0],
+                                         val=subsets_frac[1],
                                          test_meta = test_subset)
 
         for subset_name, frame in subsets:
+            if test_already_written and subset_name == 'test':continue
             dest = os.path.join(target, subset_name, cls_name)
             os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs, **kwargs)
