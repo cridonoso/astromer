@@ -82,7 +82,7 @@ def divide_training_subset(frame, train, val, test_meta):
     n_val = int(n_samples*val//2)
 
     if test_meta is not None:
-        sub_test = test_meta
+        sub_test  = None
         sub_train = frame.iloc[:n_train]
         sub_val   = frame.iloc[n_train:]
     else:
@@ -149,17 +149,18 @@ def create_dataset(meta_df,
     info_df['size'] = counts
     info_df.to_csv(os.path.join(target, 'objects.csv'), index=False)
 
-    # Separate by class
-    cls_groups = meta_df.groupby('Class')
-
     test_already_written = False
     if test_subset is not None:
-        for cls_name, frame in test_subset.groupby('Class'):
+        print('[INFO] Using fixed testing subset')
+        for cls_name, subframe in test_subset.groupby('Class'):
             dest = os.path.join(target, 'test', cls_name)
             os.makedirs(dest, exist_ok=True)
-            write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs, **kwargs)
+            write_records(subframe, dest, max_lcs_per_record,
+                          source, unique, n_jobs, **kwargs)
         test_already_written = True
 
+    # Separate by class
+    cls_groups = meta_df.groupby('Class')
     for cls_name, cls_meta in tqdm(cls_groups, total=len(cls_groups)):
         subsets = divide_training_subset(cls_meta,
                                          train=subsets_frac[0],
@@ -167,7 +168,8 @@ def create_dataset(meta_df,
                                          test_meta = test_subset)
 
         for subset_name, frame in subsets:
-            if test_already_written and subset_name == 'test':continue
+            if frame is None:
+                continue
             dest = os.path.join(target, subset_name, cls_name)
             os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs, **kwargs)
