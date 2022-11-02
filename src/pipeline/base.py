@@ -87,7 +87,9 @@ def create_target_directory(config_file, path):
 
 def load_pt_data(config,
                  subsets=['train', 'val', 'test'],
-                 step='pretraining'):
+                 step='pretraining',
+                 nsp_prob=1,
+                 nsp_frac=0):
     """
     Given a config file, this method loads data following the
     the pre-training format (i.e., Masking)
@@ -117,8 +119,12 @@ def load_pt_data(config,
                                             repeat=repeat,
                                             num_cls=None,
                                             normalize=config[step]['data']['normalize'],
-                                            cache=config[step]['data']['cache_{}'.format(subset)])
+                                            cache=config[step]['data']['cache_{}'.format(subset)],
+                                            nsp_prob=nsp_prob,
+                                            nsp_frac=nsp_frac,
+                                            moving_window=False)
     return data
+
 
 def compile_astromer(config, model, step='pretraining'):
     """
