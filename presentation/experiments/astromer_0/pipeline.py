@@ -8,7 +8,7 @@ import os, sys
 
 from src.models.classifiers.paper_0 import get_classifier_by_name
 from src.data import pretraining_pipeline
-from presentation.pipeline.base import *
+from src.pipeline.base import *
 from time import gmtime, strftime, time
 
 from tensorflow.keras.callbacks  import EarlyStopping, TensorBoard
@@ -139,6 +139,7 @@ if __name__ == '__main__':
         directory = [directory]
         
     for config_file in os.listdir(directory):
+        if config_file.split('.')[3] != 'b': continue
         if mode == 'classification':
             classify(os.path.join(directory, config_file))
         else:
