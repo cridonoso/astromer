@@ -41,7 +41,8 @@ def train(config_file, step='pretraining'):
                              dropout=config['astromer']['dropout'],
                              maxlen=config['astromer']['window_size'])
     astromer = base.compile_astromer(config, astromer, step=step)
-
+    print(astromer.summary())
+    astromer.get_layer('encoder')
     # Get callbacks
     cbks = base.get_callbacks(config, step=step, monitor='val_loss')
 
@@ -85,12 +86,13 @@ def classify(config_file):
                                  maxlen=config['astromer']['window_size'])
 
         astromer = base.compile_astromer(config, astromer, step='classification')
-
+        
         # Create classifier
-        clf_model = base.get_classifier_by_name(clf_name,
+        clf_model = get_classifier_by_name(clf_name,
                     config,
                     astromer=astromer,
-                    train_astromer=config['classification']['train_astromer'])
+                    train_astromer=config['classification']['train_astromer'],
+                                          encoder_layer_name='tf.math.reduce_mean')
 
         # Compile and train
         optimizer = Adam(learning_rate=config['classification']['lr'])

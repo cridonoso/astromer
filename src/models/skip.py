@@ -5,7 +5,7 @@ layer output as in the "zero" model)
 
 import tensorflow as tf
 
-from src.layers              import EncoderLayer, RegLayer
+from src.layers              import EncoderSKIP, RegLayer
 from src.layers.positional   import PositionalEncoder
 from src.losses              import custom_rmse
 from src.metrics             import custom_r2
@@ -27,6 +27,7 @@ def build_input(length):
             'mask_in':mask,
             'times':times}
 
+
 def get_ASTROMER(num_layers=2,
                  d_model=200,
                  num_heads=2,
@@ -40,23 +41,16 @@ def get_ASTROMER(num_layers=2,
 
     placeholder = build_input(maxlen)
 
-    inp_layer      = tf.keras.layers.Dense(d_model)
-    pe_layer       = PositionalEncoder(d_model, base=base)
-    encoder_layers = [EncoderLayer(d_model, num_heads, dff, rate=dropout) \
-                        for _ in range(num_layers)]
-    dp_layer       = tf.keras.layers.Dropout(dropout)
-
-    x_pe = pe_layer(placeholder['times'])
-    x_transformed = inp_layer(placeholder['input'])
-    x = x_transformed + x_pe
-    x = dp_layer(x)
-
-    layers_outputs = []
-    for i in range(num_layers):
-        z =  encoder_layers[i](x, mask=placeholder['mask_in'])
-        layers_outputs.append(z)
-
-    x = tf.reduce_mean(layers_outputs, 0)
+    encoder = EncoderSKIP(num_layers,
+                          d_model,
+                          num_heads,
+                          dff,
+                          base=base,
+                          dropout=dropout,
+                          use_leak=use_leak,
+                          pe_v2=pe_v2,
+                          name='encoder')
+    x = encoder(placeholder)
     x = RegLayer(name='regression')(x)
 
     return CustomModel(inputs=placeholder,

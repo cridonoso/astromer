@@ -133,15 +133,16 @@ def classify(config_file):
 if __name__ == '__main__':
 
     directory = sys.argv[1]
-    mode = sys.argv[3] # pretraining - finetuning - classification 
-    print('[INFO] Mode: {}'.format(mode))  
-    if not os.path.isdir(directory):
-        directory = [directory]
+    mode = sys.argv[3] # pretraining - finetuning - classification
+    print('[INFO] Mode: {}'.format(mode))
+    if directory.endswith('.toml'):
+        print('[INFO] Single file recieved')
+        conf_files = [directory]
+    else:
+        conf_files = [os.path.join(directory, d) for d in os.listdir(directory)]
         
-    for config_file in os.listdir(directory):
-        if config_file.split('.')[3] != 'b': continue
+    for config_file in conf_files:
         if mode == 'classification':
-            classify(os.path.join(directory, config_file))
+            classify(config_file)
         else:
-            train(os.path.join(directory, config_file), step=mode)
-
+            train(config_file, step=mode)

@@ -88,7 +88,7 @@ def classify(config_file):
         astromer = base.compile_astromer(config, astromer, step='classification')
 
         # Create classifier
-        clf_model = base.get_classifier_by_name(clf_name,
+        clf_model = get_classifier_by_name(clf_name,
                     config,
                     astromer=astromer,
                     train_astromer=config['classification']['train_astromer'])
@@ -140,9 +140,10 @@ if __name__ == '__main__':
         conf_files = [directory]
     else:
         conf_files = [os.path.join(directory, d) for d in os.listdir(directory)]
-
+        
     for config_file in conf_files:
         if mode == 'classification':
             classify(config_file)
         else:
             train(config_file, step=mode)
+
