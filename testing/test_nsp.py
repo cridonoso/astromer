@@ -5,9 +5,9 @@ import sys
 
 sys.path.append('/home')
 
-from core.data import load_records, standardize
-from core.data import mask_dataset, to_windows, nsp_dataset
-from core.models import get_ASTROMER_nsp
+from src.data import load_records, standardize
+from src.data import mask_dataset, to_windows, nsp_dataset
+from src.models import get_ASTROMER_nsp
 
 def test_mask_dataset():
     rec_dir = './data/records/alcock/fold_0/alcock_20/test'
@@ -20,7 +20,7 @@ def test_mask_dataset():
                            same_frac=.2,
                            window_size=200)
 
-    dataset = nsp_dataset(dataset)
+    dataset = nsp_dataset(dataset, buffer_shuffle=5000)
 
     shapes = {'input' :[None, 3],
               'lcid'  :(),
@@ -36,7 +36,8 @@ def test_mask_dataset():
     shapes['original_input'] = (None, 3)
 
 
-    dataset = dataset.padded_batch(10, padded_shapes=shapes)
+    dataset = dataset.padded_batch(512, padded_shapes=shapes)
+
 
 def test_model():
     model = get_ASTROMER_nsp(d_model=256, maxlen=100)
