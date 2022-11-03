@@ -1,6 +1,6 @@
 [general]
 code_root = "."
-creation_date = "2022-10-28"
+creation_date = "2022-11-03"
 gpu = 0
 
 [astromer]
@@ -28,7 +28,7 @@ epochs = 10000
 patience = 40
 
 [pretraining.data]
-path = "./data/records/atlas/"
+path = "./data/records_new/atlas_pt"
 batch_size = 2500
 repeat = 4
 sampling = true
@@ -41,8 +41,8 @@ cache_val = true
 cache_test = false
 
 [finetuning]
-exp_path = "./presentation/experiments/astromer_0/results/atlas/finetuning/atlas_500_f1"
-weights = "./results/atlas_rf/"
+exp_path = "./presentation/experiments/astromer_0/results/atlas/atlas/finetuning/atlas_500_f1"
+weights = "./presentation/experiments/astromer_0/results/atlas/pretraining"
 lr = 0.001
 scheduler = true
 epochs = 10000
@@ -63,8 +63,8 @@ cache_val = true
 cache_test = false
 
 [classification]
-exp_path = "./presentation/experiments/astromer_0/results/atlas/classification/b/atlas_500_f1"
-weights = "./presentation/experiments/astromer_0/results/atlas/finetuning/atlas_500_f1"
+exp_path = "./presentation/experiments/astromer_0/results/atlas/atlas/classification/b/atlas_500_f1"
+weights = "./presentation/experiments/astromer_0/results/atlas/atlas/finetuning/atlas_500_f1"
 train_astromer = true
 lr = 0.001
 epochs = 10000
