@@ -95,7 +95,7 @@ def divide_training_subset(frame, train, val, test_meta):
     n_samples = frame.shape[0]
 
     n_train = int(n_samples*train)
-    n_val = int(n_samples*val//2)
+    n_val = int(n_samples*val)
 
     if test_meta is not None:
         sub_test = test_meta
