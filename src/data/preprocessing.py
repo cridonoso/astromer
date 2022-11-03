@@ -15,38 +15,6 @@ def standardize(batch, on='input', axis=0):
     batch['input'] = batch['input'] - tf.expand_dims(mean_value, axis)
     return batch
 
-def divide_training_subset(frame, train, val, test_meta):
-    """
-    Divide the dataset into train, validation and test subsets.
-    Notice that:
-        test = 1 - (train + val)
-
-    Args:
-        frame (Dataframe): Dataframe following the astro-standard format
-        dest (string): Record destination.
-        train (float): train fraction
-        val (float): validation fraction
-    Returns:
-        tuple x3 : (name of subset, subframe with metadata)
-    """
-
-    frame = frame.sample(frac=1)
-    n_samples = frame.shape[0]
-
-    n_train = int(n_samples*train)
-    n_val = int(n_samples*val//2)
-
-    if test_meta is not None:
-        sub_test = test_meta
-        sub_train = frame.iloc[:n_train]
-        sub_val   = frame.iloc[n_train:]
-    else:
-        sub_train = frame.iloc[:n_train]
-        sub_val   = frame.iloc[n_train:n_train+n_val]
-        sub_test  = frame.iloc[n_train+n_val:]
-
-    return ('train', sub_train), ('val', sub_val), ('test', test_meta)
-
 def sample_lc(sample, max_obs, binary=True):
     '''
     Sample a random window of "max_obs" observations from the input sequence
