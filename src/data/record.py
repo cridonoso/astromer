@@ -144,7 +144,7 @@ def create_dataset(meta_df,
 
     # Separate by class
     cls_groups = meta_df.groupby('Class')
-    
+
     test_already_written = False
     if test_subset is not None:
         for cls_name, frame in test_subset.groupby('Class'):
@@ -152,7 +152,7 @@ def create_dataset(meta_df,
             os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs, **kwargs)
         test_already_written = True
-    
+
     for cls_name, cls_meta in tqdm(cls_groups, total=len(cls_groups)):
         subsets = divide_training_subset(cls_meta,
                                          train=subsets_frac[0],
