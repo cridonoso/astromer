@@ -85,7 +85,7 @@ def my_summary_iterator(path):
         yield event_pb2.Event.FromString(r)
 
 def get_metrics(path_logs, metric_name='epoch_loss', full_logs=True, show_keys=False):
-    train_logs = [x for x in os.listdir(path_logs) if x.endswith('.v2')][0]
+    train_logs = [x for x in os.listdir(path_logs) if x.endswith('.v2')][-1]
     path_train = os.path.join(path_logs, train_logs)
 
     if full_logs:

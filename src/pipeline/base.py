@@ -126,7 +126,7 @@ def load_pt_data(config,
     return data
 
 
-def compile_astromer(config, model, step='pretraining'):
+def compile_astromer(config, model, step='pretraining', weights=None):
     """
     Compile an astromer instance (model) by setting up the optimizer and
     loading weights if defined.
@@ -151,6 +151,10 @@ def compile_astromer(config, model, step='pretraining'):
     if step == 'finetuning' or step == 'classification':
         print('[INFO] Pretrained weights: {}'.format(config[step]['weights']))
         model.load_weights(os.path.join(config[step]['weights'], 'weights'))
+    if weights is not None:    
+        print('[INFO] Pretrained weights: {}'.format(weights))
+        model.load_weights(os.path.join(weights, 'weights'))
+    
     return model
 
 def get_callbacks(config, step='pretraining', monitor='val_loss', extra=''):

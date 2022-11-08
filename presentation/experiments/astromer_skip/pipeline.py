@@ -2,6 +2,7 @@
 Experiment to reproduce Donoso et.al., 2022
 https://arxiv.org/abs/2205.01677
 '''
+import tensorflow as tf
 import pandas as pd
 import tomli
 import os, sys
@@ -91,8 +92,7 @@ def classify(config_file):
         clf_model = get_classifier_by_name(clf_name,
                     config,
                     astromer=astromer,
-                    train_astromer=config['classification']['train_astromer'],
-                                          encoder_layer_name='tf.math.reduce_mean')
+                    train_astromer=config['classification']['train_astromer'])
 
         # Compile and train
         optimizer = Adam(learning_rate=config['classification']['lr'])

@@ -20,7 +20,7 @@ from sklearn.metrics import precision_recall_fscore_support
 
 os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[2]
 
-def train(config_file, step='pretraining'):
+def train(config_file, step='pretraining', testing=False):
     '''
     pretraining/finetuning pipeline
     '''
@@ -56,8 +56,13 @@ def train(config_file, step='pretraining'):
                   callbacks=cbks)
 
     # Getting metrics
-    loss, r2 = astromer.evaluate(data['test'])
-    metrics = {'rmse':loss, 'r_square':r2}
+    try:
+        loss, r2 = astromer.evaluate(data['test'])
+        metrics = {'rmse':loss, 'r_square':r2}
+    except:
+        acc, bce, loss, r2, rmse = astromer.evaluate(data['test'])
+        metrics = {'loss':loss, 'rmse':rmse, 'r_square':r2, 'bce':bce, 'acc':acc}
+        
     base.save_metrics(metrics,
                  path=os.path.join(config[step]['exp_path'],
                                    'metrics.csv'))
@@ -77,7 +82,7 @@ def classify(config_file):
         print('[INFO] Training {}'.format(clf_name))
         # Load pre-trained model
         d_model = config['astromer']['head_dim']*config['astromer']['heads']
-        astromer =  get_ASTROMER_skip(num_layers=config['astromer']['layers'],
+        astromer =  get_ASTROMER_nsp(num_layers=config['astromer']['layers'],
                                  d_model=d_model,
                                  num_heads=config['astromer']['heads'],
                                  dff=config['astromer']['dff'],
