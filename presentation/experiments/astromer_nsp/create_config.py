@@ -16,7 +16,7 @@ with open(template_path, mode="rb") as fp:
 # GENERAL CONFIGURATION ========================================================
 # ==============================================================================
 master_path         = './presentation/experiments/astromer_nsp' # shouldn't change
-master_name         = 'macho' # master name
+master_name         = 'macho_weird' # master name
 pretraining_data    = './data/records/macho' # unlabeled dataset
 dir_to_save_config  = f'{master_path}/config_files/{master_name}'
 # ==============================================================================
@@ -39,8 +39,8 @@ for dataset_name in datasets_to_finetune:
     data_finetuning = f'./data/records/{dataset_name}'
     data_classification = data_finetuning
 
-    save_weights_finetuning     = f'{master_path}/results/{dataset_name}/finetuning/'
-    save_weights_classification = f'{master_path}/results/{dataset_name}/classification/'
+    save_weights_finetuning     = f'{master_path}/results/{master_name}/{dataset_name}/finetuning/'
+    save_weights_classification = f'{master_path}/results/{master_name}/{dataset_name}/classification/'
 
     for sci_case in science_cases:
         if sci_case == 'a':

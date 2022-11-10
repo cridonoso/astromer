@@ -56,11 +56,11 @@ shuffle_train = true
 shuffle_val   = false
 shuffle_test  = false
 cache_train   = true
-cache_val     = true
+cache_val     = false
 cache_test    = false
 
 [classification]
-exp_path         = './results/classification/tempalte'
+exp_path         = './results/classification/template'
 weights          = './results/finetuning/template' # pre-trained weights
 train_astromer   = false
 lr               = 1e-3

@@ -1,6 +1,6 @@
 [general]
 code_root = "."
-creation_date = "2022-11-03"
+creation_date = "2022-11-10"
 gpu = 0
 
 [astromer]
@@ -59,7 +59,7 @@ shuffle_train = true
 shuffle_val = false
 shuffle_test = false
 cache_train = true
-cache_val = true
+cache_val = false
 cache_test = false
 
 [classification]

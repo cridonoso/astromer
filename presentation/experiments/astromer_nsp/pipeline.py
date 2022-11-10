@@ -1,6 +1,5 @@
 '''
-Experiment to reproduce Donoso et.al., 2022
-https://arxiv.org/abs/2205.01677
+NSP
 '''
 import pandas as pd
 import tomli

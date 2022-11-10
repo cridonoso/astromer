@@ -7,7 +7,8 @@ gpu=$(lspci | grep -i '.* vga .* nvidia .*')
 shopt -s nocasematch
 if [[ $gpu == *' nvidia '* ]]; then
   echo GPU found
-  docker run -it --rm \
+  docker run --name astromer_v2 -it \
+    --rm \
     --privileged=true \
     --mount "type=bind,src=$(pwd),dst=/home/" \
     --workdir /home/ \

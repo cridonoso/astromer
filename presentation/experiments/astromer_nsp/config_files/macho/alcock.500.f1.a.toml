@@ -1,6 +1,6 @@
 [general]
 code_root = "."
-creation_date = "2022-11-01"
+creation_date = "2022-11-10"
 gpu = 0
 
 [astromer]
@@ -41,7 +41,7 @@ cache_val = true
 cache_test = false
 
 [finetuning]
-exp_path = "./presentation/experiments/astromer_nsp/results/alcock/finetuning/alcock_500_f1"
+exp_path = "./presentation/experiments/astromer_nsp/results/macho/alcock/finetuning/alcock_500_f1"
 weights = "./presentation/experiments/astromer_nsp/results/macho/pretraining"
 lr = 0.001
 scheduler = true
@@ -59,12 +59,12 @@ shuffle_train = true
 shuffle_val = false
 shuffle_test = false
 cache_train = true
-cache_val = true
+cache_val = false
 cache_test = false
 
 [classification]
-exp_path = "./presentation/experiments/astromer_nsp/results/alcock/classification/a/alcock_500_f1"
-weights = "./presentation/experiments/astromer_nsp/results/alcock/finetuning/alcock_500_f1"
+exp_path = "./presentation/experiments/astromer_nsp/results/macho/alcock/classification/a/alcock_500_f1"
+weights = "./presentation/experiments/astromer_nsp/results/macho/alcock/finetuning/alcock_500_f1"
 train_astromer = false
 lr = 0.001
 epochs = 10000
