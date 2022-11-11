@@ -5,7 +5,7 @@ import pandas as pd
 import tomli
 import os, sys
 
-from src.models.classifiers.paper_0 import get_classifier_by_name
+from presentation.experiments.astromer_nsp.classifiers import get_classifier_by_name
 from src.data import pretraining_pipeline
 from src.pipeline import base
 from src.models import get_ASTROMER_nsp
@@ -67,6 +67,7 @@ def train(config_file, step='pretraining', testing=False):
                                    'metrics.csv'))
 
 def classify(config_file):
+    step = 'classification'
     start = time()
     with open(config_file, mode="rb") as fp:
         config = tomli.load(fp)
@@ -75,9 +76,48 @@ def classify(config_file):
                             path=config['classification']['exp_path'])
 
     # Load data for classification
-    data = base.load_clf_data(config)
+    num_cls = pd.read_csv(
+            os.path.join(config[step]['data']['path'],
+                        'objects.csv')).shape[0]
+    train_data = pretraining_pipeline(os.path.join(config[step]['data']['path'], 'train'),
+                                      config[step]['data']['batch_size'],
+                                      config['astromer']['window_size'],
+                                      0.,
+                                      0.,
+                                      0.,
+                                      config[step]['data']['sampling'],
+                                      config[step]['data']['shuffle_train'],
+                                      repeat=1,
+                                      num_cls=num_cls,
+                                      normalize=config[step]['data']['normalize'],
+                                      cache=config[step]['data']['cache_train'],
+                                      nsp_prob=0.5,
+                                      nsp_frac=.5,
+                                      moving_window=False)
+    
+    for x, y in train_data:
+        print(x['mask_in'][0])
+        return 
+       
+    
+    valid_data = pretraining_pipeline(os.path.join(config[step]['data']['path'], 'train'),
+                                      config[step]['data']['batch_size'],
+                                      config['astromer']['window_size'],
+                                      0.,
+                                      0.,
+                                      0.,
+                                      config[step]['data']['sampling'],
+                                      config[step]['data']['shuffle_train'],
+                                      repeat=1,
+                                      num_cls=num_cls,
+                                      normalize=config[step]['data']['normalize'],
+                                      cache=config[step]['data']['cache_train'],
+                                      nsp_prob=0.,
+                                      nsp_frac=.5,
+                                      moving_window=False)
+    
 
-    for clf_name in ['mlp_att', 'lstm_att', 'lstm']:
+    for clf_name in ['mlp_att_cls']:
         print('[INFO] Training {}'.format(clf_name))
         # Load pre-trained model
         d_model = config['astromer']['head_dim']*config['astromer']['heads']
@@ -90,12 +130,13 @@ def classify(config_file):
                                  maxlen=config['astromer']['window_size'])
 
         astromer = base.compile_astromer(config, astromer, step='classification')
-
+        
         # Create classifier
         clf_model = get_classifier_by_name(clf_name,
                     config,
                     astromer=astromer,
                     train_astromer=config['classification']['train_astromer'])
+
 
         # Compile and train
         optimizer = Adam(learning_rate=config['classification']['lr'])
@@ -109,10 +150,10 @@ def classify(config_file):
         cbks = base.get_callbacks(config, step='classification',
                              monitor='val_loss', extra=clf_name)
 
-        history = clf_model.fit(data['train'],
+        history = clf_model.fit(train_data,
                                 epochs=config['classification']['epochs'],
                                 callbacks=cbks,
-                                validation_data=data['val'])
+                                validation_data=valid_data)
 
         clf_model.save(os.path.join(exp_path_clf, clf_name, 'model'))
 
