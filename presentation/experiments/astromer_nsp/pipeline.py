@@ -61,7 +61,7 @@ def train(config_file, step='pretraining', testing=False):
     except:
         acc, bce, loss, r2, rmse = astromer.evaluate(data['test'])
         metrics = {'loss':loss, 'rmse':rmse, 'r_square':r2, 'bce':bce, 'acc':acc}
-        
+
     base.save_metrics(metrics,
                  path=os.path.join(config[step]['exp_path'],
                                    'metrics.csv'))
@@ -94,12 +94,7 @@ def classify(config_file):
                                       nsp_prob=0.5,
                                       nsp_frac=.5,
                                       moving_window=False)
-    
-    for x, y in train_data:
-        print(x['mask_in'][0])
-        return 
-       
-    
+
     valid_data = pretraining_pipeline(os.path.join(config[step]['data']['path'], 'train'),
                                       config[step]['data']['batch_size'],
                                       config['astromer']['window_size'],
@@ -115,9 +110,9 @@ def classify(config_file):
                                       nsp_prob=0.,
                                       nsp_frac=.5,
                                       moving_window=False)
-    
 
-    for clf_name in ['mlp_att_cls']:
+
+    for clf_name in ['mlp_cls', 'lstm', 'mlp_att_cls', 'mlp_att', 'lstm_att']:
         print('[INFO] Training {}'.format(clf_name))
         # Load pre-trained model
         d_model = config['astromer']['head_dim']*config['astromer']['heads']
@@ -130,13 +125,12 @@ def classify(config_file):
                                  maxlen=config['astromer']['window_size'])
 
         astromer = base.compile_astromer(config, astromer, step='classification')
-        
+
         # Create classifier
         clf_model = get_classifier_by_name(clf_name,
                     config,
                     astromer=astromer,
                     train_astromer=config['classification']['train_astromer'])
-
 
         # Compile and train
         optimizer = Adam(learning_rate=config['classification']['lr'])
@@ -154,25 +148,25 @@ def classify(config_file):
                                 epochs=config['classification']['epochs'],
                                 callbacks=cbks,
                                 validation_data=valid_data)
-
-        clf_model.save(os.path.join(exp_path_clf, clf_name, 'model'))
-
-        # Evaluate
-        y_pred = clf_model.predict(data['test'])
-        y_true = tf.concat([y for _, y in data['test']], 0)
-
-        pred_labels = tf.argmax(y_pred, 1)
-        true_labels = tf.argmax(y_true, 1)
-
-        p, r, f, _ = precision_recall_fscore_support(true_labels,
-                                                     pred_labels,
-                                                     average='macro')
-        metrics = {'precision':p, 'recall':r, 'f1': f,
-                   'val_acc': tf.reduce_max(history.history['val_accuracy']).numpy(),
-                   'val_loss': tf.reduce_min(history.history['val_loss']).numpy(),
-                   'model':clf_name}
-        # # Save metrics
-        base.save_metrics(metrics, path=os.path.join(exp_path_clf, 'metrics.csv'))
+        #
+        # clf_model.save(os.path.join(exp_path_clf, clf_name, 'model'))
+        #
+        # # Evaluate
+        # y_pred = clf_model.predict(data['test'])
+        # y_true = tf.concat([y for _, y in data['test']], 0)
+        #
+        # pred_labels = tf.argmax(y_pred, 1)
+        # true_labels = tf.argmax(y_true, 1)
+        #
+        # p, r, f, _ = precision_recall_fscore_support(true_labels,
+        #                                              pred_labels,
+        #                                              average='macro')
+        # metrics = {'precision':p, 'recall':r, 'f1': f,
+        #            'val_acc': tf.reduce_max(history.history['val_accuracy']).numpy(),
+        #            'val_loss': tf.reduce_min(history.history['val_loss']).numpy(),
+        #            'model':clf_name}
+        # # # Save metrics
+        # base.save_metrics(metrics, path=os.path.join(exp_path_clf, 'metrics.csv'))
 
 
 if __name__ == '__main__':
@@ -185,10 +179,9 @@ if __name__ == '__main__':
         conf_files = [directory]
     else:
         conf_files = [os.path.join(directory, d) for d in os.listdir(directory)]
-        
+
     for config_file in conf_files:
         if mode == 'classification':
             classify(config_file)
         else:
             train(config_file, step=mode)
-

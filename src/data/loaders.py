@@ -196,10 +196,11 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
         'input': batch['input_modified'],
         'times': tf.slice(batch['input'], [0,0,0], [-1,-1,1]),
         'mask_in': batch['mask_in']
-    }       
-        
+    }
+
     if num_cls is not None:
         outputs = tf.one_hot(batch['label'], num_cls)
+        inputs['mask'] = batch['mask']
     else:
         outputs = {
             'target': tf.slice(batch['input'], [0,0,1], [-1,-1,1]),
@@ -210,6 +211,7 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
         outputs['nsp_label'] = batch['nsp_label']
         outputs['target'] = tf.slice(outputs['target'], [0,1,0], [-1,-1,-1])
         outputs['mask_out'] = tf.slice(outputs['mask_out'], [0,1,0], [-1,-1,-1])
+
 
     if nsp_test:
         inputs['original_input'] = batch['original_input']
