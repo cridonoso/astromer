@@ -151,10 +151,10 @@ def compile_astromer(config, model, step='pretraining', weights=None):
     if step == 'finetuning' or step == 'classification':
         print('[INFO] Pretrained weights: {}'.format(config[step]['weights']))
         model.load_weights(os.path.join(config[step]['weights'], 'weights'))
-    if weights is not None:    
+    if weights is not None:
         print('[INFO] Pretrained weights: {}'.format(weights))
         model.load_weights(os.path.join(weights, 'weights'))
-    
+
     return model
 
 def get_callbacks(config, step='pretraining', monitor='val_loss', extra=''):
