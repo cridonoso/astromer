@@ -1,12 +1,17 @@
+import zipfile
+from io import BytesIO
 import multiprocessing as mp
 import tensorflow as tf
 import pandas as pd
 import numpy as np
+import logging
 import os
 
 from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
 from tqdm import tqdm
+from time import time
+
 
 def _bytes_feature(value):
     """Returns a bytes_list from a string / byte."""
@@ -54,12 +59,15 @@ def get_example(lcid, label, lightcurve):
     return ex
 
 @wrap_non_picklable_objects
-def process_lc2(row, source, unique_classes, **kwargs):
+def process_lc2(row, source, unique_classes, file_ins, **kwargs):
     path  = row['Path'].split('/')[-1]
     label = list(unique_classes).index(row['Class'])
     lc_path = os.path.join(source, path)
 
-    observations = pd.read_csv(lc_path, **kwargs)
+    file_inf = file_ins.getinfo(lc_path)
+    file_read = file_ins.read(file_inf)
+
+    observations = pd.read_csv(BytesIO(file_read), **kwargs)
     observations.columns = ['mjd', 'mag', 'errmag']
     observations = observations.dropna()
     observations.sort_values('mjd')
@@ -108,18 +116,25 @@ def divide_training_subset(frame, train, val, test_meta):
 
     return ('train', sub_train), ('val', sub_val), ('test', sub_test)
 
-def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None, max_obs=200, **kwargs):
+def write_records(frame, dest, max_lcs_per_record, source, unique, file_loc, n_jobs=None, max_obs=200, **kwargs):
     # Get frames with fixed number of lightcurves
     collection = [frame.iloc[i:i+max_lcs_per_record] \
                   for i in range(0, frame.shape[0], max_lcs_per_record)]
+    with zipfile.ZipFile(file_loc, 'r') as zp:
 
-    for counter, subframe in enumerate(collection):
-        var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique, **kwargs) \
-                                    for k, row in subframe.iterrows())
+        for counter, subframe in enumerate(collection):
+            #-------#
+            # var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique, **kwargs) \
+            #                             for k, row in subframe.iterrows())
+            #------#
+            
+            #var = Parallel(backend = 'threading', n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique, zp, **kwargs) \
+             #                      for k, row in subframe.iterrows())
+            var = [process_lc2(row, source, unique, zp, **kwargs) for k, row in subframe.iterrows()]
 
-        with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
-            for counter2, data_lc in enumerate(var):
-                process_lc3(*data_lc, writer)
+            with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
+                for counter2, data_lc in enumerate(var):
+                    process_lc3(*data_lc, writer)
 
 def create_dataset(meta_df,
                    source='data/raw_data/macho/MACHO/LCs',
@@ -128,6 +143,7 @@ def create_dataset(meta_df,
                    subsets_frac=(0.5, 0.25),
                    test_subset=None,
                    max_lcs_per_record=100,
+                   file_loc = 'g.zip',
                    **kwargs): # kwargs contains additional arguments for the read_csv() function
     os.makedirs(target, exist_ok=True)
 
@@ -145,14 +161,6 @@ def create_dataset(meta_df,
     # Separate by class
     cls_groups = meta_df.groupby('Class')
 
-    test_already_written = False
-    if test_subset is not None:
-        for cls_name, frame in test_subset.groupby('Class'):
-            dest = os.path.join(target, 'test', cls_name)
-            os.makedirs(dest, exist_ok=True)
-            write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs, **kwargs)
-        test_already_written = True
-
     for cls_name, cls_meta in tqdm(cls_groups, total=len(cls_groups)):
         subsets = divide_training_subset(cls_meta,
                                          train=subsets_frac[0],
@@ -160,10 +168,10 @@ def create_dataset(meta_df,
                                          test_meta = test_subset)
 
         for subset_name, frame in subsets:
-            if test_already_written and subset_name == 'test':continue
             dest = os.path.join(target, subset_name, cls_name)
-            os.makedirs(dest, exist_ok=True)
-            write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs, **kwargs)
+            if not os.path.exists(dest):
+                os.makedirs(dest, exist_ok=True)
+            write_records(frame, dest, max_lcs_per_record, source, unique,file_loc, n_jobs, **kwargs)
 
 def deserialize(sample):
     """

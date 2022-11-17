@@ -32,12 +32,12 @@ astromer =  get_ASTROMER(num_layers=2,
                          no_train=False)
 optimizer = Adam(1e-3, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
 astromer.compile(optimizer=optimizer)
-pretrained_weigths = './weights/macho/weights'
-astromer.load_weights(pretrained_weigths)
+# pretrained_weigths = './weights/macho/weights'
+# astromer.load_weights(pretrained_weigths)
 
 # LOADING DATA
 BATCH_SIZE = 256
-train_batches = pretraining_pipeline('./data/records/macho/train',
+train_batches = pretraining_pipeline('./data/data/records/new_ztf_g/train',
                                      batch_size=BATCH_SIZE,
                                      window_size=200,
                                      msk_frac=.5,
@@ -48,7 +48,7 @@ train_batches = pretraining_pipeline('./data/records/macho/train',
                                      repeat=4,
                                      normalize=True,
                                      cache=True)
-valid_batches = pretraining_pipeline('./data/records/macho/val',
+valid_batches = pretraining_pipeline('./data/data/records/new_ztf_g/val',
                                      batch_size=BATCH_SIZE,
                                      window_size=200,
                                      msk_frac=.5,
@@ -59,8 +59,8 @@ valid_batches = pretraining_pipeline('./data/records/macho/val',
                                      repeat=1,
                                      normalize=True,
                                      cache=True)
-train_batches = train_batches.take(5) # for testing purposes only
-valid_batches = valid_batches.take(5) # for testing purposes only
+# train_batches = train_batches.take(5) # for testing purposes only
+# valid_batches = valid_batches.take(5) # for testing purposes only
 
 # CALLBACKS
 callbacks = [
