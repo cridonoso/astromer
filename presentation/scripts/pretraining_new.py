@@ -37,7 +37,7 @@ astromer.compile(optimizer=optimizer)
 
 # LOADING DATA
 BATCH_SIZE = 256
-train_batches = pretraining_pipeline('./data/data/records/new_ztf_g/train',
+train_batches = pretraining_pipeline('./data/records/new_ztf_g/train',
                                      batch_size=BATCH_SIZE,
                                      window_size=200,
                                      msk_frac=.5,
@@ -48,7 +48,7 @@ train_batches = pretraining_pipeline('./data/data/records/new_ztf_g/train',
                                      repeat=4,
                                      normalize=True,
                                      cache=True)
-valid_batches = pretraining_pipeline('./data/data/records/new_ztf_g/val',
+valid_batches = pretraining_pipeline('./data/records/new_ztf_g/val',
                                      batch_size=BATCH_SIZE,
                                      window_size=200,
                                      msk_frac=.5,
