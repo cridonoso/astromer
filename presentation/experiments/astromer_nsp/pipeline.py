@@ -1,6 +1,7 @@
 '''
 NSP
 '''
+import tensorflow as tf
 import pandas as pd
 import tomli
 import os, sys
@@ -91,7 +92,7 @@ def classify(config_file):
                                       num_cls=num_cls,
                                       normalize=config[step]['data']['normalize'],
                                       cache=config[step]['data']['cache_train'],
-                                      nsp_prob=0.5,
+                                      nsp_prob=0.,
                                       nsp_frac=.5,
                                       moving_window=False)
 
@@ -110,6 +111,22 @@ def classify(config_file):
                                       nsp_prob=0.,
                                       nsp_frac=.5,
                                       moving_window=False)
+    
+    test_data = pretraining_pipeline(os.path.join(config[step]['data']['path'], 'test'),
+                                  config[step]['data']['batch_size'],
+                                  config['astromer']['window_size'],
+                                  0.,
+                                  0.,
+                                  0.,
+                                  config[step]['data']['sampling'],
+                                  config[step]['data']['shuffle_test'],
+                                  repeat=1,
+                                  num_cls=num_cls,
+                                  normalize=config[step]['data']['normalize'],
+                                  cache=config[step]['data']['cache_test'],
+                                  nsp_prob=0.,
+                                  nsp_frac=.5,
+                                  moving_window=False)
 
 
     for clf_name in ['mlp_cls', 'lstm', 'mlp_att_cls', 'mlp_att', 'lstm_att']:
@@ -148,25 +165,25 @@ def classify(config_file):
                                 epochs=config['classification']['epochs'],
                                 callbacks=cbks,
                                 validation_data=valid_data)
-        #
-        # clf_model.save(os.path.join(exp_path_clf, clf_name, 'model'))
-        #
-        # # Evaluate
-        # y_pred = clf_model.predict(data['test'])
-        # y_true = tf.concat([y for _, y in data['test']], 0)
-        #
-        # pred_labels = tf.argmax(y_pred, 1)
-        # true_labels = tf.argmax(y_true, 1)
-        #
-        # p, r, f, _ = precision_recall_fscore_support(true_labels,
-        #                                              pred_labels,
-        #                                              average='macro')
-        # metrics = {'precision':p, 'recall':r, 'f1': f,
-        #            'val_acc': tf.reduce_max(history.history['val_accuracy']).numpy(),
-        #            'val_loss': tf.reduce_min(history.history['val_loss']).numpy(),
-        #            'model':clf_name}
-        # # # Save metrics
-        # base.save_metrics(metrics, path=os.path.join(exp_path_clf, 'metrics.csv'))
+        clf_model.save(os.path.join(exp_path_clf, clf_name, 'model'))
+
+        # Evaluate
+        y_pred = clf_model.predict(test_data)
+        y_true = tf.concat([y for _, y in test_data], 0)
+
+        pred_labels = tf.argmax(y_pred, 1)
+        true_labels = tf.argmax(y_true, 1)
+
+        p, r, f, _ = precision_recall_fscore_support(true_labels,
+                                                     pred_labels,
+                                                     average='macro')
+        metrics = {'precision':p, 'recall':r, 'f1': f,
+                   'val_acc': tf.reduce_max(history.history['val_accuracy']).numpy(),
+                   'val_loss': tf.reduce_min(history.history['val_loss']).numpy(),
+                   'model':clf_name}
+        # # Save metrics
+        base.save_metrics(metrics, path=os.path.join(exp_path_clf, 'metrics.csv'))
+        
 
 
 if __name__ == '__main__':
@@ -183,5 +200,8 @@ if __name__ == '__main__':
     for config_file in conf_files:
         if mode == 'classification':
             classify(config_file)
-        else:
+        if mode == 'pretraining' or mode == 'finetuning':
             train(config_file, step=mode)
+        if mode == 'testing':
+            test_classification(config_file)
+            
