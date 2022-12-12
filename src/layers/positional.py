@@ -3,10 +3,10 @@ import numpy as np
 
 from tensorflow.keras.layers import Layer
 
-def get_angles(times, d_model):
+def get_angles_prior_knowledge(times, d_model):
     with tf.name_scope("Get_Angles") as scope:
-        t_init = tf.math.log(3/24) # 3 hours in days
-        t_end = tf.math.log(3.*365) #3 years in days
+        t_init = tf.math.log(3/24)  # 3 hours in days
+        t_end = tf.math.log(3.*365) # 3 years in days
         # Sample in log space
         exponents = tf.linspace(t_init, t_end, d_model)
         # Transform to normal space
@@ -18,24 +18,11 @@ def get_angles(times, d_model):
         return angle_rates
 
 @tf.function
-def get_angles_astromer(times, d_model, base=10000):
+def get_angles_astromer(times, d_model, c=2., base=10000):
     with tf.name_scope("Get_Angles") as scope:
         dim_indices = tf.range(d_model, dtype=tf.float32)
 
-        exponent = tf.divide(tf.multiply(2., dim_indices),
-                             tf.cast(d_model, tf.float32))
-
-        angle_rates = tf.pow(tf.cast(base, dtype=tf.float32), exponent)
-        angle_rates = tf.math.reciprocal(angle_rates)
-        angle_rates = times * angle_rates
-        return angle_rates
-
-@tf.function
-def get_angles_astromer_v2(times, d_model, base=10000):
-    with tf.name_scope("Get_Angles") as scope:
-        dim_indices = tf.range(d_model, dtype=tf.float32)
-
-        exponent = tf.divide(dim_indices,
+        exponent = tf.divide(tf.multiply(c, dim_indices),
                              tf.cast(d_model, tf.float32))
 
         angle_rates = tf.pow(tf.cast(base, dtype=tf.float32), exponent)
@@ -59,8 +46,7 @@ def get_angles_vaswani(times, d_model, base=10000):
         return angle_rates
 
 
-def positional_encoding(times, d_model, base=10000,
-                        mjd=False, v2=False):
+def positional_encoding(times, d_model, base=10000, mjd=False, c=2.):
     with tf.name_scope("PosEncoding") as scope:
         if mjd:
             indices = times
@@ -70,11 +56,8 @@ def positional_encoding(times, d_model, base=10000,
             indices = tf.tile(indices, [tf.shape(times)[0], 1])
             indices = tf.expand_dims(indices, 2)
 
-        if v2:
-            print('[INFO] Using PE')
-            angle_rads = get_angles_astromer_v2(indices, d_model)
-        else:
-            angle_rads = get_angles_astromer(indices, d_model)
+        print(f'[INFO] Using PE with c: {c}')
+        angle_rads = get_angles_astromer(indices, d_model)
 
         # SIN AND COS
         def fn(x):
@@ -90,13 +73,17 @@ def positional_encoding(times, d_model, base=10000,
         return tf.cast(pos_encoding, dtype=tf.float32)
 
 class PositionalEncoder(tf.keras.layers.Layer):
-    def __init__(self, d_model, base=1000):
-        super(PositionalEncoder, self).__init__()
+    def __init__(self, d_model, base=1000, c=2, **kwargs):
+        super(PositionalEncoder, self).__init__(**kwargs)
         self.d_model = d_model
         self.base = base
+        self.c = tf.cast(c, tf.float32)
 
     def call(self, inputs):
-        angle_rads = get_angles_astromer(inputs, self.d_model, base=self.base)
+        angle_rads = get_angles_astromer(inputs,
+                                         self.d_model,
+                                         base=self.base,
+                                         c=self.c)
         def fn(x):
             if x[1] % 2 == 0:
                 return (tf.sin(x[0]), x[1])
@@ -108,11 +95,12 @@ class PositionalEncoder(tf.keras.layers.Layer):
         x_transpose = tf.map_fn(lambda x: fn(x),  (x_transpose, indices))[0]
         pos_encoding = tf.transpose(x_transpose, [2, 1, 0])
         return tf.cast(pos_encoding, dtype=tf.float32)
-        
+
     def get_config(self):
         config = super().get_config()
         config.update({
             "d_model": self.d_model,
             "base": self.base,
+            "c":self.c,
         })
         return config

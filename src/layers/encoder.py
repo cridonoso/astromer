@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from src.layers.attention import HeadAttentionMulti
-from src.layers.positional import positional_encoding
+from src.layers.positional import positional_encoding, PositionalEncoder
 from src.data import reshape_mask
 
 def point_wise_feed_forward_network(d_model, dff):
@@ -65,30 +65,27 @@ class EncoderLayer(tf.keras.layers.Layer):
 
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, num_layers, d_model, num_heads, dff,
-                 base=10000, dropout=0.1, use_leak=False, pe_v2=False, **kwargs):
+                 base=10000, dropout=0.1, pe_c=1., **kwargs):
         super(Encoder, self).__init__(**kwargs)
 
-        self.d_model = d_model
+        self.d_model    = d_model
         self.num_layers = num_layers
-        self.base = base
-        self.pe_v2 = pe_v2
+        self.base       = base
+        self.dropout    = dropout
+
+        self.pe = PositionalEncoder(d_model, base=base, c=pe_c, name='PosEncoding')
         self.inp_transform = tf.keras.layers.Dense(d_model)
-        self.enc_layers = [EncoderLayer(d_model, num_heads, dff, dropout, use_leak)
+        self.enc_layers = [EncoderLayer(d_model, num_heads, dff, dropout, False)
                             for _ in range(num_layers)]
-        self.dropout = tf.keras.layers.Dropout(dropout)
+        self.dropout_layer = tf.keras.layers.Dropout(dropout)
 
     def call(self, data, training=False):
         # adding embedding and position encoding.
-        x_pe = positional_encoding(data['times'],
-                                   self.d_model,
-                                   base=self.base,
-                                   mjd=True,
-                                   v2=self.pe_v2)
-
+        x_pe = self.pe(data['times'])
         x_transformed = self.inp_transform(data['input'])
         transformed_input = x_transformed + x_pe
 
-        x = self.dropout(transformed_input, training=training)
+        x = self.dropout_layer(transformed_input, training=training)
 
         for i in range(self.num_layers):
             x = self.enc_layers[i](x, training, data['mask_in'])
@@ -101,7 +98,6 @@ class Encoder(tf.keras.layers.Layer):
             "d_model": self.d_model,
             "num_layers": self.num_layers,
             "base": self.base,
-            "pe_v2": self.pe_v2,
             "dropout": self.dropout
         })
         return config
