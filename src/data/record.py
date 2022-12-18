@@ -59,15 +59,20 @@ def get_example(lcid, label, lightcurve):
     return ex
 
 @wrap_non_picklable_objects
-def process_lc2(row, source, unique_classes, file_ins, **kwargs):
+def process_lc2(row, source, unique_classes, zip_flag, file_ins=None, **kwargs):
     path  = row['Path'].split('/')[-1]
     label = list(unique_classes).index(row['Class'])
     lc_path = os.path.join(source, path)
+    
+    if zip_flag == True:
+        file_inf = file_ins.getinfo(lc_path)
+        file_read = file_ins.read(file_inf)
 
-    file_inf = file_ins.getinfo(lc_path)
-    file_read = file_ins.read(file_inf)
+        observations = pd.read_csv(BytesIO(file_read), **kwargs)
 
-    observations = pd.read_csv(BytesIO(file_read), **kwargs)
+    else:
+        observations = pd.read_csv(lc_path, **kwargs)
+        
     observations.columns = ['mjd', 'mag', 'errmag']
     observations = observations.dropna()
     observations.sort_values('mjd')
@@ -116,36 +121,51 @@ def divide_training_subset(frame, train, val, test_meta):
 
     return ('train', sub_train), ('val', sub_val), ('test', sub_test)
 
-def write_records(frame, dest, max_lcs_per_record, source, unique, file_loc, n_jobs=None, max_obs=200, **kwargs):
+def write_records(frame, dest, max_lcs_per_record, source, unique, zip_flag=False, n_jobs=None, max_obs=200, **kwargs):
     # Get frames with fixed number of lightcurves
     collection = [frame.iloc[i:i+max_lcs_per_record] \
                   for i in range(0, frame.shape[0], max_lcs_per_record)]
-    with zipfile.ZipFile(file_loc, 'r') as zp:
+    
+    if zip_flag == True:
+        with zipfile.ZipFile(source.split('/')[0]+'.zip', 'r') as zp:
+
+            for counter, subframe in enumerate(collection):
+                var = [process_lc2(row, source, unique, zip_flag, file_ins = zp, **kwargs) for k, row in subframe.iterrows()]
+
+                with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
+                    for counter2, data_lc in enumerate(var):
+                        process_lc3(*data_lc, writer)    
+    
+    else:
 
         for counter, subframe in enumerate(collection):
             #-------#
-            # var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique, **kwargs) \
-            #                             for k, row in subframe.iterrows())
+            var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique, zip_flag, file_ins = None, **kwargs) \
+                                         for k, row in subframe.iterrows())
             #------#
             
             #var = Parallel(backend = 'threading', n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique, zp, **kwargs) \
              #                      for k, row in subframe.iterrows())
-            var = [process_lc2(row, source, unique, zp, **kwargs) for k, row in subframe.iterrows()]
+            
 
             with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
                 for counter2, data_lc in enumerate(var):
                     process_lc3(*data_lc, writer)
 
 def create_dataset(meta_df,
-                   source='data/raw_data/macho/MACHO/LCs',
-                   target='data/records/macho/',
+                   source,
+                   target='records/new_ztf_g',
                    n_jobs=None,
                    subsets_frac=(0.5, 0.25),
                    test_subset=None,
                    max_lcs_per_record=100,
-                   file_loc = 'g.zip',
                    **kwargs): # kwargs contains additional arguments for the read_csv() function
+
     os.makedirs(target, exist_ok=True)
+    zip_flag = False
+    if source.split('.')[-1] == 'zip':
+        zip_flag = True
+        source = source.split('.')[0]+'/'    
 
     bands = meta_df['Band'].unique()
     if len(bands) > 1:
@@ -171,7 +191,7 @@ def create_dataset(meta_df,
             dest = os.path.join(target, subset_name, cls_name)
             if not os.path.exists(dest):
                 os.makedirs(dest, exist_ok=True)
-            write_records(frame, dest, max_lcs_per_record, source, unique,file_loc, n_jobs, **kwargs)
+            write_records(frame, dest, max_lcs_per_record, source, unique, zip_flag, n_jobs, **kwargs)
 
 def deserialize(sample):
     """
