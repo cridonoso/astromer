@@ -88,21 +88,24 @@ def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
     orig_magn = seq_magn
 
     # [MASK] values
-    mask_out = get_masked(seq_magn, msk_frac)
+    if msk_frac == 0.:
+        mask_out = tf.ones_like(seq_time)
+        mask_in  =  1.- mask_out
+    else:
+        mask_out = get_masked(seq_magn, msk_frac)
+        # [MASK] -> Same values
+        seq_magn, mask_in = set_random(seq_magn,
+                                       mask_out,
+                                       seq_magn,
+                                       same_frac,
+                                       name='set_same')
 
-    # [MASK] -> Same values
-    seq_magn, mask_in = set_random(seq_magn,
-                                   mask_out,
-                                   seq_magn,
-                                   same_frac,
-                                   name='set_same')
-
-    # [MASK] -> Random value
-    seq_magn, mask_in = set_random(seq_magn,
-                                   mask_in,
-                                   tf.random.shuffle(seq_magn),
-                                   rnd_frac,
-                                   name='set_random')
+       # [MASK] -> Random value
+        seq_magn, mask_in = set_random(seq_magn,
+                                       mask_in,
+                                       tf.random.shuffle(seq_magn),
+                                       rnd_frac,
+                                       name='set_random')
 
     time_steps = tf.shape(seq_magn)[0]
 
