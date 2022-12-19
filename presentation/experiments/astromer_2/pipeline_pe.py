@@ -2,6 +2,7 @@
 Experiment to reproduce Donoso et.al., 2022
 https://arxiv.org/abs/2205.01677
 '''
+import tensorflow as tf
 import pandas as pd
 import tomli
 import os, sys
@@ -120,7 +121,7 @@ def classify(config_file):
                                 callbacks=cbks,
                                 validation_data=data['val'])
 
-        clf_model.save(os.path.join(exp_path_clf, clf_name, 'model'))
+#         clf_model.save(os.path.join(exp_path_clf, clf_name, 'model'), include_optimizer=False)
 
         # Evaluate
         y_pred = clf_model.predict(data['test'])

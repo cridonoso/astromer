@@ -18,7 +18,7 @@ with open(template_path, mode="rb") as fp:
 master_path         = './presentation/experiments/astromer_2' # shouldn't change
 pe_c                = 1.
 pretraining_data    = f'./data/records/alcock/fold_0/alcock' # unlabeled dataset
-master_name         = f'alcock_pe_{int(pe_c)}' # master name
+master_name         = f'alcock_mask_{int(pe_c)}' # master name
 dir_to_save_config  = f'{master_path}/config_files/{master_name}'
 # ==============================================================================
 config['pretraining']['exp_path'] = f'{master_path}/results/{master_name}/pretraining'

@@ -33,7 +33,7 @@ def get_classifier_by_name(clf_name,
                 os.path.join(config['classification']['data']['path'],
                             'objects.csv')).shape[0]
 
-    if name == 'mlp_att':
+    if clf_name == 'mlp_att':
         clf_model = build_mlp_att(astromer,
                                   maxlen=config['astromer']['window_size'],
                                   n_classes=num_cls,
