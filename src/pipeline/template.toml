@@ -28,7 +28,7 @@ epochs        = 10000
 patience      = 40
 [pretraining.data]
 path          = './data/records/big_atlas'
-batch_size    = 512
+batch_size    = 2500
 repeat        = 1 # Train subset only
 sampling      = true
 normalize     = true
