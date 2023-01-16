@@ -17,46 +17,79 @@ def _bytes_feature(value):
     """Returns a bytes_list from a string / byte."""
     if isinstance(value, type(tf.constant(0))):
         value = value.numpy() # BytesList won't unpack a string from an EagerTensor.
-    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
 
 def _float_feature(list_of_floats):  # float32
     return tf.train.Feature(float_list=tf.train.FloatList(value=list_of_floats))
 
 def _int64_feature(value):
-    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
 
-def get_example(lcid, label, lightcurve):
-    """
-    Create a record example from numpy values.
-    Serialization
-    Args:
-        lcid (string): object id
-        label (int): class code
-        lightcurve (numpy array): time, magnitudes and observational error
+def parse_dtype(value):
+    if type(value) == int:
+        print(value, 'int')
+        return _int64_feature([value])
+    if type(value) == float:
+        print(value, 'float')
+        return _float_feature([value])
+    if type(value) == str:
+        print(value, 'str')
+        return _bytes_feature([str(value).encode()])
+    raise ValueError('[ERROR] {} with type {} could not be parsed. Please use <str>, <int>, or <float>'.format(value, dtype(value)))
 
-    Returns:
-        tensorflow record
-    """
+class DataPipeline:
+    """docstring for DataPipeline."""
 
-    f = dict()
+    def __init__(self,
+                 metadata=None,
+                 context_features=None,
+                 sequential_features=None):
 
-    dict_features={
-    'id': _bytes_feature(str(lcid).encode()),
-    'label': _int64_feature(label),
-    'length': _int64_feature(lightcurve.shape[0]),
-    }
-    element_context = tf.train.Features(feature = dict_features)
+        self.metadata            = metadata
+        self.context_features    = context_features
+        self.sequential_features = sequential_features
 
-    dict_sequence = {}
-    for col in range(lightcurve.shape[1]):
-        seqfeat = _float_feature(lightcurve[:, col])
-        seqfeat = tf.train.FeatureList(feature = [seqfeat])
-        dict_sequence['dim_{}'.format(col)] = seqfeat
+        if metadata is not None:
+            print('[INFO] {} samples loaded'.format(metadata.shape[0]))
 
-    element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
-    ex = tf.train.SequenceExample(context = element_context,
-                                  feature_lists= element_lists)
-    return ex
+    def run(self):
+        for index, row in self.metadata.iterrows():
+            lc = pd.read_csv(row['Path'])
+
+            context_features_values = row[self.context_features].to_dict()
+            numpy_lc = lc[self.sequential_features].values
+
+            ex = self.get_example(numpy_lc, context_features_values)
+
+            break
+
+    def get_example(self, lightcurve, context_features_values):
+        """
+        Create a record example from numpy values.
+        Serialization
+        Args:
+            lightcurve (numpy array): time, magnitudes and observational error
+            context_features_values: NONE
+        Returns:
+            tensorflow record example
+        """
+        dict_features = dict()
+        for name, value in context_features_values.items():
+            dict_features[name] = parse_dtype(value)
+
+        element_context = tf.train.Features(feature = dict_features)
+
+        dict_sequence = dict()
+        for col in range(lightcurve.shape[1]):
+            seqfeat = _float_feature(lightcurve[:, col])
+            seqfeat = tf.train.FeatureList(feature = [seqfeat])
+            dict_sequence['dim_{}'.format(col)] = seqfeat
+
+        element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
+        ex = tf.train.SequenceExample(context = element_context,
+                                      feature_lists= element_lists)
+        return ex
+
 
 @wrap_non_picklable_objects
 def process_lc2(row, source, unique_classes, zip_flag, file_ins=None, **kwargs):
@@ -88,7 +121,12 @@ def process_lc2(row, source, unique_classes, zip_flag, file_ins=None, **kwargs):
 
 def process_lc3(lc_index, label, numpy_lc, writer):
     try:
-        ex = get_example(lc_index, label, numpy_lc)
+        context_features = {
+            'id': lc_index,
+            'label': label,
+            'length': numpy_lc.shape[0],
+        }
+        ex = get_example(context_features, numpy_lc)
         writer.write(ex.SerializeToString())
     except:
         print('[INFO] {} could not be processed'.format(lc_index))
