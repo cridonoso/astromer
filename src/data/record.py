@@ -2,10 +2,13 @@ import multiprocessing as mp
 import tensorflow as tf
 import pandas as pd
 import numpy as np
+
 import os
 
 from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
+from zipfile import ZipFile
+from io import BytesIO
 from tqdm import tqdm
 
 def _bytes_feature(value):
@@ -22,15 +25,22 @@ def _int64_feature(value):
 
 def parse_dtype(value):
     if type(value) == int:
-        print(value, 'int')
         return _int64_feature([value])
     if type(value) == float:
-        print(value, 'float')
         return _float_feature([value])
     if type(value) == str:
-        print(value, 'str')
         return _bytes_feature([str(value).encode()])
     raise ValueError('[ERROR] {} with type {} could not be parsed. Please use <str>, <int>, or <float>'.format(value, dtype(value)))
+
+def get_zip_reader(zip_path):
+    '''Decorator that reports the execution time.'''
+    with ZipFile(zip_path, 'r') as zp:
+        def read_zip(path):
+            file_read = zp.read(zp.getinfo(path))
+            file_byts = BytesIO(file_read)
+            observations = pd.read_csv(file_byts)
+            return observations
+    return read_zip, zp
 
 class DataPipeline:
     """docstring for DataPipeline."""
@@ -38,25 +48,38 @@ class DataPipeline:
     def __init__(self,
                  metadata=None,
                  context_features=None,
-                 sequential_features=None):
+                 sequential_features=None,
+                 output_file='records.py',
+                 zipfile=None):
 
-        self.metadata            = metadata
-        self.context_features    = context_features
-        self.sequential_features = sequential_features
+        self.metadata             = metadata
+        self.context_features     = context_features
+        self.sequential_features  = sequential_features
+        self.zipfile              = zipfile
+        self.read_sample, self.zp = get_zip_reader(zipfile) if zipfile is not None else (pd.read_csv, None)
 
         if metadata is not None:
             print('[INFO] {} samples loaded'.format(metadata.shape[0]))
 
-    def run(self):
-        for index, row in self.metadata.iterrows():
-            lc = pd.read_csv(row['Path'])
+    def filtering(self, row):
+        observations = self.read_sample(row['Path'])
+        observations.columns = ['mjd', 'mag', 'errmag']
+        observations = observations.dropna()
+        observations.sort_values('mjd')
+        observations = observations.drop_duplicates(keep='last')
+        return observations[self.sequential_features]
 
-            context_features_values = row[self.context_features].to_dict()
-            numpy_lc = lc[self.sequential_features].values
+    def process_sample(self, row):
+        context_features_values = row[self.context_features].to_dict()
+        observations = self.filtering(row)
+        numpy_lc = observations.values
+        ex = self.get_example(numpy_lc, context_features_values)
+        return ex
 
-            ex = self.get_example(numpy_lc, context_features_values)
-
-            break
+    def run(self, n_jobs=1):
+        var = Parallel(n_jobs=n_jobs)(delayed(self.process_sample)(row) \
+                                      for _, row in self.metadata.iterrows())
+        return var
 
     def get_example(self, lightcurve, context_features_values):
         """
@@ -85,34 +108,6 @@ class DataPipeline:
                                       feature_lists= element_lists)
         return ex
 
-
-@wrap_non_picklable_objects
-def process_lc2(row, source, unique_classes, **kwargs):
-    path  = row['Path'].split('/')[-1]
-    label = list(unique_classes).index(row['Class'])
-    lc_path = os.path.join(source, path)
-
-    observations = pd.read_csv(lc_path, **kwargs)
-    observations.columns = ['mjd', 'mag', 'errmag']
-    observations = observations.dropna()
-    observations.sort_values('mjd')
-    observations = observations.drop_duplicates(keep='last')
-
-    numpy_lc = observations.values
-
-    return row['ID'], label, numpy_lc
-
-def process_lc3(lc_index, label, numpy_lc, writer):
-    try:
-        context_features = {
-            'id': lc_index,
-            'label': label,
-            'length': numpy_lc.shape[0],
-        }
-        ex = get_example(context_features, numpy_lc)
-        writer.write(ex.SerializeToString())
-    except:
-        print('[INFO] {} could not be processed'.format(lc_index))
 
 def divide_training_subset(frame, train, val, test_meta):
     """
