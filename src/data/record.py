@@ -59,22 +59,19 @@ class DataPipeline:
             print('[INFO] {} samples loaded'.format(metadata.shape[0]))
 
     @staticmethod
-    def filtering(row, sequential_features):
+    def process_sample(row, context_features, sequential_features):
+        context_features_values = row[context_features].to_dict()
+        observations = filtering(row, sequential_features)
         observations = pd.read_csv(row['Path'])
         observations.columns = ['mjd', 'mag', 'errmag']
         observations = observations.dropna()
         observations.sort_values('mjd')
         observations = observations.drop_duplicates(keep='last')
-        return observations[sequential_features]
-
-    @staticmethod
-    def process_sample(row, context_features, sequential_features):
-        context_features_values = row[context_features].to_dict()
-        observations = filtering(row, sequential_features)
+        observations[sequential_features]
         return observations.values
 
     def run(self, n_jobs=1):
-        var = Parallel(n_jobs=n_jobs)(delayed(process_sample)(row, self.context_features, self.sequential_features) \
+        var = Parallel(n_jobs=n_jobs)(delayed(process_sample.__func__)(row, self.context_features, self.sequential_features) \
                                       for _, row in self.metadata.iterrows())
         return var
 
