@@ -61,8 +61,6 @@ class DataPipeline:
     @staticmethod
     def process_sample(row, context_features, sequential_features):
         context_features_values = row[context_features].to_dict()
-
-        observations = filtering(row, sequential_features)
         observations = pd.read_csv(row['Path'])
         observations.columns = ['mjd', 'mag', 'errmag']
         observations = observations.dropna()
