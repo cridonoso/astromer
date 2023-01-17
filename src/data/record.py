@@ -61,7 +61,8 @@ class DataPipeline:
         if metadata is not None:
             print('[INFO] {} samples loaded'.format(metadata.shape[0]))
 
-    def filtering(self, row):
+    @staticmethod
+    def filtering(row):
         observations = self.read_sample(row['Path'])
         observations.columns = ['mjd', 'mag', 'errmag']
         observations = observations.dropna()
@@ -69,7 +70,8 @@ class DataPipeline:
         observations = observations.drop_duplicates(keep='last')
         return observations[self.sequential_features]
 
-    def process_sample(self, row):
+    @staticmethod
+    def process_sample(row):
         context_features_values = row[self.context_features].to_dict()
         observations = self.filtering(row)
         numpy_lc = observations.values
