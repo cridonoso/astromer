@@ -43,15 +43,20 @@ class DataPipeline:
                  metadata=None,
                  context_features=None,
                  sequential_features=None,
-                 output_file='output.records'):
+                 output_folder='./records/output'):
 
         self.metadata             = metadata
         self.context_features     = context_features
         self.sequential_features  = sequential_features
-        self.output_file          = output_file
+        self.output_folder        = output_folder
 
         if metadata is not None:
             print('[INFO] {} samples loaded'.format(metadata.shape[0]))
+
+        self.metadata['subset'] = ['full']*self.metadata.shape[0]
+        self.metadata['fold'] = [0]*self.metadata.shape[0]
+
+        os.makedirs(output_folder, exist_ok=True)
 
     @staticmethod
     def get_example(lightcurve, context_features_values):
@@ -130,18 +135,24 @@ class DataPipeline:
         return var
 
     def run(self, n_jobs=1):
-        print('[INFO] Processing data...')
         threads = Parallel(n_jobs=n_jobs, backend='multiprocessing')
-        var = threads(delayed(self.__process_sample__)(row,
-                                                       self.context_features,
-                                                       self.sequential_features)\
-                                      for _, row in self.metadata.iterrows())
+        fold_groups = self.metadata.groupby('fold')
+        pbar = tqdm(fold_groups, colour='#00ff00')
+        for fold_n, group in fold_groups:
+            for subset in group['subset'].unique():
+                pbar.set_description("Processing {} fold {}".format(subset, fold_n))
+                partial = group[group['subset'] == subset]
 
-        print('[INFO] Writing records...')
-        with tf.io.TFRecordWriter(self.output_file) as writer:
-            for observations, context in tqdm(var):
-                ex = DataPipeline.get_example(observations.values, context)
-                writer.write(ex.SerializeToString())
+                var = threads(delayed(self.__process_sample__)(row,
+                                                               self.context_features,
+                                                               self.sequential_features)\
+                                              for _, row in partial.iterrows())
+                pbar.set_description("Writting {} fold {}".format(subset, fold_n))
+                output_file = os.path.join(self.output_folder, subset+'_{}.record'.format(fold_n))
+                with tf.io.TFRecordWriter(output_file) as writer:
+                    for observations, context in var:
+                        ex = DataPipeline.get_example(observations.values, context)
+                        writer.write(ex.SerializeToString())
 
         return var
 
