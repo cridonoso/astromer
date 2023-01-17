@@ -63,34 +63,6 @@ class DataPipeline:
             print('[INFO] {} samples loaded'.format(metadata.shape[0]))
 
     @staticmethod
-    def get_example(lightcurve, context_features_values):
-        """
-        Create a record example from numpy values.
-        Serialization
-        Args:
-            lightcurve (numpy array): time, magnitudes and observational error
-            context_features_values: NONE
-        Returns:
-            tensorflow record example
-        """
-        dict_features = dict()
-        for name, value in context_features_values.items():
-            dict_features[name] = parse_dtype(value)
-
-        element_context = tf.train.Features(feature = dict_features)
-
-        dict_sequence = dict()
-        for col in range(lightcurve.shape[1]):
-            seqfeat = _float_feature(lightcurve[:, col])
-            seqfeat = tf.train.FeatureList(feature = [seqfeat])
-            dict_sequence['dim_{}'.format(col)] = seqfeat
-
-        element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
-        ex = tf.train.SequenceExample(context = element_context,
-                                      feature_lists= element_lists)
-        return ex
-
-    @staticmethod
     def process_sample(row:pd.Series, context_features:list, sequential_features:list)->pd.DataFrame:
         observations = pd.read_csv(row['Path'])
         observations.columns = ['mjd', 'mag', 'errmag']
@@ -99,7 +71,7 @@ class DataPipeline:
         observations = observations.drop_duplicates(keep='last')
         observations = observations[sequential_features]
         context_features_values = row[context_features]
-        ex = DataPipeline.get_example(observations.values, context_features_values)
+        ex = get_example(observations.values, context_features_values)
         return ex
 
     @classmethod
@@ -115,12 +87,37 @@ class DataPipeline:
 
         # with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
         #     for counter2, data_lc in enumerate(var):
-        #         process_lc3(*data_lc, writer)
-
+        #         ex = DataPipeline.get_example(observations.values, context_features_values)
         return var
 
 
 
+def get_example(lightcurve, context_features_values):
+    """
+    Create a record example from numpy values.
+    Serialization
+    Args:
+        lightcurve (numpy array): time, magnitudes and observational error
+        context_features_values: NONE
+    Returns:
+        tensorflow record example
+    """
+    dict_features = dict()
+    for name, value in context_features_values.items():
+        dict_features[name] = parse_dtype(value)
+
+    element_context = tf.train.Features(feature = dict_features)
+
+    dict_sequence = dict()
+    for col in range(lightcurve.shape[1]):
+        seqfeat = _float_feature(lightcurve[:, col])
+        seqfeat = tf.train.FeatureList(feature = [seqfeat])
+        dict_sequence['dim_{}'.format(col)] = seqfeat
+
+    element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
+    ex = tf.train.SequenceExample(context = element_context,
+                                  feature_lists= element_lists)
+    return ex
 
 def write_records(frame, dest, max_lcs_per_record, source, unique, zip_flag=False, n_jobs=None, max_obs=200, **kwargs):
     # Get frames with fixed number of lightcurves
