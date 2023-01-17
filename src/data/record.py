@@ -32,6 +32,10 @@ def parse_dtype(value):
         return _bytes_feature([str(value).encode()])
     raise ValueError('[ERROR] {} with type {} could not be parsed. Please use <str>, <int>, or <float>'.format(value, dtype(value)))
 
+def substract_frames(frame1, frame2, on):
+    frame1 = frame1[~frame1[on].isin(frame2[on])]
+    return frame1
+
 class DataPipeline:
     """docstring for DataPipeline."""
 
@@ -76,6 +80,38 @@ class DataPipeline:
         ex = tf.train.SequenceExample(context = element_context,
                                       feature_lists= element_lists)
         return ex
+
+    def train_val_test(self,
+                       val_frac=0.2,
+                       test_frac=0.2,
+                       test_meta=None,
+                       val_meta=None,
+                       shuffle=True,
+                       id_column_name=None):
+
+        if id_column_name is None:
+            id_column_name = self.metadata.columns[0]
+        print('[INFO] Using {} col as sample identifier'.format(id_column_name))
+
+        if shuffle:
+            print('[INFO] Shuffling')
+            self.metadata = self.metadata.sample(frac=1)
+
+        if test_meta is None:
+            test_meta = self.metadata.sample(frac=test_frac)
+
+        self.metadata = substract_frames(self.metadata, test_meta, on=id_column_name)
+
+        if val_meta is None:
+            val_meta = self.metadata.sample(frac=val_frac)
+
+        self.metadata = substract_frames(self.metadata, val_meta, on=id_column_name)
+
+        self.metadata['subset'] = ['train']*self.metadata.shape[0]
+        val_meta['subset']      = ['validation']*val_meta.shape[0]
+        test_meta['subset']     = ['test']*test_meta.shape[0]
+
+        self.metadata = pd.concat([self.metadata, val_meta, test_meta])
 
     @staticmethod
     def process_sample(row:pd.Series, context_features:list, sequential_features:list):
