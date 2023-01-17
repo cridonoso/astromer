@@ -53,37 +53,34 @@ class DataPipeline:
                  metadata=None,
                  context_features=None,
                  sequential_features=None,
-                 output_file='records.py',
-                 zipfile=None):
+                 output_file='records.py'):
 
         self.metadata             = metadata
         self.context_features     = context_features
         self.sequential_features  = sequential_features
-        self.zipfile              = zipfile
-        self.read_sample, self.zp = get_zip_reader(zipfile) if zipfile is not None else (pd.read_csv, None)
 
         if metadata is not None:
             print('[INFO] {} samples loaded'.format(metadata.shape[0]))
 
     @staticmethod
-    def filtering(row):
-        observations = self.read_sample(row['Path'])
+    def filtering(row, sequential_features):
+        observations = pd.read_csv(row['Path'])
         observations.columns = ['mjd', 'mag', 'errmag']
         observations = observations.dropna()
         observations.sort_values('mjd')
         observations = observations.drop_duplicates(keep='last')
-        return observations[self.sequential_features]
+        return observations[sequential_features]
 
     @staticmethod
-    def process_sample(row):
-        context_features_values = row[self.context_features].to_dict()
-        observations = self.filtering(row)
+    def process_sample(row, context_features, sequential_features):
+        context_features_values = row[context_features].to_dict()
+        observations = self.filtering(row, sequential_features)
         numpy_lc = observations.values
         ex = self.get_example(numpy_lc, context_features_values)
         return ex
 
     def run(self, n_jobs=1):
-        var = Parallel(n_jobs=n_jobs)(delayed(self.process_sample)(row) \
+        var = Parallel(n_jobs=n_jobs)(delayed(self.process_sample)(row, self.context_features, self.sequential_features) \
                                       for _, row in self.metadata.iterrows())
         return var
 
