@@ -70,13 +70,11 @@ class DataPipeline:
     @staticmethod
     def process_sample(row, context_features, sequential_features):
         context_features_values = row[context_features].to_dict()
-        observations = self.filtering(row, sequential_features)
-        numpy_lc = observations.values
-        ex = self.get_example(numpy_lc, context_features_values)
-        return ex
+        observations = filtering(row, sequential_features)
+        return observations.values
 
     def run(self, n_jobs=1):
-        var = Parallel(n_jobs=n_jobs)(delayed(self.process_sample)(row, self.context_features, self.sequential_features) \
+        var = Parallel(n_jobs=n_jobs)(delayed(process_sample)(row, self.context_features, self.sequential_features) \
                                       for _, row in self.metadata.iterrows())
         return var
 
