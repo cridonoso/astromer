@@ -59,23 +59,7 @@ class DataPipeline:
             print('[INFO] {} samples loaded'.format(metadata.shape[0]))
 
     @staticmethod
-    def process_sample(row, context_features, sequential_features):
-        context_features_values = row[context_features].to_dict()
-        observations = pd.read_csv(row['Path'])
-        observations.columns = ['mjd', 'mag', 'errmag']
-        observations = observations.dropna()
-        observations.sort_values('mjd')
-        observations = observations.drop_duplicates(keep='last')
-        observations = observations[sequential_features]
-        return observations
-
-    def run(self, n_jobs=1):
-        var = Parallel(n_jobs=n_jobs)(delayed(DataPipeline.process_sample)(row, self.context_features, self.sequential_features) \
-                                      for _, row in self.metadata.iterrows())
-        # example = self.get_example(observations.values, context_features_values)
-        return var
-
-    def get_example(self, lightcurve, context_features_values):
+    def get_example(lightcurve, context_features_values):
         """
         Create a record example from numpy values.
         Serialization
@@ -102,38 +86,37 @@ class DataPipeline:
                                       feature_lists= element_lists)
         return ex
 
+    @staticmethod
+    def process_sample(row:pd.Series, context_features:list, sequential_features:list)->pd.DataFrame:
+        observations = pd.read_csv(row['Path'])
+        observations.columns = ['mjd', 'mag', 'errmag']
+        observations = observations.dropna()
+        observations.sort_values('mjd')
+        observations = observations.drop_duplicates(keep='last')
+        observations = observations[sequential_features]
+        context_features_values = row[context_features]
+        ex = DataPipeline.get_example(observations.values, context_features_values)
+        return ex
 
-def divide_training_subset(frame, train, val, test_meta):
-    """
-    Divide the dataset into train, validation and test subsets.
-    Notice that:
-        test = 1 - (train + val)
+    @classmethod
+    def __process_sample__(cls, *args):
+        cls.process_sample(*args)
 
-    Args:
-        frame (Dataframe): Dataframe following the astro-standard format
-        dest (string): Record destination.
-        train (float): train fraction
-        val (float): validation fraction
-    Returns:
-        tuple x3 : (name of subset, subframe with metadata)
-    """
+    def run(self, n_jobs=1):
+        threads = Parallel(n_jobs=n_jobs, backend='multiprocessing')
+        var = threads(delayed(self.__process_sample__)(row,
+                                                       self.context_features,
+                                                       self.sequential_features)\
+                                      for _, row in self.metadata.iterrows())
 
-    frame = frame.sample(frac=1)
-    n_samples = frame.shape[0]
+        # with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
+        #     for counter2, data_lc in enumerate(var):
+        #         process_lc3(*data_lc, writer)
 
-    n_train = int(n_samples*train)
-    n_val = int(n_samples*val)
+        return var
 
-    if test_meta is not None:
-        sub_test = test_meta
-        sub_train = frame.iloc[:n_train]
-        sub_val   = frame.iloc[n_train:]
-    else:
-        sub_train = frame.iloc[:n_train]
-        sub_val   = frame.iloc[n_train:n_train+n_val]
-        sub_test  = frame.iloc[n_train+n_val:]
 
-    return ('train', sub_train), ('val', sub_val), ('test', sub_test)
+
 
 def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None, max_obs=200, **kwargs):
     # Get frames with fixed number of lightcurves
