@@ -4,6 +4,7 @@ dictionary["alcock"]="18a4DGPlyJ21DI9HrKS-jJtaA2iIqFDQO"
 dictionary["macho"]="1ReqDHn9jKPIS_g8Xm0ThYUDM-XaLcUP3"
 dictionary["ogle"]="1L1oiq9pRRGpOVm13b2dyCQhMiVFn3o7x"
 dictionary["atlas"]="1pMzeL9BAwMXqra9iFUHLpGyclJzz-VM9"
+dictionary["ztfg"]="1O79Jkbhg0OLJlcnrnsAg-a-tX2sGA2lU"
 
 dictionary["alcock-record"]="1bEETbIgsVjhpkfR0LdYxnYQ8eeaq4wol"
 dictionary["macho-record"]="1QLXAsTkaryYUqhjKAM0wh6XKh3tG1M0k"
@@ -30,6 +31,10 @@ fi
 
 wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id='$FILEID -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=$FILEID" -O $OUTFILE && rm -rf /tmp/cookies.txt
 
-
-unzip $OUTFILE -d $DIR
-rm -rf $OUTFILE
+if [["$1" != "ztfg"]];
+then
+   unzip $OUTFILE -d $DIR
+   rm -rf $OUTFILE
+else
+   echo NEW PIPELINE FORMAT
+fi
