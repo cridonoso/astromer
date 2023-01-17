@@ -65,18 +65,20 @@ class DataPipeline:
     @staticmethod
     def process_sample(row, context_features, sequential_features):
         context_features_values = row[context_features].to_dict()
+
         observations = filtering(row, sequential_features)
         observations = pd.read_csv(row['Path'])
         observations.columns = ['mjd', 'mag', 'errmag']
         observations = observations.dropna()
         observations.sort_values('mjd')
         observations = observations.drop_duplicates(keep='last')
-        observations[sequential_features]
-        return observations.values
+        observations = observations[sequential_features]
+        return observations
 
     def run(self, n_jobs=1):
-        var = Parallel(n_jobs=n_jobs)(delayed(process_sample.__func__)(row, self.context_features, self.sequential_features) \
+        var = Parallel(n_jobs=n_jobs)(delayed(DataPipeline.process_sample)(row, self.context_features, self.sequential_features) \
                                       for _, row in self.metadata.iterrows())
+        # example = self.get_example(observations.values, context_features_values)
         return var
 
     def get_example(self, lightcurve, context_features_values):
