@@ -134,12 +134,18 @@ class DataPipeline:
         var = cls.process_sample(*args)
         return var
 
+    def resample_folds(self, n_folds=1):
+        print('[INFO] Creating {} random folds'.format(n_folds))
+        print('Not implemented yet hehehe...')
+
     def run(self, n_jobs=1):
         threads = Parallel(n_jobs=n_jobs, backend='multiprocessing')
         fold_groups = self.metadata.groupby('fold')
-        pbar = tqdm(fold_groups, colour='#00ff00')
+
+        pbar = tqdm(fold_groups, colour='#00ff00') # progress bar
         for fold_n, group in fold_groups:
             for subset in group['subset'].unique():
+                # ============ Processing Samples ===========
                 pbar.set_description("Processing {} fold {}".format(subset, fold_n))
                 partial = group[group['subset'] == subset]
 
@@ -147,6 +153,7 @@ class DataPipeline:
                                                                self.context_features,
                                                                self.sequential_features)\
                                               for _, row in partial.iterrows())
+                # ============ Writing Records ===========
                 pbar.set_description("Writting {} fold {}".format(subset, fold_n))
                 output_file = os.path.join(self.output_folder, subset+'_{}.record'.format(fold_n))
                 with tf.io.TFRecordWriter(output_file) as writer:
