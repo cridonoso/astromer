@@ -53,8 +53,7 @@ class DataPipeline:
         if metadata is not None:
             print('[INFO] {} samples loaded'.format(metadata.shape[0]))
 
-        self.metadata['subset'] = ['full']*self.metadata.shape[0]
-        self.metadata['fold'] = [0]*self.metadata.shape[0]
+        self.metadata['subset_0'] = ['full']*self.metadata.shape[0]
 
         os.makedirs(output_folder, exist_ok=True)
 
@@ -92,31 +91,46 @@ class DataPipeline:
                        test_meta=None,
                        val_meta=None,
                        shuffle=True,
-                       id_column_name=None):
+                       id_column_name=None,
+                       k_fold=1):
 
         if id_column_name is None:
             id_column_name = self.metadata.columns[0]
         print('[INFO] Using {} col as sample identifier'.format(id_column_name))
 
-        if shuffle:
-            print('[INFO] Shuffling')
-            self.metadata = self.metadata.sample(frac=1)
+        if (type(test_meta) is not list) and (k_fold > 1) and (type(test_meta) != type(None)):
+            raise ValueError(f'k_fold={k_fold} does not match with number of test frames. Please provide a list of testing frames for each fold')
+        if (type(val_meta) is not list) and (k_fold > 1) and (type(val_meta) != type(None)):
+            raise ValueError(f'k_fold={k_fold} does not match with number of validation frames.Please, provide a list of validation frames for each fold')
 
-        if test_meta is None:
-            test_meta = self.metadata.sample(frac=test_frac)
+        if test_meta is None: test_meta = []
+        if val_meta is None: val_meta = []
 
-        self.metadata = substract_frames(self.metadata, test_meta, on=id_column_name)
+        for k in range(k_fold):
+            if shuffle:
+                print('[INFO] Shuffling')
+                self.metadata = self.metadata.sample(frac=1)
 
-        if val_meta is None:
-            val_meta = self.metadata.sample(frac=val_frac)
+            try:
+                test_meta[k]
+            except:
+                test_meta.append(self.metadata.sample(frac=test_frac))
 
-        self.metadata = substract_frames(self.metadata, val_meta, on=id_column_name)
+            self.metadata = substract_frames(self.metadata, test_meta[k], on=id_column_name)
 
-        self.metadata['subset'] = ['train']*self.metadata.shape[0]
-        val_meta['subset']      = ['validation']*val_meta.shape[0]
-        test_meta['subset']     = ['test']*test_meta.shape[0]
+            try:
+                val_meta[k]
+            except:
+                val_meta.append(self.metadata.sample(frac=val_frac))
 
-        self.metadata = pd.concat([self.metadata, val_meta, test_meta])
+            self.metadata = substract_frames(self.metadata, val_meta[k], on=id_column_name)
+
+            self.metadata['subset_{}'.format(k)] = ['train']*self.metadata.shape[0]
+            val_meta[k]['subset_{}'.format(k)]      = ['validation']*val_meta[k].shape[0]
+            test_meta[k]['subset_{}'.format(k)]     = ['test']*test_meta[k].shape[0]
+
+            self.metadata = pd.concat([self.metadata, val_meta[k], test_meta[k]])
+
 
     @staticmethod
     def process_sample(row:pd.Series, context_features:list, sequential_features:list):
@@ -140,14 +154,15 @@ class DataPipeline:
 
     def run(self, n_jobs=1):
         threads = Parallel(n_jobs=n_jobs, backend='multiprocessing')
-        fold_groups = self.metadata.groupby('fold')
+        fold_groups = [x for x in self.metadata.columns if 'subset' in x]
 
         pbar = tqdm(fold_groups, colour='#00ff00') # progress bar
-        for fold_n, group in fold_groups:
-            for subset in group['subset'].unique():
+        for fold_n, fold_col in enumerate(fold_groups):
+
+            for subset in self.metadata[fold_col].unique():
                 # ============ Processing Samples ===========
-                pbar.set_description("Processing {} fold {}".format(subset, fold_n))
-                partial = group[group['subset'] == subset]
+                pbar.set_description("Processing {} {}".format(subset, fold_col))
+                partial = self.metadata[self.metadata[fold_col] == subset]
 
                 var = threads(delayed(self.__process_sample__)(row,
                                                                self.context_features,
