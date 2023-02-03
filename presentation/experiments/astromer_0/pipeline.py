@@ -110,7 +110,7 @@ def classify(config_file):
                                 callbacks=cbks,
                                 validation_data=data['val'])
 
-        clf_model.save(os.path.join(exp_path_clf, clf_name, 'model'))
+#         clf_model.save(os.path.join(exp_path_clf, clf_name, 'model'))
 
         # Evaluate
         y_pred = clf_model.predict(data['test'])

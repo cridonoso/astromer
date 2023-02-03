@@ -13,18 +13,18 @@ template_path       = './src/pipeline/template.toml'
 with open(template_path, mode="rb") as fp:
     config = tomli.load(fp)
 
-for mask_0 in [0., 0.2, 0.5, 0.8]:
+for mask_0 in [0., 0.2, 0.5]:
     for fold_n in range(3):
-        config['masking']['mask_frac'] = mask_0
-        config['masking']['rnd_frac'] = 0.
-        config['masking']['same_frac'] = 0.
+        config['masking']['mask_frac'] = 0.5
+        config['masking']['rnd_frac'] = mask_0
+        config['masking']['same_frac'] = mask_0
         # ==============================================================================
         # GENERAL CONFIGURATION ========================================================
         # ==============================================================================
         master_path         = './presentation/experiments/astromer_2' # shouldn't change
         pe_c                = 1.
         pretraining_data    = f'./data/records/alcock/fold_{fold_n}/alcock' # unlabeled dataset
-        master_name         = f'alcock_{fold_n}.msk_{mask_0}.rnd_{0}.sme_{0}' # master name
+        master_name         = f'alcock_{fold_n}.msk_{0.5}.rnd_{mask_0}.sme_{mask_0}' # master name
         dir_to_save_config  = f'{master_path}/config_files/{master_name}'
         # ==============================================================================
         config['pretraining']['exp_path'] = f'{master_path}/results/{master_name}/pretraining'

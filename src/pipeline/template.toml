@@ -29,7 +29,7 @@ patience      = 40
 [pretraining.data]
 path          = './data/records/big_atlas'
 batch_size    = 2500
-repeat        = 1 # Train subset only
+repeat        = 4 # Train subset only
 sampling      = true
 normalize     = true
 shuffle_train = true
