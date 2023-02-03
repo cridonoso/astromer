@@ -18,7 +18,8 @@ if [[ $gpu == *' nvidia '* ]]; then
     -e HOST="$(whoami)" \
     astromer bash
 else
-  docker run -it --rm \
+  docker run --name astromer_v2 -it \
+    --rm \
     --privileged=true \
     --mount "type=bind,src=$(pwd),dst=/home/" \
     --workdir /home/ \
