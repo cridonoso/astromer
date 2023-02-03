@@ -27,7 +27,7 @@ pretrained_weights  = config['pretraining']['exp_path'] # Change if pretrained w
 # ==============================================================================
 datasets_to_finetune = ['alcock', 'ogle', 'atlas']
 science_cases        = ['a']
-subsets_to_train     = [20, 500]
+subsets_to_train     = [20, 100, 500]
 # ==============================================================================
 creation_date  = datetime.today().strftime('%Y-%m-%d')
 batch_size_ft  = 2500
