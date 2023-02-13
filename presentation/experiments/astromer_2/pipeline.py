@@ -87,7 +87,7 @@ def load_data(config, step='pretraining'):
                                             cache=config[step]['data']['cache_{}'.format(subset)],
                                             nsp_prob=1,
                                             nsp_frac=0,
-                                            moving_window=False).take(5)
+                                            moving_window=False)
     return data
 
 def train_astromer(astromer, config, step='pretraining', backlog=None):
@@ -101,10 +101,22 @@ def train_astromer(astromer, config, step='pretraining', backlog=None):
     
     if backlog is not None:
         loss, r2 = astromer.evaluate(data['test'])
+        
+        if step == 'finetuning':
+            inf_path = config[step]['exp_path'].split('/')
+            target = inf_path[-1].split('_')[0]
+            spc = inf_path[-1].split('_')[1]
+            fold = inf_path[-1].split('_')[-1][-1]
+        else:
+            spc, fold, target = None, None, None
+            
         metrics = {'rmse':loss, 
                    'r_square':r2, 
                    'step': step, 
-                   'time': datetime.today().strftime('%Y-%m-%d %H:%M:%S')}
+                   'time': datetime.today().strftime('%Y-%m-%d %H:%M:%S'),
+                   'target':target, 
+                   'fold':fold, 
+                   'spc':spc}
 
         metrics = pd.DataFrame(metrics, index=[0])
         backlog = pd.concat([backlog, metrics])
@@ -143,13 +155,23 @@ def classify(clf_model, data, config, backlog=None, model_name='mlp'):
         p, r, f, _ = precision_recall_fscore_support(true_labels,
                                                      pred_labels,
                                                      average='macro')
+        
+        inf_path = config['classification']['exp_path'].split('/')
+        sci_case = inf_path[-2]
+        spc = inf_path[-1].split('_')[1]
+        fold = inf_path[-1].split('_')[-1][-1]
+
         metrics = {'test_precision':p, 
                    'test_recall':r, 
                    'test_f1': f,
                    'val_acc': tf.reduce_max(history.history['val_accuracy']).numpy(),
                    'val_loss': tf.reduce_min(history.history['val_loss']).numpy(),
                    'model':clf_model.name,
-                   'time': datetime.today().strftime('%Y-%m-%d %H:%M:%S')}
+                   'time': datetime.today().strftime('%Y-%m-%d %H:%M:%S'),
+                   'fold':fold, 
+                   'sci_case':sci_case, 
+                   'spc':spc
+                    }
 
         metrics = pd.DataFrame(metrics, index=[0])
         backlog = pd.concat([backlog, metrics])
@@ -178,11 +200,11 @@ def create_classifier(astromer, config, num_cls, name='mlp'):
     x = Dense(num_cls)(x)
     return Model(inputs=placeholder, outputs=x, name=name)
     
-def pipeline(exp_conf_folder, debug=False):
+def pipeline(exp_conf_folder, debug=False, weights_dir=None):
     '''
         Main class to run the pipeline
     '''
-    backlog_df = pd.DataFrame(columns=['rmse', 'r_square', 'step', 'time'])
+    backlog_df = pd.DataFrame(columns=['rmse', 'r_square', 'step', 'time', 'target', 'fold', 'spc'])
 
     for config_file in os.listdir(exp_conf_folder):
         # Load config file
@@ -201,13 +223,18 @@ def pipeline(exp_conf_folder, debug=False):
         # =========== PRETRAINING ====================================================
         # ============================================================================    
         astromer = get_astromer(config, step='pretraining')
-
-        if not os.path.exists(os.path.join(config['pretraining']['exp_path'], 'weights.index')):    
-            print('[INFO] Training from scratch')    
+        if weights_dir is not None:
+            print('[INFO] Loading weigths from: ', weights_dir)
+            astromer.load_weights(os.path.join(weights_dir, 'weights'))
+            
+        if not os.path.exists(os.path.join(config['pretraining']['exp_path'], 'metrics.csv')):    
+            print('[INFO] Training from scratch')                    
             astromer, backlog_df = train_astromer(astromer, config, 
                                                   step='pretraining', 
                                                   backlog=backlog_df)
-
+        else:
+            backlog_df = pd.read_csv(os.path.join(config['pretraining']['exp_path'], 'metrics.csv'))
+            
         # ============================================================================
         # =========== FINETUNING =====================================================
         # ============================================================================
@@ -216,13 +243,18 @@ def pipeline(exp_conf_folder, debug=False):
         astromer, backlog_df = train_astromer(astromer, config, 
                                               step='finetuning', 
                                               backlog=backlog_df)
-        backlog_df.to_csv(os.path.join(config['pretraining']['exp_path'], 'pt_metrics.csv'), 
+        backlog_df.to_csv(os.path.join(config['pretraining']['exp_path'], 'metrics.csv'), 
                           index=False)
         # ============================================================================
         # =========== CLASSIFICATION==================================================
         # ============================================================================
-        backlog_df = pd.DataFrame(columns=['test_precision', 'test_recall', 'test_f1', 'val_acc',
-                                           'val_loss', 'model','time'])
+        exp_path_root = '/'.join(config['classification']['exp_path'].split('/')[:-2])
+        
+        if os.path.exists(os.path.join(exp_path_root, 'metrics.csv')):
+            backlog_df = pd.read_csv(os.path.join(exp_path_root, 'metrics.csv'))
+        else:
+            backlog_df = pd.DataFrame(columns=['test_precision', 'test_recall', 'test_f1', 'val_acc',
+                                               'val_loss', 'model','time', 'fold', 'sci_case', 'spc'])
 
         num_cls = pd.read_csv(
                 os.path.join(config['classification']['data']['path'],
@@ -243,20 +275,24 @@ def pipeline(exp_conf_folder, debug=False):
                     repeat=repeat,
                     num_cls=num_cls,
                     normalize=config['classification']['data']['normalize'],
-                    cache=config['classification']['data']['cache_{}'.format(subset)]).take(3)
+                    cache=config['classification']['data']['cache_{}'.format(subset)])
 
         clf_model = create_classifier(astromer, config, num_cls=num_cls, name='mlp_att')
 
         clf_model, backlog_df = classify(clf_model, data, config, 
                                          backlog=backlog_df, 
                                          model_name=clf_model.name)
-
-        backlog_df.to_csv(os.path.join(config['classification']['exp_path'], 'clf_metrics.csv'), 
+        
+        
+        backlog_df.to_csv(os.path.join(exp_path_root, 'metrics.csv'), 
                        index=False)
 
 
 if __name__ == '__main__':
     exp_conf_folder = sys.argv[1]
     os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[2]
-
-    pipeline(exp_conf_folder, debug=True)
+    try:
+        w = sys.argv[3] # preloading weights
+    except:
+        w = None
+    pipeline(exp_conf_folder, debug=False, weights_dir=w)
