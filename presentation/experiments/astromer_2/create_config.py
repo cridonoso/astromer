@@ -12,13 +12,16 @@ from datetime import datetime
 template_path       = './src/pipeline/template.toml'
 with open(template_path, mode="rb") as fp:
     config = tomli.load(fp)
+
 # ==============================================================================
 # GENERAL CONFIGURATION ========================================================
 # ==============================================================================
 master_path         = './presentation/experiments/astromer_2' # shouldn't change
 pe_c                = 1.
+pe_base             = 10000
+
 pretraining_data    = f'./data/records/macho' # unlabeled dataset
-master_name         = f'macho_{int(pe_c)}' # master name
+master_name         = f'macho_{int(pe_c)}_{int(pe_base)}' # master name
 dir_to_save_config  = f'{master_path}/config_files/{master_name}'
 # ==============================================================================
 config['pretraining']['exp_path'] = f'{master_path}/results/{master_name}/pretraining'
@@ -38,6 +41,7 @@ batch_size_clf = 512
 os.makedirs(dir_to_save_config, exist_ok=True)
 
 config['astromer']['pe_c'] = pe_c
+config['astromer']['base'] = pe_base
 for dataset_name in datasets_to_finetune:
     data_finetuning = f'./data/records/{dataset_name}'
     data_classification = data_finetuning
