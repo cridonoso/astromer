@@ -18,10 +18,13 @@ with open(template_path, mode="rb") as fp:
 # ==============================================================================
 master_path         = './presentation/experiments/astromer_2' # shouldn't change
 pe_c                = 1.
-pe_base             = 10000
-
+pe_base             = 1000
+use_scheduler       = True
 pretraining_data    = f'./data/records/macho' # unlabeled dataset
-master_name         = f'macho_{int(pe_c)}_{int(pe_base)}' # master name
+head_dim            = 256
+heads               = 2
+layers              = 1
+master_name         = f'macho_{int(layers)}l_{int(heads)}h_{int(head_dim)}' # master name
 dir_to_save_config  = f'{master_path}/config_files/{master_name}'
 # ==============================================================================
 config['pretraining']['exp_path'] = f'{master_path}/results/{master_name}/pretraining'
@@ -42,6 +45,16 @@ os.makedirs(dir_to_save_config, exist_ok=True)
 
 config['astromer']['pe_c'] = pe_c
 config['astromer']['base'] = pe_base
+
+config['astromer']['head_dim'] = head_dim
+config['astromer']['heads'] = heads
+config['astromer']['layers'] = layers
+
+config['pretraining']['scheduler'] = use_scheduler
+config['finetuning']['scheduler'] = use_scheduler
+
+config['pretraining']['lr'] = 1e-5
+
 for dataset_name in datasets_to_finetune:
     data_finetuning = f'./data/records/{dataset_name}'
     data_classification = data_finetuning
@@ -54,7 +67,8 @@ for dataset_name in datasets_to_finetune:
             config['classification']['train_astromer'] = False
         else:
             config['classification']['train_astromer'] = True
-
+        
+                
         for fold_n in range(3):
             for samples_per_class in subsets_to_train:
                 ft_data  = os.path.join(data_finetuning,
