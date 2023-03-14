@@ -1,7 +1,7 @@
 # ASTROMER
 
 <p align="center">
-  <img src="https://github.com/cridonoso/astromer/blob/main/presentation/figures/astromer_logo.png?raw=true" width="1300" title="hover text">
+  <img src="https://github.com/cridonoso/astromer/blob/astromer-ii/presentation/figures/logo.png?raw=true" width="1300" title="hover text">
 </p>
 
 Welcome to the main repository of the ASTROMER project. This is the **stable
