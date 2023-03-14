@@ -104,38 +104,32 @@ class Encoder(tf.keras.layers.Layer):
 
 class EncoderSKIP(tf.keras.layers.Layer):
     def __init__(self, num_layers, d_model, num_heads, dff,
-                 base=10000, dropout=0.1, use_leak=False, pe_v2=False, **kwargs):
+                 base=1000, dropout=0.1, pe_c=1., **kwargs):
         super(EncoderSKIP, self).__init__(**kwargs)
 
         self.d_model = d_model
         self.num_layers = num_layers
         self.base = base
-        self.pe_v2 = pe_v2
+        self.pe_c = pe_c
+        self.pe = PositionalEncoder(d_model, base=base, c=pe_c, name='PosEncoding')
         self.inp_transform = tf.keras.layers.Dense(d_model)
-        self.enc_layers = [EncoderLayer(d_model, num_heads, dff, dropout, use_leak)
+        self.enc_layers = [EncoderLayer(d_model, num_heads, dff, dropout, False)
                             for _ in range(num_layers)]
         self.dropout = tf.keras.layers.Dropout(dropout)
 
     def call(self, data, training=False):
         # adding embedding and position encoding.
-        x_pe = positional_encoding(data['times'],
-                                   self.d_model,
-                                   base=self.base,
-                                   mjd=True,
-                                   v2=self.pe_v2)
-
+        x_pe = self.pe(data['times'])
         x_transformed = self.inp_transform(data['input'])
         transformed_input = x_transformed + x_pe
 
         x = self.dropout(transformed_input, training=training)
-
         layers_outputs = []
         for i in range(self.num_layers):
             z =  self.enc_layers[i](x, mask=data['mask_in'])
             layers_outputs.append(z)
 
         x = tf.reduce_mean(layers_outputs, 0)
-
         return x  # (batch_size, input_seq_len, d_model)
 
     def get_config(self):
@@ -144,7 +138,7 @@ class EncoderSKIP(tf.keras.layers.Layer):
             "d_model": self.d_model,
             "num_layers": self.num_layers,
             "base": self.base,
-            "pe_v2": self.pe_v2,
+            "pe_c": self.pe_c,
             "dropout": self.dropout
         })
         return config
