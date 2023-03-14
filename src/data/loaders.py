@@ -84,8 +84,8 @@ def pretraining_pipeline(dataset,
                          cache=False,
                          return_ids=False,
                          return_lengths=False,
-                         nsp_prob=1.,
-                         nsp_frac=0.,
+                         nsp_prob=None,
+                         nsp_frac=None,
                          moving_window=False,
                          nsp_test=False):
     """
@@ -151,7 +151,7 @@ def pretraining_pipeline(dataset,
               'mask_in': [None, None],
               'mask_out': [None, None]}
 
-    if nsp_frac>0. and nsp_prob<=1.:
+    if nsp_frac is not None and nsp_prob is not None:
         print('[INFO] Using NSP')
         print('[INFO] Mov. win: ',moving_window)
         dataset = nsp_dataset(dataset,

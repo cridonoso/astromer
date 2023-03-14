@@ -1,0 +1,93 @@
+[general]
+code_root     = '.'
+creation_date = '09-21-2022'
+gpu           = 0
+
+[astromer]
+layers        = 2
+heads         = 4
+head_dim      = 64
+dff           = 128
+dropout       = 0.1 # not used
+window_size   = 200 # Maximum input length
+
+[nsp]
+probability = 0.5
+fraction    = 0.5
+
+[masking]
+mask_frac = 0.5
+rnd_frac  = 0.2
+same_frac = 0.2
+
+[positional]
+base     = 1000
+alpha	 = 1
+
+[pretraining]
+exp_path      = './results/template/' # CHANGE
+lr            = 1e-3
+scheduler     = true # if true then "lr" is not considered
+epochs        = 10000
+patience      = 40
+[pretraining.data]
+path          = './data/records/atlas_50'
+spc           = -1
+fold          = 0
+target        = 'atlas'
+batch_size    = 2500
+repeat        = 4 # Train subset only
+sampling      = true
+normalize     = true
+shuffle_train = true
+shuffle_val   = false
+shuffle_test  = false
+cache_train   = true
+cache_val     = true
+cache_test    = false
+
+[finetuning]
+exp_path   = './results/finetuning/template'
+weights    = './results/template' #pre-trained weights
+lr         = 1e-3
+scheduler  = true # if true then "lr" is not considered
+epochs     = 10000
+patience   = 20
+[finetuning.data]
+path          = './data/records/atlas_50'
+spc 		  = 50
+fold 		  = 0
+target		  = 'atlas'
+batch_size    = 512
+repeat        = 1 # Train subset only
+sampling      = false
+normalize     = true
+shuffle_train = true
+shuffle_val   = false
+shuffle_test  = false
+cache_train   = true
+cache_val     = false
+cache_test    = false
+
+[classification]
+exp_path         = './results/classification/template'
+weights          = './results/finetuning/template' # pre-trained weights
+train_astromer   = false
+lr               = 1e-3
+epochs           = 10000
+patience         = 20
+[classification.data]
+path          = './data/records/atlas_50'
+spc 		  = 50
+fold 		  = 0
+target		  = 'atlas'
+batch_size    = 512
+repeat        = 1 # Train subset only
+sampling      = false
+normalize     = true
+shuffle_train = true
+shuffle_val   = false
+shuffle_test  = false
+cache_train   = true
+cache_val     = true
+cache_test    = false

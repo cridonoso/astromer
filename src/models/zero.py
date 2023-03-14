@@ -29,8 +29,8 @@ def get_ASTROMER(num_layers=2,
                  dropout=0.1,
                  no_train=True, # WARNING
                  maxlen=100,
-                 batch_size=None):
-
+                 batch_size=None,
+                 pe_c=False):
     placeholder = build_input(maxlen)
 
     encoder = Encoder(num_layers,
@@ -39,6 +39,7 @@ def get_ASTROMER(num_layers=2,
                       dff,
                       base=base,
                       dropout=dropout,
+                      pe_c=pe_c,
                       name='encoder')
 
     if no_train:
