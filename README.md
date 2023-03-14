@@ -4,30 +4,75 @@
   <img src="https://github.com/cridonoso/astromer/blob/astromer-ii/presentation/figures/logo.png?raw=true" width="600" title="hover text">
 </p>
 
-Welcome to the main repository of the ASTROMER project. This is the **stable
-version 0** where you can find all the resources associated to the article: 
-[ASTROMER: A transformer-based embedding for the representation of light curves](https://arxiv.org/abs/2205.01677).
+Welcome to the latest version of ASTROMER. This repository may not be aligned with the [Python Package](https://github.com/astromer-science/python-library), since most of the updates have not been published yet. Source code associated to the paper publication can be found [in this repository](https://github.com/astromer-science/main-code).
 
-ASTROMER is a transformer-based model that learns **light curves representations** 
-using millions of light curves. 
+## About ASTROMER
+ASTROMER is a deep learning model that can encode single-band light curves using internal representations. The encoding process consists of creating embeddings of light curves, which are features that summarize the variability of the brightness over time.   
 
-Representation are then used for extracting 
-useful **embeddings** that we can use for training another downstream tasks.
-
-
-
-
-
+Training ASTROMER from scratch can be expensive. However, we provide pre-trained weights that can be used to load representations already adjusted on millions of samples. Users can then easily fine-tune the model on new data. Fine-tuning involves training the pre-trained model on new datasets, which are typically smaller than the pre-training dataset.
 
 ## Features
-
-- Pre-trained weights from MACHO R-band light curves
-- Visualization jupyter notebooks (`/presentation/notebooks/*`)
-- Scripts for training, finetuning and classify using ASTROMER (`/presentation/scripts/*`)
-- Model implementation (`/core/astromer.py` and related)
-- Data preprocessing, saving and reading [tf.Records](https://www.tensorflow.org/tutorials/load_data/tfrecord) (`/core/data.py`)
+- BERT-based masking technique
+- Next Segment Prediction available
+- Skip connections between attention layers
+- Pre-trained weights
+  - MACHO R-band light curves
+  - ATLAS 
+  - ~ZTF~
+- Predefined experiments to reproduce publication results (`presentation/experiments/*`)
+- Data preprocessing, saving and reading [tf.Records](https://www.tensorflow.org/tutorials/load_data/tfrecord) (`/src/data.py`)
 - Dockerfile and scripts for building (`build_container.sh`) and run (`run_container.sh`) the ASTROMER container
 
+## Directory tree
+```
+📦astromer
+ ┣ 📂data
+ ┃ ┣ 📜 get_data.sh: download data (raw and preprocessed) from gdrive
+ ┃ ┗ 📜 README.md: instructions how to use get_data.sh 
+ ┣ 📂 presentation: everything that depends on the model code (i.e., experiments, plots and figures)
+ ┃ ┣ 📂 experiments: experiments folder
+ ┃ ┃ ┣ 📂 astromer_0: published version experiments
+ ┃ ┃ ┗ 📂 astromer_2: latest version experiments
+ ┃ ┣ 📂 figures
+ ┃ ┣ 📂 notebooks: util notebooks to visualize data
+ ┃ ┣ 📜 template.toml: template to run pipelines within the experiments subdirectories
+ ┃ ┗ 📜 utils.py: useful and general functions to create pipelines
+ ┣ 📂 src: Model source code
+ ┃ ┗ 📂 data: functions related to data manipulation
+ ┃ ┃ ┣ 📜 loaders.py: main script containing functions to load and format data
+ ┃ ┃ ┣ 📜 masking.py: masking functions inspired on BERT training strategy
+ ┃ ┃ ┣ 📜 nsp.py: next sentence prediction functions inspired on BERT training strategy
+ ┃ ┃ ┣ 📜 preprocessing.py: general functions to standardize, cut windows, among others.
+ ┃ ┃ ┗ 📜 record.py: functions to create and load tensorflow record files
+ ┃ ┗ 📂 layers: Custom layers used to build ASTROMER model
+ ┃ ┃ ┣ 📜 attention.py: Multihead attention
+ ┃ ┃ ┣ 📜 custom_rnn.py: Custom LSTM with normalization inside the recurrence (used in https://arxiv.org/abs/2106.03736)
+ ┃ ┃ ┣ 📜 encoder.py: Encoder layers that mixed self-attention layers and (non)linear transformations.
+ ┃ ┃ ┣ 📜 output.py: Output layers that take the embeddings and project them to other spaces (regression/classification)
+ ┃ ┃ ┗ 📜 positional.py: Positional encoder class
+ ┃ ┗ 📂 losses
+ ┃ ┃ ┣ 📜 bce.py: Masked binary cross-entropy (used with NSP)
+ ┃ ┃ ┗ 📜 rmse.py: Masked root mean square error
+ ┃ ┗ 📂 metrics
+ ┃ ┃ ┣ 📜 acc.py: masked accuracy
+ ┃ ┃ ┗ 📜 r2.py: masked r-square
+ ┃ ┗ 📂 models: ASTROMER model architectures
+ ┃ ┃ ┣ 📜 nsp.py: ASTROMER + NSP
+ ┃ ┃ ┣ 📜 second.py: ASTROMER + NSP + SkipCon
+ ┃ ┃ ┣ 📜 skip.py: ASTROMER + SkipCon
+ ┃ ┃ ┗ 📜 zero.py: ASTROMER
+ ┃ ┗ 📂 training
+ ┃ ┃ ┗ 📜 scheduler.py: Custom scheduler presented in https://arxiv.org/abs/1706.03762
+ ┃ ┣ 📜 __init__.py
+ ┃ ┗ 📜 utils.py: universal functions to use on different ASTROMER modules
+ ┣ 📜 .gitignore: files that should not be considered during a GitHub push
+ ┣ 📜 .dockerignore: files to exclude when building a Docker container.
+ ┣ 📜 build_container.sh: script to build the ASTROMER Docker image
+ ┣ 📜 run_container.sh: script to run the ASTROMER Docker image (up container)
+ ┣ 📜 Dockerfile: Docker image definition
+ ┣ 📜 requirements.txt: python dependencies
+ ┗ 📜 README.md: what you are currently reading
+ ```
 ## Get started
 
 We recomend to use [Docker](https://docs.docker.com/get-docker/) since it provides a **kernel-isolated** 
@@ -67,25 +112,8 @@ tensorboard --logdir <my-logs-folder> --host 0.0.0.0
 Finally, **if you do not want to use Docker** the `requirements.txt` file contains 
 all the packages needed to run ASTROMER.
 Use `pip install -r requirements.txt` on your local python to install them.
-## Usage/Examples
 
-We recomend to save data in tf.Records format.
-For creating records jump to the [create records tutorial](https://github.com/cridonoso/astromer/blob/main/presentation/notebooks/create_records.ipynb)
-
-Otherwise, if you have numpy-based light curves, use [`load_numpy()`](https://github.com/cridonoso/astromer/blob/main/core/data.py) function.
-
-For pre-training run [`train.py`](https://github.com/cridonoso/astromer/blob/main/presentation/scripts/train.py)
-```
-python -m presentation.scripts.train --data ./data/records/macho
-```
-To see the `--tag` options use `--help`. For example, 
-```
-python -m presentation.scripts.finetuning --help
-```
-The [pre-training](https://github.com/cridonoso/astromer/blob/main/presentation/scripts/train.py), 
-[finetuning](https://github.com/cridonoso/astromer/blob/main/presentation/scripts/finetuning.py), 
-and [classification](https://github.com/cridonoso/astromer/blob/main/presentation/scripts/classify.py) 
-scripts work in the same way.
+## USAGE
 
 ## Contributing
 
