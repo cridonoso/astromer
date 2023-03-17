@@ -4,10 +4,10 @@ scikit-learn
 notebook
 graphviz
 seaborn
+tomli_w
 joblib
 pandas
-optuna
 pydot
 tqdm
 tomli
-tomli_w
+wandb
