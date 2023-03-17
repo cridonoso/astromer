@@ -17,9 +17,8 @@ class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
         return tf.math.rsqrt(self.d_model) * tf.math.minimum(arg1, arg2)
 
     def get_config(self):
-        config = super().get_config()
-        config.update({
+        config = {
             "d_model": self.d_model,
             "warmup_steps": self.warmup_steps,
-        })
+        }
         return config
