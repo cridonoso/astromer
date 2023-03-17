@@ -1,20 +1,49 @@
 '''
-HYPERPARAMETER TUNNING USING OPTUNA 
+HYPERPARAMETER TUNNING USING WANDB 
 BY Cristobal 2023
 '''
 import tensorflow as tf
-import optuna 
+import wandb
+import sys
 import os
 
-from tensorflow.keras import Model
-from tensorflow.keras.layers import Dense, Conv1D, Flatten
+from wandb.keras import WandbCallback
+
 from src.training import CustomSchedule
 from src.models import get_ASTROMER, build_input
 from src.data import pretraining_pipeline
-from optuna.integration import TFKerasPruningCallback, OptunaCallback
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.losses     import CategoricalCrossentropy
 
+from sklearn.metrics import precision_recall_fscore_support
+
+from tensorflow.keras.losses     import CategoricalCrossentropy
+from tensorflow.keras.layers 	 import Dense, Conv1D, Flatten
+from tensorflow.keras 			 import Model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks  import (ModelCheckpoint,
+                                         EarlyStopping,
+                                         TensorBoard)
+
+os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1] # which gpu to use
+
+sweep_conf = {
+	'name': 'my_sweep',
+	'method': 'bayes',
+	'metric': {'goal': 'maximize', 'name': 'f1'},
+	'parameters': {
+		'n_layers': {'values':[1, 2, 4, 6, 8]},
+		'n_heads': {'values':[1, 2, 4, 8, 16]},
+		'head_dim': {'values':[16, 32, 64, 128, 256]},
+		'dff': {'values':[16, 32, 64, 128, 256]},
+		'dropout_rate': {'distribution':'uniform', 'min':.0, 'max':.5},
+	},
+	'early_terminate': {
+		'type': 'hyperband',
+		's': 2,
+		'eta': 3,
+		'max_iter': 100
+	},
+	'total_runs': 100
+}
 
 def create_classifier(astromer, z_dim, num_cls, n_steps=200, name='mlp_att'):
 	placeholder = build_input(n_steps)
@@ -28,19 +57,21 @@ def create_classifier(astromer, z_dim, num_cls, n_steps=200, name='mlp_att'):
 	x = Dense(num_cls)(x)
 	return Model(inputs=placeholder, outputs=x, name=name)
 
-def objetive(trial):
+def main():
 
-	n_layers 	 = trial.suggest_int('n_layers', 1, 8)
-	n_heads  	 = trial.suggest_int('n_heads', 1, 8)
-	head_dim 	 = trial.suggest_categorical('head_dim', [16, 32, 64, 128, 256])
-	dff  		 = trial.suggest_int('dff', 32, 256)
-	dropout_rate = trial.suggest_uniform('dropout_rate', 0.1, 0.5)
+	run = wandb.init(project='astromer_0')
+
+	n_layers 	 = wandb.config.n_layers
+	n_heads  	 = wandb.config.n_heads
+	head_dim 	 = wandb.config.head_dim
+	dff  		 = wandb.config.dff
+	dropout_rate = wandb.config.dropout_rate
 
 	batch_size = 256 # Max batch size based on the heaviest model
 	window_size = 200
-	data_path = './data/records/macho'
-
+	data_path = './data/records/macho/{}'
 	d_model = head_dim*n_heads
+
 	astromer =  get_ASTROMER(num_layers=n_layers,
 							 d_model=d_model,
 							 num_heads=n_heads,
@@ -53,19 +84,17 @@ def objetive(trial):
 	optimizer = Adam(lr, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
 	astromer.compile(optimizer=optimizer)
 
-	batch_size = (total_params * 661505)
-
 	data = dict()
 	for subset in ['train', 'val']:
-		data[subset] = pretraining_pipeline(data_path, batch_size, window_size, .5, .2,	.2,
+		data[subset] = pretraining_pipeline(data_path.format(subset), batch_size, window_size, .5, .2,	.2,
 											sampling=True, shuffle=True, repeat=1, num_cls=None,
 											normalize=True, cache=True)
 
 	earlystop_callback   = EarlyStopping(monitor='val_loss', patience = 20, restore_best_weights=True),
-	checkpoint_callback  = ModelCheckpoint(filepath=f'./results/hp/trial_{trial.number}/pretraining/model_weights.h5', save_best_only=True)
-	tensorboard_callback = TensorBoard(log_dir=f'./results/hp/trial_{trial.number}/pretraining/logs')
-	optuna_callback      = OptunaCallback(trial, metric_name='val_loss')
-	pruning_callback     = TFKerasPruningCallback(trial, 'val_loss')
+	checkpoint_callback  = ModelCheckpoint(filepath=f'./results/hp/trial_{wandb.run.id}/pretraining/model_weights.h5', 
+										   save_best_only=True)
+	tensorboard_callback = TensorBoard(log_dir=f'./results/hp/trial_{wandb.run.id}/pretraining/logs')
+	wandb_callback 		 = WandbCallback()
 
 	astromer.fit(data['train'],
 	 			 epochs=10000,
@@ -73,8 +102,8 @@ def objetive(trial):
 				 callbacks=[earlystop_callback, 
 				 			checkpoint_callback, 
 				 			tensorboard_callback, 
-				 			optuna_callback,
-				 			pruning_callback])
+				 			wandb_callback])
+       
 	# ==========================================================================================
 	# ======= CLASSIFICATION ===================================================================
 	# ==========================================================================================
@@ -89,29 +118,35 @@ def objetive(trial):
 			batch_size,	200, 0., 0., 0., False,	True, repeat=1,	num_cls=num_cls,
 			normalize=True, cache=True)
 
-		clf_model = create_classifier(astromer, d_model, num_cls, n_steps=window_size, name='mlp_att')
-		optimizer = Adam(learning_rate=1e-3)
-		clf_model.compile(optimizer=optimizer,
-						  loss=CategoricalCrossentropy(from_logits=True),
-						  metrics='accuracy')
+	clf_model = create_classifier(astromer, d_model, num_cls, n_steps=window_size, name='mlp_att')
+	optimizer = Adam(learning_rate=1e-3)
+	clf_model.compile(optimizer=optimizer,
+					  loss=CategoricalCrossentropy(from_logits=True),
+					  metrics='accuracy')
 
-		earlystop_callback   = EarlyStopping(monitor='val_loss', patience = 20, restore_best_weights=True),
-		tensorboard_callback = TensorBoard(log_dir=f'./results/hp/trial_{trial.number}/classification')
-		optuna_callback      = OptunaCallback(trial, metric_name='val_loss')
-		pruning_callback     = TFKerasPruningCallback(trial, 'val_loss')
+	earlystop_callback   = EarlyStopping(monitor='val_loss', patience = 20, restore_best_weights=True),
+	tensorboard_callback = TensorBoard(log_dir=f'./results/hp/trial_{wandb.run.id}/classification')
 
-		_ = clf_model.fit(data['train'],
-						  epochs=1000,
-						  callbacks=[earlystop_callback,
-									 tensorboard_callback,
-									 optuna_callback],
-						  validation_data=data['val'])
+	_ = clf_model.fit(data['train'],
+					  epochs=1000,
+					  callbacks=[earlystop_callback,
+								 tensorboard_callback],
+					  validation_data=data['val'])
 
-		loss, acc = clf_model.evaluate(data['val'])
-		
-		optuna.report(acc, step=trial.epoch)
-		return acc
+	y_pred = clf_model.predict(data['val'])
+	y_true = tf.concat([y for _, y in data['val']], 0)
 
-study = optuna.create_study(direction='maximize')
-study.optimize(objective, n_trials=100, n_jobs=2)
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
+	pred_labels = tf.argmax(y_pred, 1)
+	true_labels = tf.argmax(y_true, 1)
+
+	p, r, f, _ = precision_recall_fscore_support(true_labels,
+	                                             pred_labels,
+	                                             average='macro',
+	                                             zero_division=0.)
+
+	wandb.log({'f1':f})
+
+sweep_id = wandb.sweep(sweep=sweep_conf, project='astromer_0')
+wandb.agent(sweep_id,
+			function=main, 
+			count=1)
