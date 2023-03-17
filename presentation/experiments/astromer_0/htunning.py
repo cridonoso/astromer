@@ -7,7 +7,7 @@ import wandb
 import sys
 import os
 
-from wandb.keras import WandbCallback
+from wandb.keras import WandbMetricsLogger
 
 from src.training import CustomSchedule
 from src.models import get_ASTROMER, build_input
@@ -94,12 +94,12 @@ def main():
 	checkpoint_callback  = ModelCheckpoint(filepath=f'./results/hp/trial_{wandb.run.id}/pretraining/model_weights.h5', 
 										   save_best_only=True)
 	tensorboard_callback = TensorBoard(log_dir=f'./results/hp/trial_{wandb.run.id}/pretraining/logs')
-	wandb_callback 		 = WandbCallback()
+	wandb_callback 		 = WandbMetricsLogger()
 
-	astromer.fit(data['train'],
-	 			 epochs=10000,
-				 validation_data=data['val'], 
-				 callbacks=[earlystop_callback, 
+	_ = astromer.fit(data['train'],
+	 			 		epochs=10000,
+				 		validation_data=data['val'], 
+				 		callbacks=[earlystop_callback, 
 				 			checkpoint_callback, 
 				 			tensorboard_callback, 
 				 			wandb_callback])
