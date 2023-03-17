@@ -67,7 +67,7 @@ def main():
 	dff  		 = wandb.config.dff
 	dropout_rate = wandb.config.dropout_rate
 
-	batch_size = 256 # Max batch size based on the heaviest model
+	batch_size = 10 # Max batch size based on the heaviest model
 	window_size = 200
 	data_path = './data/records/macho/{}'
 	d_model = head_dim*n_heads
@@ -91,16 +91,16 @@ def main():
 											normalize=True, cache=True)
 
 	earlystop_callback   = EarlyStopping(monitor='val_loss', patience = 20, restore_best_weights=True),
-	checkpoint_callback  = ModelCheckpoint(filepath=f'./results/hp/trial_{wandb.run.id}/pretraining/model_weights.h5', 
-										   save_best_only=True)
+	# checkpoint_callback  = ModelCheckpoint(filepath=f'./results/hp/trial_{wandb.run.id}/pretraining/model_weights.h5', 
+	# 									   save_best_only=True)
 	tensorboard_callback = TensorBoard(log_dir=f'./results/hp/trial_{wandb.run.id}/pretraining/logs')
 	wandb_callback 		 = WandbMetricsLogger()
 
-	_ = astromer.fit(data['train'],
+	_ = astromer.fit(data['train'].take(1),
 	 			 		epochs=10000,
-				 		validation_data=data['val'], 
+				 		validation_data=data['val'].take(1), 
 				 		callbacks=[earlystop_callback, 
-				 			checkpoint_callback, 
+				 			# checkpoint_callback, 
 				 			tensorboard_callback, 
 				 			wandb_callback])
        
