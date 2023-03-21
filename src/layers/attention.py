@@ -65,7 +65,7 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
     def call(self, x, mask):
         batch_size = tf.shape(x)[0]
 
-        x = tf.multiply(x, mask)
+        x = tf.multiply(x, mask) # masking outside attention
 
         q = self.wq(x)  # (batch_size, seq_len, d_model)
         k = self.wk(x)  # (batch_size, seq_len, d_model)
