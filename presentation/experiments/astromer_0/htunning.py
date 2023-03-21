@@ -88,7 +88,7 @@ def main():
 
 	data = dict()
 	for subset in ['train', 'val']:
-		data[subset] = pretraining_pipeline(data_path.format(subset), batch_size, window_size, .5, .2,	.2,
+		data[subset] = pretraining_pipeline(data_path.format(subset), batch_size, window_size, .2, .1, .1,
 											sampling=True, shuffle=True, repeat=1, num_cls=None,
 											normalize=True, cache=True)
 
