@@ -37,12 +37,6 @@ sweep_conf = {
 		'dff': {'values':[16, 32, 64, 128, 256]},
 		'dropout_rate': {'distribution':'uniform', 'min':.0, 'max':.5},
 	},
-	'early_terminate': {
-		'type': 'hyperband',
-		's': 2,
-		'eta': 3,
-		'max_iter': 100
-	},
 	'total_runs': 100
 }
 
