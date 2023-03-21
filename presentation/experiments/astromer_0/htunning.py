@@ -33,7 +33,7 @@ sweep_conf = {
 	'parameters': {
 		'n_layers': {'values':[1, 2, 4, 6, 8]},
 		'n_heads': {'values':[1, 2, 4, 8, 16]},
-		'head_dim': {'values':[16, 32, 64, 128, 256]},
+		'head_dim': {'values':[16, 32, 64, 128]},
 		'dff': {'values':[16, 32, 64, 128, 256]},
 		'dropout_rate': {'distribution':'uniform', 'min':.0, 'max':.5},
 	},
@@ -58,6 +58,11 @@ def create_classifier(astromer, z_dim, num_cls, n_steps=200, name='mlp_att'):
 	x = Dense(num_cls)(x)
 	return Model(inputs=placeholder, outputs=x, name=name)
 
+def get_batchsize(model):
+	known_params = 662019
+	known_bs  	 = 2000
+	return int((known_params*known_bs)/model.count_params())
+
 def main():
 
 	run = wandb.init(project='astromer_0')
@@ -68,7 +73,6 @@ def main():
 	dff  		 = wandb.config.dff
 	dropout_rate = wandb.config.dropout_rate
 
-	batch_size = 10 # Max batch size based on the heaviest model
 	window_size = 200
 	data_path = './data/records/macho/{}'
 	d_model = head_dim*n_heads
@@ -81,6 +85,7 @@ def main():
 							 dropout=dropout_rate,
 							 maxlen=window_size,
 							 pe_c=1.)
+	batch_size = get_batchsize(astromer)
 	lr = CustomSchedule(d_model)
 	optimizer = Adam(lr, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
 	astromer.compile(optimizer=optimizer)
@@ -116,7 +121,7 @@ def main():
 
 		data[subset] = pretraining_pipeline(
 			f'./data/records/alcock/fold_{fold_n}/alcock_50/{subset}',
-			batch_size,	200, 0., 0., 0., False,	True, repeat=1,	num_cls=num_cls,
+			512, 200, 0., 0., 0., False,	True, repeat=1,	num_cls=num_cls,
 			normalize=True, cache=True)
 
 	clf_model = create_classifier(astromer, d_model, num_cls, n_steps=window_size, name='mlp_att')
