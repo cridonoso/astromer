@@ -3,6 +3,7 @@ HYPERPARAMETER TUNNING USING WANDB
 BY Cristobal 2023
 '''
 import tensorflow as tf
+import pandas as pd
 import wandb
 import sys
 import os
