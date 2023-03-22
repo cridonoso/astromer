@@ -153,5 +153,4 @@ def main():
 
 sweep_id = wandb.sweep(sweep=sweep_conf, project='astromer_0')
 wandb.agent(sweep_id,
-			function=main, 
-			count=1)
+			function=main)
