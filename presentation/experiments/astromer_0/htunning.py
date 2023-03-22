@@ -55,7 +55,10 @@ def create_classifier(astromer, z_dim, num_cls, n_steps=200, name='mlp_att'):
 def get_batchsize(model):
 	known_params = 662019
 	known_bs  	 = 2000
-	return int((known_params*known_bs)/model.count_params())
+	batch_size 	 = int((known_params*known_bs)/model.count_params())
+	if batch_size > 2000:
+		batch_size = 2000
+	return batch_size
 
 def main():
 
