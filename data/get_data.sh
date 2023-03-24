@@ -5,6 +5,8 @@ dictionary["macho"]="1ReqDHn9jKPIS_g8Xm0ThYUDM-XaLcUP3"
 dictionary["ogle"]="1L1oiq9pRRGpOVm13b2dyCQhMiVFn3o7x"
 dictionary["atlas"]="1pMzeL9BAwMXqra9iFUHLpGyclJzz-VM9"
 
+dictionary['macho_r_parquets']='1nCdUoIoKhnvDdF66LuEnNSGmlmHzqFyp'
+
 dictionary["alcock-record"]="1bEETbIgsVjhpkfR0LdYxnYQ8eeaq4wol"
 dictionary["macho-record"]="1QLXAsTkaryYUqhjKAM0wh6XKh3tG1M0k"
 dictionary["ogle-record"]="1Ei5PZ13LjJ44tA2iBOkDHPueGbLlTl2C"
