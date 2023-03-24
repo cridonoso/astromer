@@ -70,7 +70,7 @@ def main():
 	head_dim 	 = wandb.config.head_dim
 	dff  		 = wandb.config.dff
 	dropout_rate = wandb.config.dropout_rate
-	learning_rate = wandb.config.learning_rate
+	learning_rate = wandb.config.lr
 
 	window_size = 200
 	data_path = './data/records/macho/{}'
