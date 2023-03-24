@@ -1,7 +1,7 @@
 #!/bin/bash
  
 
-phycores=$(echo $sudoPW|cat - /proc/cpuinfo|grep -m 1 "cpu cores"|awk '{print $ 4;}')
+phycores=$(nproc)
 
 echo $phycores  
 
