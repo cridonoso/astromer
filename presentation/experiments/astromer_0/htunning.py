@@ -85,7 +85,7 @@ def main():
 	batch_size = get_batchsize(astromer)
 	wandb.log({'batch_size':batch_size})
 
-	lr = CustomSchedule(d_model)
+	lr = 1e-3#CustomSchedule(d_model)
 	optimizer = Adam(lr, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
 	astromer.compile(optimizer=optimizer)
 
