@@ -2,12 +2,12 @@ import multiprocessing as mp
 import tensorflow as tf
 import pandas as pd
 import numpy as np
-
+import polars as pl
 import os
-
-from joblib import wrap_non_picklable_objects
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+# from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
-from zipfile import ZipFile
+# from zipfile import ZipFile
 from io import BytesIO
 from tqdm import tqdm
 
@@ -56,34 +56,45 @@ class DataPipeline:
         self.metadata['subset_0'] = ['full']*self.metadata.shape[0]
 
         os.makedirs(output_folder, exist_ok=True)
-
+        
     @staticmethod
-    def get_example(lightcurve, context_features_values):
+    def aux_serialize(sel, path):
+        with tf.io.TFRecordWriter(path) as writer:
+            for lc in sel:
+                ex = DataPipeline.get_example(lc)
+                writer.write(ex.SerializeToString())       
+        
+    @staticmethod
+    def get_example(row, context_features=['ID', 'Label', 'Class']):
+        
         """
-        Create a record example from numpy values.
+        Create a record example from numpy values in a list of dictionaries.
         Serialization
         Args:
-            lightcurve (numpy array): time, magnitudes and observational error
-            context_features_values: NONE
+            row (dictionary): Keys ['ID', 'mjd', 'mag', 'Class', 'Path', 'Band', 'newID', 'Label'])
+            context_features_values: ['ID', 'Label', 'Class']
         Returns:
             tensorflow record example
         """
         dict_features = dict()
-        for name, value in context_features_values.items():
-            dict_features[name] = parse_dtype(value)
+        for name in context_features:
+            dict_features[name] = parse_dtype(row[name])
 
         element_context = tf.train.Features(feature = dict_features)
 
         dict_sequence = dict()
-        for col in range(lightcurve.shape[1]):
-            seqfeat = _float_feature(lightcurve[:, col])
+        time = row['mjd']
+        mag = row['mag']
+        lightcurve = [time, mag]
+        for col in range(len(lightcurve)):
+            seqfeat = _float_feature(lightcurve[col][:])
             seqfeat = tf.train.FeatureList(feature = [seqfeat])
             dict_sequence['dim_{}'.format(col)] = seqfeat
 
         element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
         ex = tf.train.SequenceExample(context = element_context,
                                       feature_lists= element_lists)
-        return ex
+        return ex    
 
     def train_val_test(self,
                        val_frac=0.2,
@@ -132,52 +143,104 @@ class DataPipeline:
             self.metadata = pd.concat([self.metadata, val_meta[k], test_meta[k]])
 
 
-    @staticmethod
-    def process_sample(row:pd.Series, context_features:list, sequential_features:list):
-        observations = pd.read_csv(row['Path'])
-        observations.columns = ['mjd', 'mag', 'errmag']
-        observations = observations.dropna()
-        observations.sort_values('mjd')
-        observations = observations.drop_duplicates(keep='last')
-        observations = observations[sequential_features]
-        context_features_values = row[context_features].to_dict()
-        return observations, context_features_values
+    def prepare_data(self, container, elements_per_shard, subset, fold_n):
+        """Prepare the data to be saved as records"""
+        
+        # Number of objects in the split
+        N = self.metadata.shape[0]
+        # Compute the number of shards
 
-    @classmethod
-    def __process_sample__(cls, *args):
-        var = cls.process_sample(*args)
-        return var
+        n_shards = -np.floor_divide(N, -elements_per_shard)
+        # Number of characters of the padded number of shards
+        name_length = len(str(n_shards))
+
+        # Create one file per shard
+        shard_paths = []
+        for shard in range(n_shards):
+            # Get the shard number padded with 0s
+            shard_name = str(shard+1).rjust(name_length, '0')
+            # Get the shard store name
+            shard_path= os.path.join(self.output_folder, subset+'_{}_{}.record'.format(fold_n, shard_name))
+            # Save it into a list
+            shard_paths.append(shard_path)
+
+        shards_data = []
+        for j in range(len(shard_paths)):
+            sel = container[j*elements_per_shard:(j+1)*elements_per_shard]
+            shards_data.append(sel)        
+        return shards_data, shard_paths
+    
+    
+    def read_all_parquets(self, path_parquets, metadata_path):
+        """Read the files """
+        # Read the parquet filez lazily
+        paths = os.path.join(path_parquets, '*.parquet')
+        scan = pl.scan_parquet(paths)
+        
+        # Using partial information, extract only the necessary objects
+        # Define filters
+        ID_series = pl.Series(self.metadata['newID'].values)
+        f1 = pl.col("newID").is_in(ID_series)
+        f2 = pl.col("err")<1 # Clean the data on the big lazy dataframe
+        # Define groupby functions
+        # func1 cleans the data
+        func1 = lambda group_df: group_df.sort("mjd")
+        # Filter, drop nulls, and sort every object
+        new_df = scan.filter(f1 & f2).drop_nulls().groupby('newID').apply(func1, schema=None)
+
+        # Select only the relevant columns
+        # IMPROVE
+        select_columns =  ["mjd", "mag"]
+        new_df = new_df.select(["newID"]+select_columns)
+
+        # Mix metadata and the data
+        new_df = new_df.groupby('newID').all()
+        # display(print(new_df))
+        # First run takes more time!
+        metadata_lazy = pl.scan_parquet(metadata_path, cache=True) # First run is slower
+        # display(print(metadata_lazy))        
+        # Perform the join to get the data
+        new_df = new_df.join(other=metadata_lazy, on='newID').collect(streaming=True) #streaming might be useless.                    
+        return new_df
+    
+
 
     def resample_folds(self, n_folds=1):
         print('[INFO] Creating {} random folds'.format(n_folds))
         print('Not implemented yet hehehe...')
 
-    def run(self, n_jobs=1):
-        threads = Parallel(n_jobs=n_jobs, backend='multiprocessing')
+    def run(self, path_parquets, metadata_path, n_jobs=1, elements_per_shard=5000):
+        # threads = Parallel(n_jobs=n_jobs, backend='threading')
         fold_groups = [x for x in self.metadata.columns if 'subset' in x]
+        
 
         pbar = tqdm(fold_groups, colour='#00ff00') # progress bar
+        
+        new_df = self.read_all_parquets(path_parquets, metadata_path)
+        self.new_df = new_df
         for fold_n, fold_col in enumerate(fold_groups):
 
-            for subset in self.metadata[fold_col].unique():
+            for subset in self.metadata[fold_col].unique():               
                 # ============ Processing Samples ===========
                 pbar.set_description("Processing {} {}".format(subset, fold_col))
                 partial = self.metadata[self.metadata[fold_col] == subset]
-
-                var = threads(delayed(self.__process_sample__)(row,
-                                                               self.context_features,
-                                                               self.sequential_features)\
-                                              for _, row in partial.iterrows())
+                
+                # Transform into a appropiate representation
+                index = partial.newID
+                b = np.isin(new_df['newID'].to_numpy(), index)
+                container = new_df.filter(b).to_numpy()  
+                
                 # ============ Writing Records ===========
                 pbar.set_description("Writting {} fold {}".format(subset, fold_n))
                 output_file = os.path.join(self.output_folder, subset+'_{}.record'.format(fold_n))
-                with tf.io.TFRecordWriter(output_file) as writer:
-                    for observations, context in var:
-                        ex = DataPipeline.get_example(observations.values, context)
-                        writer.write(ex.SerializeToString())
-
-        return var
-
+                
+                shards_data,shard_paths = self.prepare_data(container, elements_per_shard, subset, fold_n)
+                    
+                # Idea from
+                with ThreadPoolExecutor(n_jobs) as exe:
+                    # submit tasks to generate files
+                    _ = [exe.submit(DataPipeline.aux_serialize, shard,shard_path) for shard, shard_path in zip(shards_data,shard_paths)]
+                
 
 def deserialize(sample):
     """
