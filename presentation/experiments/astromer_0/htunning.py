@@ -102,14 +102,15 @@ def main():
 	tensorboard_callback = TensorBoard(log_dir=f'./results/hp/trial_{wandb.run.id}/pretraining/logs')
 	wandb_callback 		 = WandbMetricsLogger()
 
-	_ = astromer.fit(data['train'],
-	 			 		epochs=10000,
-				 		validation_data=data['val'], 
-				 		callbacks=[earlystop_callback, 
-				 			# checkpoint_callback, 
-				 			tensorboard_callback, 
-				 			wandb_callback])
-       
+	history_logs = astromer.fit(data['train'],
+	 			 				epochs=10000,
+				 				validation_data=data['val'], 
+				 				callbacks=[earlystop_callback, 
+							 			  # checkpoint_callback, 
+							 			  tensorboard_callback, 
+							 			  wandb_callback])
+	wandb.log(history_logs.history)
+	
 	# ==========================================================================================
 	# ======= CLASSIFICATION ===================================================================
 	# ==========================================================================================
