@@ -36,7 +36,7 @@ sweep_conf = {
 		'head_dim': {'values':[16, 32, 64, 128]},
 		'dff': {'values':[16, 32, 64, 128, 256]},
 		'dropout_rate': {'distribution':'uniform', 'min':.0, 'max':.5},
-		'lr': {'values':[1e-1, 1e-2, 1e-3, 1e-4, 1e-5]},
+		'lr': {'values':[1e-2, 1e-3, 1e-4, 1e-5]},
 	},
 	'total_runs': 150
 }
@@ -109,7 +109,11 @@ def main():
 							 			  # checkpoint_callback, 
 							 			  tensorboard_callback, 
 							 			  wandb_callback])
-	wandb.log(history_logs.history)
+	min_index = tf.argmin(history_logs.history['val_loss']) 
+	wandb.log({'train_loss':history_logs.history['loss'][min_index],
+			   'train_r2':history_logs.history['r_square'][min_index],
+			   'val_loss':history_logs.history['val_loss'][min_index],
+			   'val_r2':history_logs.history['val_r_square'][min_index]})
 	
 	# ==========================================================================================
 	# ======= CLASSIFICATION ===================================================================
