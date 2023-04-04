@@ -16,7 +16,7 @@ from tensorflow.keras.optimizers import Adam
 
 os.environ["CUDA_VISIBLE_DEVICES"] = '-1' if len(sys.argv) == 1 else sys.argv[1]
 
-exp_path = './presentation/scripts/results'
+exp_path = './presentation/scripts/results/test'
 head_dim = 64
 num_head = 4
 d_model  = head_dim * num_head
@@ -32,11 +32,9 @@ astromer =  get_ASTROMER(num_layers=2,
                          no_train=False)
 optimizer = Adam(1e-3, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
 astromer.compile(optimizer=optimizer)
-pretrained_weigths = './weights/macho/weights'
-astromer.load_weights(pretrained_weigths)
 
 # LOADING DATA
-BATCH_SIZE = 256
+BATCH_SIZE = 2000
 train_batches = pretraining_pipeline('./data/records/macho/train',
                                      batch_size=BATCH_SIZE,
                                      window_size=200,
@@ -59,8 +57,6 @@ valid_batches = pretraining_pipeline('./data/records/macho/val',
                                      repeat=1,
                                      normalize=True,
                                      cache=True)
-train_batches = train_batches.take(5) # for testing purposes only
-valid_batches = valid_batches.take(5) # for testing purposes only
 
 # CALLBACKS
 callbacks = [
@@ -70,7 +66,7 @@ callbacks = [
         monitor='val_loss',
         save_best_only=True),
     EarlyStopping(monitor='val_loss',
-        patience = 40,
+        patience = 20,
         restore_best_weights=True),
     TensorBoard(
         log_dir = os.path.join(exp_path, 'logs'),
@@ -79,6 +75,6 @@ callbacks = [
 
 # TRAIN ASTROMER
 _ = astromer.fit(train_batches,
-                 epochs=10,
+                 epochs=1000,
                  validation_data=valid_batches,
                  callbacks=callbacks)
