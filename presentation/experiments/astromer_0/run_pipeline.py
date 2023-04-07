@@ -14,7 +14,7 @@ from src.data import pretraining_pipeline
 from src.training import CustomSchedule
 
 from tensorflow.keras.losses     import CategoricalCrossentropy
-from tensorflow.keras.layers     import Dense, Conv1D, Flatten, RNN
+from tensorflow.keras.layers     import Dense, Conv1D, Flatten, RNN, LSTM, LayerNormalization
 from tensorflow.keras            import Input, Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks  import (ModelCheckpoint,
@@ -53,7 +53,8 @@ def get_astromer(config, step='pretraining'):
                              base=config['positional']['base'],
                              dropout=config['astromer']['dropout'],
                              maxlen=config['astromer']['window_size'],
-                             pe_c=config['positional']['alpha'])
+                             pe_c=config['positional']['alpha'],
+                             no_train=False)
     # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
     # OPTIMIZER = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
     # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = 
@@ -89,14 +90,15 @@ def load_data(config, step='pretraining'):
                                             cache=config[step]['data']['cache_{}'.format(subset)])
     return data
 
-def train_astromer(astromer, config, step='pretraining', backlog=None):
+def train_astromer(astromer, config, step='pretraining', backlog=None, do_train=True):
     cbks = get_callbacks(config, step=step, monitor='val_loss')
     data = load_data(config, step=step)
-
-    _ = astromer.fit(data['train'],
-                  epochs=config[step]['epochs'],
-                  validation_data=data['val'],
-                  callbacks=cbks)
+    
+    if do_train:
+        _ = astromer.fit(data['train'],
+                      epochs=config[step]['epochs'],
+                      validation_data=data['val'],
+                      callbacks=cbks)
     
     if backlog is not None:
         loss, r2 = astromer.evaluate(data['test'])            
@@ -127,7 +129,7 @@ def classify(clf_model, data, config, backlog=None, model_name='mlp'):
 
     cbks = get_callbacks(config, step='classification',
                          monitor='val_loss', extra=model_name)
-
+    
     history = clf_model.fit(data['train'],
                             epochs=config['classification']['epochs'],
                             callbacks=cbks,
@@ -155,6 +157,7 @@ def classify(clf_model, data, config, backlog=None, model_name='mlp'):
                    'model':clf_model.name,
                    'time': datetime.today().strftime('%Y-%m-%d %H:%M:%S'),
                    'fold':config['classification']['data']['fold'], 
+                   'target':config['classification']['data']['target'],
                    'sci_case':'a' if config['classification']['train_astromer'] else 'b', 
                    'spc':config['classification']['data']['spc']
                     }
@@ -174,12 +177,38 @@ def create_classifier(astromer, config, num_cls, name='mlp_att'):
     conv_shift = 4
     
     x = encoder(placeholder, training=config['classification']['train_astromer'])
+    
+    if name == 'lstm':
+        m = tf.cast(1.-placeholder['mask_in'][...,0], tf.bool)
+        tim = normalize_batch(placeholder['times'])
+        inp = normalize_batch(placeholder['input'])
+        x = tf.concat([tim, inp], 2)
+
+        cell_0 = NormedLSTMCell(units=256)
+        s0 = [tf.zeros([tf.shape(x)[0], 256]),
+              tf.zeros([tf.shape(x)[0], 256])]
+        s1 = [tf.zeros([tf.shape(x)[0], 256]),
+              tf.zeros([tf.shape(x)[0], 256])]
+
+        rnn = tf.keras.layers.RNN(cell_0, return_sequences=False)
+        x = rnn(x, initial_state=[s0, s1], mask=m)
+        x = tf.nn.dropout(x, .3)
+    
     if name == 'mlp_att':
+        mask = 1.-placeholder['mask_in']
+        x = x * mask
+        x = tf.reduce_sum(x, 1)/tf.reduce_sum(mask, 1)
+        x = Dense(1024, activation='relu')(x)
+        x = Dense(512, activation='relu')(x)
+        x = Dense(256, activation='relu')(x)
+        x = LayerNormalization()(x)
+    
+    if name == 'mlp_att_conv':
         x = Conv1D(32, 5, activation='relu', input_shape=[n_steps, z_dim])(x)
         x = Flatten()(tf.expand_dims(x, 1))
         x = tf.reshape(x, [-1, (n_steps-conv_shift)*32])
 
-    if name == 'rnn_att':
+    if name == 'lstm_att':
         ssize = 256
         m = tf.cast(1.-placeholder['mask_in'][...,0], tf.bool)
         tim = normalize_batch(placeholder['times'])
@@ -221,13 +250,25 @@ def pipeline(exp_conf_folder, debug=False, weights_dir=None):
             print('[INFO] Loading weigths from: ', weights_dir)
             astromer.load_weights(os.path.join(weights_dir, 'weights'))
             
-        if not os.path.exists(os.path.join(config['pretraining']['exp_path'], 'metrics.csv')):    
+        if os.path.exists(os.path.join(config['pretraining']['exp_path'], 'checkpoint')): 
+            print('[INFO] Checkpoint found! loading weights')
+            astromer.load_weights(os.path.join(config['pretraining']['exp_path'], 'weights'))
+            if not os.path.exists(os.path.join(config['pretraining']['exp_path'], 'metrics.csv')):
+                print('[INFO] Computing metrics ...')
+                astromer, backlog_df = train_astromer(astromer, config, 
+                                                      step='pretraining', 
+                                                      backlog=backlog_df,
+                                                      do_train=False)
+            else:
+                print('[INFO] Loading metrics...')
+                backlog_df = pd.read_csv(os.path.join(config['pretraining']['exp_path'], 'metrics.csv'))
+        else:
             print('[INFO] Training from scratch')                    
             astromer, backlog_df = train_astromer(astromer, config, 
                                                   step='pretraining', 
                                                   backlog=backlog_df)
-        else:
-            backlog_df = pd.read_csv(os.path.join(config['pretraining']['exp_path'], 'metrics.csv'))
+            
+            
             
         # ============================================================================
         # =========== FINETUNING =====================================================
@@ -272,7 +313,7 @@ def pipeline(exp_conf_folder, debug=False, weights_dir=None):
                     normalize=config['classification']['data']['normalize'],
                     cache=config['classification']['data']['cache_{}'.format(subset)])
 
-        for name in ['rnn_att', 'mlp_att']:
+        for name in ['lstm_att', 'mlp_att', 'mlp_att_conv', 'lstm']:
             clf_model = create_classifier(astromer, config, num_cls=num_cls, name='mlp_att')
 
             clf_model, backlog_df = classify(clf_model, data, config, 
@@ -291,4 +332,4 @@ if __name__ == '__main__':
         w = sys.argv[3] # preloading weights
     except:
         w = None
-    pipeline(exp_conf_folder, debug=True, weights_dir=w)
+    pipeline(exp_conf_folder, debug=False, weights_dir=w)
