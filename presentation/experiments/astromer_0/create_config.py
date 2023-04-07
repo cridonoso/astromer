@@ -9,15 +9,20 @@ from datetime import datetime
 # (i.e., astromer hyperparameters)
 # Parameters that change based on the datasets will be overwritten by this script
 # ==============================================================================
-template_path       = './src/pipeline/template.toml'
+template_path = './presentation/experiments/astromer_0/config_files/macho_mask.toml'
 with open(template_path, mode="rb") as fp:
     config = tomli.load(fp)
 # ==============================================================================
 # GENERAL CONFIGURATION ========================================================
 # ==============================================================================
+config['masking']['mask_frac'] = 0.5
+config['masking']['rnd_frac']  = 0.2
+config['masking']['same_frac'] = 0.2
+config['positional']['alpha'] = 1
+# ==============================================================================
 master_path         = './presentation/experiments/astromer_0' # shouldn't change
-master_name         = 'ztfg' # master name
-pretraining_data    = './data/records/ztfg_pt' # unlabeled dataset
+master_name         = 'macho_mask_{}_{}'.format(int(config['masking']['mask_frac']*100), config['positional']['alpha']) # master name
+pretraining_data    = './data/records/macho' # unlabeled dataset
 dir_to_save_config  = f'{master_path}/config_files/{master_name}'
 # ==============================================================================
 config['pretraining']['exp_path'] = f'{master_path}/results/{master_name}/pretraining'
@@ -34,6 +39,10 @@ batch_size_clf = 512
 # CREATE CONFIG FILES ==========================================================
 # ==============================================================================
 os.makedirs(dir_to_save_config, exist_ok=True)
+
+config['pretraining']['data']['target'] = ''
+config['pretraining']['data']['fold'] = 0
+config['pretraining']['data']['spc'] = ''    
 
 for dataset_name in datasets_to_finetune:
     data_finetuning = f'./data/records/{dataset_name}'
@@ -62,8 +71,16 @@ for dataset_name in datasets_to_finetune:
                 clf_path = os.path.join(save_weights_classification,
                                         sci_case,
                                         '{}_{}_f{}'.format(dataset_name, samples_per_class,fold_n))
+                
 
-
+                config['finetuning']['data']['target'] = dataset_name
+                config['finetuning']['data']['fold'] = fold_n
+                config['finetuning']['data']['spc'] = samples_per_class
+                config['classification']['data']['target'] = dataset_name
+                config['classification']['data']['fold'] = fold_n
+                config['classification']['data']['spc'] = samples_per_class
+                
+                
                 config['general']['creation_date'] = creation_date
 
                 config['finetuning']['batch_size']     = batch_size_ft

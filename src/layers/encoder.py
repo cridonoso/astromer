@@ -72,7 +72,7 @@ class Encoder(tf.keras.layers.Layer):
         self.num_layers = num_layers
         self.base       = base
         self.dropout    = dropout
-
+        
         self.pe = PositionalEncoder(d_model, base=base, c=pe_c, name='PosEncoding')
         self.inp_transform = tf.keras.layers.Dense(d_model)
         self.enc_layers = [EncoderLayer(d_model, num_heads, dff, dropout, False)
@@ -111,6 +111,7 @@ class EncoderSKIP(tf.keras.layers.Layer):
         self.num_layers = num_layers
         self.base = base
         self.pe_c = pe_c
+        
         self.pe = PositionalEncoder(d_model, base=base, c=pe_c, name='PosEncoding')
         self.inp_transform = tf.keras.layers.Dense(d_model)
         self.enc_layers = [EncoderLayer(d_model, num_heads, dff, dropout, False)
