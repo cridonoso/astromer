@@ -24,6 +24,11 @@ from tensorflow.keras.callbacks  import (ModelCheckpoint,
 from datetime import datetime
 from sklearn.metrics import precision_recall_fscore_support
 
+def normalize_batch(tensor):
+    min_ = tf.expand_dims(tf.reduce_min(tensor, 1), 1)
+    max_ = tf.expand_dims(tf.reduce_max(tensor, 1), 1)
+    tensor = tf.math.divide_no_nan(tensor - min_, max_ - min_)
+    return tensor
 
 def get_callbacks(config, step='pretraining', monitor='val_loss', extra=''):
     callbacks = [
@@ -175,26 +180,24 @@ def create_classifier(astromer, config, num_cls, name='mlp_att'):
     z_dim = config['astromer']['head_dim']*config['astromer']['heads']
     n_steps = config['astromer']['window_size']
     conv_shift = 4
-    
     x = encoder(placeholder, training=config['classification']['train_astromer'])
     
     if name == 'lstm':
+        print('[INFO] Training an MLP on light curves directly')
         m = tf.cast(1.-placeholder['mask_in'][...,0], tf.bool)
         tim = normalize_batch(placeholder['times'])
         inp = normalize_batch(placeholder['input'])
         x = tf.concat([tim, inp], 2)
 
         cell_0 = NormedLSTMCell(units=256)
-        s0 = [tf.zeros([tf.shape(x)[0], 256]),
-              tf.zeros([tf.shape(x)[0], 256])]
-        s1 = [tf.zeros([tf.shape(x)[0], 256]),
-              tf.zeros([tf.shape(x)[0], 256])]
-
+        zero_state = build_zero_init_state(x, 256)
         rnn = tf.keras.layers.RNN(cell_0, return_sequences=False)
-        x = rnn(x, initial_state=[s0, s1], mask=m)
+        x = rnn(x, initial_state=zero_state, mask=m)
         x = tf.nn.dropout(x, .3)
+        
     
     if name == 'mlp_att':
+        print('[INFO] Training an MLP on time-mean Z')
         mask = 1.-placeholder['mask_in']
         x = x * mask
         x = tf.reduce_sum(x, 1)/tf.reduce_sum(mask, 1)
@@ -204,30 +207,40 @@ def create_classifier(astromer, config, num_cls, name='mlp_att'):
         x = LayerNormalization()(x)
     
     if name == 'mlp_att_conv':
+        print('[INFO] Training an MLP on convolved Z')
         x = Conv1D(32, 5, activation='relu', input_shape=[n_steps, z_dim])(x)
         x = Flatten()(tf.expand_dims(x, 1))
         x = tf.reshape(x, [-1, (n_steps-conv_shift)*32])
 
     if name == 'lstm_att':
+        print('[INFO] Training an LSTM on Z')
         ssize = 256
-        m = tf.cast(1.-placeholder['mask_in'][...,0], tf.bool)
-        tim = normalize_batch(placeholder['times'])
-        inp = normalize_batch(placeholder['input'])
-        x = tf.concat([tim, inp], 2)
-        init_states = build_zero_init_state(ssize)
+        init_states = build_zero_init_state(x, ssize)
+        m = tf.cast(1.-placeholder['mask_in'][...,0], dtype=tf.bool)
+        x = tf.math.divide_no_nan(x-tf.expand_dims(tf.reduce_mean(x, 1),1),
+                                  tf.expand_dims(tf.math.reduce_std(x, 1), 1))
         x = RNN(NormedLSTMCell(units=ssize), 
                 return_sequences=False)(x, initial_state=init_states, mask=m) 
         x = tf.nn.dropout(x, .3)
-
+    
+    if name == 'mlp_last':
+        print('[INFO] Training an MLP on the last position of Z')
+        x = tf.slice(x, [0,n_steps-1,0], [-1, 1,-1])
+        x = tf.reshape(x, [-1, z_dim])
+    if name == 'mlp_first':
+        print('[INFO] Training an MLP on the first position of Z')
+        x = tf.slice(x, [0,0,0], [-1, 1,-1])
+        x = tf.reshape(x, [-1, z_dim])
+        
     x = Dense(num_cls)(x)
     return Model(inputs=placeholder, outputs=x, name=name)
     
-def pipeline(exp_conf_folder, debug=False, weights_dir=None):
+def pipeline(exp_conf_folder, debug=False, weights_dir=None, load_ft_if_exists=False):
     '''
         Main class to run the pipeline
     '''
     backlog_df = pd.DataFrame(columns=['rmse', 'r_square', 'step', 'time', 'target', 'fold', 'spc'])
-
+    print(backlog_df)
     for config_file in os.listdir(exp_conf_folder):
         if not config_file.endswith('toml'): continue
         # Load config file
@@ -259,6 +272,8 @@ def pipeline(exp_conf_folder, debug=False, weights_dir=None):
                                                       step='pretraining', 
                                                       backlog=backlog_df,
                                                       do_train=False)
+                backlog_df.to_csv(os.path.join(config['pretraining']['exp_path'], 'metrics.csv'), 
+                                  index=False)
             else:
                 print('[INFO] Loading metrics...')
                 backlog_df = pd.read_csv(os.path.join(config['pretraining']['exp_path'], 'metrics.csv'))
@@ -269,18 +284,25 @@ def pipeline(exp_conf_folder, debug=False, weights_dir=None):
                                                   backlog=backlog_df)
             
             
-            
         # ============================================================================
         # =========== FINETUNING =====================================================
         # ============================================================================
         print('[INFO] Loading weights to finetune')
-        astromer.load_weights(os.path.join(config['finetuning']['weights'], 'weights')).expect_partial()
+        if os.path.exists(os.path.join(config['finetuning']['exp_path'], 'checkpoint')) and load_ft_if_exists: 
+            print('[INFO] Restoring cktps at: {}'.format(config['finetuning']['exp_path']))
+            astromer.load_weights(os.path.join(config['finetuning']['exp_path'], 'weights')).expect_partial()
+            metrics_ft = backlog_df[(backlog_df['spc'] == config['finetuning']['data']['spc']) & \
+                                    (backlog_df['target'] == config['finetuning']['data']['target']) & \
+                                    (backlog_df['fold'] == config['finetuning']['data']['fold']) ]
+            print(metrics_ft)
+        else:
+            astromer.load_weights(os.path.join(config['finetuning']['weights'], 'weights')).expect_partial()
+            astromer, backlog_df = train_astromer(astromer, config, 
+                                                  step='finetuning', 
+                                                  backlog=backlog_df)
 
-        astromer, backlog_df = train_astromer(astromer, config, 
-                                              step='finetuning', 
-                                              backlog=backlog_df)
-        backlog_df.to_csv(os.path.join(config['pretraining']['exp_path'], 'metrics.csv'), 
-                          index=False)
+            backlog_df.to_csv(os.path.join(config['pretraining']['exp_path'], 'metrics.csv'), 
+                              index=False)
         # ============================================================================
         # =========== CLASSIFICATION==================================================
         # ============================================================================
@@ -313,8 +335,9 @@ def pipeline(exp_conf_folder, debug=False, weights_dir=None):
                     normalize=config['classification']['data']['normalize'],
                     cache=config['classification']['data']['cache_{}'.format(subset)])
 
-        for name in ['lstm_att', 'mlp_att', 'mlp_att_conv', 'lstm']:
-            clf_model = create_classifier(astromer, config, num_cls=num_cls, name='mlp_att')
+        # 'mlp_att', 'mlp_att_conv', 'lstm'
+        for name in ['mlp_last', 'lstm_att', 'mlp_first', 'lstm', 'mlp_att']:
+            clf_model = create_classifier(astromer, config, num_cls=num_cls, name=name)
 
             clf_model, backlog_df = classify(clf_model, data, config, 
                                              backlog=backlog_df, 
@@ -332,4 +355,4 @@ if __name__ == '__main__':
         w = sys.argv[3] # preloading weights
     except:
         w = None
-    pipeline(exp_conf_folder, debug=False, weights_dir=w)
+    pipeline(exp_conf_folder, debug=False, weights_dir=w, load_ft_if_exists=True)
