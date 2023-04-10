@@ -2,12 +2,12 @@ import tensorflow as tf
 
 from tensorflow.keras.layers import LSTMCell, LayerNormalization, Layer
 
-def build_zero_init_state(state_size):
-	s0 = [tf.zeros([tf.shape(x)[0], state_size]),
-	      tf.zeros([tf.shape(x)[0], state_size])]
-	s1 = [tf.zeros([tf.shape(x)[0], state_size]),
-	      tf.zeros([tf.shape(x)[0], state_size])]
-	return [s0, s1]
+def build_zero_init_state(x, state_size):
+    s0 = [tf.zeros([tf.shape(x)[0], state_size]),
+          tf.zeros([tf.shape(x)[0], state_size])]
+    s1 = [tf.zeros([tf.shape(x)[0], state_size]),
+          tf.zeros([tf.shape(x)[0], state_size])]
+    return [s0, s1]
 
 class NormedLSTMCell(Layer):
 

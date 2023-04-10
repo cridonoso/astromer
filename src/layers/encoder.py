@@ -33,8 +33,8 @@ class EncoderLayer(tf.keras.layers.Layer):
         self.dropout1 = tf.keras.layers.Dropout(rate)
         self.dropout2 = tf.keras.layers.Dropout(rate)
 
-    def call(self, x, training=False, mask=None):
-        attn_output, _ = self.mha(x, mask)  # (batch_size, input_seq_len, d_model)
+    def call(self, x, training=False, mask=None, return_weights=False):
+        attn_output, att_weights = self.mha(x, mask)  # (batch_size, input_seq_len, d_model)
         attn_output = self.dropout1(attn_output, training=training)
 
         if self.use_leak:
@@ -50,6 +50,8 @@ class EncoderLayer(tf.keras.layers.Layer):
         else:
             out2 = self.layernorm2(ffn_output)
 
+        if return_weights:
+            return out2, att_weights
         return out2
 
     def get_config(self):
@@ -79,7 +81,7 @@ class Encoder(tf.keras.layers.Layer):
                             for _ in range(num_layers)]
         self.dropout_layer = tf.keras.layers.Dropout(dropout)
 
-    def call(self, data, training=False):
+    def call(self, data, training=False, return_weights=False):
         # adding embedding and position encoding.
         x_pe = self.pe(data['times'])
         x_transformed = self.inp_transform(data['input'])
@@ -88,8 +90,10 @@ class Encoder(tf.keras.layers.Layer):
         x = self.dropout_layer(transformed_input, training=training)
 
         for i in range(self.num_layers):
-            x = self.enc_layers[i](x, training, data['mask_in'])
-
+            x, w = self.enc_layers[i](x, training, data['mask_in'], return_weights=True)
+        
+        if return_weights:
+            return x, w
         return x  # (batch_size, input_seq_len, d_model)
 
     def get_config(self):

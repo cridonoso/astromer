@@ -15,10 +15,10 @@ with open(template_path, mode="rb") as fp:
 # ==============================================================================
 # GENERAL CONFIGURATION ========================================================
 # ==============================================================================
-config['masking']['mask_frac'] = 0.5
-config['masking']['rnd_frac']  = 0.2
-config['masking']['same_frac'] = 0.2
-config['positional']['alpha'] = 1
+config['masking']['mask_frac'] = 0.2
+config['masking']['rnd_frac']  = 0.1
+config['masking']['same_frac'] = 0.1
+config['positional']['alpha'] = 0.5
 # ==============================================================================
 master_path         = './presentation/experiments/astromer_0' # shouldn't change
 master_name         = 'macho_mask_{}_{}'.format(int(config['masking']['mask_frac']*100), config['positional']['alpha']) # master name
