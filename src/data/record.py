@@ -2,168 +2,245 @@ import multiprocessing as mp
 import tensorflow as tf
 import pandas as pd
 import numpy as np
+import polars as pl
 import os
-
-from joblib import wrap_non_picklable_objects
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+# from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
+# from zipfile import ZipFile
+from io import BytesIO
 from tqdm import tqdm
 
 def _bytes_feature(value):
     """Returns a bytes_list from a string / byte."""
     if isinstance(value, type(tf.constant(0))):
         value = value.numpy() # BytesList won't unpack a string from an EagerTensor.
-    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
 
 def _float_feature(list_of_floats):  # float32
     return tf.train.Feature(float_list=tf.train.FloatList(value=list_of_floats))
 
 def _int64_feature(value):
-    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
 
-def get_example(lcid, label, lightcurve):
-    """
-    Create a record example from numpy values.
-    Serialization
-    Args:
-        lcid (string): object id
-        label (int): class code
-        lightcurve (numpy array): time, magnitudes and observational error
+def parse_dtype(value):
+    if type(value) == int:
+        return _int64_feature([value])
+    if type(value) == float:
+        return _float_feature([value])
+    if type(value) == str:
+        return _bytes_feature([str(value).encode()])
+    raise ValueError('[ERROR] {} with type {} could not be parsed. Please use <str>, <int>, or <float>'.format(value, dtype(value)))
 
-    Returns:
-        tensorflow record
-    """
+def substract_frames(frame1, frame2, on):
+    frame1 = frame1[~frame1[on].isin(frame2[on])]
+    return frame1
 
-    f = dict()
+class DataPipeline:
+    """docstring for DataPipeline."""
 
-    dict_features={
-    'id': _bytes_feature(str(lcid).encode()),
-    'label': _int64_feature(label),
-    'length': _int64_feature(lightcurve.shape[0]),
-    }
-    element_context = tf.train.Features(feature = dict_features)
+    def __init__(self,
+                 metadata=None,
+                 context_features=None,
+                 sequential_features=None,
+                 output_folder='./records/output'):
 
-    dict_sequence = {}
-    for col in range(lightcurve.shape[1]):
-        seqfeat = _float_feature(lightcurve[:, col])
-        seqfeat = tf.train.FeatureList(feature = [seqfeat])
-        dict_sequence['dim_{}'.format(col)] = seqfeat
+        self.metadata             = metadata
+        self.context_features     = context_features
+        self.sequential_features  = sequential_features
+        self.output_folder        = output_folder
 
-    element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
-    ex = tf.train.SequenceExample(context = element_context,
-                                  feature_lists= element_lists)
-    return ex
+        if metadata is not None:
+            print('[INFO] {} samples loaded'.format(metadata.shape[0]))
 
-@wrap_non_picklable_objects
-def process_lc2(row, source, unique_classes, **kwargs):
-    path  = row['Path'].split('/')[-1]
-    label = list(unique_classes).index(row['Class'])
-    lc_path = os.path.join(source, path)
+        self.metadata['subset_0'] = ['full']*self.metadata.shape[0]
 
-    observations = pd.read_csv(lc_path, **kwargs)
-    observations.columns = ['mjd', 'mag', 'errmag']
-    observations = observations.dropna()
-    observations.sort_values('mjd')
-    observations = observations.drop_duplicates(keep='last')
+        os.makedirs(output_folder, exist_ok=True)
+        
+    @staticmethod
+    def aux_serialize(sel, path):
+        with tf.io.TFRecordWriter(path) as writer:
+            for lc in sel:
+                ex = DataPipeline.get_example(lc)
+                writer.write(ex.SerializeToString())       
+        
+    @staticmethod
+    def get_example(row, context_features=['ID', 'Label', 'Class']):
+        
+        """
+        Create a record example from numpy values in a list of dictionaries.
+        Serialization
+        Args:
+            row (dictionary): Keys ['ID', 'mjd', 'mag', 'Class', 'Path', 'Band', 'newID', 'Label'])
+            context_features_values: ['ID', 'Label', 'Class']
+        Returns:
+            tensorflow record example
+        """
+        dict_features = dict()
+        for name in context_features:
+            dict_features[name] = parse_dtype(row[name])
 
-    numpy_lc = observations.values
+        element_context = tf.train.Features(feature = dict_features)
 
-    return row['ID'], label, numpy_lc
+        dict_sequence = dict()
+        time = row['mjd']
+        mag = row['mag']
+        lightcurve = [time, mag]
+        for col in range(len(lightcurve)):
+            seqfeat = _float_feature(lightcurve[col][:])
+            seqfeat = tf.train.FeatureList(feature = [seqfeat])
+            dict_sequence['dim_{}'.format(col)] = seqfeat
 
-def process_lc3(lc_index, label, numpy_lc, writer):
-    try:
-        ex = get_example(lc_index, label, numpy_lc)
-        writer.write(ex.SerializeToString())
-    except:
-        print('[INFO] {} could not be processed'.format(lc_index))
+        element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
+        ex = tf.train.SequenceExample(context = element_context,
+                                      feature_lists= element_lists)
+        return ex    
 
-def divide_training_subset(frame, train, val, test_meta):
-    """
-    Divide the dataset into train, validation and test subsets.
-    Notice that:
-        test = 1 - (train + val)
+    def train_val_test(self,
+                       val_frac=0.2,
+                       test_frac=0.2,
+                       test_meta=None,
+                       val_meta=None,
+                       shuffle=True,
+                       id_column_name=None,
+                       k_fold=1):
 
-    Args:
-        frame (Dataframe): Dataframe following the astro-standard format
-        dest (string): Record destination.
-        train (float): train fraction
-        val (float): validation fraction
-    Returns:
-        tuple x3 : (name of subset, subframe with metadata)
-    """
+        if id_column_name is None:
+            id_column_name = self.metadata.columns[0]
+        print('[INFO] Using {} col as sample identifier'.format(id_column_name))
 
-    frame = frame.sample(frac=1)
-    n_samples = frame.shape[0]
+        if (type(test_meta) is not list) and (k_fold > 1) and (type(test_meta) != type(None)):
+            raise ValueError(f'k_fold={k_fold} does not match with number of test frames. Please provide a list of testing frames for each fold')
+        if (type(val_meta) is not list) and (k_fold > 1) and (type(val_meta) != type(None)):
+            raise ValueError(f'k_fold={k_fold} does not match with number of validation frames.Please, provide a list of validation frames for each fold')
 
-    n_train = int(n_samples*train)
-    n_val = int(n_samples*val)
+        if test_meta is None: test_meta = []
+        if val_meta is None: val_meta = []
 
-    if test_meta is not None:
-        sub_test = test_meta
-        sub_train = frame.iloc[:n_train]
-        sub_val   = frame.iloc[n_train:]
-    else:
-        sub_train = frame.iloc[:n_train]
-        sub_val   = frame.iloc[n_train:n_train+n_val]
-        sub_test  = frame.iloc[n_train+n_val:]
+        for k in range(k_fold):
+            if shuffle:
+                print('[INFO] Shuffling')
+                self.metadata = self.metadata.sample(frac=1)
 
-    return ('train', sub_train), ('val', sub_val), ('test', sub_test)
+            try:
+                test_meta[k]
+            except:
+                test_meta.append(self.metadata.sample(frac=test_frac))
 
-def write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs=None, max_obs=200, **kwargs):
-    # Get frames with fixed number of lightcurves
-    collection = [frame.iloc[i:i+max_lcs_per_record] \
-                  for i in range(0, frame.shape[0], max_lcs_per_record)]
+            self.metadata = substract_frames(self.metadata, test_meta[k], on=id_column_name)
 
-    for counter, subframe in enumerate(collection):
-        var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique, **kwargs) \
-                                    for k, row in subframe.iterrows())
+            try:
+                val_meta[k]
+            except:
+                val_meta.append(self.metadata.sample(frac=val_frac))
 
-        with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
-            for counter2, data_lc in enumerate(var):
-                process_lc3(*data_lc, writer)
+            self.metadata = substract_frames(self.metadata, val_meta[k], on=id_column_name)
 
-def create_dataset(meta_df,
-                   source='data/raw_data/macho/MACHO/LCs',
-                   target='data/records/macho/',
-                   n_jobs=None,
-                   subsets_frac=(0.5, 0.25),
-                   test_subset=None,
-                   max_lcs_per_record=100,
-                   **kwargs): # kwargs contains additional arguments for the read_csv() function
-    os.makedirs(target, exist_ok=True)
+            self.metadata['subset_{}'.format(k)] = ['train']*self.metadata.shape[0]
+            val_meta[k]['subset_{}'.format(k)]      = ['validation']*val_meta[k].shape[0]
+            test_meta[k]['subset_{}'.format(k)]     = ['test']*test_meta[k].shape[0]
 
-    bands = meta_df['Band'].unique()
-    if len(bands) > 1:
-        b = input('Filters {} were found. Type one to continue'.format(' and'.join(bands)))
-        meta_df = meta_df[meta_df['Band'] == b]
+            self.metadata = pd.concat([self.metadata, val_meta[k], test_meta[k]])
 
-    unique, counts = np.unique(meta_df['Class'], return_counts=True)
-    info_df = pd.DataFrame()
-    info_df['label'] = unique
-    info_df['size'] = counts
-    info_df.to_csv(os.path.join(target, 'objects.csv'), index=False)
 
-    # Separate by class
-    cls_groups = meta_df.groupby('Class')
+    def prepare_data(self, container, elements_per_shard, subset, fold_n):
+        """Prepare the data to be saved as records"""
+        
+        # Number of objects in the split
+        N = self.metadata.shape[0]
+        # Compute the number of shards
 
-    test_already_written = False
-    if test_subset is not None:
-        for cls_name, frame in test_subset.groupby('Class'):
-            dest = os.path.join(target, 'test', cls_name)
-            os.makedirs(dest, exist_ok=True)
-            write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs, **kwargs)
-        test_already_written = True
+        n_shards = -np.floor_divide(N, -elements_per_shard)
+        # Number of characters of the padded number of shards
+        name_length = len(str(n_shards))
 
-    for cls_name, cls_meta in tqdm(cls_groups, total=len(cls_groups)):
-        subsets = divide_training_subset(cls_meta,
-                                         train=subsets_frac[0],
-                                         val=subsets_frac[1],
-                                         test_meta = test_subset)
+        # Create one file per shard
+        shard_paths = []
+        for shard in range(n_shards):
+            # Get the shard number padded with 0s
+            shard_name = str(shard+1).rjust(name_length, '0')
+            # Get the shard store name
+            shard_path= os.path.join(self.output_folder, subset+'_{}_{}.record'.format(fold_n, shard_name))
+            # Save it into a list
+            shard_paths.append(shard_path)
 
-        for subset_name, frame in subsets:
-            if test_already_written and subset_name == 'test':continue
-            dest = os.path.join(target, subset_name, cls_name)
-            os.makedirs(dest, exist_ok=True)
-            write_records(frame, dest, max_lcs_per_record, source, unique, n_jobs, **kwargs)
+        shards_data = []
+        for j in range(len(shard_paths)):
+            sel = container[j*elements_per_shard:(j+1)*elements_per_shard]
+            shards_data.append(sel)        
+        return shards_data, shard_paths
+    
+    
+    def read_all_parquets(self, path_parquets, metadata_path):
+        """Read the files """
+        # Read the parquet filez lazily
+        paths = os.path.join(path_parquets, '*.parquet')
+        scan = pl.scan_parquet(paths)
+        
+        # Using partial information, extract only the necessary objects
+        # Define filters
+        ID_series = pl.Series(self.metadata['newID'].values)
+        f1 = pl.col("newID").is_in(ID_series)
+        f2 = pl.col("err")<1 # Clean the data on the big lazy dataframe
+        # Define groupby functions
+        # func1 cleans the data
+        func1 = lambda group_df: group_df.sort("mjd")
+        # Filter, drop nulls, and sort every object
+        new_df = scan.filter(f1 & f2).drop_nulls().groupby('newID').apply(func1, schema=None)
+
+        # Select only the relevant columns
+        # IMPROVE
+        select_columns =  ["mjd", "mag"]
+        new_df = new_df.select(["newID"]+select_columns)
+
+        # Mix metadata and the data
+        new_df = new_df.groupby('newID').all()
+        # display(print(new_df))
+        # First run takes more time!
+        metadata_lazy = pl.scan_parquet(metadata_path, cache=True) # First run is slower
+        # display(print(metadata_lazy))        
+        # Perform the join to get the data
+        new_df = new_df.join(other=metadata_lazy, on='newID').collect(streaming=True) #streaming might be useless.                    
+        return new_df
+    
+
+
+    def resample_folds(self, n_folds=1):
+        print('[INFO] Creating {} random folds'.format(n_folds))
+        print('Not implemented yet hehehe...')
+
+    def run(self, path_parquets, metadata_path, n_jobs=1, elements_per_shard=5000):
+        # threads = Parallel(n_jobs=n_jobs, backend='threading')
+        fold_groups = [x for x in self.metadata.columns if 'subset' in x]
+        
+
+        pbar = tqdm(fold_groups, colour='#00ff00') # progress bar
+        
+        new_df = self.read_all_parquets(path_parquets, metadata_path)
+        self.new_df = new_df
+        for fold_n, fold_col in enumerate(fold_groups):
+
+            for subset in self.metadata[fold_col].unique():               
+                # ============ Processing Samples ===========
+                pbar.set_description("Processing {} {}".format(subset, fold_col))
+                partial = self.metadata[self.metadata[fold_col] == subset]
+                
+                # Transform into a appropiate representation
+                index = partial.newID
+                b = np.isin(new_df['newID'].to_numpy(), index)
+                container = new_df.filter(b).to_numpy()  
+                
+                # ============ Writing Records ===========
+                pbar.set_description("Writting {} fold {}".format(subset, fold_n))
+                output_file = os.path.join(self.output_folder, subset+'_{}.record'.format(fold_n))
+                
+                shards_data,shard_paths = self.prepare_data(container, elements_per_shard, subset, fold_n)
+                    
+                # Idea from
+                with ThreadPoolExecutor(n_jobs) as exe:
+                    # submit tasks to generate files
+                    _ = [exe.submit(DataPipeline.aux_serialize, shard,shard_path) for shard, shard_path in zip(shards_data,shard_paths)]
+                
 
 def deserialize(sample):
     """
