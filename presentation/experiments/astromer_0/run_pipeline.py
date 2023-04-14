@@ -335,8 +335,8 @@ def pipeline(exp_conf_folder, debug=False, weights_dir=None, load_ft_if_exists=F
                     normalize=config['classification']['data']['normalize'],
                     cache=config['classification']['data']['cache_{}'.format(subset)])
 
-        # 'mlp_att', 'mlp_att_conv', 'lstm'
-        for name in ['mlp_last', 'lstm_att', 'mlp_first', 'lstm', 'mlp_att']:
+        # 'mlp_att', 'mlp_att_conv', 'lstm', 'mlp_last', 'mlp_first'
+        for name in ['lstm_att', 'lstm', 'mlp_att']:
             clf_model = create_classifier(astromer, config, num_cls=num_cls, name=name)
 
             clf_model, backlog_df = classify(clf_model, data, config, 

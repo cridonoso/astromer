@@ -16,7 +16,7 @@ from tensorflow.keras.optimizers import Adam
 
 os.environ["CUDA_VISIBLE_DEVICES"] = '-1' if len(sys.argv) == 1 else sys.argv[1]
 
-exp_path = './presentation/scripts/results/test'
+exp_path = './presentation/scripts/results/macho_mask'
 head_dim = 64
 num_head = 4
 d_model  = head_dim * num_head
@@ -29,7 +29,8 @@ astromer =  get_ASTROMER(num_layers=2,
                          base=1000,
                          dropout=0.,
                          maxlen=200,
-                         no_train=False)
+                         no_train=False,
+                         pe_c=.5)
 optimizer = Adam(1e-3, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
 astromer.compile(optimizer=optimizer)
 
@@ -66,7 +67,7 @@ callbacks = [
         monitor='val_loss',
         save_best_only=True),
     EarlyStopping(monitor='val_loss',
-        patience = 20,
+        patience = 40,
         restore_best_weights=True),
     TensorBoard(
         log_dir = os.path.join(exp_path, 'logs'),

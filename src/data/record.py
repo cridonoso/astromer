@@ -64,6 +64,10 @@ def process_lc2(row, source, unique_classes, **kwargs):
     observations = observations.dropna()
     observations.sort_values('mjd')
     observations = observations.drop_duplicates(keep='last')
+    
+    observations = observations[(observations['mag']>=observations['mag'].quantile(.1)) &
+                                (observations['mag']<=observations['mag'].quantile(.99)) &
+                                (observations['errmag']>=0.) & (observations['errmag']<=1)]
 
     numpy_lc = observations.values
 

@@ -14,23 +14,31 @@ with open(template_path, mode="rb") as fp:
     config = tomli.load(fp)
 # ==============================================================================
 # GENERAL CONFIGURATION ========================================================
-# ==============================================================================
-config['masking']['mask_frac'] = 0.2
-config['masking']['rnd_frac']  = 0.1
-config['masking']['same_frac'] = 0.1
-config['positional']['alpha'] = 0.5
+# ==============================================================================    
+config['pretraining']['lr'] = 1e-5
+config['pretraining']['scheduler']= False
+name_opt = 'scheduler' if config['pretraining']['scheduler'] else 'LR{}'.format(config['pretraining']['lr'])
+config['masking']['mask_frac'] = 0.8
+config['masking']['rnd_frac']  = 0.2
+config['masking']['same_frac'] = 0.2
+config['positional']['alpha'] = 1
+norm_method = 'zero-mean'
 # ==============================================================================
 master_path         = './presentation/experiments/astromer_0' # shouldn't change
-master_name         = 'macho_mask_{}_{}'.format(int(config['masking']['mask_frac']*100), config['positional']['alpha']) # master name
-pretraining_data    = './data/records/macho' # unlabeled dataset
-dir_to_save_config  = f'{master_path}/config_files/{master_name}'
+master_name         = 'alcock_{}_{}_{}_{}'.format(int(config['masking']['mask_frac']*100), 
+                                                       config['positional']['alpha'],
+                                                       norm_method,
+                                                       name_opt) # master name
+pretraining_data    = './data/records/alcock/fold_0/alcock' # unlabeled dataset
+dir_to_save_config  = f'{master_path}/config_files_alcock/{master_name}'
+dir_to_save_results = 'results_alcock'
 # ==============================================================================
-config['pretraining']['exp_path'] = f'{master_path}/results/{master_name}/pretraining'
+config['pretraining']['exp_path'] = f'{master_path}/{dir_to_save_results}/{master_name}/pretraining'
 config['pretraining']['data']['path'] = pretraining_data
 pretrained_weights  = config['pretraining']['exp_path'] # Change if pretrained weights already exists
 # ==============================================================================
 datasets_to_finetune = ['alcock', 'ogle', 'atlas']
-science_cases        = ['a', 'b']
+science_cases        = ['a']
 # ==============================================================================
 creation_date  = datetime.today().strftime('%Y-%m-%d')
 batch_size_ft  = 2500
@@ -43,13 +51,14 @@ os.makedirs(dir_to_save_config, exist_ok=True)
 config['pretraining']['data']['target'] = ''
 config['pretraining']['data']['fold'] = 0
 config['pretraining']['data']['spc'] = ''    
+config['pretraining']['data']['normalize'] = norm_method 
 
 for dataset_name in datasets_to_finetune:
     data_finetuning = f'./data/records/{dataset_name}'
     data_classification = data_finetuning
 
-    save_weights_finetuning     = f'{master_path}/results/{master_name}/{dataset_name}/finetuning/'
-    save_weights_classification = f'{master_path}/results/{master_name}/{dataset_name}/classification/'
+    save_weights_finetuning     = f'{master_path}/{dir_to_save_results}/{master_name}/{dataset_name}/finetuning/'
+    save_weights_classification = f'{master_path}/{dir_to_save_results}/{master_name}/{dataset_name}/classification/'
 
     for sci_case in science_cases:
         if sci_case == 'a':
@@ -76,10 +85,11 @@ for dataset_name in datasets_to_finetune:
                 config['finetuning']['data']['target'] = dataset_name
                 config['finetuning']['data']['fold'] = fold_n
                 config['finetuning']['data']['spc'] = samples_per_class
+                config['finetuning']['data']['normalize'] = norm_method 
                 config['classification']['data']['target'] = dataset_name
                 config['classification']['data']['fold'] = fold_n
                 config['classification']['data']['spc'] = samples_per_class
-                
+                config['classification']['data']['normalize'] = norm_method 
                 
                 config['general']['creation_date'] = creation_date
 

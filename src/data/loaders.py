@@ -2,7 +2,7 @@ import tensorflow as tf
 import os
 
 from src.data.record import deserialize
-from src.data.preprocessing import to_windows, standardize
+from src.data.preprocessing import to_windows, standardize, min_max_scaler
 from src.data.masking import mask_dataset, mask_sample
 from src.data.nsp import nsp_dataset
 
@@ -80,7 +80,7 @@ def pretraining_pipeline(dataset,
                          shuffle=False,
                          repeat=1,
                          num_cls=None,
-                         normalize=True,
+                         normalize='zero-mean', # 'None', 'minmax'
                          cache=False,
                          return_ids=False,
                          return_lengths=False,
@@ -133,9 +133,11 @@ def pretraining_pipeline(dataset,
                          window_size=window_size,
                          sampling=sampling)
 
-    if normalize:
+    if normalize == 'zero-mean':
         dataset = dataset.map(standardize)
-
+    if normalize == 'minmax':
+        dataset = dataset.map(min_max_scaler)
+        
     dataset = mask_dataset(dataset,
                            msk_frac=msk_frac,
                            rnd_frac=rnd_frac,
@@ -204,6 +206,7 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
     else:
         outputs = {
             'target': tf.slice(batch['input'], [0,0,1], [-1,-1,1]),
+            'error': tf.slice(batch['input'], [0,0,2], [-1,-1,1]),
             'mask_out': batch['mask_out'],
         }
 

@@ -89,17 +89,27 @@ def get_metrics(path_logs, metric_name='epoch_loss', full_logs=True, show_keys=F
     path_train = os.path.join(path_logs, train_logs)
 
     if full_logs:
-        ea = event_accumulator.EventAccumulator(path_train, size_guidance={'tensors': 0})
+        ea = event_accumulator.EventAccumulator(path_train, 
+                                                size_guidance={'tensors': 0})
     else:
         ea = event_accumulator.EventAccumulator(path_train)
-
+      
     ea.Reload()
 
     if show_keys:
         print(ea.Tags())
 
-    metrics = pd.DataFrame([(w,s,tf.make_ndarray(t))for w,s,t in ea.Tensors(metric_name)],
-                columns=['wall_time', 'step', 'value'])
+    try:
+        metrics = pd.DataFrame([(w,s,tf.make_ndarray(t))for w,s,t in ea.Tensors(metric_name)],
+                    columns=['wall_time', 'step', 'value'])
+    except:
+        frames = []
+        for file in os.listdir(path_logs):
+            if not file.endswith('.csv'): continue
+            if metric_name in file:
+                metrics = pd.read_csv(os.path.join(path_logs, file))
+                metrics.columns = ['wall_time', 'step', 'value']
+        
     return metrics
 
 def dict_to_json(varsdic, conf_file):
