@@ -100,7 +100,7 @@ def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
                                        same_frac,
                                        name='set_same')
 
-       # [MASK] -> Random value
+        # [MASK] -> Random value
         seq_magn, mask_in = set_random(seq_magn,
                                        mask_in,
                                        tf.random.shuffle(seq_magn),
