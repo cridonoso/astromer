@@ -18,26 +18,24 @@ with open(template_path, mode="rb") as fp:
 config['pretraining']['lr'] = 1e-5
 config['pretraining']['scheduler']= False
 name_opt = 'scheduler' if config['pretraining']['scheduler'] else 'LR{}'.format(config['pretraining']['lr'])
-config['masking']['mask_frac'] = 0.8
+config['masking']['mask_frac'] = 0.5
 config['masking']['rnd_frac']  = 0.2
 config['masking']['same_frac'] = 0.2
 config['positional']['alpha'] = 1
 norm_method = 'zero-mean'
 # ==============================================================================
 master_path         = './presentation/experiments/astromer_0' # shouldn't change
-master_name         = 'alcock_{}_{}_{}_{}'.format(int(config['masking']['mask_frac']*100), 
-                                                       config['positional']['alpha'],
-                                                       norm_method,
-                                                       name_opt) # master name
-pretraining_data    = './data/records/alcock/fold_0/alcock' # unlabeled dataset
-dir_to_save_config  = f'{master_path}/config_files_alcock/{master_name}'
-dir_to_save_results = 'results_alcock'
+master_name         = 'macho_dani_{}_{}'.format(int(config['masking']['mask_frac']*100),
+                                                  name_opt) # master name
+pretraining_data    = './data/records/macho' # unlabeled dataset
+dir_to_save_config  = f'{master_path}/config_files/{master_name}'
+dir_to_save_results = 'results_daniel'
 # ==============================================================================
 config['pretraining']['exp_path'] = f'{master_path}/{dir_to_save_results}/{master_name}/pretraining'
 config['pretraining']['data']['path'] = pretraining_data
 pretrained_weights  = config['pretraining']['exp_path'] # Change if pretrained weights already exists
 # ==============================================================================
-datasets_to_finetune = ['alcock', 'ogle', 'atlas']
+datasets_to_finetune = ['atlas']
 science_cases        = ['a']
 # ==============================================================================
 creation_date  = datetime.today().strftime('%Y-%m-%d')

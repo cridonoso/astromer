@@ -84,8 +84,8 @@ def my_summary_iterator(path):
     for r in tf_record.tf_record_iterator(path):
         yield event_pb2.Event.FromString(r)
 
-def get_metrics(path_logs, metric_name='epoch_loss', full_logs=True, show_keys=False):
-    train_logs = [x for x in os.listdir(path_logs) if x.endswith('.v2')][-1]
+def get_metrics(path_logs, metric_name='epoch_loss', full_logs=True, show_keys=False, nlog=-1):
+    train_logs = [x for x in os.listdir(path_logs) if x.endswith('.v2')][nlog]
     path_train = os.path.join(path_logs, train_logs)
 
     if full_logs:
