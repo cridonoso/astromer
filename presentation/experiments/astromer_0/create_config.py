@@ -21,22 +21,23 @@ name_opt = 'scheduler' if config['pretraining']['scheduler'] else 'LR{}'.format(
 config['masking']['mask_frac'] = 0.5
 config['masking']['rnd_frac']  = 0.2
 config['masking']['same_frac'] = 0.2
-config['positional']['alpha'] = 1
+config['positional']['alpha'] = 2
 norm_method = 'zero-mean'
 # ==============================================================================
 master_path         = './presentation/experiments/astromer_0' # shouldn't change
-master_name         = 'macho_dani_{}_{}'.format(int(config['masking']['mask_frac']*100),
-                                                  name_opt) # master name
+master_name         = 'macho_clean_{}_{}_{}_alpha{}'.format(int(config['masking']['mask_frac']*100),
+                                                             norm_method, name_opt, 
+                                                             config['positional']['alpha'], ) # master name
 pretraining_data    = './data/records/macho' # unlabeled dataset
 dir_to_save_config  = f'{master_path}/config_files/{master_name}'
-dir_to_save_results = 'results_daniel'
+dir_to_save_results = 'results_deephub/results/'
 # ==============================================================================
 config['pretraining']['exp_path'] = f'{master_path}/{dir_to_save_results}/{master_name}/pretraining'
 config['pretraining']['data']['path'] = pretraining_data
 pretrained_weights  = config['pretraining']['exp_path'] # Change if pretrained weights already exists
 # ==============================================================================
-datasets_to_finetune = ['atlas']
-science_cases        = ['a']
+datasets_to_finetune = ['alcock','ogle','atlas']
+science_cases        = ['a', 'b', 'c']
 # ==============================================================================
 creation_date  = datetime.today().strftime('%Y-%m-%d')
 batch_size_ft  = 2500
@@ -63,7 +64,9 @@ for dataset_name in datasets_to_finetune:
             config['classification']['train_astromer'] = False
         else:
             config['classification']['train_astromer'] = True
-
+        
+        config['classification']['sci_case'] = sci_case
+        
         for fold_n in range(3):
             for samples_per_class in [20, 50, 100, 500]:
                 ft_data  = os.path.join(data_finetuning,

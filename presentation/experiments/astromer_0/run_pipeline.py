@@ -23,6 +23,9 @@ from tensorflow.keras.callbacks  import (ModelCheckpoint,
 
 from datetime import datetime
 from sklearn.metrics import precision_recall_fscore_support
+import shutil
+
+
 
 def normalize_batch(tensor):
     min_ = tf.expand_dims(tf.reduce_min(tensor, 1), 1)
@@ -163,7 +166,7 @@ def classify(clf_model, data, config, backlog=None, model_name='mlp'):
                    'time': datetime.today().strftime('%Y-%m-%d %H:%M:%S'),
                    'fold':config['classification']['data']['fold'], 
                    'target':config['classification']['data']['target'],
-                   'sci_case':'a' if config['classification']['train_astromer'] else 'b', 
+                   'sci_case':config['classification']['sci_case'], 
                    'spc':config['classification']['data']['spc']
                     }
 
@@ -235,18 +238,35 @@ def create_classifier(astromer, config, num_cls, name='mlp_att'):
     x = Dense(num_cls)(x)
     return Model(inputs=placeholder, outputs=x, name=name)
     
+def check_config_in_pretraining(config, exp_conf_folder, config_file, out_file='config.toml'):
+    copy = True
+    for arx in os.listdir(config['pretraining']['exp_path']):
+        if arx.endswith('.toml'):
+            print('[INFO] A config .toml file was already detected in the pretraining folder')
+            copy=False
+    if copy:
+        print('[INFO] Copying a sample config .toml to restore the pretraining parameters in future uses cases')
+        src = os.path.join(exp_conf_folder, config_file)
+        dst = os.path.join(config['pretraining']['exp_path'], out_file)
+        shutil.copyfile(src, dst)
+            
 def pipeline(exp_conf_folder, debug=False, weights_dir=None, load_ft_if_exists=False):
     '''
         Main class to run the pipeline
     '''
     backlog_df = pd.DataFrame(columns=['rmse', 'r_square', 'step', 'time', 'target', 'fold', 'spc'])
-    print(backlog_df)
+    
     for config_file in os.listdir(exp_conf_folder):
         if not config_file.endswith('toml'): continue
+        
         # Load config file
         with open(os.path.join(exp_conf_folder, config_file), mode="rb") as fp:
             config = tomli.load(fp)
-
+        
+        # Check if conf file is already stored in the pretraining folder
+        check_config_in_pretraining(config, exp_conf_folder, config_file)
+        
+        # If debugging low resources - poor performance 
         if debug:
             config['pretraining']['data']['batch_size'] = 32
             config['pretraining']['epochs'] = 1
