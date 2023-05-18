@@ -85,8 +85,8 @@ def main():
 							 pe_c=1.)
 	batch_size = get_batchsize(astromer)
 	wandb.log({'batch_size':batch_size})
-	learning_rate = CustomSchedule(d_model)
-	optimizer = Adam(learning_rate, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
+# 	learning_rate = CustomSchedule(d_model)
+	optimizer = Adam(1e-5, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
 	astromer.compile(optimizer=optimizer)
 
 	data = dict()

@@ -195,8 +195,10 @@ def create_classifier(astromer, config, num_cls, name='mlp_att'):
         cell_0 = NormedLSTMCell(units=256)
         zero_state = build_zero_init_state(x, 256)
         rnn = tf.keras.layers.RNN(cell_0, return_sequences=False)
+        drop_layer = tf.keras.layers.Dropout(.3)
+        
         x = rnn(x, initial_state=zero_state, mask=m)
-        x = tf.nn.dropout(x, .3)
+        x = drop_layer(x)
         
     
     if name == 'mlp_att':
@@ -224,12 +226,13 @@ def create_classifier(astromer, config, num_cls, name='mlp_att'):
                                   tf.expand_dims(tf.math.reduce_std(x, 1), 1))
         x = RNN(NormedLSTMCell(units=ssize), 
                 return_sequences=False)(x, initial_state=init_states, mask=m) 
-        x = tf.nn.dropout(x, .3)
+        x = tf.keras.layers.Dropout(.3)(x)
     
     if name == 'mlp_last':
         print('[INFO] Training an MLP on the last position of Z')
         x = tf.slice(x, [0,n_steps-1,0], [-1, 1,-1])
         x = tf.reshape(x, [-1, z_dim])
+        
     if name == 'mlp_first':
         print('[INFO] Training an MLP on the first position of Z')
         x = tf.slice(x, [0,0,0], [-1, 1,-1])
@@ -363,7 +366,6 @@ def pipeline(exp_conf_folder, debug=False, weights_dir=None, load_ft_if_exists=F
                                              backlog=backlog_df, 
                                              model_name=clf_model.name)
             
-            
             backlog_df.to_csv(os.path.join(exp_path_root, 'metrics.csv'), 
                            index=False)
 
@@ -375,4 +377,5 @@ if __name__ == '__main__':
         w = sys.argv[3] # preloading weights
     except:
         w = None
+        
     pipeline(exp_conf_folder, debug=False, weights_dir=w, load_ft_if_exists=True)

@@ -1,0 +1,95 @@
+[general]
+code_root = "."
+creation_date = "2023-05-11"
+
+[astromer]
+layers = 2
+heads = 4
+head_dim = 64
+dff = 128
+dropout = 0
+window_size = 200
+
+[masking]
+mask_frac = 0.5
+rnd_frac = 0.2
+same_frac = 0.2
+
+[positional]
+base = 1000
+alpha = 2
+version = "v1"
+
+[pretraining]
+exp_path = "./presentation/experiments/astromer_0/results_deephub/results//macho_clean_50_zero-mean_LR1e-05_alpha2/pretraining"
+lr = 1e-05
+scheduler = false
+epochs = 10000
+patience = 40
+
+[pretraining.data]
+path = "./data/records/macho"
+batch_size = 2000
+repeat = 4
+sampling = true
+normalize = "zero-mean"
+shuffle_train = true
+shuffle_val = false
+shuffle_test = false
+cache_train = true
+cache_val = true
+cache_test = false
+target = ""
+fold = 0
+spc = ""
+
+[finetuning]
+exp_path = "./presentation/experiments/astromer_0/results_deephub/results//macho_clean_50_zero-mean_LR1e-05_alpha2/alcock/finetuning/alcock_500_f1"
+weights = "./presentation/experiments/astromer_0/results_deephub/results//macho_clean_50_zero-mean_LR1e-05_alpha2/pretraining"
+lr = 0.001
+scheduler = false
+epochs = 10000
+patience = 40
+batch_size = 2500
+
+[finetuning.data]
+path = "./data/records/alcock/fold_1/alcock_500"
+batch_size = 2000
+repeat = 1
+sampling = false
+normalize = "zero-mean"
+shuffle_train = true
+shuffle_val = false
+shuffle_test = false
+cache_train = true
+cache_val = true
+cache_test = false
+target = "alcock"
+fold = 1
+spc = 500
+
+[classification]
+exp_path = "./presentation/experiments/astromer_0/results_deephub/results//macho_clean_50_zero-mean_LR1e-05_alpha2/alcock/classification/a/alcock_500_f1"
+weights = "./presentation/experiments/astromer_0/results_deephub/results//macho_clean_50_zero-mean_LR1e-05_alpha2/alcock/finetuning/alcock_500_f1"
+train_astromer = false
+lr = 0.001
+epochs = 10000
+patience = 20
+sci_case = "a"
+batch_size = 512
+
+[classification.data]
+path = "./data/records/alcock/fold_1/alcock_500"
+batch_size = 512
+repeat = 1
+sampling = false
+normalize = "zero-mean"
+shuffle_train = true
+shuffle_val = false
+shuffle_test = false
+cache_train = true
+cache_val = true
+cache_test = false
+target = "alcock"
+fold = 1
+spc = 500
