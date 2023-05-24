@@ -19,7 +19,7 @@ os.makedirs(WEIGHTS_FOLDER, exist_ok=True)
 sweep_conf = {
     'name': 'ASTROMER_I',
     'method': 'bayes',
-    'metric': {'goal': 'minimize', 'name': 'val_loss'},
+    'metric': {'goal': 'minimize', 'name': 'epoch/val_loss'},
     'early_terminate':{
       'type': 'hyperband',
       'min_iter': 5},
@@ -30,7 +30,7 @@ sweep_conf = {
         'dff': {'values':[16, 32, 64, 128]},
         'dropout_rate': {'values':[0.1, 0.2, 0.3, 0.4, 0.5]},
         'learning_rate':{'max': 1e-1, 'min': 1e-5},
-    	'batch_size': {'value':64},
+    	'batch_size': {'value':2000},
 		'window_size': {'value':200}
     }
 }
@@ -85,4 +85,4 @@ def sweep_train(config=None):
 # ===== WandB =========================================================================
 # =====================================================================================
 sweep_id = wandb.sweep(sweep_conf, project="hp-astromer-i")
-wandb.agent(sweep_id, function=sweep_train, count=5)
+wandb.agent(sweep_id, function=sweep_train, count=100)
