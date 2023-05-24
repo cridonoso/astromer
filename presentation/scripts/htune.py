@@ -41,18 +41,18 @@ def sweep_train(config=None):
 		# =====================================================================================
 		# ===== DATA ==========================================================================
 		# =====================================================================================
-		petrain_ds  = './data/records/alcock/fold_0/alcock_20'
+		petrain_ds  = './data/records/macho_clean'
 		# -------------------------------------------------------------------------------------
 		trainloader = pretraining_pipeline(os.path.join(petrain_ds, 'train'), 
 										   config.batch_size, config.window_size, .5, .2, .2,
-		                                   sampling=True, shuffle=True, repeat=1, num_cls=None,
+		                                   sampling=True, shuffle=True, repeat=4, num_cls=None,
 		                                   normalize=True, cache=True)
 		validloader = pretraining_pipeline(os.path.join(petrain_ds, 'val'), 
 										   config.batch_size, config.window_size, .5, .2, .2,
 		                                   sampling=True, shuffle=True, repeat=1, num_cls=None,
 		                                   normalize=True, cache=True)
-		trainloader = trainloader.take(1)
-		validloader = validloader.take(1)
+		# trainloader = trainloader.take(1)
+		# validloader = validloader.take(1)
 		# =====================================================================================
 		# ===== MODEL =========================================================================
 		# =====================================================================================
