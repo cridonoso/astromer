@@ -9,31 +9,43 @@ from datetime import datetime
 # (i.e., astromer hyperparameters)
 # Parameters that change based on the datasets will be overwritten by this script
 # ==============================================================================
-template_path       = './src/pipeline/template.toml'
+template_path = './presentation/experiments/astromer_0/config_files/macho_mask.toml'
 with open(template_path, mode="rb") as fp:
     config = tomli.load(fp)
-
 # ==============================================================================
 # GENERAL CONFIGURATION ========================================================
+# ==============================================================================    
+config['pretraining']['lr'] = 0.006322
+config['pretraining']['scheduler']= False
+name_opt = 'scheduler' if config['pretraining']['scheduler'] else 'LR{}'.format(config['pretraining']['lr'])
+config['masking']['mask_frac'] = 0.5
+config['masking']['rnd_frac']  = 0.2
+config['masking']['same_frac'] = 0.2
+config['positional']['alpha']  s= 2
+norm_method = 'zero-mean'
+
+config['astromer']['layers']      = 1
+config['astromer']['heads']       = 4
+config['astromer']['head_dim']    = 32
+config['astromer']['dff']         = 128
+config['astromer']['dropout']     = 0.2
+config['astromer']['window_size'] = 200
+
 # ==============================================================================
 master_path         = './presentation/experiments/astromer_2' # shouldn't change
-pe_c                = 1.
-pe_base             = 1000
-use_scheduler       = True
-pretraining_data    = f'./data/records/macho' # unlabeled dataset
-head_dim            = 256
-heads               = 2
-layers              = 1
-master_name         = f'macho_{int(layers)}l_{int(heads)}h_{int(head_dim)}' # master name
+master_name         = 'macho_clean_{}_{}_{}_alpha{}'.format(int(config['masking']['mask_frac']*100),
+                                                             norm_method, name_opt, 
+                                                             config['positional']['alpha'], ) # master name
+pretraining_data    = './data/records/macho_clean' # unlabeled dataset
 dir_to_save_config  = f'{master_path}/config_files/{master_name}'
+dir_to_save_results = './results/'
 # ==============================================================================
-config['pretraining']['exp_path'] = f'{master_path}/results/{master_name}/pretraining'
+config['pretraining']['exp_path'] = f'{master_path}/{dir_to_save_results}/{master_name}/pretraining'
 config['pretraining']['data']['path'] = pretraining_data
 pretrained_weights  = config['pretraining']['exp_path'] # Change if pretrained weights already exists
 # ==============================================================================
-datasets_to_finetune = ['alcock', 'ogle', 'atlas']
-science_cases        = ['a']
-subsets_to_train     = [20, 100, 500]
+datasets_to_finetune = ['alcock','ogle','atlas']
+science_cases        = ['a', 'b']
 # ==============================================================================
 creation_date  = datetime.today().strftime('%Y-%m-%d')
 batch_size_ft  = 2500
@@ -43,24 +55,17 @@ batch_size_clf = 512
 # ==============================================================================
 os.makedirs(dir_to_save_config, exist_ok=True)
 
-config['astromer']['pe_c'] = pe_c
-config['astromer']['base'] = pe_base
-
-config['astromer']['head_dim'] = head_dim
-config['astromer']['heads'] = heads
-config['astromer']['layers'] = layers
-
-config['pretraining']['scheduler'] = use_scheduler
-config['finetuning']['scheduler'] = use_scheduler
-
-config['pretraining']['lr'] = 1e-5
+config['pretraining']['data']['target'] = ''
+config['pretraining']['data']['fold'] = 0
+config['pretraining']['data']['spc'] = ''    
+config['pretraining']['data']['normalize'] = norm_method 
 
 for dataset_name in datasets_to_finetune:
     data_finetuning = f'./data/records/{dataset_name}'
     data_classification = data_finetuning
 
-    save_weights_finetuning     = f'{master_path}/results/{master_name}/{dataset_name}/finetuning/'
-    save_weights_classification = f'{master_path}/results/{master_name}/{dataset_name}/classification/'
+    save_weights_finetuning     = f'{master_path}/{dir_to_save_results}/{master_name}/{dataset_name}/finetuning/'
+    save_weights_classification = f'{master_path}/{dir_to_save_results}/{master_name}/{dataset_name}/classification/'
 
     for sci_case in science_cases:
         if sci_case == 'a':
@@ -68,9 +73,10 @@ for dataset_name in datasets_to_finetune:
         else:
             config['classification']['train_astromer'] = True
         
-                
+        config['classification']['sci_case'] = sci_case
+        
         for fold_n in range(3):
-            for samples_per_class in subsets_to_train:
+            for samples_per_class in [20, 50, 100, 500]:
                 ft_data  = os.path.join(data_finetuning,
                                         'fold_{}'.format(fold_n),
                                         '{}_{}'.format(dataset_name, samples_per_class))
@@ -83,8 +89,17 @@ for dataset_name in datasets_to_finetune:
                 clf_path = os.path.join(save_weights_classification,
                                         sci_case,
                                         '{}_{}_f{}'.format(dataset_name, samples_per_class,fold_n))
+                
 
-
+                config['finetuning']['data']['target'] = dataset_name
+                config['finetuning']['data']['fold'] = fold_n
+                config['finetuning']['data']['spc'] = samples_per_class
+                config['finetuning']['data']['normalize'] = norm_method 
+                config['classification']['data']['target'] = dataset_name
+                config['classification']['data']['fold'] = fold_n
+                config['classification']['data']['spc'] = samples_per_class
+                config['classification']['data']['normalize'] = norm_method 
+                
                 config['general']['creation_date'] = creation_date
 
                 config['finetuning']['batch_size']     = batch_size_ft

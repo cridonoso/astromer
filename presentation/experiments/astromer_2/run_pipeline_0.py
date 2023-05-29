@@ -23,6 +23,9 @@ from tensorflow.keras.callbacks  import (ModelCheckpoint,
 
 from datetime import datetime
 from sklearn.metrics import precision_recall_fscore_support
+import shutil
+
+
 
 def normalize_batch(tensor):
     min_ = tf.expand_dims(tf.reduce_min(tensor, 1), 1)
@@ -163,7 +166,7 @@ def classify(clf_model, data, config, backlog=None, model_name='mlp'):
                    'time': datetime.today().strftime('%Y-%m-%d %H:%M:%S'),
                    'fold':config['classification']['data']['fold'], 
                    'target':config['classification']['data']['target'],
-                   'sci_case':'a' if config['classification']['train_astromer'] else 'b', 
+                   'sci_case':config['classification']['sci_case'], 
                    'spc':config['classification']['data']['spc']
                     }
 
@@ -192,8 +195,10 @@ def create_classifier(astromer, config, num_cls, name='mlp_att'):
         cell_0 = NormedLSTMCell(units=256)
         zero_state = build_zero_init_state(x, 256)
         rnn = tf.keras.layers.RNN(cell_0, return_sequences=False)
+        drop_layer = tf.keras.layers.Dropout(.3)
+        
         x = rnn(x, initial_state=zero_state, mask=m)
-        x = tf.nn.dropout(x, .3)
+        x = drop_layer(x)
         
     
     if name == 'mlp_att':
@@ -221,12 +226,13 @@ def create_classifier(astromer, config, num_cls, name='mlp_att'):
                                   tf.expand_dims(tf.math.reduce_std(x, 1), 1))
         x = RNN(NormedLSTMCell(units=ssize), 
                 return_sequences=False)(x, initial_state=init_states, mask=m) 
-        x = tf.nn.dropout(x, .3)
+        x = tf.keras.layers.Dropout(.3)(x)
     
     if name == 'mlp_last':
         print('[INFO] Training an MLP on the last position of Z')
         x = tf.slice(x, [0,n_steps-1,0], [-1, 1,-1])
         x = tf.reshape(x, [-1, z_dim])
+        
     if name == 'mlp_first':
         print('[INFO] Training an MLP on the first position of Z')
         x = tf.slice(x, [0,0,0], [-1, 1,-1])
@@ -235,18 +241,35 @@ def create_classifier(astromer, config, num_cls, name='mlp_att'):
     x = Dense(num_cls)(x)
     return Model(inputs=placeholder, outputs=x, name=name)
     
-def pipeline(exp_conf_folder, debug=False, weights_dir=None, load_ft_if_exists=False, not_ft=False):
+def check_config_in_pretraining(config, exp_conf_folder, config_file, out_file='config.toml'):
+    copy = True
+    for arx in os.listdir(config['pretraining']['exp_path']):
+        if arx.endswith('.toml'):
+            print('[INFO] A config .toml file was already detected in the pretraining folder')
+            copy=False
+    if copy:
+        print('[INFO] Copying a sample config .toml to restore the pretraining parameters in future uses cases')
+        src = os.path.join(exp_conf_folder, config_file)
+        dst = os.path.join(config['pretraining']['exp_path'], out_file)
+        shutil.copyfile(src, dst)
+            
+def pipeline(exp_conf_folder, debug=False, weights_dir=None, load_ft_if_exists=False):
     '''
         Main class to run the pipeline
     '''
     backlog_df = pd.DataFrame(columns=['rmse', 'r_square', 'step', 'time', 'target', 'fold', 'spc'])
-    print(backlog_df)
+    
     for config_file in os.listdir(exp_conf_folder):
         if not config_file.endswith('toml'): continue
+        
         # Load config file
         with open(os.path.join(exp_conf_folder, config_file), mode="rb") as fp:
             config = tomli.load(fp)
-
+        
+        # Check if conf file is already stored in the pretraining folder
+        check_config_in_pretraining(config, exp_conf_folder, config_file)
+        
+        # If debugging low resources - poor performance 
         if debug:
             config['pretraining']['data']['batch_size'] = 32
             config['pretraining']['epochs'] = 1
@@ -287,25 +310,22 @@ def pipeline(exp_conf_folder, debug=False, weights_dir=None, load_ft_if_exists=F
         # ============================================================================
         # =========== FINETUNING =====================================================
         # ============================================================================
-        if not_ft:
-            print('[INFO] No finetuning')
+        print('[INFO] Loading weights to finetune')
+        if os.path.exists(os.path.join(config['finetuning']['exp_path'], 'checkpoint')) and load_ft_if_exists: 
+            print('[INFO] Restoring cktps at: {}'.format(config['finetuning']['exp_path']))
+            astromer.load_weights(os.path.join(config['finetuning']['exp_path'], 'weights')).expect_partial()
+            metrics_ft = backlog_df[(backlog_df['spc'] == config['finetuning']['data']['spc']) & \
+                                    (backlog_df['target'] == config['finetuning']['data']['target']) & \
+                                    (backlog_df['fold'] == config['finetuning']['data']['fold']) ]
+            print(metrics_ft)
         else:
-            print('[INFO] Loading weights to finetune')
-            if os.path.exists(os.path.join(config['finetuning']['exp_path'], 'checkpoint')) and load_ft_if_exists: 
-                print('[INFO] Restoring cktps at: {}'.format(config['finetuning']['exp_path']))
-                astromer.load_weights(os.path.join(config['finetuning']['exp_path'], 'weights')).expect_partial()
-                metrics_ft = backlog_df[(backlog_df['spc'] == config['finetuning']['data']['spc']) & \
-                                        (backlog_df['target'] == config['finetuning']['data']['target']) & \
-                                        (backlog_df['fold'] == config['finetuning']['data']['fold']) ]
-                print(metrics_ft)
-            else:
-                astromer.load_weights(os.path.join(config['finetuning']['weights'], 'weights')).expect_partial()
-                astromer, backlog_df = train_astromer(astromer, config, 
-                                                      step='finetuning', 
-                                                      backlog=backlog_df)
+            astromer.load_weights(os.path.join(config['finetuning']['weights'], 'weights')).expect_partial()
+            astromer, backlog_df = train_astromer(astromer, config, 
+                                                  step='finetuning', 
+                                                  backlog=backlog_df)
 
-                backlog_df.to_csv(os.path.join(config['pretraining']['exp_path'], 'metrics.csv'), 
-                                  index=False)
+            backlog_df.to_csv(os.path.join(config['pretraining']['exp_path'], 'metrics.csv'), 
+                              index=False)
         # ============================================================================
         # =========== CLASSIFICATION==================================================
         # ============================================================================
@@ -339,13 +359,12 @@ def pipeline(exp_conf_folder, debug=False, weights_dir=None, load_ft_if_exists=F
                     cache=config['classification']['data']['cache_{}'.format(subset)])
 
         # 'mlp_att', 'mlp_att_conv', 'lstm', 'mlp_last', 'mlp_first'
-        for name in ['lstm_att']:
+        for name in ['lstm_att', 'lstm', 'mlp_att']:
             clf_model = create_classifier(astromer, config, num_cls=num_cls, name=name)
 
             clf_model, backlog_df = classify(clf_model, data, config, 
                                              backlog=backlog_df, 
                                              model_name=clf_model.name)
-            
             
             backlog_df.to_csv(os.path.join(exp_path_root, 'metrics.csv'), 
                            index=False)
@@ -358,4 +377,5 @@ if __name__ == '__main__':
         w = sys.argv[3] # preloading weights
     except:
         w = None
-    pipeline(exp_conf_folder, debug=False, weights_dir=w, load_ft_if_exists=True, not_ft=True)
+        
+    pipeline(exp_conf_folder, debug=False, weights_dir=w, load_ft_if_exists=True)

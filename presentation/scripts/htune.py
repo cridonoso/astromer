@@ -8,7 +8,8 @@ from src.data import pretraining_pipeline
 
 from tensorflow.keras.optimizers import Adam
 from wandb.keras import WandbMetricsLogger, WandbModelCheckpoint
-
+from tensorflow.keras.callbacks  import EarlyStopping
+                                         
 os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1] # which gpu to use
 
 WEIGHTS_FOLDER = './presentation/scripts/hp_results'
@@ -28,9 +29,9 @@ sweep_conf = {
         'n_heads': {'values':[1, 2, 4]},
         'head_dim': {'values':[16, 32, 64]},
         'dff': {'values':[16, 32, 64, 128]},
-        'dropout_rate': {'values':[0.1, 0.2, 0.3, 0.4, 0.5]},
+        'dropout_rate': {'max': 0.5, 'min': 0.},
         'learning_rate':{'max': 1e-1, 'min': 1e-5},
-    	'batch_size': {'value':2000},
+    	'batch_size': {'value':2500},
 		'window_size': {'value':200}
     }
 }
@@ -44,13 +45,25 @@ def sweep_train(config=None):
 		petrain_ds  = './data/records/macho_clean'
 		# -------------------------------------------------------------------------------------
 		trainloader = pretraining_pipeline(os.path.join(petrain_ds, 'train'), 
-										   config.batch_size, config.window_size, .5, .2, .2,
-		                                   sampling=True, shuffle=True, repeat=4, num_cls=None,
-		                                   normalize=True, cache=True)
+										   config.batch_size, 
+                                           config.window_size, 
+                                           .5, .2, .2,
+		                                   sampling=True, 
+                                           shuffle=True, 
+                                           repeat=4, 
+                                           num_cls=None,
+		                                   normalize="zero-mean", 
+                                           cache=True)
 		validloader = pretraining_pipeline(os.path.join(petrain_ds, 'val'), 
-										   config.batch_size, config.window_size, .5, .2, .2,
-		                                   sampling=True, shuffle=True, repeat=1, num_cls=None,
-		                                   normalize=True, cache=True)
+										   config.batch_size, 
+                                           config.window_size, 
+                                           .5, .2, .2,
+		                                   sampling=True, 
+                                           shuffle=False, 
+                                           repeat=1, 
+                                           num_cls=None,
+		                                   normalize="zero-mean", 
+                                           cache=True)
 		# trainloader = trainloader.take(1)
 		# validloader = validloader.take(1)
 		# =====================================================================================
@@ -70,7 +83,7 @@ def sweep_train(config=None):
 		# =====================================================================================
 		# ===== TRAINING ======================================================================
 		# =====================================================================================
-		N_EPOCHS = 10
+		N_EPOCHS = 10000
 		astromer.fit(trainloader, 
 					 epochs=N_EPOCHS, 
 					 validation_data=validloader,
@@ -79,10 +92,13 @@ def sweep_train(config=None):
 					 								 save_freq='epoch',
 					 								 save_weights_only=True, 
 					 								 save_best_only=True), 
-					 			WandbMetricsLogger(log_freq='epoch')])
+					 			WandbMetricsLogger(log_freq='epoch'),
+                                EarlyStopping(monitor='val_loss',
+                                              patience = 20,
+                                              restore_best_weights=True)])
 
 # =====================================================================================
 # ===== WandB =========================================================================
 # =====================================================================================
-sweep_id = wandb.sweep(sweep_conf, project="hp-astromer-i")
-wandb.agent(sweep_id, function=sweep_train, count=100)
+sweep_id = wandb.sweep(sweep_conf, project="hp-astromer-zero")
+wandb.agent(sweep_id, function=sweep_train, count=50)
