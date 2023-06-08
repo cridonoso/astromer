@@ -80,8 +80,10 @@ def add_segment_to_tensor(tensor_0, tensor_1, pivot, rnd_seq_size, cls_tkn=-99.,
 
     return tensor_3
 
-# @tf.function
-def randomize_segment(batch, random_sample, frac=.5, prob=.5, sep_token=-98, cls_token=-99, moving_window=False):
+@tf.function
+def randomize_segment(batch_, random_sample, frac=.5, prob=.5, sep_token=-98, cls_token=-99, moving_window=False):
+    batch = batch_.copy()
+
     nsp_label = tf.random.categorical(tf.math.log([[prob, 1-prob]]), 1)
     nsp_label = tf.squeeze(nsp_label)
 
@@ -154,6 +156,8 @@ def randomize_segment(batch, random_sample, frac=.5, prob=.5, sep_token=-98, cls
                                               cls_tkn=0.,
                                               sep_tkn=0.)
     batch['nsp_label'] = nsp_label
+
+    
 
     return batch
 
