@@ -11,9 +11,9 @@ from tensorflow.keras.optimizers import Adam
 from wandb.keras import WandbMetricsLogger, WandbModelCheckpoint
 from tensorflow.keras.callbacks  import EarlyStopping, ModelCheckpoint
                                          
-
+project_name = 'masking'
 WEIGHTS_FOLDER = './presentation/scripts/hp_results'
-os.makedirs(WEIGHTS_FOLDER, exist_ok=True)
+os.makedirs(os.path.join(WEIGHTS_FOLDER, project_name), exist_ok=True)
 
 # =====================================================================================
 # ===== SEARCH SPACE ==================================================================
@@ -23,7 +23,7 @@ sweep_conf = {
     'method': 'grid',
     'metric': {'goal': 'minimize', 'name': 'epoch/val_loss'},
     'parameters': {
-        'n_layers': {'values':[2],},
+        'n_layers': {'values':[1],},
         'n_heads': {'value':4},
         'head_dim': {'value':64},
         'dff': {'value':64},
@@ -47,6 +47,10 @@ def sweep_train(config=None):
     with wandb.init(config=config):
         config = wandb.config
         print(config)
+        
+        
+        SAVEPATH = os.path.join(WEIGHTS_FOLDER, project_name, ':.2f'.format(config.probed))
+        
         # =====================================================================================
         # ===== MODEL =========================================================================
         # =====================================================================================
@@ -100,16 +104,11 @@ def sweep_train(config=None):
         astromer.fit(trainloader, 
                      epochs=N_EPOCHS, 
                      validation_data=validloader,
-                     callbacks=[WandbModelCheckpoint(filepath=os.path.join(WEIGHTS_FOLDER, 'model'),
-                                                     monitor='val_loss',
-                                                     save_freq='epoch',
-                                                     save_weights_only=True, 
-                                                     save_best_only=True), 
-                                WandbMetricsLogger(log_freq='epoch'),
+                     callbacks=[WandbMetricsLogger(log_freq='epoch'),
                                 EarlyStopping(monitor='val_loss',
                                               patience = 20,
                                               restore_best_weights=True),
-                                ModelCheckpoint(filepath=os.path.join(WEIGHTS_FOLDER, 'weights'),
+                                ModelCheckpoint(filepath=os.path.join(SAVEPATH, 'weights'),
                                                 save_weights_only=True,
                                                 monitor='val_loss',
                                                 save_best_only=True)])
@@ -117,7 +116,7 @@ def sweep_train(config=None):
 # =====================================================================================
 # ===== WandB =========================================================================
 # =====================================================================================
-sweep_id = wandb.sweep(sweep_conf, project="astromer-masking")
+sweep_id = wandb.sweep(sweep_conf, project=project_name)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
 
