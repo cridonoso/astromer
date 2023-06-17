@@ -11,7 +11,7 @@ from tensorflow.keras.optimizers import Adam
 from wandb.keras import WandbMetricsLogger, WandbModelCheckpoint
 from tensorflow.keras.callbacks  import EarlyStopping, ModelCheckpoint
                                          
-
+# soe5c734
 project_name = 'winsize'
 WEIGHTS_FOLDER = './presentation/scripts/hp_results'
 os.makedirs(os.path.join(WEIGHTS_FOLDER, project_name), exist_ok=True)
@@ -30,7 +30,7 @@ sweep_conf = {
         'dff': {'value':64},
         'dropout_rate': {'value': 0.3955},
         'learning_rate':{'value':1e-5},
-        'window_size': {'values':[20, 50, 100, 200, 500, 800]},
+        'window_size': {'values':[800, 500, 200, 100, 50, 20]},
         'probed': {'values':[0.5]},
         'rand': {'value':0.2}
     }
@@ -49,7 +49,7 @@ def sweep_train(config=None):
         config = wandb.config
         print(config)
                 
-        SAVEPATH = os.path.join(WEIGHTS_FOLDER, project_name, ':.0f'.format(config.window_size))
+        SAVEPATH = os.path.join(WEIGHTS_FOLDER, project_name, '{:.0f}'.format(config.window_size))
         
         # =====================================================================================
         # ===== MODEL =========================================================================
