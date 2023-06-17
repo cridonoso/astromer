@@ -49,7 +49,7 @@ def sweep_train(config=None):
         print(config)
         
         
-        SAVEPATH = os.path.join(WEIGHTS_FOLDER, project_name, ':.2f'.format(config.probed))
+        SAVEPATH = os.path.join(WEIGHTS_FOLDER, project_name, '{:.2f}'.format(config.probed))
         
         # =====================================================================================
         # ===== MODEL =========================================================================
