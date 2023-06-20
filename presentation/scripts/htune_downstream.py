@@ -21,7 +21,7 @@ from tensorflow.keras.callbacks  import (ModelCheckpoint,
                                          TensorBoard)
 from sklearn.metrics import precision_recall_fscore_support
 
-# g34htgii
+# g34htgii 
 MASTER_PROJECT_NAME = 'downstream'
 WEIGHTS_FOLDER = './presentation/scripts/hp_results'
 os.makedirs(os.path.join(WEIGHTS_FOLDER, MASTER_PROJECT_NAME), exist_ok=True)
@@ -35,7 +35,7 @@ sweep_conf = {
     'metric': {'goal': 'maximize', 'name': 'epoch/val_accuracy'},
     'parameters': {
         'paths':{'values':['masking/0.20', 'masking/0.40', 'masking/0.50', 'masking/0.60', 'masking/0.80', 'masking/1.00',
-                 'winsize/100', 'winsize/200', 'winsize/500', 'winsize/800']},
+                 'winsize/20', 'winsize/100', 'winsize/200', 'winsize/500', 'winsize/800']},
         'n_layers': {'values':[1]},
         'fold':{'values':[0, 1, 2]},
         'dataset_to_ft':{'values':['atlas', 'alcock']},
