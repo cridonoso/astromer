@@ -21,7 +21,7 @@ from tensorflow.keras.callbacks  import (ModelCheckpoint,
                                          TensorBoard)
 from sklearn.metrics import precision_recall_fscore_support
 
-# inciwpm3
+# g34htgii
 MASTER_PROJECT_NAME = 'downstream'
 WEIGHTS_FOLDER = './presentation/scripts/hp_results'
 os.makedirs(os.path.join(WEIGHTS_FOLDER, MASTER_PROJECT_NAME), exist_ok=True)
@@ -210,7 +210,8 @@ def sweep_train(config=None):
             if run.config['paths'] == config.paths and \
                run.config['fold']== config.fold and \
                run.config['dataset_to_ft'] == config.dataset_to_ft and \
-               run.state == 'finished':
+               run.state == 'finished' and \
+               os.path.exists(os.path.join(SAVEPATH, 'weights')):
                 ft_done=True
                 break
         
