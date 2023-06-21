@@ -10,6 +10,11 @@ from joblib import Parallel, delayed
 # from zipfile import ZipFile
 from io import BytesIO
 from tqdm import tqdm
+import logging
+
+
+# Set up logging configuration
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 def _bytes_feature(value):
     """Returns a bytes_list from a string / byte."""
@@ -41,18 +46,24 @@ class DataPipeline:
     Args:
             sequential_features (list[str]): seuqential features keys, order important, [0] : mjd, [1] : mag 
             context_features (list[str]): Context feature keys
+            id_key (str) : id key for paraquet files
+            err_threshold (int) : used to clean up dataset by error 
     """
 
     def __init__(self,
                  metadata=None,
                  context_features=None,
                  sequential_features=None,
-                 output_folder='./records/output'):
+                 output_folder='./records/output', 
+                 id_key = 'newID', 
+                 err_threshold=1, ):
 
         self.metadata             = metadata
         self.context_features     = context_features
         self.sequential_features  = sequential_features
         self.output_folder        = output_folder
+        self.id_key               = id_key
+        self.err_threshold = err_threshold
 
         if metadata is not None:
             print('[INFO] {} samples loaded'.format(metadata.shape[0]))
@@ -176,35 +187,44 @@ class DataPipeline:
     
     
     def read_all_parquets(self, path_parquets, metadata_path):
-        """Read the files """
+        """
+        Read the files from given paths and filters it based on err_threshold and ID from metadata
+        Args:
+            path_parquets (str): Directory path of parquet files
+            metadata_path (str): File path of metadata
+        Returns:
+            new_df (pl.DataFrame): Processed dataframe
+        """
+        logging.info("Reading parquet files")
+
         # Read the parquet filez lazily
         paths = os.path.join(path_parquets, '*.parquet')
         scan = pl.scan_parquet(paths)
         
         # Using partial information, extract only the necessary objects
         # Define filters
-        ID_series = pl.Series(self.metadata['newID'].values)
-        f1 = pl.col("newID").is_in(ID_series)
-        f2 = pl.col("err")<1 # Clean the data on the big lazy dataframe
+        ID_series = pl.Series(self.metadata[self.id_key].values)
+        f1 = pl.col(self.id_key).is_in(ID_series)
+        f2 = pl.col("err") < self.err_threshold  # Clean the data on the big lazy dataframe
+
         # Define groupby functions
         # func1 cleans the data
-        func1 = lambda group_df: group_df.sort("mjd")
+        func1 = lambda group_df: group_df.sort(self.sequential_features[0]) #mjd 
+
         # Filter, drop nulls, and sort every object
-        new_df = scan.filter(f1 & f2).drop_nulls().groupby('newID').apply(func1, schema=None)
+        new_df = scan.filter(f1 & f2).drop_nulls().groupby(self.id_key).apply(func1, schema=None)
 
         # Select only the relevant columns
-        # IMPROVE
-        select_columns =  ["mjd", "mag"]
-        new_df = new_df.select(["newID"]+select_columns)
+        new_df = new_df.select([self.id_key] + self.sequential_features)
 
         # Mix metadata and the data
-        new_df = new_df.groupby('newID').all()
+        new_df = new_df.groupby(self.id_key).all()
         # display(print(new_df))
         # First run takes more time!
         metadata_lazy = pl.scan_parquet(metadata_path, cache=True) # First run is slower
         # display(print(metadata_lazy))        
         # Perform the join to get the data
-        new_df = new_df.join(other=metadata_lazy, on='newID').collect(streaming=True) #streaming might be useless.                    
+        new_df = new_df.join(other=metadata_lazy, on=self.id_key).collect(streaming=True) #streaming might be useless.                    
         return new_df
     
 
