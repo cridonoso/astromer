@@ -11,6 +11,8 @@ from joblib import Parallel, delayed
 from io import BytesIO
 from tqdm import tqdm
 import logging
+import toml
+from typing import List
 
 
 # Set up logging configuration
@@ -109,7 +111,32 @@ class DataPipeline:
         element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
         ex = tf.train.SequenceExample(context = element_context,
                                       feature_lists= element_lists)
-        return ex    
+        return ex
+    
+    def write_config(self, config_path='./config.toml') -> None:
+        """
+        Writes configuration details to a .toml file
+
+        Args :
+            config_path (str, optional) : path of the configuration file, defaults to ./config.toml
+        """
+        logging.info("Starting the writing process for the config file.")
+
+        # Define the context features which are constant for each record.
+        context_features: List[str] = ['ID', 'Label', 'Class']
+
+        # Retrieve sequential features
+        sequential_features: List[str] = self.sequential_features
+
+        # Create a dictionary to hold both context and sequential features.
+        config = {'context_features': context_features,
+                  'sequential_features': sequential_features}
+
+        # Open the config file in write mode, toml to dump
+        with open(config_path, 'w') as f:
+            toml.dump(config, f)
+
+        logging.info("Config file written successfully to {}".format(config_path))
 
     def train_val_test(self,
                        val_frac=0.2,
