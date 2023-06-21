@@ -37,7 +37,11 @@ def substract_frames(frame1, frame2, on):
     return frame1
 
 class DataPipeline:
-    """docstring for DataPipeline."""
+    """
+    Args:
+            sequential_features (list[str]): seuqential features keys, order important, [0] : mjd, [1] : mag 
+            context_features (list[str]): Context feature keys
+    """
 
     def __init__(self,
                  metadata=None,
@@ -65,7 +69,7 @@ class DataPipeline:
                 writer.write(ex.SerializeToString())       
         
     @staticmethod
-    def get_example(row, context_features=['ID', 'Label', 'Class']):
+    def get_example(self, row, context_features=['ID', 'Label', 'Class']):
         
         """
         Create a record example from numpy values in a list of dictionaries.
@@ -83,8 +87,8 @@ class DataPipeline:
         element_context = tf.train.Features(feature = dict_features)
 
         dict_sequence = dict()
-        time = row['mjd']
-        mag = row['mag']
+        time = row[self.sequential_features[0]]
+        mag = row[self.sequential_features[1]]
         lightcurve = [time, mag]
         for col in range(len(lightcurve)):
             seqfeat = _float_feature(lightcurve[col][:])
