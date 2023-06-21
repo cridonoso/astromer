@@ -12,7 +12,7 @@ from io import BytesIO
 from tqdm import tqdm
 import logging
 import toml
-from typing import List
+from typing import List, Dict, Any
 
 
 # Set up logging configuration
@@ -79,41 +79,60 @@ class DataPipeline:
         with tf.io.TFRecordWriter(path) as writer:
             for lc in sel:
                 ex = DataPipeline.get_example(lc)
-                writer.write(ex.SerializeToString())       
+                writer.write(ex.SerializeToString())  
+         
         
     @staticmethod
-    def get_example(self, row, context_features=['ID', 'Label', 'Class']):
-        
+    def get_example(self,row: pd.Series, config_file: str)-> tf.train.SequenceExample:
         """
-        Create a record example from numpy values in a list of dictionaries.
-        Serialization
+        Converts a given row into a TensorFlow SequenceExample.
+
         Args:
-            row (dictionary): Keys ['ID', 'mjd', 'mag', 'Class', 'Path', 'Band', 'newID', 'Label'])
-            context_features_values: ['ID', 'Label', 'Class']
+            row (pd.Series): Row of data to be converted.
+            config_file (str): Path to the configuration file.
+
         Returns:
-            tensorflow record example
+            tf.train.SequenceExample: The converted row as a SequenceExample.
         """
-        dict_features = dict()
+        logging.info("Starting conversion to SequenceExample.")  # Log start of conversion
+
+
+        # Load the configuration file
+        config = toml.load(config_file)
+
+
+        context_features = config["context_features"]
+        sequential_features = config["sequential_features"]
+
+        dict_features = {}
+        # Parse each context feature based on its dtype and add to the features dictionary
         for name in context_features:
             dict_features[name] = parse_dtype(row[name])
 
-        element_context = tf.train.Features(feature = dict_features)
+        # Create a context for the SequenceExample using the features dictionary
+        element_context = tf.train.Features(feature=dict_features)
 
-        dict_sequence = dict()
-        time = row[self.sequential_features[0]]
-        mag = row[self.sequential_features[1]]
+        dict_sequence = {}
+        time = row[sequential_features[0]]
+        mag = row[sequential_features[1]]
         lightcurve = [time, mag]
+
+
+        # Create a sequence of features for each dimension of the lightcurve
         for col in range(len(lightcurve)):
             seqfeat = _float_feature(lightcurve[col][:])
-            seqfeat = tf.train.FeatureList(feature = [seqfeat])
+            seqfeat = tf.train.FeatureList(feature=[seqfeat])
             dict_sequence['dim_{}'.format(col)] = seqfeat
 
+        # Add the sequence to the SequenceExample
         element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
-        ex = tf.train.SequenceExample(context = element_context,
-                                      feature_lists= element_lists)
+
+        # Create the SequenceExample
+        ex = tf.train.SequenceExample(context=element_context, feature_lists=element_lists)
+
         return ex
     
-    def write_config(self, config_path='./config.toml') -> None:
+    def write_config(self, config_path : str ='./config.toml') -> None:
         """
         Writes configuration details to a .toml file
 
@@ -137,6 +156,54 @@ class DataPipeline:
             toml.dump(config, f)
 
         logging.info("Config file written successfully to {}".format(config_path))
+
+
+    @staticmethod
+    def read_config(config_path: str = './config.toml') -> Dict:
+        """
+        Reads configuration details from a .toml file.
+
+        Args:
+            config_path (str, optional): Path of the configuration file. Defaults to './config.toml'.
+
+        Returns:
+            Dict: Dictionary containing the config details.
+        """
+        logging.info("Reading config from file.")
+
+        # Load the .toml file, and read it as a dictionary
+        with open(config_path, 'r') as f:
+            config: Dict = toml.load(f)
+
+        logging.info("Config read successfully.")  # Log end of reading
+
+        return config
+    
+    
+    def open_and_read_record(self, file_path : str) -> Any:
+        """
+        Opens and reads a .record file
+
+        Args:
+            file_path (str) : The path to the .record file to be read.
+
+        Returns:
+            raw_dataset (Any) : The raw dataset loaded from the .record file.
+        """
+        # Log the start of the file reading process
+        logging.info(f'Starting to read the file from {file_path}.')
+
+        # Use TensorFlow's TFRecordDataset method to read the .record file
+        raw_dataset = tf.data.TFRecordDataset(file_path)
+
+        # Log the completion of the file reading process
+        logging.info(f'Successfully read the file from {file_path}.')
+
+        return raw_dataset
+    
+
+
+    
 
     def train_val_test(self,
                        val_frac=0.2,
@@ -187,6 +254,8 @@ class DataPipeline:
 
     def prepare_data(self, container, elements_per_shard, subset, fold_n):
         """Prepare the data to be saved as records"""
+        if container is None or not hasattr(container, '__iter__'):
+            raise ValueError("Invalid container provided to prepare_data")
         
         # Number of objects in the split
         N = self.metadata.shape[0]
@@ -303,45 +372,52 @@ class DataPipeline:
                 with ThreadPoolExecutor(n_jobs) as exe:
                     # submit tasks to generate files
                     _ = [exe.submit(DataPipeline.aux_serialize, shard,shard_path) for shard, shard_path in zip(shards_data,shard_paths)]
-        
+
         logging.info('Finished execution of DataPipeline operations')
+        self.write_config()
+        logging.info('Config file written')
 
 def deserialize(sample):
     """
-    Read a serialized sample and convert it to tensor
-    Context and sequence features should match with the name used when writing.
+    Reads a serialized sample and converts it to tensor.
+    Context and sequence features should match the name used when writing.
     Args:
         sample (binary): serialized sample
 
     Returns:
         type: decoded sample
     """
-    context_features = {'label': tf.io.FixedLenFeature([],dtype=tf.int64),
-                        'length': tf.io.FixedLenFeature([],dtype=tf.int64),
-                        'id': tf.io.FixedLenFeature([], dtype=tf.string)}
-    sequence_features = dict()
-    for i in range(3):
-        sequence_features['dim_{}'.format(i)] = tf.io.VarLenFeature(dtype=tf.float32)
+    # Read the configuration file
+    config = DataPipeline.read_config()
 
+    # Define context features as strings
+    context_features = {k: tf.io.FixedLenFeature([], dtype=tf.string) for k in config['context_features']}
+    # Define sequence features as floating point numbers
+    sequence_features = {k: tf.io.VarLenFeature(dtype=tf.float32) for k in config['sequential_features']}
+
+    # Parse the serialized sample into context and sequence features
     context, sequence = tf.io.parse_single_sequence_example(
                             serialized=sample,
                             context_features=context_features,
                             sequence_features=sequence_features
                             )
+    
+    # Cast context features to strings
+    input_dict = {k: tf.cast(context[k], tf.string) for k in config['context_features']}
 
-    input_dict = dict()
-    input_dict['lcid']   = tf.cast(context['id'], tf.string)
-    input_dict['length'] = tf.cast(context['length'], tf.int32)
-    input_dict['label']  = tf.cast(context['label'], tf.int32)
-
+    # Cast and store sequence features
     casted_inp_parameters = []
-    for i in range(3):
-        seq_dim = sequence['dim_{}'.format(i)]
+    for k in config['sequential_features']:
+        seq_dim = sequence[k]
         seq_dim = tf.sparse.to_dense(seq_dim)
         seq_dim = tf.cast(seq_dim, tf.float32)
         casted_inp_parameters.append(seq_dim)
 
-
+    # Stack sequence features along a new third dimension
     sequence = tf.stack(casted_inp_parameters, axis=2)[0]
+    # Add sequence to the input dictionary
     input_dict['input'] = sequence
+
+    # Log the completion of deserialization
+    logging.info(f'Successfully deserialized a sample.')
     return input_dict
