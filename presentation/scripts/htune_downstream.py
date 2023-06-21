@@ -199,22 +199,23 @@ def create_classifier(astromer, window_size, heads=4, head_dim=64, num_cls=None,
     x = Dense(num_cls)(x)
     return Model(inputs=placeholder, outputs=x, name=name)
 
+def check_if_exist_finetuned_weights(config, FTSAVEPATH):
+    api = wandb.Api()
+    runs = api.runs(MASTER_PROJECT_NAME)
+    ft_done = False
+    for run in runs:
+        if run.config['paths'] == config.paths and \
+           run.config['fold']== config.fold and \
+           run.config['dataset_to_ft'] == config.dataset_to_ft and \
+           run.state == 'finished' and \
+           os.path.exists(os.path.join(FTSAVEPATH, 'weights')):
+            return True
+    return False
+
 def sweep_train(config=None):
     with wandb.init(config=config):
-        config = wandb.config
-        
-        api = wandb.Api()
-        runs = api.runs(MASTER_PROJECT_NAME)
-        ft_done = False
-        for run in runs:
-            if run.config['paths'] == config.paths and \
-               run.config['fold']== config.fold and \
-               run.config['dataset_to_ft'] == config.dataset_to_ft and \
-               run.state == 'finished' and \
-               os.path.exists(os.path.join(SAVEPATH, 'weights')):
-                ft_done=True
-                break
-        
+        config = wandb.config                   
+       
         project_name = str(config.paths).split('/')[0]
         hpcurr = str(config.paths).split('/')[1]
         
@@ -227,7 +228,7 @@ def sweep_train(config=None):
             window_size = 200 
             probed = hpcurr
             
-        
+                      
         wandb.log({"window_size": window_size, "probed": probed})
         # =====================================================================================
         # === data =========================
@@ -284,13 +285,16 @@ def sweep_train(config=None):
         astromer.compile(optimizer=optimizer)
         astromer.load_weights(os.path.join(PTWEIGTHS, 'weights')).expect_partial()
         N_EPOCHS = 10000
-        
-        # CHECK IF THERE IS ALREADY FINETUNED WEIGHTS
-        SAVEPATH = os.path.join(PTWEIGTHS, 'finetuning', config.dataset_to_ft,'fold_'+str(config.fold), config.dataset_to_ft+'_20')
-                
+        # CHECK IF THERE IS ALREADY FINETUNED WEIGHT
+        FTSAVEPATH = os.path.join(PTWEIGTHS, 
+                                  'finetuning', 
+                                   config.dataset_to_ft,
+                                  'fold_'+str(config.fold), 
+                                   config.dataset_to_ft+'_20')
+        ft_done = check_if_exist_finetuned_weights(config, FTSAVEPATH)
         if ft_done:
             print('RESTORING FINETUNING WEIGHTS')
-            astromer.load_weights(os.path.join(SAVEPATH, 'weights')).expect_partial()
+            astromer.load_weights(os.path.join(FTSAVEPATH, 'weights')).expect_partial()
         else:
             print('FINETUNING FROM SCRATCH')
             astromer.fit(trainloader, 
@@ -300,7 +304,7 @@ def sweep_train(config=None):
                                     EarlyStopping(monitor='val_loss',
                                                   patience = 20,
                                                   restore_best_weights=True),
-                                    ModelCheckpoint(filepath=os.path.join(SAVEPATH, 'weights'),
+                                    ModelCheckpoint(filepath=os.path.join(FTSAVEPATH, 'weights'),
                                                     save_weights_only=True,
                                                     monitor='val_loss',
                                                     save_best_only=True)])
@@ -333,7 +337,6 @@ sweep_id = wandb.sweep(sweep_conf, project=MASTER_PROJECT_NAME)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
 
-#7beif1u9
 if sys.argv[2] != '0':
     print('using previous id: ', sys.argv[2])
     sweep_id = sys.argv[2]
