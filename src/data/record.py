@@ -282,7 +282,7 @@ class DataPipeline:
         return shards_data, shard_paths
     
     
-    def read_all_parquets(self, path_parquets, metadata_path):
+    def read_all_parquets(self, path_parquets : str , metadata_path : str) -> pd.DataFrame:
         """
         Read the files from given paths and filters it based on err_threshold and ID from metadata
         Args:
@@ -338,7 +338,7 @@ class DataPipeline:
         print('[INFO] Creating {} random folds'.format(n_folds))
         print('Not implemented yet hehehe...')
 
-    def run(self, path_parquets, metadata_path, n_jobs=1, elements_per_shard=5000):
+    def run(self, path_parquets :str , metadata_path : str, n_jobs : int =1, elements_per_shard : int = 5000) -> None: 
         """
         Executes the DataPipeline operations which includes reading parquet files, processing samples and writing records.
         
@@ -358,8 +358,6 @@ class DataPipeline:
 
         # threads = Parallel(n_jobs=n_jobs, backend='threading')
         fold_groups = [x for x in self.metadata.columns if 'subset' in x]
-        
-
         pbar = tqdm(fold_groups, colour='#00ff00') # progress bar
         
         new_df = self.read_all_parquets(path_parquets, metadata_path)
@@ -388,6 +386,7 @@ class DataPipeline:
                 with ThreadPoolExecutor(n_jobs) as exe:
                     # submit tasks to generate files
                     _ = [exe.submit(DataPipeline.aux_serialize, shard,shard_path) for shard, shard_path in zip(shards_data,shard_paths)]
+                    logging.info(f"Wrote {subset} fold {fold_n} as TensorFlow Records")
 
         logging.info('Finished execution of DataPipeline operations')
         self.write_config()
