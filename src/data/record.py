@@ -339,6 +339,13 @@ class DataPipeline:
             n_jobs (int): The maximum number of concurrently running jobs. Default is 1
             elements_per_shard (int): Maximum number of elements per shard. Default is 5000
         """
+        if not os.path.exists(path_parquets):
+            logging.error("The specified parquets path does not exist")
+            raise FileNotFoundError("The specified parquets path does not exist")
+        
+        if not os.path.isfile(metadata_path):
+            logging.error("The specified metadata path does not exist")
+            raise FileNotFoundError("The specified metadata path does not exist")
 
         # threads = Parallel(n_jobs=n_jobs, backend='threading')
         fold_groups = [x for x in self.metadata.columns if 'subset' in x]
