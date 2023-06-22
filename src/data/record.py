@@ -293,6 +293,15 @@ class DataPipeline:
         """
         logging.info("Reading parquet files")
 
+        if not os.path.exists(path_parquets):
+            logging.error("The specified parquets path does not exist")
+            raise FileNotFoundError("The specified parquets path does not exist")
+
+        if not os.path.isfile(metadata_path):
+            logging.error("The specified metadata path does not exist")
+            raise FileNotFoundError("The specified metadata path does not exist")
+
+
         # Read the parquet filez lazily
         paths = os.path.join(path_parquets, '*.parquet')
         scan = pl.scan_parquet(paths)
