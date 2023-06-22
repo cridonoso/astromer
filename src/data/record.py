@@ -391,7 +391,11 @@ def deserialize(sample):
     config = DataPipeline.read_config()
 
     # Define context features as strings
-    context_features = {k: tf.io.FixedLenFeature([], dtype=tf.string) for k in config['context_features']}
+    context_features = {
+    'ID': tf.io.FixedLenFeature([], dtype=tf.string),
+    'Label': tf.io.FixedLenFeature([], dtype=tf.int64),
+    'Class': tf.io.FixedLenFeature([], dtype=tf.string)}
+
     # Define sequence features as floating point numbers
     sequence_features = {k: tf.io.VarLenFeature(dtype=tf.float32) for k in config['sequential_features']}
 
@@ -403,15 +407,22 @@ def deserialize(sample):
                             )
     
     # Cast context features to strings
-    input_dict = {k: tf.cast(context[k], tf.string) for k in config['context_features']}
+    input_dict = {k: context[k] for k in config['context_features']}
 
     # Cast and store sequence features
     casted_inp_parameters = []
     for k in config['sequential_features']:
+        print(f"Key: {k}")
+        print(f"Sequence: {sequence[k]}")
         seq_dim = sequence[k]
         seq_dim = tf.sparse.to_dense(seq_dim)
+        print(f"Dense sequence: {seq_dim}")
         seq_dim = tf.cast(seq_dim, tf.float32)
+        print(f"Casted sequence: {seq_dim}")
         casted_inp_parameters.append(seq_dim)
+
+    
+    print(casted_inp_parameters)
 
     # Stack sequence features along a new third dimension
     sequence = tf.stack(casted_inp_parameters, axis=2)[0]
