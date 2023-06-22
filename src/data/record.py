@@ -75,11 +75,15 @@ class DataPipeline:
         os.makedirs(output_folder, exist_ok=True)
         
     @staticmethod
-    def aux_serialize(sel, path):
+    def aux_serialize(sel : np.ndarray, path : str) -> None:
+        if not isinstance(sel, np.ndarray):
+            logging.error("Invalid data type provided to aux_serialize")
+            raise ValueError("Invalid data type provided to aux_serialize")
         with tf.io.TFRecordWriter(path) as writer:
             for lc in sel:
                 ex = DataPipeline.get_example(lc)
-                writer.write(ex.SerializeToString())  
+                writer.write(ex.SerializeToString())
+        logging.info(f"wrote tfrecords to {path}")
          
         
     @staticmethod
@@ -94,6 +98,11 @@ class DataPipeline:
         Returns:
             tf.train.SequenceExample: The converted row as a SequenceExample.
         """
+
+        if not os.path.isfile(config_file):
+            logging.error("Configuration file does not exist")
+            raise FileNotFoundError("Configuration file does not exist")
+
         logging.info("Starting conversion to SequenceExample.")  # Log start of conversion
 
 
@@ -129,7 +138,7 @@ class DataPipeline:
 
         # Create the SequenceExample
         ex = tf.train.SequenceExample(context=element_context, feature_lists=element_lists)
-
+        logging.info("Successfully converted to SequenceExample.")
         return ex
     
     def write_config(self, config_path : str ='./config.toml') -> None:
@@ -252,7 +261,7 @@ class DataPipeline:
             self.metadata = pd.concat([self.metadata, val_meta[k], test_meta[k]])
 
 
-    def prepare_data(self, container, elements_per_shard, subset, fold_n):
+    def prepare_data(self, container : np.ndarray, elements_per_shard : int, subset : str, fold_n : int):
         """Prepare the data to be saved as records"""
         if container is None or not hasattr(container, '__iter__'):
             raise ValueError("Invalid container provided to prepare_data")
