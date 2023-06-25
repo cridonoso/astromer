@@ -26,7 +26,7 @@ sweep_conf = {
     'metric': {'goal': 'maximize', 'name': 'epoch/val_accuracy'},
     'parameters': {
         'pt_data':{'value':'./data/records/macho_clean'},
-        'n_layers': {'values':[1]},
+        'n_layers': {'values':[2]},
         'fold':{'values':[0, 1, 2]},
         'subdataset':{'values':['atlas', 'alcock']},
         'clf_name':{'values':['mlp_att', 'mlp_cls', 'mlp_att_lite']},
