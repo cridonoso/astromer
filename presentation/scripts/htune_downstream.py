@@ -202,13 +202,13 @@ def create_classifier(astromer, window_size, heads=4, head_dim=64, num_cls=None,
 def check_if_exist_finetuned_weights(config, FTSAVEPATH):
     api = wandb.Api()
     runs = api.runs(MASTER_PROJECT_NAME)
-    ft_done = False
     for run in runs:
         if run.config['paths'] == config.paths and \
            run.config['fold']== config.fold and \
            run.config['dataset_to_ft'] == config.dataset_to_ft and \
            run.state == 'finished' and \
            os.path.exists(os.path.join(FTSAVEPATH, 'weights')):
+            print(FTSAVEPATH)
             return True
     return False
 
@@ -341,5 +341,5 @@ if sys.argv[2] != '0':
     print('using previous id: ', sys.argv[2])
     sweep_id = sys.argv[2]
 
-wandb.agent(sweep_id, function=sweep_train, count=10)
+wandb.agent(sweep_id, function=sweep_train, count=100)
 

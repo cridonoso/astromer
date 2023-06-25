@@ -69,6 +69,15 @@ summary_df.to_csv(os.path.join(exp_folder, 'results.csv'), index=False)
 # ====================================================================================================
 for eid, param in enumerate(combinations):
     param_dict = dict(zip(params_names, param))
+    
+    config['astromer']['layers']        = param_dict['num_layers']
+    config['astromer']['heads']         = param_dict['num_heads']
+    config['astromer']['head_dim']      = param_dict['head_dim']
+    config['astromer']['dff']           = param_dict['dff']
+    config['astromer']['dropout']       = param_dict['dropout']
+    config['astromer']['window_size']   = param_dict['windows_size']
+
+
     config['general']['creation_date'] = datetime.today().strftime('%m-%d-%Y')
 
     config['masking']['mask_frac'] = param_dict['probed_ptge']
@@ -84,7 +93,13 @@ for eid, param in enumerate(combinations):
     config['pretraining']['data']['target'] = ''
     config['pretraining']['data']['fold'] = 0
     config['pretraining']['data']['spc'] = ''    
-    config['pretraining']['exp_path'] = os.path.join(exp_folder, 'pretraining')
+    
+    name_pt = '{}_{}_{}.{}'.format(config['astromer']['layers'], 
+                                   config['astromer']['window_size'],
+                                   config['masking']['mask_frac'],
+                                   config['masking']['rnd_frac'])
+    
+    config['pretraining']['exp_path'] = os.path.join(exp_folder, 'pretraining', name_pt)
     
     config['classification']['train_astromer'] = False
     config['classification']['sci_case'] = 'a'

@@ -1,5 +1,5 @@
 '''
-Experiment to reproduce Donoso et.al., 2022
+Experiment to reproduce Donoso et.al., 2023
 https://arxiv.org/abs/2205.01677
 '''
 import tensorflow as tf
@@ -26,8 +26,17 @@ from sklearn.metrics import precision_recall_fscore_support
 import shutil
 import time
 
-
-
+def get_batch_size(model, bytes_per_param=4, window_size=None):
+    params = model.count_params()
+    mem = tf.config.experimental.get_memory_info('GPU:0')['current']
+    
+    if window_size > 200:
+        bs = int(300*595841/params)
+    else:
+        bs = int(3000*595841/params)
+    
+    return bs
+    
 def normalize_batch(tensor):
     min_ = tf.expand_dims(tf.reduce_min(tensor, 1), 1)
     max_ = tf.expand_dims(tf.reduce_max(tensor, 1), 1)
@@ -303,6 +312,11 @@ def pipeline(exp_folder, debug=False):
         with open(os.path.join(exp_conf_folder, config_file), mode="rb") as fp:
             config = tomli.load(fp)
         
+        # ============================================================================
+        # =========== PRETRAINING ====================================================
+        # ============================================================================    
+        astromer = get_astromer(config, step='pretraining')
+           
         # If debugging low resources - poor performance 
         if debug:
             config['pretraining']['data']['batch_size'] = 32
@@ -311,14 +325,14 @@ def pipeline(exp_folder, debug=False):
             config['finetuning']['epochs'] = 1
             config['classification']['data']['batch_size'] = 32
             config['classification']['epochs'] = 1
-
-        # ============================================================================
-        # =========== PRETRAINING ====================================================
-        # ============================================================================    
-        astromer = get_astromer(config, step='pretraining')
-
-        if results_df.shape[0] == 0: 
+        else:
+            batch_size_star = get_batch_size(astromer, window_size=config['astromer']['window_size'])
+            config['pretraining']['data']['batch_size'] = batch_size_star
+            
+        exist_pt = os.path.isfile(os.path.join(config['pretraining']['exp_path'], 'weights'))
+        if results_df.shape[0] == 0 or not exist_pt: 
             print('[INFO] TRAINING FROM SCRATCH ✓')
+            print(config['astromer'])
             start_time = time.time()
             astromer, backlog_df = train_astromer(astromer, config, step='pretraining', debug=debug)
             end_time = time.time()
