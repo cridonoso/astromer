@@ -168,27 +168,27 @@ class DataPipeline:
         logging.info("Successfully converted to SequenceExample.")
         return ex
     
-    
-    def open_and_read_record(self, file_path : str) -> Any:
+    def inspect_records(self, file_path:str = './records/output', num_records: int = 1):
         """
-        Opens and reads a .record file
+    Function to inspect the first 'num_records' from a TFRecord file.
 
-        Args:
-            file_path (str) : The path to the .record file to be read.
+    Args:
+        file_path (str): Path to the TFRecord file.
+        num_records (int): Number of records to inspect.
 
-        Returns:
-            raw_dataset (Any) : The raw dataset loaded from the .record file.
-        """
-        # Log the start of the file reading process
-        logging.info(f'Starting to read the file from {file_path}.')
-
-        # Use TensorFlow's TFRecordDataset method to read the .record file
-        raw_dataset = tf.data.TFRecordDataset(file_path)
-
-        # Log the completion of the file reading process
-        logging.info(f'Successfully read the file from {file_path}.')
-
-        return raw_dataset
+    Returns:
+        NoReturn
+    """
+        try:
+            raw_dataset = tf.data.TFRecordDataset(file_path)
+            for raw_record in raw_dataset.take(num_records):
+                example = tf.train.Example()
+                example.ParseFromString(raw_record.numpy())
+                print(example)
+            logging.info(f'Successfully inspected {num_records} records from {file_path}.')
+        except Exception as e:
+            logging.error(f'Error while inspecting records from {file_path}. Error message: {str(e)}')
+            raise e
     
     def train_val_test(self,
                        val_frac=0.2,
