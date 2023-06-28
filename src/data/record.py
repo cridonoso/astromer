@@ -14,6 +14,7 @@ import logging
 import toml
 from typing import List, Dict, Any
 import glob
+import random
 
 # Set up logging configuration
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -43,7 +44,7 @@ def substract_frames(frame1, frame2, on):
     frame1 = frame1[~frame1[on].isin(frame2[on])]
     return frame1
 
-def write_config(context_features: List[str], sequential_features: List[str], config_path: str) -> None:
+def write_config(context_features: List[str], sequential_features: List[str], config_path: str = './config.toml') -> None:
     """
     Writes the configuration to a toml file.
 
@@ -170,27 +171,32 @@ class DataPipeline:
     
     def inspect_records(self, dir_path:str = './records/output/', num_records: int = 1):
         """
-    Function to inspect the first 'num_records' from a TFRecord file.
+        Function to inspect the first 'num_records' from a random TFRecord file in the given directory.
 
-    Args:
-        file_path (str): Path to the TFRecord file.
-        num_records (int): Number of records to inspect.
+        Args:
+            dir_path (str): Directory path where TFRecord files are located.
+            num_records (int): Number of records to inspect.
 
-    Returns:
-        NoReturn
-    """
+        Returns:
+            NoReturn
+        """
+        # Use glob to get all the .record files in the directory
         file_paths = glob.glob(dir_path + '*.record')
+
+        # Select a random file path
+        file_path = random.choice(file_paths)
+
         try:
-            for file_path in file_paths:
-                raw_dataset = tf.data.TFRecordDataset(file_path)
-                for raw_record in raw_dataset.take(num_records):
-                    example = tf.train.Example()
-                    example.ParseFromString(raw_record.numpy())
-                    print(example)
-                logging.info(f'Successfully inspected {num_records} records from {file_path}.')
+            raw_dataset = tf.data.TFRecordDataset(file_path)
+            for raw_record in raw_dataset.take(num_records):
+                example = tf.train.Example()
+                example.ParseFromString(raw_record.numpy())
+                print(example)
+            logging.info(f'Successfully inspected {num_records} records from {file_path}.')
         except Exception as e:
             logging.error(f'Error while inspecting records. Error message: {str(e)}')
             raise e
+
 
     
     def train_val_test(self,
@@ -405,7 +411,7 @@ def deserialize(sample, config_path = "./config.toml"):
         raise e
 
     # Define context features as strings
-    context_features = {feat: tf.io.FixedLenFeature([], dtype=tf.string) for feat in config['context_features']}
+    context_features = {feat: tf.io.FixedLenFeature([], dtype=tf.int64 if feat.lower() == 'label' else tf.string) for feat in config['context_features']}
 
     # Define sequence features as floating point numbers
     sequence_features = {feat: tf.io.VarLenFeature(dtype=tf.float32) for feat in config['sequential_features']}
@@ -423,23 +429,13 @@ def deserialize(sample, config_path = "./config.toml"):
     # Cast and store sequence features
     casted_inp_parameters = []
     for k in config['sequential_features']:
-        print(f"Key: {k}")
-        print(f"Sequence: {sequence[k]}")
         seq_dim = sequence[k]
         seq_dim = tf.sparse.to_dense(seq_dim)
-        print(f"Dense sequence: {seq_dim}")
         seq_dim = tf.cast(seq_dim, tf.float32)
-        print(f"Casted sequence: {seq_dim}")
         casted_inp_parameters.append(seq_dim)
 
-    
-    print(casted_inp_parameters)
-
     # Stack sequence features along a new third dimension
-    sequence = tf.stack(casted_inp_parameters, axis=2)[0]
+    sequence = tf.stack(casted_inp_parameters, axis=2)
     # Add sequence to the input dictionary
     input_dict['input'] = sequence
-
-    # Log the completion of deserialization
-    logging.info(f'Successfully deserialized a sample.')
     return input_dict
