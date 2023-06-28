@@ -151,7 +151,7 @@ class DataPipeline:
         logging.info("Starting the writing process for the config file.")
 
         # Define the context features which are constant for each record.
-        context_features: List[str] = ['ID', 'Label', 'Class']
+        context_features: List[str] = self.context_features
 
         # Retrieve sequential features
         sequential_features: List[str] = self.sequential_features
