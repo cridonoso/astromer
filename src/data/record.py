@@ -58,7 +58,7 @@ def get_tf_dtype(dtype: pd.core.dtypes.dtypes.Dtype):
         return 'tf.int64'
     elif pd.api.types.is_float_dtype(dtype):
         return 'tf.float32'
-    elif pd.api.types.is_string_dtype(dtype):
+    elif pd.api.types.is_string_dtype(dtype) or pd.api.types.is_categorical_dtype(dtype):
         return 'tf.string'
     else:
         raise ValueError(f'Unsupported data type: {dtype}')
@@ -432,10 +432,12 @@ def deserialize(sample, config_path = "./config.toml"):
         raise e
 
     # Define context features as strings
-    context_features = {feat: tf.io.FixedLenFeature([], dtype=tf.string) for feat in config['context_features']}
+    context_features = {feat: tf.io.FixedLenFeature([], dtype=tf.dtypes.as_dtype(dtype)) 
+                        for feat, dtype in config['context_features'].items()}
 
     # Define sequence features as floating point numbers
-    sequence_features = {feat: tf.io.VarLenFeature(dtype=tf.float32) for feat in config['sequential_features']}
+    sequence_features = {feat: tf.io.VarLenFeature(dtype=tf.dtypes.as_dtype(dtype)) 
+                         for feat, dtype in config['sequential_features'].items()}
 
     # Parse the serialized sample into context and sequence features
     context, sequence = tf.io.parse_single_sequence_example(
