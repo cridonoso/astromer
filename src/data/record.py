@@ -168,7 +168,7 @@ class DataPipeline:
         logging.info("Successfully converted to SequenceExample.")
         return ex
     
-    def inspect_records(self, file_path:str = './records/output', num_records: int = 1):
+    def inspect_records(self, file_path:str = './records/output/', num_records: int = 1):
         """
     Function to inspect the first 'num_records' from a TFRecord file.
 
