@@ -13,7 +13,7 @@ from tqdm import tqdm
 import logging
 import toml
 from typing import List, Dict, Any
-
+import glob
 
 # Set up logging configuration
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -168,7 +168,7 @@ class DataPipeline:
         logging.info("Successfully converted to SequenceExample.")
         return ex
     
-    def inspect_records(self, file_path:str = './records/output/', num_records: int = 1):
+    def inspect_records(self, dir_path:str = './records/output/', num_records: int = 1):
         """
     Function to inspect the first 'num_records' from a TFRecord file.
 
@@ -179,16 +179,19 @@ class DataPipeline:
     Returns:
         NoReturn
     """
+        file_paths = glob.glob(dir_path + '*.record')
         try:
-            raw_dataset = tf.data.TFRecordDataset(file_path)
-            for raw_record in raw_dataset.take(num_records):
-                example = tf.train.Example()
-                example.ParseFromString(raw_record.numpy())
-                print(example)
-            logging.info(f'Successfully inspected {num_records} records from {file_path}.')
+            for file_path in file_paths:
+                raw_dataset = tf.data.TFRecordDataset(file_path)
+                for raw_record in raw_dataset.take(num_records):
+                    example = tf.train.Example()
+                    example.ParseFromString(raw_record.numpy())
+                    print(example)
+                logging.info(f'Successfully inspected {num_records} records from {file_path}.')
         except Exception as e:
-            logging.error(f'Error while inspecting records from {file_path}. Error message: {str(e)}')
+            logging.error(f'Error while inspecting records. Error message: {str(e)}')
             raise e
+
     
     def train_val_test(self,
                        val_frac=0.2,
