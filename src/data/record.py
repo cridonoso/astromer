@@ -210,10 +210,6 @@ class DataPipeline:
 
         return raw_dataset
     
-
-
-    
-
     def train_val_test(self,
                        val_frac=0.2,
                        test_frac=0.2,
@@ -364,6 +360,9 @@ class DataPipeline:
         if not os.path.isfile(metadata_path):
             logging.error("The specified metadata path does not exist")
             raise FileNotFoundError("The specified metadata path does not exist")
+        
+        # Start the operations
+        logging.info("Starting DataPipeline operations")
 
         # threads = Parallel(n_jobs=n_jobs, backend='threading')
         fold_groups = [x for x in self.metadata.columns if 'subset' in x]
@@ -371,11 +370,12 @@ class DataPipeline:
         
         new_df = self.read_all_parquets(path_parquets, metadata_path)
         self.new_df = new_df
-        for fold_n, fold_col in enumerate(fold_groups):
+
+        for fold_n, fold_col in enumerate(pbar):
+            pbar.set_description(f"Processing fold {fold_n+1}/{len(fold_groups)}")
 
             for subset in self.metadata[fold_col].unique():               
                 # ============ Processing Samples ===========
-                logging.info(f"Processing {subset} {fold_col}")
                 pbar.set_description("Processing {} {}".format(subset, fold_col))
                 partial = self.metadata[self.metadata[fold_col] == subset]
                 
@@ -385,7 +385,7 @@ class DataPipeline:
                 container = new_df.filter(b).to_numpy()  
                 
                 # ============ Writing Records ===========
-                logging.info(f"Writting {subset} fold {fold_n}")
+
                 pbar.set_description("Writting {} fold {}".format(subset, fold_n))
                 output_file = os.path.join(self.output_folder, subset+'_{}.record'.format(fold_n))
                 
@@ -395,7 +395,7 @@ class DataPipeline:
                 with ThreadPoolExecutor(n_jobs) as exe:
                     # submit tasks to generate files
                     _ = [exe.submit(DataPipeline.aux_serialize, shard,shard_path) for shard, shard_path in zip(shards_data,shard_paths)]
-                    logging.info(f"Wrote {subset} fold {fold_n} as TensorFlow Records")
+    
 
         logging.info('Finished execution of DataPipeline operations')
         self.write_config()
