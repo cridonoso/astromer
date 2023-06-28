@@ -80,7 +80,7 @@ class DataPipeline:
 
     def __init__(self,
                  metadata=None,
-                 config_path= None, 
+                 config_path= "./config.toml", 
                  output_folder='./records/output', 
                  id_key = 'newID', 
                  err_threshold=1, ):
@@ -167,28 +167,6 @@ class DataPipeline:
         ex = tf.train.SequenceExample(context=element_context, feature_lists=element_lists)
         logging.info("Successfully converted to SequenceExample.")
         return ex
-
-
-    @staticmethod
-    def read_config(config_path: str = './config.toml') -> Dict:
-        """
-        Reads configuration details from a .toml file.
-
-        Args:
-            config_path (str, optional): Path of the configuration file. Defaults to './config.toml'.
-
-        Returns:
-            Dict: Dictionary containing the config details.
-        """
-        logging.info("Reading config from file.")
-
-        # Load the .toml file, and read it as a dictionary
-        with open(config_path, 'r') as f:
-            config: Dict = toml.load(f)
-
-        logging.info("Config read successfully.")  # Log end of reading
-
-        return config
     
     
     def open_and_read_record(self, file_path : str) -> Any:
@@ -401,7 +379,7 @@ class DataPipeline:
 
         logging.info('Finished execution of DataPipeline operations')
 
-def deserialize(sample):
+def deserialize(sample, config_path = "./config.toml"):
     """
     Reads a serialized sample and converts it to tensor.
     Context and sequence features should match the name used when writing.
@@ -412,16 +390,22 @@ def deserialize(sample):
         type: decoded sample
     """
     # Read the configuration file
-    config = DataPipeline.read_config()
+        # Load the configuration file
+    try:
+        with open(config_path, 'r') as f:
+            config = toml.load(f)
+    except FileNotFoundError as e:
+        logging.error(f'Configuration file not found at {config_path}. Please provide a valid path.')
+        raise e
+    except Exception as e:
+        logging.error(f'An error occurred while loading the configuration file: {str(e)}')
+        raise e
 
     # Define context features as strings
-    context_features = {
-    'ID': tf.io.FixedLenFeature([], dtype=tf.string),
-    'Label': tf.io.FixedLenFeature([], dtype=tf.int64),
-    'Class': tf.io.FixedLenFeature([], dtype=tf.string)}
+    context_features = {feat: tf.io.FixedLenFeature([], dtype=tf.string) for feat in config['context_features']}
 
     # Define sequence features as floating point numbers
-    sequence_features = {k: tf.io.VarLenFeature(dtype=tf.float32) for k in config['sequential_features']}
+    sequence_features = {feat: tf.io.VarLenFeature(dtype=tf.float32) for feat in config['sequential_features']}
 
     # Parse the serialized sample into context and sequence features
     context, sequence = tf.io.parse_single_sequence_example(
