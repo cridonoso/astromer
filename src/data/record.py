@@ -43,6 +43,32 @@ def substract_frames(frame1, frame2, on):
     frame1 = frame1[~frame1[on].isin(frame2[on])]
     return frame1
 
+def write_config(context_features: List[str], sequential_features: List[str], config_path: str) -> None:
+    """
+    Writes the configuration to a toml file.
+
+    Args:
+        context_features (list): List of context features.
+        sequential_features (list): List of sequential features.
+        config_path (str): Path to the output config.toml file.
+    """
+    config = {
+        "context_features": context_features,
+        "sequential_features": sequential_features
+    }
+
+    # Make directory if it does not exist
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+
+    try:
+        with open(config_path, 'w') as config_file:
+            toml.dump(config, config_file)
+        logging.info(f'Successfully wrote config to {config_path}')
+    except Exception as e:
+        logging.error(f'Error while writing the config file: {str(e)}')
+        raise e
+
+
 class DataPipeline:
     """
     Args:
@@ -54,18 +80,33 @@ class DataPipeline:
 
     def __init__(self,
                  metadata=None,
-                 context_features=None,
-                 sequential_features=None,
+                 config_path= None, 
                  output_folder='./records/output', 
                  id_key = 'newID', 
                  err_threshold=1, ):
 
         self.metadata             = metadata
-        self.context_features     = context_features
-        self.sequential_features  = sequential_features
         self.output_folder        = output_folder
         self.id_key               = id_key
-        self.err_threshold = err_threshold
+        self.err_threshold        = err_threshold
+        
+        #get context and sequential features from config file 
+        if not os.path.isfile(config_path):
+            logging.error("The specified config path does not exist")
+            raise FileNotFoundError("The specified config path does not exist")
+        try:
+            # Read the config file
+            with open(config_path, 'r') as config_file:
+                config = toml.load(config_file)
+
+            # Get the context and sequential features
+            self.context_features = config['context_features']
+            self.sequential_features = config['sequential_features']
+
+        except Exception as e:
+            logging.error(f'Error while reading the config file: {str(e)}')
+            raise e
+
 
         if metadata is not None:
             print('[INFO] {} samples loaded'.format(metadata.shape[0]))
@@ -87,43 +128,29 @@ class DataPipeline:
          
         
     @staticmethod
-    def get_example(self,row: pd.Series, config_file: str)-> tf.train.SequenceExample:
+    def get_example(self,row: pd.Series)-> tf.train.SequenceExample:
         """
         Converts a given row into a TensorFlow SequenceExample.
 
         Args:
             row (pd.Series): Row of data to be converted.
-            config_file (str): Path to the configuration file.
 
         Returns:
             tf.train.SequenceExample: The converted row as a SequenceExample.
         """
-
-        if not os.path.isfile(config_file):
-            logging.error("Configuration file does not exist")
-            raise FileNotFoundError("Configuration file does not exist")
-
-        logging.info("Starting conversion to SequenceExample.")  # Log start of conversion
-
-
-        # Load the configuration file
-        config = toml.load(config_file)
-
-
-        context_features = config["context_features"]
-        sequential_features = config["sequential_features"]
-
         dict_features = {}
         # Parse each context feature based on its dtype and add to the features dictionary
-        for name in context_features:
+        for name in self.context_features:
             dict_features[name] = parse_dtype(row[name])
 
         # Create a context for the SequenceExample using the features dictionary
         element_context = tf.train.Features(feature=dict_features)
 
         dict_sequence = {}
-        time = row[sequential_features[0]]
-        mag = row[sequential_features[1]]
+
+        time = row[self.sequential_features[0]]
+        mag = row[self.sequential_features[1]]
+
         lightcurve = [time, mag]
 
 
@@ -140,31 +167,6 @@ class DataPipeline:
         ex = tf.train.SequenceExample(context=element_context, feature_lists=element_lists)
         logging.info("Successfully converted to SequenceExample.")
         return ex
-    
-    def write_config(self, config_path : str ='./config.toml') -> None:
-        """
-        Writes configuration details to a .toml file
-
-        Args :
-            config_path (str, optional) : path of the configuration file, defaults to ./config.toml
-        """
-        logging.info("Starting the writing process for the config file.")
-
-        # Define the context features which are constant for each record.
-        context_features: List[str] = self.context_features
-
-        # Retrieve sequential features
-        sequential_features: List[str] = self.sequential_features
-
-        # Create a dictionary to hold both context and sequential features.
-        config = {'context_features': context_features,
-                  'sequential_features': sequential_features}
-
-        # Open the config file in write mode, toml to dump
-        with open(config_path, 'w') as f:
-            toml.dump(config, f)
-
-        logging.info("Config file written successfully to {}".format(config_path))
 
 
     @staticmethod
@@ -398,8 +400,6 @@ class DataPipeline:
     
 
         logging.info('Finished execution of DataPipeline operations')
-        self.write_config()
-        logging.info('Config file written')
 
 def deserialize(sample):
     """
