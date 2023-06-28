@@ -44,42 +44,18 @@ def substract_frames(frame1, frame2, on):
     frame1 = frame1[~frame1[on].isin(frame2[on])]
     return frame1
 
-def get_tf_dtype(dtype: pd.core.dtypes.dtypes.Dtype):
-    """
-    Converts pandas dtype to TensorFlow dtype.
-
-    Args:
-        dtype (pandas dtype): The pandas data type to convert
-
-    Returns:
-        tf_dtype (str): The corresponding TensorFlow data type
-    """
-    if pd.api.types.is_integer_dtype(dtype):
-        return 'tf.int64'
-    elif pd.api.types.is_float_dtype(dtype):
-        return 'tf.float32'
-    elif pd.api.types.is_string_dtype(dtype) or pd.api.types.is_categorical_dtype(dtype):
-        return 'tf.string'
-    else:
-        raise ValueError(f'Unsupported data type: {dtype}')
-
-
-def write_config(metadata: pd.DataFrame, context_features: List[str], sequential_features: List[str], config_path: str) -> None:
+def write_config(context_features: List[str], sequential_features: List[str], config_path: str) -> None:
     """
     Writes the configuration to a toml file.
 
     Args:
-        metadata (DataFrame): The metadata DataFrame to extract dtypes from.
         context_features (list): List of context features.
         sequential_features (list): List of sequential features.
         config_path (str): Path to the output config.toml file.
     """
-    context_dtypes = {feat: get_tf_dtype(metadata[feat].dtype) for feat in context_features}
-    sequential_dtypes = {feat: 'tf.float32' for feat in sequential_features}
-
     config = {
-        "context_features": context_dtypes,
-        "sequential_features": sequential_dtypes
+        "context_features": context_features,
+        "sequential_features": sequential_features
     }
 
     # Make directory if it does not exist
@@ -194,15 +170,16 @@ class DataPipeline:
     
     def inspect_records(self, dir_path:str = './records/output/', num_records: int = 1):
         """
-    Function to inspect the first 'num_records' from a TFRecord file.
+        Function to inspect the first 'num_records' from a random TFRecord file in the given directory.
 
-    Args:
-        file_path (str): Path to the TFRecord file.
-        num_records (int): Number of records to inspect.
+        Args:
+            dir_path (str): Directory path where TFRecord files are located.
+            num_records (int): Number of records to inspect.
 
-    Returns:
-        NoReturn
-    """
+        Returns:
+            NoReturn
+        """
+        # Use glob to get all the .record files in the directory
         file_paths = glob.glob(dir_path + '*.record')
 
         # Select a random file path
@@ -218,6 +195,7 @@ class DataPipeline:
         except Exception as e:
             logging.error(f'Error while inspecting records. Error message: {str(e)}')
             raise e
+
 
     
     def train_val_test(self,
@@ -432,8 +410,7 @@ def deserialize(sample, config_path = "./config.toml"):
         raise e
 
     # Define context features as strings
-    context_features = {feat: tf.io.FixedLenFeature([], dtype=tf.dtypes.as_dtype(dtype)) 
-                        for feat, dtype in config['context_features'].items()}
+    context_features = {feat: tf.io.FixedLenFeature([], dtype=tf.int64 if feat.lower() == 'label' else tf.string) for feat in config['context_features']}
 
     # Define sequence features as floating point numbers
     sequence_features = {feat: tf.io.VarLenFeature(dtype=tf.dtypes.as_dtype(dtype)) 
@@ -452,23 +429,13 @@ def deserialize(sample, config_path = "./config.toml"):
     # Cast and store sequence features
     casted_inp_parameters = []
     for k in config['sequential_features']:
-        print(f"Key: {k}")
-        print(f"Sequence: {sequence[k]}")
         seq_dim = sequence[k]
         seq_dim = tf.sparse.to_dense(seq_dim)
-        print(f"Dense sequence: {seq_dim}")
         seq_dim = tf.cast(seq_dim, tf.float32)
-        print(f"Casted sequence: {seq_dim}")
         casted_inp_parameters.append(seq_dim)
 
-    
-    print(casted_inp_parameters)
-
     # Stack sequence features along a new third dimension
-    sequence = tf.stack(casted_inp_parameters, axis=2)[0]
+    sequence = tf.stack(casted_inp_parameters, axis=2)
     # Add sequence to the input dictionary
     input_dict['input'] = sequence
-
-    # Log the completion of deserialization
-    logging.info(f'Successfully deserialized a sample.')
     return input_dict
