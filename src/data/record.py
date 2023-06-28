@@ -14,6 +14,7 @@ import logging
 import toml
 from typing import List, Dict, Any
 import glob
+import random
 
 # Set up logging configuration
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -43,18 +44,42 @@ def substract_frames(frame1, frame2, on):
     frame1 = frame1[~frame1[on].isin(frame2[on])]
     return frame1
 
-def write_config(context_features: List[str], sequential_features: List[str], config_path: str) -> None:
+def get_tf_dtype(dtype: pd.core.dtypes.dtypes.Dtype):
+    """
+    Converts pandas dtype to TensorFlow dtype.
+
+    Args:
+        dtype (pandas dtype): The pandas data type to convert
+
+    Returns:
+        tf_dtype (str): The corresponding TensorFlow data type
+    """
+    if pd.api.types.is_integer_dtype(dtype):
+        return 'tf.int64'
+    elif pd.api.types.is_float_dtype(dtype):
+        return 'tf.float32'
+    elif pd.api.types.is_string_dtype(dtype):
+        return 'tf.string'
+    else:
+        raise ValueError(f'Unsupported data type: {dtype}')
+
+
+def write_config(metadata: pd.DataFrame, context_features: List[str], sequential_features: List[str], config_path: str) -> None:
     """
     Writes the configuration to a toml file.
 
     Args:
+        metadata (DataFrame): The metadata DataFrame to extract dtypes from.
         context_features (list): List of context features.
         sequential_features (list): List of sequential features.
         config_path (str): Path to the output config.toml file.
     """
+    context_dtypes = {feat: get_tf_dtype(metadata[feat].dtype) for feat in context_features}
+    sequential_dtypes = {feat: 'tf.float32' for feat in sequential_features}
+
     config = {
-        "context_features": context_features,
-        "sequential_features": sequential_features
+        "context_features": context_dtypes,
+        "sequential_features": sequential_dtypes
     }
 
     # Make directory if it does not exist
@@ -67,7 +92,6 @@ def write_config(context_features: List[str], sequential_features: List[str], co
     except Exception as e:
         logging.error(f'Error while writing the config file: {str(e)}')
         raise e
-
 
 class DataPipeline:
     """
@@ -180,14 +204,17 @@ class DataPipeline:
         NoReturn
     """
         file_paths = glob.glob(dir_path + '*.record')
+
+        # Select a random file path
+        file_path = random.choice(file_paths)
+
         try:
-            for file_path in file_paths:
-                raw_dataset = tf.data.TFRecordDataset(file_path)
-                for raw_record in raw_dataset.take(num_records):
-                    example = tf.train.Example()
-                    example.ParseFromString(raw_record.numpy())
-                    print(example)
-                logging.info(f'Successfully inspected {num_records} records from {file_path}.')
+            raw_dataset = tf.data.TFRecordDataset(file_path)
+            for raw_record in raw_dataset.take(num_records):
+                example = tf.train.Example()
+                example.ParseFromString(raw_record.numpy())
+                print(example)
+            logging.info(f'Successfully inspected {num_records} records from {file_path}.')
         except Exception as e:
             logging.error(f'Error while inspecting records. Error message: {str(e)}')
             raise e
