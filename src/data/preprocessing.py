@@ -2,6 +2,23 @@ import tensorflow as tf
 
 from src.data.record import deserialize
 
+def min_max_scaler(batch, on='input', axis=0):
+    """
+    Normalize input tensor given a dataset batch
+    Args:
+        dataset: batched dataset
+
+    Returns:
+        type: tf.Dataset
+    """
+    min_value = tf.reduce_min(batch['input'], axis, name='min_value')
+    max_value = tf.reduce_max(batch['input'], axis, name='max_value')
+    min_value = tf.expand_dims(min_value, axis)
+    max_value = tf.expand_dims(max_value, axis)
+    batch['input'] = tf.math.divide_no_nan(batch['input'] - min_value,
+                                           max_value-min_value)
+    return batch
+
 def standardize(batch, on='input', axis=0):
     """
     Standardize input tensor given a dataset batch
@@ -92,6 +109,7 @@ def to_windows(dataset,
     """
 
     if sampling:
+        print('[INFO] Sampling random windows')
         dataset = dataset.map(lambda x: sample_lc(x,
                                                   max_obs=window_size,
                                                   binary=False),
