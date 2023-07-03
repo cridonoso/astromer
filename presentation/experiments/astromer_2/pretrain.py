@@ -20,7 +20,7 @@ n_heads       = 4
 head_dim      = 64
 dff           = 64
 learning_rate = 1e-5
-dropout_rate  = 0.2
+dropout_rate  = 0.
 window_size   = 200
 batch_size    = 3000
 probed        = 0.6
@@ -28,7 +28,7 @@ rand          = 0.2
 nsp_prob      = 0.5
 nsp_fraction  = 0.5
 
-MASTER_PROJECT_NAME = 'nsp_script_02dp'
+MASTER_PROJECT_NAME = 'nsp_script_0dp'
 ROOT = './presentation/experiments/astromer_2/'
 EXPDIR = os.path.join(ROOT, 'results', MASTER_PROJECT_NAME)
 os.makedirs(EXPDIR, exist_ok=True)

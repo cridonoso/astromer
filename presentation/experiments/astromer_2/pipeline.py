@@ -12,7 +12,7 @@ from src.models import get_ASTROMER_II
 
 # g34htgii 
 DEBUG = False
-MASTER_PROJECT_NAME = 'nsp'
+MASTER_PROJECT_NAME = 'nsp_script_02dp'
 ROOT = './presentation/experiments/astromer_2/'
 EXPDIR = os.path.join(ROOT, 'results', MASTER_PROJECT_NAME)
 os.makedirs(EXPDIR, exist_ok=True)
@@ -26,17 +26,17 @@ sweep_conf = {
     'metric': {'goal': 'maximize', 'name': 'epoch/val_accuracy'},
     'parameters': {
         'pt_data':{'value':'./data/records/macho_clean'},
-        'n_layers': {'values':[1]},
+        'n_layers': {'values':[1, 2]},
         'fold':{'values':[0, 1, 2]},
         'subdataset':{'values':['atlas', 'alcock']},
         'clf_name':{'values':['mlp_att', 'mlp_cls', 'mlp_att_lite']},
         'n_heads': {'value':4},
         'head_dim': {'value':64},
         'dff': {'value':64},
-        'dropout_rate': {'value': 0.3955},
+        'dropout_rate': {'value': 0.},
         'learning_rate':{'value':1e-5},
         'window_size': {'value':200},
-        'probed':{'value': 0.4},
+        'probed':{'value': 0.6},
         'rand': {'value':0.2},
         'nsp_prob':{'value':0.5},
         'nsp_fraction':{'value':0.5},
