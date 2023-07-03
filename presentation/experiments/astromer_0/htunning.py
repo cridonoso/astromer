@@ -36,7 +36,6 @@ sweep_conf = {
 		'head_dim': {'values':[16, 32, 64, 128]},
 		'dff': {'values':[16, 32, 64, 128, 256]},
 		'dropout_rate': {'distribution':'uniform', 'min':.0, 'max':.5},
-		'lr': {'values':[1e-2, 1e-3, 1e-4, 1e-5]},
 	},
 	'total_runs': 150
 }
@@ -70,7 +69,7 @@ def main():
 	head_dim 	 = wandb.config.head_dim
 	dff  		 = wandb.config.dff
 	dropout_rate = wandb.config.dropout_rate
-	learning_rate = wandb.config.lr
+	#learning_rate = wandb.config.lr
 
 	window_size = 200
 	data_path = './data/records/macho/{}'
@@ -86,7 +85,7 @@ def main():
 							 pe_c=1.)
 	batch_size = get_batchsize(astromer)
 	wandb.log({'batch_size':batch_size})
-
+	learning_rate = CustomSchedule(d_model)
 	optimizer = Adam(learning_rate, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
 	astromer.compile(optimizer=optimizer)
 
