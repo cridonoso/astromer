@@ -14,5 +14,5 @@ results
 data/records_new
 presentation/experiments/astromer_0/results*
 wandb
-presentation/scripts/hp_results/
-presentation/experiments/astromer_0/final_results/
+presentation/experiments/astromer_0/backup/
+
