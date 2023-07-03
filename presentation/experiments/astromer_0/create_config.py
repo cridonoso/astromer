@@ -16,8 +16,8 @@ with open(template_path, mode="rb") as fp:
 # GENERAL CONFIGURATION ========================================================
 # ==============================================================================
 master_path         = './presentation/experiments/astromer_0' # shouldn't change
-master_name         = 'atlas_weird' # master name
-pretraining_data    = './data/records_new/atlas_pt' # unlabeled dataset
+master_name         = 'ztfg' # master name
+pretraining_data    = './data/records/ztfg_pt' # unlabeled dataset
 dir_to_save_config  = f'{master_path}/config_files/{master_name}'
 # ==============================================================================
 config['pretraining']['exp_path'] = f'{master_path}/results/{master_name}/pretraining'

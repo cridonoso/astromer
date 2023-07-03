@@ -2,6 +2,7 @@
 Experiment to reproduce Donoso et.al., 2022
 https://arxiv.org/abs/2205.01677
 '''
+import tensorflow as tf
 import pandas as pd
 import tomli
 import os, sys
@@ -120,7 +121,7 @@ def classify(config_file):
                                 callbacks=cbks,
                                 validation_data=data['val'])
 
-        clf_model.save(os.path.join(exp_path_clf, clf_name, 'model'))
+#         clf_model.save(os.path.join(exp_path_clf, clf_name, 'model'))
 
         # Evaluate
         y_pred = clf_model.predict(data['test'])
@@ -155,15 +156,18 @@ if __name__ == '__main__':
                 conf_files = [os.path.join(directory, d) for d in os.listdir(directory)]
             else:
                 if mode == 'pretraining':
-                    conf_file = []
+                    conf_files = []
                     for d in os.listdir(directory):
-                        for e in os.listdir(d):
-                            conf_file.append(os.path.join(directory, d, e))
+                   
+                        for e in os.listdir(os.path.join(directory, d)):
+                            conf_files.append(os.path.join(directory, d, e))
                             break
                 else:
-                    conf_file = [os.path.join(directory, d, e) for d in os.listdir(directory) for e in os.listdir(d)]
+                    conf_files = [os.path.join(directory, d, e) for d in os.listdir(directory) \
+                                  for e in os.listdir(os.path.join(directory, d))]
 
     for config_file in conf_files:
+        print('[INFO] Running {}'.format(config_file))
         if mode == 'classification':
             classify(config_file)
         else:

@@ -65,7 +65,7 @@ class EncoderLayer(tf.keras.layers.Layer):
 
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, num_layers, d_model, num_heads, dff,
-                 base=10000, dropout=0.1, pe_c=1., **kwargs):
+                 base=10000, dropout=0.1, pe_c=2., **kwargs):
         super(Encoder, self).__init__(**kwargs)
 
         self.d_model    = d_model
