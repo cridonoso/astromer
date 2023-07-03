@@ -12,4 +12,6 @@ user
 literature
 results
 data/records_new
+presentation/experiments/astromer_0/results*
+wandb
 presentation/experiments/astromer_0/backup/
