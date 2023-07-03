@@ -33,10 +33,12 @@ astromer =  get_ASTROMER(num_layers=2,
                          pe_c=.5)
 optimizer = Adam(1e-3, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
 astromer.compile(optimizer=optimizer)
+# pretrained_weigths = './weights/macho/weights'
+# astromer.load_weights(pretrained_weigths)
 
 # LOADING DATA
-BATCH_SIZE = 2000
-train_batches = pretraining_pipeline('./data/records/macho/train',
+BATCH_SIZE = 256
+train_batches = pretraining_pipeline('./data/records/new_ztf_g/train',
                                      batch_size=BATCH_SIZE,
                                      window_size=200,
                                      msk_frac=.5,

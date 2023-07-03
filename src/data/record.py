@@ -9,8 +9,6 @@ import os
 
 from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
-from zipfile import ZipFile
-from io import BytesIO
 from tqdm import tqdm
 from time import time
 
@@ -19,118 +17,37 @@ def _bytes_feature(value):
     """Returns a bytes_list from a string / byte."""
     if isinstance(value, type(tf.constant(0))):
         value = value.numpy() # BytesList won't unpack a string from an EagerTensor.
-    return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
 def _float_feature(list_of_floats):  # float32
     return tf.train.Feature(float_list=tf.train.FloatList(value=list_of_floats))
 
 def _int64_feature(value):
-    return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
-def parse_dtype(value):
-    if type(value) == int:
-        return _int64_feature([value])
-    if type(value) == float:
-        return _float_feature([value])
-    if type(value) == str:
-        return _bytes_feature([str(value).encode()])
-    raise ValueError('[ERROR] {} with type {} could not be parsed. Please use <str>, <int>, or <float>'.format(value, dtype(value)))
-
-class DataPipeline:
-    """docstring for DataPipeline."""
-
-    def __init__(self,
-                 metadata=None,
-                 context_features=None,
-                 sequential_features=None,
-                 output_file='output.records'):
-
-        self.metadata             = metadata
-        self.context_features     = context_features
-        self.sequential_features  = sequential_features
-        self.output_file          = output_file
-
-        if metadata is not None:
-            print('[INFO] {} samples loaded'.format(metadata.shape[0]))
-
-    @staticmethod
-    def get_example(lightcurve, context_features_values):
-        """
-        Create a record example from numpy values.
-        Serialization
-        Args:
-            lightcurve (numpy array): time, magnitudes and observational error
-            context_features_values: NONE
-        Returns:
-            tensorflow record example
-        """
-        dict_features = dict()
-        for name, value in context_features_values.items():
-            dict_features[name] = parse_dtype(value)
-
-        element_context = tf.train.Features(feature = dict_features)
-
-        dict_sequence = dict()
-        for col in range(lightcurve.shape[1]):
-            seqfeat = _float_feature(lightcurve[:, col])
-            seqfeat = tf.train.FeatureList(feature = [seqfeat])
-            dict_sequence['dim_{}'.format(col)] = seqfeat
-
-        element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
-        ex = tf.train.SequenceExample(context = element_context,
-                                      feature_lists= element_lists)
-        return ex
-
-    @staticmethod
-    def process_sample(row:pd.Series, context_features:list, sequential_features:list):
-        observations = pd.read_csv(row['Path'])
-        observations.columns = ['mjd', 'mag', 'errmag']
-        observations = observations.dropna()
-        observations.sort_values('mjd')
-        observations = observations.drop_duplicates(keep='last')
-        observations = observations[sequential_features]
-        context_features_values = row[context_features].to_dict()
-        return observations, context_features_values
-
-    @classmethod
-    def __process_sample__(cls, *args):
-        var = cls.process_sample(*args)
-        return var
-
-    def run(self, n_jobs=1):
-        print('[INFO] Processing data...')
-        threads = Parallel(n_jobs=n_jobs, backend='multiprocessing')
-        var = threads(delayed(self.__process_sample__)(row,
-                                                       self.context_features,
-                                                       self.sequential_features)\
-                                      for _, row in self.metadata.iterrows())
-
-        print('[INFO] Writing records...')
-        with tf.io.TFRecordWriter(self.output_file) as writer:
-            for observations, context in tqdm(var):
-                ex = DataPipeline.get_example(observations.values, context)
-                writer.write(ex.SerializeToString())
-
-        return var
-
-
-def get_example(lightcurve, context_features_values):
+def get_example(lcid, label, lightcurve):
     """
     Create a record example from numpy values.
     Serialization
     Args:
+        lcid (string): object id
+        label (int): class code
         lightcurve (numpy array): time, magnitudes and observational error
-        context_features_values: NONE
-    Returns:
-        tensorflow record example
-    """
-    dict_features = dict()
-    for name, value in context_features_values.items():
-        dict_features[name] = parse_dtype(value)
 
+    Returns:
+        tensorflow record
+    """
+
+    f = dict()
+
+    dict_features={
+    'id': _bytes_feature(str(lcid).encode()),
+    'label': _int64_feature(label),
+    'length': _int64_feature(lightcurve.shape[0]),
+    }
     element_context = tf.train.Features(feature = dict_features)
 
-    dict_sequence = dict()
+    dict_sequence = {}
     for col in range(lightcurve.shape[1]):
         seqfeat = _float_feature(lightcurve[:, col])
         seqfeat = tf.train.FeatureList(feature = [seqfeat])
@@ -140,6 +57,73 @@ def get_example(lightcurve, context_features_values):
     ex = tf.train.SequenceExample(context = element_context,
                                   feature_lists= element_lists)
     return ex
+
+@wrap_non_picklable_objects
+def process_lc2(row, source, unique_classes, zip_flag, file_ins=None, **kwargs):
+    path  = row['Path'].split('/')[-1]
+    label = list(unique_classes).index(row['Class'])
+    lc_path = os.path.join(source, path)
+    
+    if zip_flag == True:
+        file_inf = file_ins.getinfo(lc_path)
+        file_read = file_ins.read(file_inf)
+
+        observations = pd.read_csv(BytesIO(file_read), **kwargs)
+
+    else:
+        observations = pd.read_csv(lc_path, **kwargs)
+        
+    observations.columns = ['mjd', 'mag', 'errmag']
+    observations = observations.dropna()
+    observations.sort_values('mjd')
+    observations = observations.drop_duplicates(keep='last')
+    
+    observations = observations[(observations['mag']>=observations['mag'].quantile(.1)) &
+                                (observations['mag']<=observations['mag'].quantile(.99)) &
+                                (observations['errmag']>=0.) & (observations['errmag']<=1)]
+
+    numpy_lc = observations.values
+
+    return row['ID'], label, numpy_lc
+
+def process_lc3(lc_index, label, numpy_lc, writer):
+    try:
+        ex = get_example(lc_index, label, numpy_lc)
+        writer.write(ex.SerializeToString())
+    except:
+        print('[INFO] {} could not be processed'.format(lc_index))
+
+def divide_training_subset(frame, train, val, test_meta):
+    """
+    Divide the dataset into train, validation and test subsets.
+    Notice that:
+        test = 1 - (train + val)
+
+    Args:
+        frame (Dataframe): Dataframe following the astro-standard format
+        dest (string): Record destination.
+        train (float): train fraction
+        val (float): validation fraction
+    Returns:
+        tuple x3 : (name of subset, subframe with metadata)
+    """
+
+    frame = frame.sample(frac=1)
+    n_samples = frame.shape[0]
+
+    n_train = int(n_samples*train)
+    n_val = int(n_samples*val)
+
+    if test_meta is not None:
+        sub_test = test_meta
+        sub_train = frame.iloc[:n_train]
+        sub_val   = frame.iloc[n_train:]
+    else:
+        sub_train = frame.iloc[:n_train]
+        sub_val   = frame.iloc[n_train:n_train+n_val]
+        sub_test  = frame.iloc[n_train+n_val:]
+
+    return ('train', sub_train), ('val', sub_val), ('test', sub_test)
 
 def write_records(frame, dest, max_lcs_per_record, source, unique, zip_flag=False, n_jobs=None, max_obs=200, **kwargs):
     # Get frames with fixed number of lightcurves
@@ -212,7 +196,6 @@ def create_dataset(meta_df,
             if not os.path.exists(dest):
                 os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, zip_flag, n_jobs, **kwargs)
-
 
 def deserialize(sample):
     """

@@ -1,110 +1,136 @@
 import tomli, tomli_w
+import pandas as pd
+import itertools
 import os
 
 from datetime import datetime
 
-# ==============================================================================
-# OPENING TEMPLATE CONFIG FILE =================================================
+# ===================================================================================================
+# OPENING TEMPLATE CONFIG FILE and BUILDER ==========================================================
 # Template should contain all the parameters needed for running the pipeline
-# (i.e., astromer hyperparameters)
-# Parameters that change based on the datasets will be overwritten by this script
-# ==============================================================================
-template_path = './presentation/experiments/astromer_0/config_files/macho_mask.toml'
+# Builder contains all the posible values for hyperparameters
+# ===================================================================================================
+template_path = './presentation/experiments/astromer_0/template.toml'
+builder_path  = './presentation/experiments/astromer_0/config_builder.toml'
 with open(template_path, mode="rb") as fp:
     config = tomli.load(fp)
-# ==============================================================================
-# GENERAL CONFIGURATION ========================================================
-# ==============================================================================    
-config['pretraining']['lr'] = 1e-5
-config['pretraining']['scheduler']= False
-name_opt = 'scheduler' if config['pretraining']['scheduler'] else 'LR{}'.format(config['pretraining']['lr'])
-config['masking']['mask_frac'] = 0.8
-config['masking']['rnd_frac']  = 0.2
-config['masking']['same_frac'] = 0.2
-config['positional']['alpha'] = 1
-norm_method = 'zero-mean'
-# ==============================================================================
-master_path         = './presentation/experiments/astromer_0' # shouldn't change
-master_name         = 'alcock_{}_{}_{}_{}'.format(int(config['masking']['mask_frac']*100), 
-                                                       config['positional']['alpha'],
-                                                       norm_method,
-                                                       name_opt) # master name
-pretraining_data    = './data/records/alcock/fold_0/alcock' # unlabeled dataset
-dir_to_save_config  = f'{master_path}/config_files_alcock/{master_name}'
-dir_to_save_results = 'results_alcock'
-# ==============================================================================
-config['pretraining']['exp_path'] = f'{master_path}/{dir_to_save_results}/{master_name}/pretraining'
-config['pretraining']['data']['path'] = pretraining_data
-pretrained_weights  = config['pretraining']['exp_path'] # Change if pretrained weights already exists
-# ==============================================================================
-datasets_to_finetune = ['alcock', 'ogle', 'atlas']
-science_cases        = ['a']
-# ==============================================================================
-creation_date  = datetime.today().strftime('%Y-%m-%d')
-batch_size_ft  = 2500
-batch_size_clf = 512
-# ==============================================================================
-# CREATE CONFIG FILES ==========================================================
-# ==============================================================================
-os.makedirs(dir_to_save_config, exist_ok=True)
 
-config['pretraining']['data']['target'] = ''
-config['pretraining']['data']['fold'] = 0
-config['pretraining']['data']['spc'] = ''    
-config['pretraining']['data']['normalize'] = norm_method 
+with open(builder_path, mode="rb") as fp:
+    builder = tomli.load(fp)
 
-for dataset_name in datasets_to_finetune:
-    data_finetuning = f'./data/records/{dataset_name}'
-    data_classification = data_finetuning
+exp_folder    = os.path.join(builder['experiment']['exp_folder'], builder['experiment']['exp_name'])
+config_folder = os.path.join(exp_folder, 'config_files')
+os.makedirs(exp_folder, exist_ok=True)
+os.makedirs(config_folder, exist_ok=True)
 
-    save_weights_finetuning     = f'{master_path}/{dir_to_save_results}/{master_name}/{dataset_name}/finetuning/'
-    save_weights_classification = f'{master_path}/{dir_to_save_results}/{master_name}/{dataset_name}/classification/'
+# ====================================================================================================
+# === LIST EXPERIMENTS ===============================================================================
+# ====================================================================================================
+hparam_values = {}
+hparam_names  = {}
+for key, value in builder.items():
+    if key == 'experiment': continue
+    hparam_values[key] = list(itertools.product(*[subval for subkey, subval in value.items()]))
+    hparam_names[key] = [subkey for subkey, _ in value.items()]
 
-    for sci_case in science_cases:
-        if sci_case == 'a':
-            config['classification']['train_astromer'] = False
-        else:
-            config['classification']['train_astromer'] = True
+t = list(itertools.product(*[value for key, value in hparam_values.items()]))
+combinations = [tuple(itertools.chain(*tt)) for tt in t]
+params_names = [ttt for _, tt in hparam_names.items() for ttt in tt]
 
-        for fold_n in range(3):
-            for samples_per_class in [20, 50, 100, 500]:
-                ft_data  = os.path.join(data_finetuning,
-                                        'fold_{}'.format(fold_n),
-                                        '{}_{}'.format(dataset_name, samples_per_class))
-                clf_data = os.path.join(data_classification,
-                                        'fold_{}'.format(fold_n),
-                                        '{}_{}'.format(dataset_name, samples_per_class))
+# ====================================================================================================
+# === SUMMARY RESULTS TABLE ==========================================================================
+# ====================================================================================================
+summary_df = pd.DataFrame(columns=['eid',
+                                   'date',
+                                   'step',
+                                   'target', 
+                                   'fold', 
+                                   'spc',
+                                   'rmse', 
+                                   'r_square',
+                                   'val_rmse',
+                                   'val_r_square',
+                                   'test_rmse',
+                                   'test_r_square',
+                                   'model',
+                                   'acc',
+                                   'loss',
+                                   'val_acc',
+                                   'val_loss',
+                                   'test_precision',
+                                   'test_recall',
+                                   'test_f1',
+                                   'elapsed'
+                                   ])
+summary_df.to_csv(os.path.join(exp_folder, 'results.csv'), index=False)
 
-                ft_path  = os.path.join(save_weights_finetuning,
-                                        '{}_{}_f{}'.format(dataset_name, samples_per_class,fold_n))
-                clf_path = os.path.join(save_weights_classification,
-                                        sci_case,
-                                        '{}_{}_f{}'.format(dataset_name, samples_per_class,fold_n))
-                
+# ====================================================================================================
+# === ITERATE OVER THE EXPERIMENTS ===================================================================
+# ====================================================================================================
+for eid, param in enumerate(combinations):
+    param_dict = dict(zip(params_names, param))
+    
+    config['astromer']['layers']        = param_dict['num_layers']
+    config['astromer']['heads']         = param_dict['num_heads']
+    config['astromer']['head_dim']      = param_dict['head_dim']
+    config['astromer']['dff']           = param_dict['dff']
+    config['astromer']['dropout']       = param_dict['dropout']
+    config['astromer']['window_size']   = param_dict['windows_size']
 
-                config['finetuning']['data']['target'] = dataset_name
-                config['finetuning']['data']['fold'] = fold_n
-                config['finetuning']['data']['spc'] = samples_per_class
-                config['finetuning']['data']['normalize'] = norm_method 
-                config['classification']['data']['target'] = dataset_name
-                config['classification']['data']['fold'] = fold_n
-                config['classification']['data']['spc'] = samples_per_class
-                config['classification']['data']['normalize'] = norm_method 
-                
-                config['general']['creation_date'] = creation_date
 
-                config['finetuning']['batch_size']     = batch_size_ft
-                config['classification']['batch_size'] = batch_size_clf
+    config['general']['creation_date'] = datetime.today().strftime('%m-%d-%Y')
 
-                config['finetuning']['data']['path']     = ft_data
-                config['classification']['data']['path'] = clf_data
+    config['masking']['mask_frac'] = param_dict['probed_ptge']
+    config['masking']['rnd_frac']  = param_dict['rndsame_ptge']
+    config['masking']['same_frac'] = param_dict['rndsame_ptge']
 
-                config['finetuning']['exp_path']     = ft_path
-                config['classification']['exp_path'] = clf_path
+    config['positional']['alpha']  = param_dict['pe_alpha']
 
-                config['finetuning']['weights']     = pretrained_weights
-                config['classification']['weights'] = ft_path # Classification uses finetuned weights
+    config['pretraining']['lr'] = param_dict['learn_rate']
+    config['pretraining']['scheduler']= False
+    config['pretraining']['data']['batch_size'] = param_dict['batch_size']
+    config['pretraining']['data']['path'] = param_dict['dataset']
+    config['pretraining']['data']['target'] = ''
+    config['pretraining']['data']['fold'] = 0
+    config['pretraining']['data']['spc'] = ''    
+    
+    name_pt = '{}_{}_{}.{}'.format(config['astromer']['layers'], 
+                                   config['astromer']['window_size'],
+                                   config['masking']['mask_frac'],
+                                   config['masking']['rnd_frac'])
+    
+    config['pretraining']['exp_path'] = os.path.join(exp_folder, 'pretraining', name_pt)
+    
+    config['classification']['train_astromer'] = False
+    config['classification']['sci_case'] = 'a'
 
-                with open(f'{dir_to_save_config}/{dataset_name}.{samples_per_class}.f{fold_n}.{sci_case}.toml',
-                          mode="wb") as fp:
-                    tomli_w.dump(config, fp)
+    config['finetuning']['data']['path']   = param_dict['dataset_2']
+    config['finetuning']['data']['target'] = param_dict['dataset_2'].split('/')[3]
+    config['finetuning']['data']['fold']   = int(param_dict['dataset_2'].split('/')[4].split('_')[-1])
+    config['finetuning']['data']['spc']    = int(param_dict['dataset_2'].split('/')[-1].split('_')[-1])
+    config['finetuning']['batch_size']     = param_dict['batch_size']
+
+    config['classification']['data']['path']   = config['finetuning']['data']['path']
+    config['classification']['data']['target'] = config['finetuning']['data']['target'] 
+    config['classification']['data']['fold']   = config['finetuning']['data']['fold']
+    config['classification']['data']['spc']    = config['finetuning']['data']['spc']
+    config['classification']['batch_size']     = param_dict['batch_size_2']
+
+
+    config['finetuning']['exp_path']     = os.path.join(exp_folder,
+                                                        config['finetuning']['data']['target'],
+                                                       'finetuning')
+
+    config['classification']['exp_path'] = os.path.join(exp_folder,
+                                                        config['classification']['data']['target'],
+                                                       'classification')
+
+    config['finetuning']['weights']     = config['pretraining']['exp_path']
+    config['classification']['weights'] = config['finetuning']['exp_path']
+
+    # SAVING CONFIG FILE
+    with open(os.path.join(config_folder, f'exp_{eid}.toml'), mode="wb") as fp:
+        tomli_w.dump(config, fp)
+
+
+

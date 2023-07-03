@@ -16,13 +16,19 @@ def build_input(length):
     times  = Input(shape=(length, 1),
                   batch_size=None,
                   name='times')
-    mask   = Input(shape=(length, 1),
+    mask_in   = Input(shape=(length, 1),
                   batch_size=None,
-                  name='mask')
+                  name='mask_in')
+    mask_out   = Input(shape=(length, 1),
+                  batch_size=None,
+                  name='mask_out')
+    
+    pholder = {'input':serie,
+               'mask_in':mask_in,
+               'times':times,
+               'mask_out':mask_out}
 
-    return {'input':serie,
-            'mask_in':mask,
-            'times':times}
+    return pholder
 
 def get_ASTROMER(num_layers=2,
                  d_model=200,

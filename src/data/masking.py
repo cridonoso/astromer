@@ -56,7 +56,7 @@ def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
         rand_mask = tf.minimum(rand_mask, tf.ones_like(rand_mask))
         rand_mask = tf.expand_dims(rand_mask, 1)
         rand_mask = tf.tile(rand_mask, [1, tf.shape(serie_2)[-1]])
-
+        
         len_s1 = tf.minimum(tf.shape(serie_2)[0],
                             tf.shape(rand_mask)[0])
 
@@ -85,29 +85,30 @@ def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
     seq_errs = tf.slice(x, [0, 2], [-1, 1])
 
     # Save the true values
+    time_steps = tf.shape(seq_magn)[0]
     orig_magn = seq_magn
 
     # [MASK] values
     if msk_frac == 0.:
-        mask_out = tf.ones_like(seq_time)
-        mask_in  =  1.- mask_out
+        mask_out = tf.ones(time_steps)
     else:
         mask_out = get_masked(seq_magn, msk_frac)
-        # [MASK] -> Same values
-        seq_magn, mask_in = set_random(seq_magn,
-                                       mask_out,
-                                       seq_magn,
-                                       same_frac,
-                                       name='set_same')
 
-       # [MASK] -> Random value
-        seq_magn, mask_in = set_random(seq_magn,
-                                       mask_in,
-                                       tf.random.shuffle(seq_magn),
-                                       rnd_frac,
-                                       name='set_random')
+    # [MASK] -> Identity
+    seq_magn, mask_in = set_random(seq_magn,
+                                   mask_out,
+                                   seq_magn,
+                                   same_frac,
+                                   name='set_same')
 
-    time_steps = tf.shape(seq_magn)[0]
+    # [MASK] -> Random
+    seq_magn, mask_in = set_random(seq_magn,
+                                   mask_in,
+                                   tf.random.shuffle(seq_magn),
+                                   rnd_frac,
+                                   name='set_random')
+    if msk_frac == 0.:
+        mask_in  =  1.- mask_out
 
     mask_out = tf.reshape(mask_out, [time_steps, 1])
     mask_in = tf.reshape(mask_in, [time_steps, 1])
