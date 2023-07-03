@@ -36,16 +36,6 @@ def parse_dtype(value):
         return _bytes_feature([str(value).encode()])
     raise ValueError('[ERROR] {} with type {} could not be parsed. Please use <str>, <int>, or <float>'.format(value, dtype(value)))
 
-def get_zip_reader(zip_path):
-    '''Decorator that reports the execution time.'''
-    with ZipFile(zip_path, 'r') as zp:
-        def read_zip(path):
-            file_read = zp.read(zp.getinfo(path))
-            file_byts = BytesIO(file_read)
-            observations = pd.read_csv(file_byts)
-            return observations
-    return read_zip, zp
-
 class DataPipeline:
     """docstring for DataPipeline."""
 
@@ -53,43 +43,75 @@ class DataPipeline:
                  metadata=None,
                  context_features=None,
                  sequential_features=None,
-                 output_file='records.py'):
+                 output_file='output.records'):
 
         self.metadata             = metadata
         self.context_features     = context_features
         self.sequential_features  = sequential_features
+        self.output_file          = output_file
 
         if metadata is not None:
             print('[INFO] {} samples loaded'.format(metadata.shape[0]))
 
     @staticmethod
-    def process_sample(row:pd.Series, context_features:list, sequential_features:list)->pd.DataFrame:
+    def get_example(lightcurve, context_features_values):
+        """
+        Create a record example from numpy values.
+        Serialization
+        Args:
+            lightcurve (numpy array): time, magnitudes and observational error
+            context_features_values: NONE
+        Returns:
+            tensorflow record example
+        """
+        dict_features = dict()
+        for name, value in context_features_values.items():
+            dict_features[name] = parse_dtype(value)
+
+        element_context = tf.train.Features(feature = dict_features)
+
+        dict_sequence = dict()
+        for col in range(lightcurve.shape[1]):
+            seqfeat = _float_feature(lightcurve[:, col])
+            seqfeat = tf.train.FeatureList(feature = [seqfeat])
+            dict_sequence['dim_{}'.format(col)] = seqfeat
+
+        element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
+        ex = tf.train.SequenceExample(context = element_context,
+                                      feature_lists= element_lists)
+        return ex
+
+    @staticmethod
+    def process_sample(row:pd.Series, context_features:list, sequential_features:list):
         observations = pd.read_csv(row['Path'])
         observations.columns = ['mjd', 'mag', 'errmag']
         observations = observations.dropna()
         observations.sort_values('mjd')
         observations = observations.drop_duplicates(keep='last')
         observations = observations[sequential_features]
-        context_features_values = row[context_features]
-        ex = get_example(observations.values, context_features_values)
-        return ex
+        context_features_values = row[context_features].to_dict()
+        return observations, context_features_values
 
     @classmethod
     def __process_sample__(cls, *args):
-        cls.process_sample(*args)
+        var = cls.process_sample(*args)
+        return var
 
     def run(self, n_jobs=1):
+        print('[INFO] Processing data...')
         threads = Parallel(n_jobs=n_jobs, backend='multiprocessing')
         var = threads(delayed(self.__process_sample__)(row,
                                                        self.context_features,
                                                        self.sequential_features)\
                                       for _, row in self.metadata.iterrows())
 
-        # with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
-        #     for counter2, data_lc in enumerate(var):
-        #         ex = DataPipeline.get_example(observations.values, context_features_values)
-        return var
+        print('[INFO] Writing records...')
+        with tf.io.TFRecordWriter(self.output_file) as writer:
+            for observations, context in tqdm(var):
+                ex = DataPipeline.get_example(observations.values, context)
+                writer.write(ex.SerializeToString())
 
+        return var
 
 
 def get_example(lightcurve, context_features_values):
@@ -190,6 +212,7 @@ def create_dataset(meta_df,
             if not os.path.exists(dest):
                 os.makedirs(dest, exist_ok=True)
             write_records(frame, dest, max_lcs_per_record, source, unique, zip_flag, n_jobs, **kwargs)
+
 
 def deserialize(sample):
     """
