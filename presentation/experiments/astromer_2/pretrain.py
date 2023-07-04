@@ -4,7 +4,7 @@ import json
 import sys
 import os
 
-from tensorflow.keras.optimizers import Adam, AdamW
+from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks  import (ModelCheckpoint,
                                          EarlyStopping,
                                          TensorBoard)
@@ -64,7 +64,7 @@ astromer = get_ASTROMER_II(num_layers=n_layers,
                            pe_c=1,
                            window_size=window_size)
 
-optimizer = AdamW(learning_rate)
+optimizer = Adam(learning_rate)
 astromer.compile(optimizer=optimizer)
 
 callbacks = [
