@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.8.0-gpu
+FROM tensorflow/tensorflow:2.12.0-gpu
 # ==== USER CREATION ===
 ARG USER_ID
 ARG GROUP_ID

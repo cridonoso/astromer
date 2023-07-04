@@ -9,7 +9,7 @@ if [[ $gpu == *' nvidia '* ]]; then
   echo GPU found
   docker run --name astromer_v2 -it \
     --rm \
-    --privileged=true \
+    --privileged \
     --mount "type=bind,src=$(pwd),dst=/home/" \
     --workdir /home/ \
     -p 8888:8888 \
@@ -20,7 +20,7 @@ if [[ $gpu == *' nvidia '* ]]; then
 else
   docker run --name astromer_v2 -it \
     --rm \
-    --privileged=true \
+    --privileged \
     --mount "type=bind,src=$(pwd),dst=/home/" \
     --workdir /home/ \
     -p 8888:8888 \

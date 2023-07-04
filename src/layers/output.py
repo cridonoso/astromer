@@ -3,6 +3,22 @@ import tensorflow as tf
 from tensorflow.keras.layers import Input, Layer, Dense
 
 
+class TransformLayer(Layer):
+	def __init__(self, **kwargs):
+		super(TransformLayer, self).__init__(**kwargs)
+		self.clf_layer = Dense(2, name='Classification')
+		self.reg_layer = Dense(1, name='Reconstruction')
+		
+	def call(self, inputs):
+
+		cls_token = tf.slice(inputs, [0, 0, 0], [-1, 1, -1], name='cls_token')
+		rec_token = tf.slice(inputs, [0, 1, 0], [-1, -1, -1], name='rec_token')
+
+		x_prob = self.clf_layer(cls_token)
+		x_rec = self.reg_layer(rec_token)
+
+		return x_prob, x_rec
+
 class RegLayer(Layer):
 	def __init__(self, **kwargs):
 		super().__init__(**kwargs)
@@ -12,18 +28,4 @@ class RegLayer(Layer):
 	def call(self, inputs):
 		x = self.bn_0(inputs)
 		x = self.reg_layer(x)
-		return x
-
-class SauceLayer(tf.keras.layers.Layer):
-	def init(self, shape,**kwargs):
-	    super(SauceLayer, self).init(**kwargs)
-	    self.supports_masking = True
-	    self.shape = shape
-
-	def build(self, input_shape):
-	    self.scale = tf.Variable([1/self.shape for _ in range(self.shape)], trainable=True)
-
-	def call(self, inputs):
-	    # Softmax normalized
-	    scale = tf.nn.softmax(self.scale)
-	    return tf.tensordot(scale, inputs, axes=1)
+		return 
