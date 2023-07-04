@@ -90,6 +90,8 @@ def format_input(input_dict, cls_token=None):
 
 
     inputs = {
+        'original':input_dict['input'],
+        'mask': input_dict['mask'],
         'magnitudes': magnitudes,
         'times': times,
         'att_mask': att_mask,
@@ -131,6 +133,7 @@ def load_data(dataset,
     # MASKING
     dataset = dataset.map(lambda x: get_probed(x, probed=probed, njobs=njobs))
     
+
     # NSP
     dataset = dataset.map(lambda x: randomize(x, nsp_prob=nsp_prob))
 

@@ -16,13 +16,13 @@ os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
 datapath      = './data/records/macho_clean'
 
 n_layers      = int(sys.argv[2])
-n_heads       = 4
+n_heads       = 2
 head_dim      = 64
 mixer_size    = 64
 learning_rate = 1e-5
 dropout_rate  = 0.2
 window_size   = 200
-batch_size    = 3000
+batch_size    = 256
 probed        = 0.6
 rand          = 0.2
 nsp_prob      = 0.5

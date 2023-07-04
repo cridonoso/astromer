@@ -7,7 +7,8 @@ def standardize_batch(input_tensor, axis=1):
     N = tf.where(tf.abs(input_tensor) > 0, 1., 0.)
     N = tf.slice(N, [0, 0, 0], [-1, -1, 1])
     N = tf.reduce_sum(N, 1)
-    input_mean = tf.reduce_sum(input_tensor, axis)/N
+
+    input_mean = tf.math.divide_no_nan(tf.reduce_sum(input_tensor, axis), N)
     input_mean = tf.expand_dims(input_mean, axis)
     input_tensor = input_tensor - input_mean
     return input_tensor
