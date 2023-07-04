@@ -76,11 +76,13 @@ class CustomModel(tf.keras.Model):
     def train_step(self, data):
         x, y = data
         with tf.GradientTape() as tape:
-            x_cls, x_pred = self(x)
+            x_cls, x_pred = self(x, training=True)
+            
             rmse = custom_rmse(y_true=y['magnitudes'],
                                y_pred=x_pred,
                                mask=y['probed_mask'])
             bce = custom_bce(y['nsp_label'], x_cls)
+            
             loss = rmse + bce
 
             r2_value = custom_r2(y_true=y['magnitudes'], 
@@ -88,7 +90,7 @@ class CustomModel(tf.keras.Model):
                                  mask=y['probed_mask'])
 
             acc = custom_acc(y['nsp_label'], x_cls)
-
+        
         grads = tape.gradient(loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         return {'loss':loss,

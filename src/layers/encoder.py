@@ -83,6 +83,7 @@ class Encoder(Model):
         # adding embedding and position encoding.
         x_pe = self.positional_encoder(data['times'])
         x = tf.concat([x_pe, data['magnitudes'], data['seg_emb']], 2)
+        
         layers_outputs = []
         for i in range(self.num_layers):
             z =  self.enc_layers[i](x, mask=data['att_mask'])
