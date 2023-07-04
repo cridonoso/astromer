@@ -413,8 +413,7 @@ def deserialize(sample, config_path = "./config.toml"):
     context_features = {feat: tf.io.FixedLenFeature([], dtype=tf.int64 if feat.lower() == 'label' else tf.string) for feat in config['context_features']}
 
     # Define sequence features as floating point numbers
-    sequence_features = {feat: tf.io.VarLenFeature(dtype=tf.dtypes.as_dtype(dtype)) 
-                         for feat, dtype in config['sequential_features'].items()}
+    sequence_features = {feat: tf.io.VarLenFeature(dtype=tf.float32) for feat in config['sequential_features']}
 
     # Parse the serialized sample into context and sequence features
     context, sequence = tf.io.parse_single_sequence_example(
