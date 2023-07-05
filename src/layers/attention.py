@@ -39,21 +39,18 @@ def scaled_dot_product_attention(q, k, v, mask=None):
     return output, attention_weights
 
 class HeadAttentionMulti(tf.keras.layers.Layer):
-    def __init__(self, d_model, num_heads, mode=0):
+    def __init__(self, head_dim, num_heads):
         super(HeadAttentionMulti, self).__init__()
         self.num_heads = num_heads
-        self.d_model = d_model
-        self.mode = mode
+        self.head_dim = head_dim
         
-        assert d_model % self.num_heads == 0
-
-        self.depth = d_model // self.num_heads # final dimension
+        self.d_model = self.num_heads * self.head_dim
+        self.depth = self.d_model // self.num_heads # final dimension
         
-        self.wq = tf.keras.layers.Dense(d_model, name='WQ')
-        self.wk = tf.keras.layers.Dense(d_model, name='WK')
-        self.wv = tf.keras.layers.Dense(d_model, name='WV')
-
-        self.dense = tf.keras.layers.Dense(d_model, name='MixerDense')
+    def build(self, input_shape):
+        self.wq = tf.keras.layers.Dense(self.d_model, name='WQ')
+        self.wk = tf.keras.layers.Dense(self.d_model, name='WK')
+        self.wv = tf.keras.layers.Dense(self.d_model, name='WV')
 
     def split_heads(self, x, batch_size, name='qkv'):
         """Split the last dimension into (num_heads, depth).
@@ -75,19 +72,21 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 
         # scaled_attention.shape == (batch_size, num_heads, seq_len_q, depth)
         # attention_weights.shape == (batch_size, num_heads, seq_len_q, seq_len_k)
-        if self.mode == 0:
-            scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask=mask)
-        else:
-            scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v)
+        scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask=mask)
 
         scaled_attention = tf.transpose(scaled_attention, perm=[0, 2, 1, 3])  # (batch_size, seq_len_q, num_heads, depth)
 
         concat_attention = tf.reshape(scaled_attention,
                                         (batch_size, -1, self.d_model))  # (batch_size, seq_len_q, d_model)
 
-        output = self.dense(concat_attention)  # (batch_size, seq_len_q, d_model)
+        # output = self.dense(concat_attention)  # (batch_size, seq_len_q, d_model)
         
-        if self.mode != 0:
-            output = tf.multiply(output, 1.- mask) # masking outside attention
+        return concat_attention, attention_weights
 
-        return output, attention_weights
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "head_dim": self.head_dim,
+            "num_heads": self.num_heads,
+        })
+        return config
