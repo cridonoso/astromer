@@ -5,6 +5,7 @@ import sys
 import os
 
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers.experimental import AdamW
 from tensorflow.keras.callbacks  import (ModelCheckpoint,
                                          EarlyStopping,
                                          TensorBoard)
@@ -16,18 +17,22 @@ os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
 datapath      = './data/records/macho_clean'
 
 n_layers      = int(sys.argv[2])
-n_heads       = 2
+n_heads       = 6
 head_dim      = 64
-mixer_size    = 64
+mixer_size    = 256
 learning_rate = 1e-5
-dropout_rate  = 0.2
+dropout_rate  = 0.1
 window_size   = 200
-batch_size    = 256
+batch_size    = 512
 probed        = 0.6
 rand          = 0.2
 nsp_prob      = 0.5
+bce_factor    = float(sys.argv[3])
+rmse_factor   = 1. - bce_factor
 
-MASTER_PROJECT_NAME = 'nsp_script_0dp'
+print('[INFO] BCE: {:.2f} RMSE: {:.2f}'.format(bce_factor, rmse_factor))
+print('\n')
+MASTER_PROJECT_NAME = 'nsp_adamw_factor'
 ROOT = './presentation/experiments/astromer_2/'
 EXPDIR = os.path.join(ROOT, 'results', MASTER_PROJECT_NAME)
 os.makedirs(EXPDIR, exist_ok=True)
@@ -39,7 +44,7 @@ train_batches = load_data(dataset=os.path.join(datapath, 'train'),
                           probed=probed,  
                           window_size=window_size, 
                           nsp_prob=nsp_prob, 
-                          repeat=1, 
+                          repeat=4, 
                           sampling=True)
 valid_batches = load_data(dataset=os.path.join(datapath, 'val'), 
                           batch_size=batch_size, 
@@ -50,7 +55,7 @@ valid_batches = load_data(dataset=os.path.join(datapath, 'val'),
                           sampling=True)
 
 # ======= MODEL ========================================
-model_name = '{}_{}_{}'.format(n_layers, n_heads, head_dim)
+model_name = '{}_{}_{}_rmse_{}'.format(n_layers, n_heads, head_dim, rmse_factor)
 PTWEIGTHS = os.path.join(EXPDIR, model_name, 'pretraining')
         
 d_model = head_dim*n_heads
@@ -64,8 +69,8 @@ astromer = get_ASTROMER_II(num_layers=n_layers,
                            pe_c=1,
                            window_size=window_size)
 
-optimizer = Adam(learning_rate)
-astromer.compile(optimizer=optimizer)
+optimizer = AdamW(learning_rate)
+astromer.compile(rmse_factor=rmse_factor, bce_factor=bce_factor, optimizer=optimizer)
 
 callbacks = [
         ModelCheckpoint(

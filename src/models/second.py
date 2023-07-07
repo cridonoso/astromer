@@ -70,6 +70,10 @@ def get_ASTROMER(num_layers=2,
                        name="ASTROMER_NSP")
 
 class CustomModel(tf.keras.Model):
+    def compile(self, rmse_factor=1, bce_factor=1,*args, **kwargs):
+        super().compile(*args, **kwargs)
+        self.rmse_factor = tf.cast(rmse_factor, tf.float32)
+        self.bce_factor = tf.cast(bce_factor, tf.float32)
     '''
     Custom functional model
     '''
@@ -83,7 +87,7 @@ class CustomModel(tf.keras.Model):
                                mask=y['probed_mask'])
             bce = custom_bce(y['nsp_label'], x_cls)
             
-            loss = rmse + bce
+            loss = rmse*self.rmse_factor + bce*self.bce_factor
 
             r2_value = custom_r2(y_true=y['magnitudes'], 
                                  y_pred=x_pred, 
@@ -107,7 +111,7 @@ class CustomModel(tf.keras.Model):
                                y_pred=x_pred,
                                mask=y['probed_mask'])
             bce = custom_bce(y['nsp_label'], x_cls)
-            loss = rmse + bce
+            loss = rmse*self.rmse_factor + bce*self.bce_factor
 
             r2_value = custom_r2(y_true=y['magnitudes'], 
                                  y_pred=x_pred, 

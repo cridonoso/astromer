@@ -6,14 +6,15 @@ import pandas as pd
 import os
 
 from .utils import load_pt_data, load_clf_data, create_classifier, classify, get_callbacks, check_if_exist_finetuned_weights
+from tensorflow.keras.optimizers.experimental import AdamW
 from tensorflow.keras.optimizers import Adam
 
 from src.models import get_ASTROMER_II
 
 # g34htgii 
 DEBUG = False
-MASTER_PROJECT_NAME = 'nsp_script_02dp'
-ROOT = './presentation/experiments/astromer_2/'
+MASTER_PROJECT_NAME = 'nsp_adamw'
+ROOT = './presentation/experiments/astromer_2/results'
 EXPDIR = os.path.join(ROOT, 'results', MASTER_PROJECT_NAME)
 os.makedirs(EXPDIR, exist_ok=True)
 
@@ -26,14 +27,14 @@ sweep_conf = {
     'metric': {'goal': 'maximize', 'name': 'epoch/val_accuracy'},
     'parameters': {
         'pt_data':{'value':'./data/records/macho_clean'},
-        'n_layers': {'values':[1, 2]},
+        'n_layers': {'values':[3]},
         'fold':{'values':[0, 1, 2]},
         'subdataset':{'values':['atlas', 'alcock']},
         'clf_name':{'values':['mlp_att', 'mlp_cls', 'mlp_att_lite']},
-        'n_heads': {'value':4},
+        'n_heads': {'value':6},
         'head_dim': {'value':64},
-        'dff': {'value':64},
-        'dropout_rate': {'value': 0.},
+        'dff': {'value':256},
+        'dropout_rate': {'value': 0.1},
         'learning_rate':{'value':1e-5},
         'window_size': {'value':200},
         'probed':{'value': 0.6},
@@ -71,7 +72,7 @@ def sweep_train(config=None):
             astromer.load_weights(os.path.join(PTWEIGTHS, 'weights'))
         else:
             print('[INFO] TRAINING FROM SCRATCH')
-            optimizer = Adam(config.learning_rate, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
+            optimizer = AdamW(config.learning_rate)
             astromer.compile(optimizer=optimizer)
             loader = load_pt_data(config, sampling=True, debug=DEBUG)
             cbks = get_callbacks(PTWEIGTHS, monitor='val_loss')
