@@ -1,23 +1,24 @@
 import multiprocessing as mp
 import tensorflow as tf
 import pandas as pd
-import numpy as np
 import polars as pl
+import numpy as np
+import logging
+import shutil
+import random
+import glob
+import toml
 import os
+
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-# from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
-# from zipfile import ZipFile
+from typing import List, Dict, Any
 from io import BytesIO
 from tqdm import tqdm
-import logging
-import toml
-from typing import List, Dict, Any
-import glob
-import random
 
 # Set up logging configuration
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+
 
 def _bytes_feature(value):
     """Returns a bytes_list from a string / byte."""
@@ -31,14 +32,23 @@ def _float_feature(list_of_floats):  # float32
 def _int64_feature(value):
     return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
 
-def parse_dtype(value):
-    if type(value) == int:
-        return _int64_feature([value])
-    if type(value) == float:
+def parse_dtype(value, data_type):
+    if type(value) in [int, float] and data_type == 'integer':
+        return _int64_feature([int(value)])
+    if type(value) in [int, float] and data_type == 'float':
         return _float_feature([value])
-    if type(value) == str:
+    if type(value) == str and data_type == 'string':
         return _bytes_feature([str(value).encode()])
-    raise ValueError('[ERROR] {} with type {} could not be parsed. Please use <str>, <int>, or <float>'.format(value, dtype(value)))
+
+    if type(value) == list:
+        if type(value[0]) == int and data_type == 'integer':
+            return _int64_feature(value)
+        if type(value[0]) == float and data_type == 'float':
+            return _float_feature(value)
+        if type(value[0]) == str and data_type == 'string':
+            return _bytes_feature(value)
+
+    raise ValueError('[ERROR] {} with type {} could not be parsed. Please use <str>, <int>, or <float>'.format(value, type(value)))
 
 def substract_frames(frame1, frame2, on):
     frame1 = frame1[~frame1[on].isin(frame2[on])]
@@ -80,55 +90,64 @@ class DataPipeline:
 
     def __init__(self,
                  metadata=None,
-                 config_path= "./config.toml", 
-                 output_folder='./records/output', 
-                 id_key = 'newID', 
-                 err_threshold=1, ):
+                 config_path= "./config.toml"):
 
-        self.metadata             = metadata
-        self.output_folder        = output_folder
-        self.id_key               = id_key
-        self.err_threshold        = err_threshold
         
+
         #get context and sequential features from config file 
         if not os.path.isfile(config_path):
             logging.error("The specified config path does not exist")
             raise FileNotFoundError("The specified config path does not exist")
-        try:
-            # Read the config file
-            with open(config_path, 'r') as config_file:
-                config = toml.load(config_file)
 
-            # Get the context and sequential features
-            self.context_features = config['context_features']
-            self.sequential_features = config['sequential_features']
+        # Read the config file
+        with open(config_path, 'r') as f:
+            config = toml.load(f)
 
-        except Exception as e:
-            logging.error(f'Error while reading the config file: {str(e)}')
-            raise e
+        # Saving class variables
+        self.metadata                  = metadata
+        self.config_path               = config_path
+        self.config                    = config
+        self.context_features          = config['context_features']['value']
+        self.context_features_dtype    = config['context_features']['dtypes']
+        self.sequential_features       = config['sequential_features']['value']
+        self.sequential_features_dtype = config['sequential_features']['dtypes']
+        self.output_folder             = config['general']['target']['value']
+        self.id_column                 = config['general']['id_column']['value']
 
-
+        assert self.metadata[self.id_column].dtype == int, \
+        'ID column should be an integer Serie but {} was given'.format(self.metadata[self.id_column].dtype)
+        
         if metadata is not None:
             print('[INFO] {} samples loaded'.format(metadata.shape[0]))
 
         self.metadata['subset_0'] = ['full']*self.metadata.shape[0]
 
-        os.makedirs(output_folder, exist_ok=True)
-        
+        os.makedirs(self.output_folder, exist_ok=True)
+
     @staticmethod
-    def aux_serialize(sel : np.ndarray, path : str) -> None:
-        if not isinstance(sel, np.ndarray):
+    def aux_serialize(sel : pl.DataFrame, 
+                      path : str, 
+                      context_features: list, 
+                      context_features_dtype: list,
+                      sequential_features: list,
+                      sequential_features_dtype: list) -> None:
+        if not isinstance(sel, pl.DataFrame):
             logging.error("Invalid data type provided to aux_serialize")
             raise ValueError("Invalid data type provided to aux_serialize")
+
         with tf.io.TFRecordWriter(path) as writer:
-            for lc in sel:
-                ex = DataPipeline.get_example(lc)
+            for row  in sel.iter_rows(named=True):
+                ex = DataPipeline.get_example(row, context_features, context_features_dtype, 
+                                              sequential_features, sequential_features_dtype)
                 writer.write(ex.SerializeToString())
-        logging.info(f"wrote tfrecords to {path}")
          
         
     @staticmethod
-    def get_example(self,row: pd.Series)-> tf.train.SequenceExample:
+    def get_example(row: dict, 
+                    context_features: list, 
+                    context_features_dtype: list,
+                    sequential_features: list,
+                    sequential_features_dtype: list) -> tf.train.SequenceExample:
         """
         Converts a given row into a TensorFlow SequenceExample.
 
@@ -140,32 +159,25 @@ class DataPipeline:
         """
         dict_features = {}
         # Parse each context feature based on its dtype and add to the features dictionary
-        for name in self.context_features:
-            dict_features[name] = parse_dtype(row[name])
+        for name, data_type in zip(context_features, context_features_dtype):
+            dict_features[name] = parse_dtype(row[name], data_type=data_type)
 
         # Create a context for the SequenceExample using the features dictionary
         element_context = tf.train.Features(feature=dict_features)
 
         dict_sequence = {}
-
-        time = row[self.sequential_features[0]]
-        mag = row[self.sequential_features[1]]
-
-        lightcurve = [time, mag]
-
-
         # Create a sequence of features for each dimension of the lightcurve
-        for col in range(len(lightcurve)):
-            seqfeat = _float_feature(lightcurve[col][:])
+        for col, data_type in zip(sequential_features, sequential_features_dtype):
+            seqfeat = parse_dtype(row[col][:], data_type=data_type)
             seqfeat = tf.train.FeatureList(feature=[seqfeat])
-            dict_sequence['dim_{}'.format(col)] = seqfeat
+            dict_sequence[col] = seqfeat
 
         # Add the sequence to the SequenceExample
         element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
 
         # Create the SequenceExample
         ex = tf.train.SequenceExample(context=element_context, feature_lists=element_lists)
-        logging.info("Successfully converted to SequenceExample.")
+        # logging.info("Successfully converted to SequenceExample.")
         return ex
     
     def inspect_records(self, dir_path:str = './records/output/', num_records: int = 1):
@@ -190,7 +202,7 @@ class DataPipeline:
             for raw_record in raw_dataset.take(num_records):
                 example = tf.train.Example()
                 example.ParseFromString(raw_record.numpy())
-                print(example)
+
             logging.info(f'Successfully inspected {num_records} records from {file_path}.')
         except Exception as e:
             logging.error(f'Error while inspecting records. Error message: {str(e)}')
@@ -206,6 +218,9 @@ class DataPipeline:
                        shuffle=True,
                        id_column_name=None,
                        k_fold=1):
+
+        if k_fold > 1 and test_meta is not None:
+            assert len(test_meta) == k_fold, 'test_meta should be a list containing {}-fold subsets'.format(k_fold)
 
         if id_column_name is None:
             id_column_name = self.metadata.columns[0]
@@ -223,11 +238,6 @@ class DataPipeline:
             if shuffle:
                 print('[INFO] Shuffling')
                 self.metadata = self.metadata.sample(frac=1)
-
-            try:
-                test_meta[k]
-            except:
-                test_meta.append(self.metadata.sample(frac=test_frac))
 
             self.metadata = substract_frames(self.metadata, test_meta[k], on=id_column_name)
 
@@ -260,11 +270,14 @@ class DataPipeline:
 
         # Create one file per shard
         shard_paths = []
+        root = os.path.join(self.output_folder, f'fold_{fold_n}', subset)
+        os.makedirs(root, exist_ok=True)
+        shutil.copyfile(self.config_path, os.path.join(root, 'config.toml'))
         for shard in range(n_shards):
             # Get the shard number padded with 0s
             shard_name = str(shard+1).rjust(name_length, '0')
             # Get the shard store name
-            shard_path= os.path.join(self.output_folder, subset+'_{}_{}.record'.format(fold_n, shard_name))
+            shard_path= os.path.join(root, '{}.record'.format(shard_name))
             # Save it into a list
             shard_paths.append(shard_path)
 
@@ -274,19 +287,26 @@ class DataPipeline:
             shards_data.append(sel)        
         return shards_data, shard_paths
     
-    
-    def read_all_parquets(self, path_parquets : str , metadata_path : str) -> pd.DataFrame:
+    @staticmethod
+    def preprocess_lightcurves(scan, id_column, sequential_features):
+        general_fn = pl.col("err") < 1.  # Clean the data on the big lazy dataframe
+        particular_fn = lambda group_df: group_df.sort(sequential_features[0]) #mjd 
+        # Filter, drop nulls, and sort every object
+        processed_obs = scan.filter(general_fn).drop_nulls().groupby(id_column).apply(particular_fn, schema=None)
+        return processed_obs
+
+    def read_all_parquets(self, observations_path : str , metadata_path : str) -> pd.DataFrame:
         """
         Read the files from given paths and filters it based on err_threshold and ID from metadata
         Args:
-            path_parquets (str): Directory path of parquet files
+            observations_path (str): Directory path of parquet files
             metadata_path (str): File path of metadata
         Returns:
             new_df (pl.DataFrame): Processed dataframe
         """
-        logging.info("Reading parquet files")
+        # logging.info("Reading parquet files")
 
-        if not os.path.exists(path_parquets):
+        if not os.path.exists(observations_path):
             logging.error("The specified parquets path does not exist")
             raise FileNotFoundError("The specified parquets path does not exist")
 
@@ -296,34 +316,31 @@ class DataPipeline:
 
 
         # Read the parquet filez lazily
-        paths = os.path.join(path_parquets, '*.parquet')
+        paths = os.path.join(observations_path, '*.parquet')
         scan = pl.scan_parquet(paths)
-        
+
         # Using partial information, extract only the necessary objects
         # Define filters
-        ID_series = pl.Series(self.metadata[self.id_key].values)
-        f1 = pl.col(self.id_key).is_in(ID_series)
-        f2 = pl.col("err") < self.err_threshold  # Clean the data on the big lazy dataframe
-
-        # Define groupby functions
-        # func1 cleans the data
-        func1 = lambda group_df: group_df.sort(self.sequential_features[0]) #mjd 
-
-        # Filter, drop nulls, and sort every object
-        new_df = scan.filter(f1 & f2).drop_nulls().groupby(self.id_key).apply(func1, schema=None)
+        ID_series = pl.Series(self.metadata[self.id_column].values)
+        f1 = pl.col(self.id_column).is_in(ID_series)
+        scan.filter(f1)
+        
+        processed_obs = self.preprocess_lightcurves(scan, self.id_column, self.sequential_features)
 
         # Select only the relevant columns
-        new_df = new_df.select([self.id_key] + self.sequential_features)
+        processed_obs = processed_obs.select([self.id_column] + self.sequential_features)
 
         # Mix metadata and the data
-        new_df = new_df.groupby(self.id_key).all()
-        # display(print(new_df))
+        processed_obs = processed_obs.groupby(self.id_column).all()
+
         # First run takes more time!
         metadata_lazy = pl.scan_parquet(metadata_path, cache=True) # First run is slower
-        # display(print(metadata_lazy))        
+           
         # Perform the join to get the data
-        new_df = new_df.join(other=metadata_lazy, on=self.id_key).collect(streaming=True) #streaming might be useless.                    
-        return new_df
+        processed_obs = processed_obs.join(other=metadata_lazy, 
+                                            on=self.id_column).collect(streaming=True) #streaming might be useless.                    
+        
+        return processed_obs
     
 
 
@@ -331,17 +348,17 @@ class DataPipeline:
         print('[INFO] Creating {} random folds'.format(n_folds))
         print('Not implemented yet hehehe...')
 
-    def run(self, path_parquets :str , metadata_path : str, n_jobs : int =1, elements_per_shard : int = 5000) -> None: 
+    def run(self, observations_path :str , metadata_path : str, n_jobs : int =1, elements_per_shard : int = 5000) -> None: 
         """
         Executes the DataPipeline operations which includes reading parquet files, processing samples and writing records.
         
         Args:
-            path_parquets (str): Directory path of parquet files
+            observations_path (str): Directory path of parquet files containing light curves observations
             metadata_path (str): Path for metadata file
             n_jobs (int): The maximum number of concurrently running jobs. Default is 1
             elements_per_shard (int): Maximum number of elements per shard. Default is 5000
         """
-        if not os.path.exists(path_parquets):
+        if not os.path.exists(observations_path):
             logging.error("The specified parquets path does not exist")
             raise FileNotFoundError("The specified parquets path does not exist")
         
@@ -356,38 +373,52 @@ class DataPipeline:
         fold_groups = [x for x in self.metadata.columns if 'subset' in x]
         pbar = tqdm(fold_groups, colour='#00ff00') # progress bar
         
-        new_df = self.read_all_parquets(path_parquets, metadata_path)
+        new_df = self.read_all_parquets(observations_path, metadata_path)
         self.new_df = new_df
 
         for fold_n, fold_col in enumerate(pbar):
-            pbar.set_description(f"Processing fold {fold_n+1}/{len(fold_groups)}")
-
+            pbar.set_description(f"Processing fold {fold_n}/{len(fold_groups)}")
             for subset in self.metadata[fold_col].unique():               
                 # ============ Processing Samples ===========
-                pbar.set_description("Processing {} {}".format(subset, fold_col))
                 partial = self.metadata[self.metadata[fold_col] == subset]
                 
                 # Transform into a appropiate representation
-                index = partial[self.id_key]
-                b = np.isin(new_df[self.id_key].to_numpy(), index)
-                container = new_df.filter(b).to_numpy()  
+                index = partial[self.id_column]
+                b = np.isin(new_df[self.id_column].to_numpy(), index)
+                container = new_df.filter(b)
                 
-                # ============ Writing Records ===========
+                # ============ Writing Records ===========                
+                shards_data, shard_paths = self.prepare_data(container, elements_per_shard, subset, fold_n)
+                
+                # for shard, shard_path in zip(shards_data,shard_paths):
+                #     DataPipeline.aux_serialize(shard, shard_path, 
+                #                     self.context_features, self.context_features_dtype, 
+                #                     self.sequential_features, self.sequential_features_dtype)
 
-                pbar.set_description("Writting {} fold {}".format(subset, fold_n))
-                output_file = os.path.join(self.output_folder, subset+'_{}.record'.format(fold_n))
-                
-                shards_data,shard_paths = self.prepare_data(container, elements_per_shard, subset, fold_n)
-                    
-                # Idea from
                 with ThreadPoolExecutor(n_jobs) as exe:
                     # submit tasks to generate files
-                    _ = [exe.submit(DataPipeline.aux_serialize, shard,shard_path) for shard, shard_path in zip(shards_data,shard_paths)]
+                    _ = [exe.submit(DataPipeline.aux_serialize, shard, shard_path, 
+                                    self.context_features, self.context_features_dtype, 
+                                    self.sequential_features, self.sequential_features_dtype) \
+                             for shard, shard_path in zip(shards_data,shard_paths)]
     
 
         logging.info('Finished execution of DataPipeline operations')
 
-def deserialize(sample, config_path = "./config.toml"):
+
+
+
+def get_tf_dtype(data_type, is_sequence=False):
+    if not is_sequence:
+        if data_type == 'integer': return tf.io.FixedLenFeature([], dtype=tf.int64)
+        if data_type == 'float': return tf.io.FixedLenFeature([], dtype=tf.float32)
+        if data_type == 'string': return tf.io.FixedLenFeature([], dtype=tf.string)
+    else:
+        if data_type == 'integer': return tf.io.VarLenFeature(dtype=tf.int64)
+        if data_type == 'float': return tf.io.VarLenFeature(dtype=tf.float32)
+        if data_type == 'string': return tf.io.VarLenFeature(dtype=tf.string32)
+
+def deserialize(sample, records_path=None):
     """
     Reads a serialized sample and converts it to tensor.
     Context and sequence features should match the name used when writing.
@@ -397,23 +428,25 @@ def deserialize(sample, config_path = "./config.toml"):
     Returns:
         type: decoded sample
     """
-    # Read the configuration file
-        # Load the configuration file
     try:
-        with open(config_path, 'r') as f:
+        with open(os.path.join(records_path, 'config.toml'), 'r') as f:
             config = toml.load(f)
     except FileNotFoundError as e:
-        logging.error(f'Configuration file not found at {config_path}. Please provide a valid path.')
+        logging.error(f'Configuration file not found at {records_path}. Please provide a valid path.')
         raise e
     except Exception as e:
         logging.error(f'An error occurred while loading the configuration file: {str(e)}')
         raise e
 
     # Define context features as strings
-    context_features = {feat: tf.io.FixedLenFeature([], dtype=tf.int64 if feat.lower() == 'label' else tf.string) for feat in config['context_features']}
+    context_features = {}
+    for feat, data_type in zip(config['context_features']['value'], config['context_features']['dtypes']):
+        context_features[feat]= get_tf_dtype(data_type)
 
+    sequence_features = {}
     # Define sequence features as floating point numbers
-    sequence_features = {feat: tf.io.VarLenFeature(dtype=tf.float32) for feat in config['sequential_features']}
+    for feat, data_type in zip(config['sequential_features']['value'], config['sequential_features']['dtypes']):
+        sequence_features[feat]= get_tf_dtype(data_type, is_sequence=True)
 
     # Parse the serialized sample into context and sequence features
     context, sequence = tf.io.parse_single_sequence_example(
@@ -423,18 +456,16 @@ def deserialize(sample, config_path = "./config.toml"):
                             )
     
     # Cast context features to strings
-    input_dict = {k: context[k] for k in config['context_features']}
+    input_dict = {k: context[k] for k in config['context_features']['value']}
 
     # Cast and store sequence features
     casted_inp_parameters = []
-    for k in config['sequential_features']:
+    for k in config['sequential_features']['value']:
         seq_dim = sequence[k]
         seq_dim = tf.sparse.to_dense(seq_dim)
         seq_dim = tf.cast(seq_dim, tf.float32)
         casted_inp_parameters.append(seq_dim)
 
-    # Stack sequence features along a new third dimension
-    sequence = tf.stack(casted_inp_parameters, axis=2)
     # Add sequence to the input dictionary
-    input_dict['input'] = sequence
+    input_dict['input'] = tf.stack(casted_inp_parameters, axis=2)
     return input_dict
