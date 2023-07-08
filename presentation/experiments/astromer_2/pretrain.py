@@ -1,7 +1,8 @@
 import tensorflow as tf 
 import pandas as pd
 import argparse
-import json
+import toml
+import time
 import sys
 import os
 
@@ -37,11 +38,21 @@ def run(opt):
                               nsp_prob=opt.nsp_prob, 
                               repeat=1, 
                               sampling=True)
+    # ========== DEBUG ======================================
+    if opt.debug:
+        print('[INFO] DEBGUGING MODE')
+        train_batches  = train_batches.take(2)
+        valid_batches  = valid_batches.take(2)
+        opt.epochs = 5
 
     # ======= MODEL ========================================
     model_name = '{}_{}_{}_rmse_{}'.format(opt.layers, opt.nh, opt.hdim, opt.rmse_factor)
     PTWEIGTHS = os.path.join(EXPDIR, model_name, 'pretraining')
-            
+    os.makedirs(PTWEIGTHS, exist_ok=True)
+
+    with open(os.path.join(PTWEIGTHS, 'config.toml'), 'w') as f:
+        toml.dump(opt.__dict__, f)
+
     astromer = get_ASTROMER_II(num_layers=opt.layers,
                                num_heads=opt.nh,
                                head_dim=opt.hdim,
@@ -56,7 +67,6 @@ def run(opt):
     optimizer = AdamW(opt.lr)
     bce_factor    = 1.- opt.rmse_factor
     astromer.compile(rmse_factor=opt.rmse_factor, bce_factor=bce_factor, optimizer=optimizer)
-
 
     callbacks = [
             ModelCheckpoint(
@@ -80,10 +90,12 @@ def run(opt):
     print(f'[INFO] HEAD DIM: {opt.hdim}')
     print('\n')
 
-    astromer.fit(train_batches, 
-             epochs=opt.epochs, 
-             validation_data=valid_batches,
-             callbacks=callbacks)      
+    start = time.time()
+    hist = astromer.fit(train_batches, 
+                        epochs=opt.epochs, 
+                        validation_data=valid_batches,
+                        callbacks=callbacks)      
+    training_time = time.time() - start
 
     # ======== TESTING =========================================
     test_batches = load_data(dataset=os.path.join(opt.data, 'test'), 
@@ -93,10 +105,22 @@ def run(opt):
                               nsp_prob=opt.nsp_prob, 
                               repeat=1, 
                               sampling=True)
-
+    if opt.debug:
+        test_batches = test_batches.take(1)
+    
     acc, bce, loss, r2, rmse = astromer.evaluate(test_batches)   
-    with open(os.path.join(PTWEIGTHS, 'results.json'), 'w') as fp:
-        json.dump({'test_acc': acc, 
+    with open(os.path.join(PTWEIGTHS, 'metrics.toml'), 'w') as fp:
+        toml.dump({'data':os.path.join(opt.data, 'test'),
+                   'training_time_sec': training_time,
+                   'val_rmse': float(tf.reduce_min(hist.history['val_rmse']).numpy()),
+                   'val_r2': float(tf.reduce_min(hist.history['val_r_square']).numpy()),
+                   'val_bce': float(tf.reduce_min(hist.history['val_bce']).numpy()),
+                   'val_acc': float(tf.reduce_min(hist.history['val_acc']).numpy()),
+                   'train_bce': float(tf.reduce_min(hist.history['bce']).numpy()),
+                   'train_acc': float(tf.reduce_min(hist.history['acc']).numpy()),
+                   'train_rmse': float(tf.reduce_min(hist.history['rmse']).numpy()),
+                   'r2': float(tf.reduce_min(hist.history['r_square']).numpy()),                   
+                   'test_acc': acc, 
                    'test_r2':r2, 
                    'test_rmse':rmse, 
                    'test_bce':bce}, fp)
@@ -110,6 +134,8 @@ if __name__ == '__main__':
                     help='Data folder where tf.record files are located')
     parser.add_argument('--gpu', default='-1', type=str,
                         help='GPU to be used. -1 means no GPU will be used')
+    parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
+
 
     parser.add_argument('--encoder-mode', default='normal', type=str,
                         help='normal - conditioned')
@@ -142,5 +168,6 @@ if __name__ == '__main__':
     parser.add_argument('--rmse-factor', default=0.5, type=float,
                         help='RMSE weight factor. The loss function will be loss = rmse_factor*rmse + (1 - rmse_factor)*bce')
 
-    opt = parser.parse_args()
+
+    opt = parser.parse_args()        
     run(opt)

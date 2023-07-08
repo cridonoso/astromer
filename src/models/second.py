@@ -58,7 +58,8 @@ def get_ASTROMER(num_layers=2,
                           dropout=dropout,
                           pe_base=pe_base,
                           pe_dim=pe_dim,
-                          pe_c=pe_c)
+                          pe_c=pe_c,
+                          name='encoder')
 
     if encoder_mode == 'conditioned':
         encoder = CondEncoder(window_size=window_size,
@@ -69,7 +70,8 @@ def get_ASTROMER(num_layers=2,
                               dropout=dropout,
                               pe_base=pe_base,
                               pe_dim=pe_dim,
-                              pe_c=pe_c)
+                              pe_c=pe_c,
+                              name='encoder')
 
     transform_layer = TransformLayer(name='transform_layer')
 

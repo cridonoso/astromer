@@ -144,3 +144,43 @@ def load_data(dataset,
     dataset = dataset.prefetch(2)
 
     return dataset
+
+def format_input_lc(input_dict):
+    x = {
+        'times': tf.slice(input_dict['input'], [0,0,0], [-1, -1, 1]),
+        'values': tf.slice(input_dict['input'], [0,0,1], [-1, -1, 1]),
+        'mask': input_dict['mask'],
+    }
+
+    y = {
+        'label' : input_dict['label'],
+        'id' : input_dict['lcid']
+    }
+    return x, y
+
+def load_light_curves(dataset, 
+                      batch_size=16, 
+                      window_size=200, 
+                      repeat=1,
+                      cache=False, 
+                      njobs=None):
+    '''
+    Load data for downstream tasks.
+    LC without normalizing
+    '''
+    if njobs is None:
+        njobs = multiprocessing.cpu_count()//2
+        
+    dataset = load_records(dataset)
+
+    dataset, sizes = to_windows(dataset,
+                         window_size=window_size,
+                         sampling=False)
+
+    dataset = dataset.padded_batch(batch_size, padded_shapes=sizes)
+
+    dataset = dataset.prefetch(2)
+
+    dataset = dataset.map(format_input_lc)
+
+    return dataset
