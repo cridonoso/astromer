@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.keras.layers import Input
 from tensorflow.keras import Model
 
-from src.layers  import Encoder, CondEncoder, TransformLayer
+from src.layers  import Encoder, CondEncoder, ConcatEncoder, TransformLayer
 from src.losses  import custom_rmse, custom_bce
 from src.metrics import custom_r2, custom_acc
 
@@ -60,6 +60,18 @@ def get_ASTROMER(num_layers=2,
                           pe_dim=pe_dim,
                           pe_c=pe_c,
                           name='encoder')
+        print(encoder.inp_transform)
+    if encoder_mode == 'concat':
+        encoder = ConcatEncoder(window_size=window_size,
+                                num_layers=num_layers,
+                                num_heads=num_heads,
+                                head_dim=head_dim,
+                                mixer_size=mixer_size,
+                                dropout=dropout,
+                                pe_base=pe_base,
+                                pe_dim=pe_dim,
+                                pe_c=pe_c,
+                                name='encoder')
 
     if encoder_mode == 'conditioned':
         encoder = CondEncoder(window_size=window_size,
