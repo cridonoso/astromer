@@ -60,7 +60,7 @@ def get_ASTROMER(num_layers=2,
                           pe_dim=pe_dim,
                           pe_c=pe_c,
                           name='encoder')
-        print(encoder.inp_transform)
+
     if encoder_mode == 'concat':
         encoder = ConcatEncoder(window_size=window_size,
                                 num_layers=num_layers,

@@ -145,20 +145,21 @@ def load_data(dataset,
 
     return dataset
 
-def format_input_lc(input_dict):
+def format_input_lc(input_dict, num_cls):
     x = {
         'times': tf.slice(input_dict['input'], [0,0,0], [-1, -1, 1]),
         'values': tf.slice(input_dict['input'], [0,0,1], [-1, -1, 1]),
-        'mask': input_dict['mask'],
+        'mask': tf.expand_dims(input_dict['mask'], -1)
     }
 
     y = {
-        'label' : input_dict['label'],
+        'label' : tf.one_hot(input_dict['label'], num_cls),
         'id' : input_dict['lcid']
     }
     return x, y
 
 def load_light_curves(dataset, 
+                      num_cls=1,
                       batch_size=16, 
                       window_size=200, 
                       repeat=1,
@@ -181,6 +182,6 @@ def load_light_curves(dataset,
 
     dataset = dataset.prefetch(2)
 
-    dataset = dataset.map(format_input_lc)
+    dataset = dataset.map(lambda x: format_input_lc(x, num_cls))
 
     return dataset
