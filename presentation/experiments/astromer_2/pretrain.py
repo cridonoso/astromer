@@ -1,5 +1,6 @@
 import tensorflow as tf 
 import pandas as pd
+import argparse
 import json
 import sys
 import os
@@ -12,99 +13,134 @@ from tensorflow.keras.callbacks  import (ModelCheckpoint,
 from src.models import get_ASTROMER_II
 from src.data import load_data
 
-os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
-# BEST PARAMETERS ACCORDING TO PREVIOUS EXPERIMENTS
-datapath      = './data/records/macho_clean'
 
-n_layers      = int(sys.argv[2])
-n_heads       = 6
-head_dim      = 64
-mixer_size    = 256
-learning_rate = 1e-5
-dropout_rate  = 0.1
-window_size   = 200
-batch_size    = 512
-probed        = 0.6
-rand          = 0.2
-nsp_prob      = 0.5
-bce_factor    = float(sys.argv[3])
-rmse_factor   = 1. - bce_factor
-
-print('[INFO] BCE: {:.2f} RMSE: {:.2f}'.format(bce_factor, rmse_factor))
-print('\n')
-MASTER_PROJECT_NAME = 'nsp_adamw_factor'
 ROOT = './presentation/experiments/astromer_2/'
-EXPDIR = os.path.join(ROOT, 'results', MASTER_PROJECT_NAME)
-os.makedirs(EXPDIR, exist_ok=True)
+
+def run(opt):
+    os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
+
+    EXPDIR = os.path.join(ROOT, 'results', opt.exp_name)
+    os.makedirs(EXPDIR, exist_ok=True)
+
+    # ========== DATA ========================================
+    train_batches = load_data(dataset=os.path.join(opt.data, 'train'), 
+                              batch_size=opt.bs, 
+                              probed=opt.probed,  
+                              window_size=opt.ws, 
+                              nsp_prob=opt.nsp_prob, 
+                              repeat=4, 
+                              sampling=True)
+    valid_batches = load_data(dataset=os.path.join(opt.data, 'val'), 
+                              batch_size=opt.bs, 
+                              probed=opt.probed,  
+                              window_size=opt.ws, 
+                              nsp_prob=opt.nsp_prob, 
+                              repeat=1, 
+                              sampling=True)
+
+    # ======= MODEL ========================================
+    model_name = '{}_{}_{}_rmse_{}'.format(opt.layers, opt.nh, opt.hdim, opt.rmse_factor)
+    PTWEIGTHS = os.path.join(EXPDIR, model_name, 'pretraining')
+            
+    astromer = get_ASTROMER_II(num_layers=opt.layers,
+                               num_heads=opt.nh,
+                               head_dim=opt.hdim,
+                               mixer_size=opt.mixer,
+                               dropout=opt.dropout,
+                               pe_base=1000,
+                               pe_dim=128,
+                               pe_c=1,
+                               window_size=opt.ws,
+                               encoder_mode=opt.encoder_mode)
+
+    optimizer = AdamW(opt.lr)
+    bce_factor    = 1.- opt.rmse_factor
+    astromer.compile(rmse_factor=opt.rmse_factor, bce_factor=bce_factor, optimizer=optimizer)
 
 
-# ========== DATA ========================================
-train_batches = load_data(dataset=os.path.join(datapath, 'train'), 
-                          batch_size=batch_size, 
-                          probed=probed,  
-                          window_size=window_size, 
-                          nsp_prob=nsp_prob, 
-                          repeat=4, 
-                          sampling=True)
-valid_batches = load_data(dataset=os.path.join(datapath, 'val'), 
-                          batch_size=batch_size, 
-                          probed=probed,  
-                          window_size=window_size, 
-                          nsp_prob=nsp_prob, 
-                          repeat=1, 
-                          sampling=True)
+    callbacks = [
+            ModelCheckpoint(
+                filepath=os.path.join(PTWEIGTHS, 'weights'),
+                save_weights_only=True,
+                monitor='val_loss',
+                save_best_only=True),
+            EarlyStopping(monitor='val_loss',
+                patience = opt.patience,
+                restore_best_weights=True),
+            TensorBoard(
+                log_dir = os.path.join(PTWEIGTHS, 'logs'),
+                histogram_freq=1,
+                write_graph=True)]
 
-# ======= MODEL ========================================
-model_name = '{}_{}_{}_rmse_{}'.format(n_layers, n_heads, head_dim, rmse_factor)
-PTWEIGTHS = os.path.join(EXPDIR, model_name, 'pretraining')
-        
-d_model = head_dim*n_heads
-astromer = get_ASTROMER_II(num_layers=n_layers,
-                           num_heads=n_heads,
-                           head_dim=head_dim,
-                           mixer_size=mixer_size,
-                           dropout=dropout_rate,
-                           pe_base=1000,
-                           pe_dim=128,
-                           pe_c=1,
-                           window_size=window_size)
+    print('\n')
+    print(f'[INFO] ENCODER: {opt.encoder_mode}')
+    print('[INFO] BCE: {:.2f} RMSE: {:.2f}'.format(bce_factor, opt.rmse_factor))
+    print(f'[INFO] No LAYERS: {opt.layers}')
+    print(f'[INFO] No HEADS: {opt.nh}')
+    print(f'[INFO] HEAD DIM: {opt.hdim}')
+    print('\n')
 
-optimizer = AdamW(learning_rate)
-astromer.compile(rmse_factor=rmse_factor, bce_factor=bce_factor, optimizer=optimizer)
+    astromer.fit(train_batches, 
+             epochs=opt.epochs, 
+             validation_data=valid_batches,
+             callbacks=callbacks)      
 
-callbacks = [
-        ModelCheckpoint(
-            filepath=os.path.join(PTWEIGTHS, 'weights'),
-            save_weights_only=True,
-            monitor='val_loss',
-            save_best_only=True),
-        EarlyStopping(monitor='val_loss',
-            patience = 20,
-            restore_best_weights=True),
-        TensorBoard(
-            log_dir = os.path.join(PTWEIGTHS, 'logs'),
-            histogram_freq=1,
-            write_graph=True)]
-    
-astromer.fit(train_batches, 
-         epochs=100000, 
-         validation_data=valid_batches,
-         callbacks=callbacks)      
+    # ======== TESTING =========================================
+    test_batches = load_data(dataset=os.path.join(opt.data, 'test'), 
+                              batch_size=opt.bs, 
+                              probed=opt.probed,  
+                              window_size=opt.ws, 
+                              nsp_prob=opt.nsp_prob, 
+                              repeat=1, 
+                              sampling=True)
 
-# ======== TESTING =========================================
-test_batches = load_data(dataset=os.path.join(datapath, 'test'), 
-                          batch_size=batch_size, 
-                          probed=probed,  
-                          window_size=window_size, 
-                          nsp_prob=nsp_prob, 
-                          repeat=1, 
-                          sampling=True)
-
-acc, bce, loss, r2, rmse = astromer.evaluate(test_batches)   
-with open(os.path.join(PTWEIGTHS, 'results.json'), 'w') as fp:
-    json.dump({'test_acc': acc, 
-               'test_r2':r2, 
-               'test_rmse':rmse, 
-               'test_bce':bce}, fp)
+    acc, bce, loss, r2, rmse = astromer.evaluate(test_batches)   
+    with open(os.path.join(PTWEIGTHS, 'results.json'), 'w') as fp:
+        json.dump({'test_acc': acc, 
+                   'test_r2':r2, 
+                   'test_rmse':rmse, 
+                   'test_bce':bce}, fp)
 
 
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--exp-name', default='nsp_adamw_factor', type=str,
+                    help='Project name')
+    parser.add_argument('--data', default='./data/records/macho_clean', type=str,
+                    help='Data folder where tf.record files are located')
+    parser.add_argument('--gpu', default='-1', type=str,
+                        help='GPU to be used. -1 means no GPU will be used')
+
+    parser.add_argument('--encoder-mode', default='normal', type=str,
+                        help='normal - conditioned')
+    parser.add_argument('--layers', default=1, type=int,
+                        help='Number of Attention Layers')
+    parser.add_argument('--nh', default=4, type=int,
+                        help='Number of heads within the attention layer')
+    parser.add_argument('--hdim', default=64, type=int,
+                        help='Head dimension')
+    parser.add_argument('--mixer', default=256, type=int,
+                        help='Units to be used on the hidden layer of a feed-forward network that combines head outputs within an attention layer')
+    parser.add_argument('--dropout', default=0.1, type=float,
+                        help='Dropout to use on the output of each attention layer (before mixer layer)')
+
+    parser.add_argument('--lr', default=1e-5, type=float,
+                        help='learning rate')
+    parser.add_argument('--bs', default=16, type=int,
+                        help='Batch size')
+    parser.add_argument('--patience', default=20, type=int,
+                        help='Earlystopping threshold in number of epochs')
+    parser.add_argument('--epochs', default=100000, type=int,
+                        help='Number of epochs')
+    parser.add_argument('--ws', default=200, type=int,
+                        help='windows size of the PSFs')
+
+    parser.add_argument('--probed', default=0.5, type=float,
+                        help='Probed percentage')
+    parser.add_argument('--nsp-prob', default=0.5, type=float,
+                        help='Next segment prediction probability. The probability of randomize half of the light curve')
+    parser.add_argument('--rmse-factor', default=0.5, type=float,
+                        help='RMSE weight factor. The loss function will be loss = rmse_factor*rmse + (1 - rmse_factor)*bce')
+
+    opt = parser.parse_args()
+    run(opt)
