@@ -90,8 +90,8 @@ def format_input(input_dict, cls_token=None):
 
 
     inputs = {
-        'original':input_dict['input'],
-        'mask': input_dict['mask'],
+        # 'original':input_dict['input'],
+        # 'mask': input_dict['mask'],
         'magnitudes': magnitudes,
         'times': times,
         'att_mask': att_mask,
