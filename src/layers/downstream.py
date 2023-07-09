@@ -1,10 +1,17 @@
+import multiprocessing as mp
 import tensorflow as tf
 import argparse
 import toml
 import os
 
-from src.models import get_ASTROMER_II
+from tensorflow.keras.optimizers.experimental import AdamW
 from src.data.preprocessing import standardize_batch, min_max_scaler
+from src.losses import custom_rmse, custom_bce
+from src.metrics import custom_r2, custom_acc
+from src.models import get_ASTROMER_II
+from src.data.masking import get_probed
+from src.data.nsp import randomize
+from src.data.loaders import format_input
 
 class AstromerEmbedding(tf.keras.layers.Layer):
 	'''
@@ -19,42 +26,41 @@ class AstromerEmbedding(tf.keras.layers.Layer):
 		with open(os.path.join(self.pretrain_weights, 'config.toml'), 'r') as file:
 			config = toml.load(file)
 
-		astromer = get_ASTROMER_II(num_layers=config['layers'],
-		                           num_heads=config['nh'],
-		                           head_dim=config['hdim'],
-		                           mixer_size=config['mixer'],
-		                           dropout=config['dropout'],
-		                           pe_base=1000,
-		                           pe_dim=128,
-		                           pe_c=1,
-		                           window_size=config['ws'],
-		                           encoder_mode=config['encoder_mode'])
-		astromer.load_weights(os.path.join(self.pretrain_weights, 'weights')).expect_partial()
-		astromer.trainable = False
+		self.astromer = get_ASTROMER_II(num_layers=config['layers'],
+								   num_heads=config['nh'],
+								   head_dim=config['hdim'],
+								   mixer_size=config['mixer'],
+								   dropout=config['dropout'],
+								   pe_base=1000,
+								   pe_dim=128,
+								   pe_c=1,
+								   window_size=config['ws'],
+								   encoder_mode=config['encoder_mode'])
 
-		self.encoder = astromer.get_layer('encoder')
+		self.astromer.load_weights(os.path.join(self.pretrain_weights, 'weights')).expect_partial()
+		self.astromer.trainable = False
+
+		self.config = config
+		self.encoder = self.astromer.get_layer('encoder')
 		self.trainable = trainable
 
+	def format_input(self, inputs, y=None):
+		input_dict = get_probed(inputs, probed=1., njobs=mp.cpu_count())
+		input_dict = randomize(inputs, 0.)
+		input_dict = format_input(input_dict, cls_token=-99.)
+		return input_dict
+
+	def evaluate_on_dataset(self, dataset):
+		dataset = dataset.map(self.format_input)
+		optimizer = AdamW(self.config['lr'])
+		bce_factor    = 1.- self.config['rmse_factor']
+		self.astromer.compile(rmse_factor=self.config['rmse_factor'], bce_factor=bce_factor, optimizer=optimizer)
+		self.astromer.evaluate(dataset)
+
 	def call(self, inputs):
-		values = standardize_batch(inputs['values'])
-		times = min_max_scaler(inputs['times'])
+		inputs, _ = self.format_input(inputs)
 
-		inp_shape = tf.shape(inputs['values'])
-		cls_vector = tf.ones([inp_shape[0], 1, 1], dtype=tf.float32)
-		values = tf.concat([cls_vector*-99., values], axis=1)
-
-		times = tf.concat([1.-cls_vector, times], axis=1)
-		mask = tf.concat([cls_vector, inputs['mask']], axis=1)
-
-
-		encoder_input = {
-			'magnitudes':values,
-			'times':times,
-			'att_mask': 1.-mask,
-			'seg_emb': tf.zeros_like(mask)
-		}
-
-		x_emb = self.encoder(encoder_input, training=self.trainable)
+		x_emb = self.encoder(inputs, training=self.trainable)
 
 		cls_token = tf.slice(x_emb, [0, 0, 0], [-1, 1, -1], name='nsp_tokens')
 		rec_token = tf.slice(x_emb, [0, 1, 0], [-1, -1, -1], name='reconstruction_tokens')
@@ -71,6 +77,7 @@ class ReduceAttention(tf.keras.layers.Layer):
 		self.reduce_to = reduce_to
 
 	def call(self, inputs, mask):
+		mask = tf.expand_dims(mask, -1)
 		x_rec = tf.multiply(inputs, mask, name='rec_valid')  # 1: valid / 0: padding
 		if self.reduce_to == 'sum':
 			x_rec = tf.reduce_sum(x_rec, 1, name='rec_reduced')

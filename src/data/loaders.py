@@ -147,9 +147,8 @@ def load_data(dataset,
 
 def format_input_lc(input_dict, num_cls):
     x = {
-        'times': tf.slice(input_dict['input'], [0,0,0], [-1, -1, 1]),
-        'values': tf.slice(input_dict['input'], [0,0,1], [-1, -1, 1]),
-        'mask': tf.expand_dims(input_dict['mask'], -1)
+        'input': input_dict['input'],
+        'mask': input_dict['mask']
     }
 
     y = {

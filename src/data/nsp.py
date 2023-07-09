@@ -11,7 +11,6 @@ def get_mask(steps, max_len):
     return tf.concat([mask_0, mask_1, mask_2], 0)
     
 def randomize(input_dict, nsp_prob):
-
     n_steps = tf.reduce_sum(input_dict['mask'], 1)
     inp_size = tf.shape(input_dict['input'])
 
@@ -42,4 +41,5 @@ def randomize(input_dict, nsp_prob):
     input_dict['nsp_label'] = 1.-binary_vector
     input_dict['nsp_input'] = replace*mask_replace + original*mask_preserve*padding_mask
     input_dict['seg_emb'] = mask
+
     return input_dict
