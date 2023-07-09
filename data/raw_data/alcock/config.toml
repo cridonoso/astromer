@@ -1,0 +1,17 @@
+[general]
+	[general.id_column]
+		value = 'newID'
+		dtype = 'integer'  
+	[general.target]
+		value = './data/records_parquet/alcock'
+		dtype = 'string' 
+
+[context_features]
+	value = ['ID', 'Label', 'Class', 'Band']
+	dtypes = ['string', 'integer', 'string', 'integer']
+
+[sequential_features]
+	value = ['mjd', 'mag', 'err']
+	dtypes = ['float', 'float', 'float']
+
+
