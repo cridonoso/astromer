@@ -19,10 +19,9 @@ from src.data import load_data
 from sklearn.metrics import precision_recall_fscore_support
 
 # g34htgii 
-
-DEBUG = True
+DEBUG = False
 ROOT = './presentation/experiments/astromer_2/results'
-MASTER_PROJECT_NAME = 'downstream_astromer-2'
+MASTER_PROJECT_NAME = 'downstream_a2'
 os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
 
 # =====================================================================================
@@ -34,7 +33,8 @@ sweep_conf = {
 	'metric': {'goal': 'maximize', 'name': 'val_acc'},
 	'parameters': {
 		'pt_model': {'values':['nsp_cond/1_4_64_rmse_0.5', 'nsp_cond/2_4_64_rmse_0.5',
-							   'nsp_normal/1_4_64_rmse_0.5', 'nsp_normal/1_4_64_rmse_0.5']},
+							   'nsp_normal/1_4_64_rmse_0.5', 'nsp_normal/1_4_64_rmse_0.5', 
+                               'nsp_concat/1_4_64_rmse_0.5', 'nsp_concat/1_4_64_rmse_0.5']},
 		'fold':{'values':[0, 1, 2]},
 		'subdataset':{'values':['atlas', 'alcock']},
 		'clf_name':{'values':['mlp_att', 'mlp_cls', 'mlp_all']},
@@ -150,7 +150,7 @@ def sweep_train(config=None):
 
 			print('[INFO] Testing')
 			acc, bce, loss, r2, rmse = astromer.evaluate(test_batches)   
-			wandb.log({'test_acc': acc, 'test_r2':r2, 'test_rmse':rmse, 'test_bce':bce})
+			wandb.log({'ft_test_acc': acc, 'ft_test_r2':r2, 'ft_test_rmse':rmse, 'ft_test_bce':bce})
 
 			with open(os.path.join(FTWEIGTHS, 'config.toml'), 'w') as f:
 				toml.dump(model_config, f)
@@ -170,21 +170,21 @@ def sweep_train(config=None):
 		
 		train_batches = load_light_curves(os.path.join(DOWNSTREAM_DATA, 'train'), 
 										  num_cls=num_cls,
-										  batch_size=32 if DEBUG else model_config['bs'], 
+										  batch_size=32 if DEBUG else 512, 
 										  window_size=model_config['ws'], 
 										  repeat=1,
 										  cache=True, 
 										  njobs=None)
 		valid_batches = load_light_curves(os.path.join(DOWNSTREAM_DATA, 'val'), 
 										  num_cls=num_cls,
-										  batch_size=32 if DEBUG else model_config['bs'], 
+										  batch_size=32 if DEBUG else 512, 
 										  window_size=model_config['ws'], 
 										  repeat=1,
 										  cache=True, 
 										  njobs=None)
 		test_batches = load_light_curves(os.path.join(DOWNSTREAM_DATA, 'test'), 
 										  num_cls=num_cls,
-										  batch_size=32 if DEBUG else model_config['bs'], 
+										  batch_size=32 if DEBUG else 512, 
 										  window_size=model_config['ws'], 
 										  repeat=1,
 										  cache=True, 
