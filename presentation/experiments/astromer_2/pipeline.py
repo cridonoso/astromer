@@ -21,7 +21,7 @@ from sklearn.metrics import precision_recall_fscore_support
 # g34htgii 
 DEBUG = False
 ROOT = './presentation/experiments/astromer_2/results'
-MASTER_PROJECT_NAME = 'downstream_a2'
+MASTER_PROJECT_NAME = 'downstream_a2_50probed'
 os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
 
 # =====================================================================================
@@ -104,21 +104,21 @@ def sweep_train(config=None):
 
 			train_batches = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
 									  batch_size=32 if DEBUG else model_config['bs'], 
-									  probed=1.,  
+									  probed=model_config['probed'],  
 									  window_size=model_config['ws'], 
 									  nsp_prob=model_config['nsp_prob'], 
 									  repeat=1, 
 									  sampling=False)
 			valid_batches = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'val'), 
 									  batch_size=32 if DEBUG else model_config['bs'], 
-									  probed=1.,  
+									  probed=model_config['probed'],  
 									  window_size=model_config['ws'], 
 									  nsp_prob=model_config['nsp_prob'], 
 									  repeat=1, 
 									  sampling=False)
 			test_batches = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'test'), 
 									  batch_size=32 if DEBUG else model_config['bs'], 
-									  probed=1.,  
+									  probed=model_config['probed'],  
 									  window_size=model_config['ws'], 
 									  nsp_prob=model_config['nsp_prob'], 
 									  repeat=1, 
