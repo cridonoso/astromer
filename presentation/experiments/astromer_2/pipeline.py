@@ -140,8 +140,7 @@ def sweep_train(config=None):
 				TensorBoard(
 					log_dir = os.path.join(FTWEIGTHS, 'logs'),
 					histogram_freq=1,
-					write_graph=True),
-				WandbMetricsLogger(log_freq='epoch')]
+					write_graph=True)]
 
 			astromer.fit(train_batches, 
 						 epochs=2 if DEBUG else model_config['epochs'], 
@@ -206,8 +205,7 @@ def sweep_train(config=None):
 			TensorBoard(
 				log_dir = os.path.join(CLFWEIGHTS, 'logs'),
 				histogram_freq=1,
-				write_graph=True),
-			WandbMetricsLogger(log_freq='epoch')]
+				write_graph=True)]
 
 		history = clf_model.fit(train_batches,
 								epochs= 2 if DEBUG else model_config['epochs'],
