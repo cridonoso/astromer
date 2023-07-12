@@ -66,13 +66,18 @@ def sweep_train(config=None):
 			model_config = toml.load(f)
 			wandb.log(model_config)
 
+		if 'nsp_normal_bigpe' in config.pt_model:
+			pe_dim = 256
+		else:
+			pe_dim = 128
+			 
 		astromer = get_ASTROMER_II(num_layers=model_config['layers'],
 								   num_heads=model_config['nh'],
 								   head_dim=model_config['hdim'],
 								   mixer_size=model_config['mixer'],
 								   dropout=model_config['dropout'],
 								   pe_base=1000,
-								   pe_dim=128,
+								   pe_dim=pe_dim,
 								   pe_c=1,
 								   window_size=model_config['ws'],
 								   encoder_mode=model_config['encoder_mode'])
