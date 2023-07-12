@@ -1,5 +1,6 @@
 import tensorflow as tf 
 import pandas as pd
+import numpy as np
 import wandb
 import sys
 import toml
@@ -16,12 +17,12 @@ from src.models import get_ASTROMER_II
 from src.data.loaders import load_light_curves
 from src.data import load_data
 
-from sklearn.metrics import precision_recall_fscore_support
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 # g34htgii 
 DEBUG = False
 ROOT = './presentation/experiments/astromer_2/results'
-MASTER_PROJECT_NAME = 'downstream_a2_50probed'
+MASTER_PROJECT_NAME = 'downstream-a2'
 os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
 
 # =====================================================================================
@@ -33,7 +34,7 @@ sweep_conf = {
 	'metric': {'goal': 'maximize', 'name': 'val_acc'},
 	'parameters': {
 		'pt_model': {'values':['nsp_cond/1_4_64_rmse_0.5', 'nsp_cond/2_4_64_rmse_0.5',
-							   'nsp_normal/1_4_64_rmse_0.5', 'nsp_normal/1_4_64_rmse_0.5', 
+							   'nsp_normal_bigpe/1_4_64_rmse_0.5', 'nsp_normal_bigpe/1_4_64_rmse_0.5', 
                                'nsp_concat/1_4_64_rmse_0.5', 'nsp_concat/1_4_64_rmse_0.5']},
 		'fold':{'values':[0, 1, 2]},
 		'subdataset':{'values':['atlas', 'alcock']},
@@ -99,6 +100,8 @@ def sweep_train(config=None):
 		if os.path.isfile(os.path.join(FTWEIGTHS, 'checkpoint')) and does_it_exists:
 			print('[INFO] FINETUNED MODEL FOUND. LOADING WEIGHTS')
 			astromer.load_weights(os.path.join(FTWEIGTHS, 'weights')).expect_partial()
+			with open(os.path.join(FTWEIGTHS, 'metrics.toml'), 'r') as fp:
+				ft_res = toml.load(fp)
 		else:
 			print('[INFO] FINETUNING FROM SCRATCH')
 
@@ -142,17 +145,44 @@ def sweep_train(config=None):
 					histogram_freq=1,
 					write_graph=True)]
 
-			astromer.fit(train_batches, 
-						 epochs=2 if DEBUG else model_config['epochs'], 
-						 validation_data=valid_batches,
-						 callbacks=cbks) 
+			if DEBUG:
+				train_batches = train_batches.take(1)
+				valid_batches = valid_batches.take(1)
+				test_batches  = test_batches.take(1)
 
+			hist = astromer.fit(train_batches, 
+								 epochs=2 if DEBUG else model_config['epochs'], 
+								 validation_data=valid_batches,
+								 callbacks=cbks) 
+
+			best_epoch = np.argmin(hist.history['val_loss'])
+			val_loss = hist.history['val_loss'][best_epoch]
+			val_acc = hist.history['val_acc'][best_epoch]
+			val_rmse = hist.history['val_rmse'][best_epoch]
+			val_bce = hist.history['val_bce'][best_epoch]
+			val_r_square = hist.history['val_r_square'][best_epoch]
+			
 			print('[INFO] Testing')
-			acc, bce, loss, r2, rmse = astromer.evaluate(test_batches)   
-			wandb.log({'ft_test_acc': acc, 'ft_test_r2':r2, 'ft_test_rmse':rmse, 'ft_test_bce':bce})
+			test_acc, test_bce, test_loss, test_r2, test_rmse = astromer.evaluate(test_batches)   
+						
+			ft_res = {'ft_val_loss':val_loss,
+					  'ft_val_acc': val_acc, 
+					  'ft_val_r2':val_r_square, 
+					  'ft_val_rmse':val_rmse, 
+					  'ft_val_bce':val_bce,
+					  'ft_test_loss':test_loss,
+					  'ft_test_acc':test_acc,
+					  'ft_test_r2':test_r2,
+					  'ft_test_rmse':test_rmse,
+					  'ft_test_bce':test_bce}
+
+			with open(os.path.join(FTWEIGTHS, 'metrics.toml'), 'w') as fp:
+				toml.dump(ft_res, fp)
 
 			with open(os.path.join(FTWEIGTHS, 'config.toml'), 'w') as f:
 				toml.dump(model_config, f)
+
+		wandb.log(ft_res)
 		# ============================================================================
 		# =========== CLASSIFICATION==================================================
 		# ============================================================================
@@ -188,6 +218,10 @@ def sweep_train(config=None):
 										  repeat=1,
 										  cache=True, 
 										  njobs=None)
+		if DEBUG:
+			train_batches = train_batches.take(1)
+			valid_batches = valid_batches.take(1)
+			test_batches = test_batches.take(1)
 
 		clf_model = create_classifier(FTWEIGTHS, model_config['ws'], num_cls, clf_name=config.clf_name)
 
@@ -207,10 +241,14 @@ def sweep_train(config=None):
 				histogram_freq=1,
 				write_graph=True)]
 
-		history = clf_model.fit(train_batches,
-								epochs= 2 if DEBUG else model_config['epochs'],
-								callbacks=cbks,
-								validation_data=valid_batches)
+		hist = clf_model.fit(train_batches,
+							 epochs= 2 if DEBUG else model_config['epochs'],
+							 callbacks=cbks,
+							 validation_data=valid_batches)
+
+		best_epoch = np.argmin(hist.history['val_loss'])
+		val_loss = hist.history['val_loss'][best_epoch]
+		val_acc = hist.history['val_acc'][best_epoch]
 
 		y_pred = clf_model.predict(test_batches)
 		y_true = tf.concat([y['label'] for _, y in test_batches], 0)
@@ -220,8 +258,16 @@ def sweep_train(config=None):
 													 pred_labels,
 													 average='macro',
 													 zero_division=0.)
-	
-		wandb.log({'clf_test_precision': p, 'clf_test_recall': r, 'clf_test_f1': f})
+		
+
+		test_acc = accuracy_score(true_labels, pred_labels)
+		
+		wandb.log({'clf_val_acc': val_acc,
+				   'clf_val_loss': val_loss,
+				   'clf_test_precision': p, 
+				   'clf_test_recall': r, 
+				   'clf_test_f1': f,
+				   'clf_test_acc': test_acc})
 
 
 # =====================================================================================

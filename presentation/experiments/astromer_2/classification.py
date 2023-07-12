@@ -120,10 +120,6 @@ def run(opt):
 		opt.epochs = 10
 
 
-	# for x, y in train_batches:
-	# 	print(x['input'].shape)
-	# 	print(x['mask'].shape)
-
 	clf_model = create_classifier(opt.pre_weights, opt.ws, num_cls, clf_name=opt.clf_name)
 	clf_model.compile(optimizer=Adam(opt.lr),
 					  loss=CategoricalCrossentropy(from_logits=True))
