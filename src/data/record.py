@@ -82,10 +82,8 @@ def write_config(context_features: List[str], sequential_features: List[str], co
 class DataPipeline:
     """
     Args:
-            sequential_features (list[str]): seuqential features keys, order important, [0] : mjd, [1] : mag 
-            context_features (list[str]): Context feature keys
-            id_key (str) : id key for paraquet files
-            err_threshold (int) : used to clean up dataset by error 
+        metadata
+        config_path
     """
 
     def __init__(self,
