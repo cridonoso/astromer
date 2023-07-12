@@ -14,3 +14,6 @@ results
 data/records_new
 records/
 presentation/experiments/astromer_0/backup/
+wandb
+*.record
+data/records_parquet

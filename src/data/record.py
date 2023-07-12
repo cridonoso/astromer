@@ -287,13 +287,20 @@ class DataPipeline:
             shards_data.append(sel)        
         return shards_data, shard_paths
     
-    @staticmethod
-    def preprocess_lightcurves(scan, id_column, sequential_features):
-        general_fn = pl.col("err") < 1.  # Clean the data on the big lazy dataframe
-        particular_fn = lambda group_df: group_df.sort(sequential_features[0]) #mjd 
-        # Filter, drop nulls, and sort every object
-        processed_obs = scan.filter(general_fn).drop_nulls().groupby(id_column).apply(particular_fn, schema=None)
-        return processed_obs
+    def lightcurve_step(self, inputs):
+        """
+        Preprocessing applied to each light curve separately
+        """
+        # First feature is time
+        inputs = inputs.sort(self.sequential_features[0]) 
+        return inputs
+
+    def observations_step(self):
+        """
+        Preprocessing applied to all observations. Filter only
+        """
+        fn = pl.col("err") < 1.  # Clean the data on the big lazy dataframe
+        return fn
 
     def read_all_parquets(self, observations_path : str , metadata_path : str) -> pd.DataFrame:
         """
@@ -320,12 +327,14 @@ class DataPipeline:
         scan = pl.scan_parquet(paths)
 
         # Using partial information, extract only the necessary objects
-        # Define filters
         ID_series = pl.Series(self.metadata[self.id_column].values)
         f1 = pl.col(self.id_column).is_in(ID_series)
         scan.filter(f1)
         
-        processed_obs = self.preprocess_lightcurves(scan, self.id_column, self.sequential_features)
+        lightcurves_fn  = lambda light_curve: self.lightcurve_step(light_curve)
+
+        # Filter, drop nulls, and sort every object
+        processed_obs = scan.filter(self.observations_step()).drop_nulls().groupby(self.id_column).apply(lightcurves_fn, schema=None)
 
         # Select only the relevant columns
         processed_obs = processed_obs.select([self.id_column] + self.sequential_features)
