@@ -215,7 +215,8 @@ def sweep_train(config=None):
 		clf_model = create_classifier(FTWEIGTHS, model_config['ws'], num_cls, clf_name=config.clf_name)
 
 		clf_model.compile(optimizer=Adam(1e-3),
-						  loss=CategoricalCrossentropy(from_logits=True))
+						  loss=CategoricalCrossentropy(from_logits=True),
+						  metrics=['accuracy'])
 		cbks =  [
 			ModelCheckpoint(
 				filepath=os.path.join(CLFWEIGHTS, 'weights'),
@@ -234,13 +235,13 @@ def sweep_train(config=None):
 							 epochs= 2 if DEBUG else model_config['epochs'],
 							 callbacks=cbks,
 							 validation_data=valid_batches)
-
+		
 		best_epoch = np.argmin(hist.history['val_loss'])
 		val_loss = hist.history['val_loss'][best_epoch]
-		val_acc = hist.history['val_acc'][best_epoch]
+		val_acc = hist.history['val_accuracy'][best_epoch]
 
 		y_pred = clf_model.predict(test_batches)
-		y_true = tf.concat([y['label'] for _, y in test_batches], 0)
+		y_true = tf.concat([y for _, y in test_batches], 0)
 		pred_labels = tf.argmax(y_pred, 1)
 		true_labels = tf.argmax(y_true, 1)
 		p, r, f, _ = precision_recall_fscore_support(true_labels,
