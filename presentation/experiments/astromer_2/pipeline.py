@@ -34,8 +34,8 @@ sweep_conf = {
 	'metric': {'goal': 'maximize', 'name': 'val_acc'},
 	'parameters': {
 		'pt_model': {'values':['nsp_cond/1_4_64_rmse_0.5', 'nsp_cond/2_4_64_rmse_0.5',
-							   'nsp_normal_bigpe/1_4_64_rmse_0.5', 'nsp_normal_bigpe/1_4_64_rmse_0.5', 
-                               'nsp_concat/1_4_64_rmse_0.5', 'nsp_concat/1_4_64_rmse_0.5']},
+							   'nsp_normal_bigpe/1_4_64_rmse_0.5', 'nsp_normal_bigpe/2_4_64_rmse_0.5', 
+                               'nsp_concat/1_4_64_rmse_0.5', 'nsp_concat/2_4_64_rmse_0.5']},
 		'fold':{'values':[0, 1, 2]},
 		'subdataset':{'values':['atlas', 'alcock']},
 		'clf_name':{'values':['mlp_att', 'mlp_cls', 'mlp_all']},
