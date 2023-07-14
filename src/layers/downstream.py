@@ -63,7 +63,7 @@ def get_astromer_encoder(path, version='zero'):
 	encoder.trainable = False
 	return encoder, inp_placeholder
 
-def load_classification_data(path, window_size, batch_size, version='zero'):
+def load_classification_data(path, window_size, batch_size, version='zero', test=False):
 	num_cls = pd.read_csv(os.path.join(path, 'objects.csv')).shape[0]
 
 	if version == 'zero':
@@ -81,7 +81,7 @@ def load_classification_data(path, window_size, batch_size, version='zero'):
 				normalize='zero-mean',
 				cache=True)
 		valid_batches = pretraining_pipeline(
-				os.path.join(path, 'train'),
+				os.path.join(path, 'val'),
 				batch_size,
 				window_size,
 				0.,
@@ -93,7 +93,21 @@ def load_classification_data(path, window_size, batch_size, version='zero'):
 				num_cls=num_cls,
 				normalize='zero-mean',
 				cache=True)
-
+		if test:
+			test_batches = pretraining_pipeline(
+			os.path.join(path, 'test'),
+			batch_size,
+			window_size,
+			0.,
+			0.,
+			0.,
+			False,
+			False, #shuffle
+			repeat=1,
+			num_cls=num_cls,
+			normalize='zero-mean',
+			cache=True)
+			return train_batches, valid_batches, test_batches, num_cls
 		return train_batches, valid_batches, num_cls
 
 
@@ -116,7 +130,17 @@ def load_classification_data(path, window_size, batch_size, version='zero'):
 								  sampling=False,
 								  shuffle=False,
 								  num_cls=num_cls)
-
+		if test:
+			test_batches = load_data(dataset=os.path.join(path, 'test'), 
+						  batch_size=batch_size, 
+						  probed=1.,  
+						  window_size=window_size, 
+						  nsp_prob=0., 
+						  repeat=1, 
+						  sampling=False,
+						  shuffle=False,
+						  num_cls=num_cls)
+			return train_batches, valid_batches, test_batches, num_cls 
 		return train_batches, valid_batches, num_cls
 
 

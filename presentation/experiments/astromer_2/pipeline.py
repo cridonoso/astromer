@@ -12,7 +12,7 @@ from tensorflow.keras.optimizers.experimental import AdamW
 from tensorflow.keras.optimizers import Adam
 from wandb.keras import WandbMetricsLogger
 
-from presentation.experiments.astromer_2.classification import create_classifier
+from presentation.experiments.astromer_2.classification import create_classifier, load_classification_data
 from src.models import get_ASTROMER_II
 from src.data.loaders import load_light_curves
 from src.data import load_data
@@ -202,30 +202,11 @@ def sweep_train(config=None):
 								  config.subdataset+'_20')
 		os.makedirs(CLFWEIGHTS, exist_ok=True)
 
-		num_cls = pd.read_csv(
-				os.path.join(DOWNSTREAM_DATA, 'objects.csv')).shape[0]
-		
-		train_batches = load_light_curves(os.path.join(DOWNSTREAM_DATA, 'train'), 
-										  num_cls=num_cls,
-										  batch_size=32 if DEBUG else 512, 
-										  window_size=model_config['ws'], 
-										  repeat=1,
-										  cache=True, 
-										  njobs=None)
-		valid_batches = load_light_curves(os.path.join(DOWNSTREAM_DATA, 'val'), 
-										  num_cls=num_cls,
-										  batch_size=32 if DEBUG else 512, 
-										  window_size=model_config['ws'], 
-										  repeat=1,
-										  cache=True, 
-										  njobs=None)
-		test_batches = load_light_curves(os.path.join(DOWNSTREAM_DATA, 'test'), 
-										  num_cls=num_cls,
-										  batch_size=32 if DEBUG else 512, 
-										  window_size=model_config['ws'], 
-										  repeat=1,
-										  cache=True, 
-										  njobs=None)
+		train_batches, valid_batches, test_batches, num_cls = load_classification_data(DOWNSTREAM_DATA, 
+																			 window_size=model_config['ws'], 
+																			 batch_size=512, 
+																			 version='second',
+																			 test=True)
 		if DEBUG:
 			train_batches = train_batches.take(1)
 			valid_batches = valid_batches.take(1)

@@ -35,8 +35,6 @@ def get_callbacks(path, patience=20, monitor='val_loss'):
 
 
 def create_classifier(pretrain_weights, window_size, n_classes, clf_name='mlp_att'):
-
-
 	if clf_name == 'mlp_att_zero':
 		encoder, inp_placeholder = get_astromer_encoder(pretrain_weights, version='zero')
 		x = encoder(inp_placeholder, training=False)
