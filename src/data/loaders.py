@@ -72,7 +72,7 @@ def load_numpy(samples,
     return dataset
 
 
-def format_input(input_dict, cls_token=None):
+def format_input(input_dict, cls_token=None, num_cls=None):
     times = tf.slice(input_dict['input'], [0, 0, 0], [-1, -1, 1])
     times = min_max_scaler(times)
 
@@ -97,11 +97,15 @@ def format_input(input_dict, cls_token=None):
         'att_mask': att_mask,
         'seg_emb': seg_emb,
     }
-    outputs = {
-        'magnitudes': tf.slice(input_dict['nsp_input'], [0, 0, 1], [-1, -1, 1]),
-        'nsp_label': input_dict['nsp_label'],
-        'probed_mask': tf.expand_dims(input_dict['probed_mask'], -1),
-    }
+    if num_cls is not None:
+        outputs = tf.one_hot(input_dict['label'], num_cls)
+
+    else:
+        outputs = {
+            'magnitudes': tf.slice(input_dict['nsp_input'], [0, 0, 1], [-1, -1, 1]),
+            'nsp_label': input_dict['nsp_label'],
+            'probed_mask': tf.expand_dims(input_dict['probed_mask'], -1),
+        }
 
     return inputs, outputs
 
@@ -113,7 +117,9 @@ def load_data(dataset,
               nsp_prob=.5, 
               repeat=1, 
               sampling=False, 
-              njobs=None):
+              shuffle=False,
+              njobs=None,
+              num_cls=None):
 
     if njobs is None:
         njobs = multiprocessing.cpu_count()//2
@@ -133,28 +139,29 @@ def load_data(dataset,
     # MASKING
     dataset = dataset.map(lambda x: get_probed(x, probed=probed, njobs=njobs))
     
-
     # NSP
     dataset = dataset.map(lambda x: randomize(x, nsp_prob=nsp_prob))
 
     # FORMAT input 
-    dataset = dataset.map(lambda x: format_input(x, cls_token=-99.))
+    dataset = dataset.map(lambda x: format_input(x, cls_token=-99., num_cls=num_cls))
+
+    if shuffle:
+        SHUFFLE_BUFFER = 10000
+        dataset = dataset.shuffle(SHUFFLE_BUFFER)
 
     # PREFETCH
     dataset = dataset.prefetch(2)
 
     return dataset
 
+# ========================================================
 def format_input_lc(input_dict, num_cls):
     x = {
         'input': input_dict['input'],
         'mask': input_dict['mask']
     }
 
-    y = {
-        'label' : tf.one_hot(input_dict['label'], num_cls),
-        'id' : input_dict['lcid']
-    }
+    y = tf.one_hot(input_dict['label'], num_cls)
     return x, y
 
 def load_light_curves(dataset, 

@@ -66,6 +66,9 @@ def sweep_train(config=None):
 			model_config = toml.load(f)
 			wandb.log(model_config)
 
+
+		print(model_config)
+
 		if 'nsp_normal_bigpe' in config.pt_model:
 			pe_dim = 256
 		else:
