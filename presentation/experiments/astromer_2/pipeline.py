@@ -22,7 +22,7 @@ from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 # g34htgii 
 DEBUG = False
 ROOT = './presentation/experiments/astromer_2/results'
-MASTER_PROJECT_NAME = 'downstream-a2'
+MASTER_PROJECT_NAME = 'downstream-a3'
 os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
 
 # =====================================================================================
@@ -37,6 +37,7 @@ sweep_conf = {
 							   'nsp_normal_bigpe/1_4_64_rmse_0.5', 'nsp_normal_bigpe/2_4_64_rmse_0.5', 
                                'nsp_concat/1_4_64_rmse_0.5', 'nsp_concat/2_4_64_rmse_0.5']},
 		'fold':{'values':[0, 1, 2]},
+		'spc': {'values': [20, 100]},
 		'subdataset':{'values':['atlas', 'alcock']},
 		'clf_name':{'values':['mlp_att', 'mlp_cls', 'mlp_all']},
 	}
@@ -94,13 +95,13 @@ def sweep_train(config=None):
 		DOWNSTREAM_DATA = os.path.join('./data/records', 
 									   config.subdataset,
 									   'fold_'+str(config.fold), 
-									   config.subdataset+'_20')
+									   '{}_{}'.format(config.subdataset, config.spc))
 		FTWEIGTHS = os.path.join(ROOT, 
 								 config.pt_model,
 								 'finetuning',                                     
 								 config.subdataset,
 								 'fold_'+str(config.fold), 
-								 config.subdataset+'_20')     
+								 '{}_{}'.format(config.subdataset, config.spc))     
 		
 
 		does_it_exists = check_if_exist_finetuned_weights(config, MASTER_PROJECT_NAME)
@@ -232,7 +233,7 @@ def sweep_train(config=None):
 				write_graph=True)]
 
 		hist = clf_model.fit(train_batches,
-							 epochs= 2 if DEBUG else model_config['epochs'],
+							 epochs= 2 if DEBUG else 100000,
 							 callbacks=cbks,
 							 validation_data=valid_batches)
 		
@@ -252,12 +253,14 @@ def sweep_train(config=None):
 
 		test_acc = accuracy_score(true_labels, pred_labels)
 		
-		wandb.log({'clf_val_acc': val_acc,
+		summary_clf = {'clf_val_acc': val_acc,
 				   'clf_val_loss': val_loss,
 				   'clf_test_precision': p, 
 				   'clf_test_recall': r, 
 				   'clf_test_f1': f,
-				   'clf_test_acc': test_acc})
+				   'clf_test_acc': test_acc}
+		print(summary_clf)
+		wandb.log(summary_clf)
 
 
 # =====================================================================================
