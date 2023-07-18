@@ -72,7 +72,7 @@ def load_numpy(samples,
     return dataset
 
 
-def format_input(input_dict, cls_token=None, num_cls=None):
+def format_input(input_dict, cls_token=None, num_cls=None, test_mode=False):
     times = tf.slice(input_dict['input'], [0, 0, 0], [-1, -1, 1])
     times = min_max_scaler(times)
 
@@ -90,13 +90,16 @@ def format_input(input_dict, cls_token=None, num_cls=None):
 
 
     inputs = {
-        # 'original':input_dict['input'],
-        # 'mask': input_dict['mask'],
         'magnitudes': magnitudes,
         'times': times,
         'att_mask': att_mask,
         'seg_emb': seg_emb,
     }
+    
+    if test_mode:
+        inputs['original'] = input_dict['input']
+        inputs['mask'] = input_dict['mask']
+
     if num_cls is not None:
         outputs = tf.one_hot(input_dict['label'], num_cls)
 
@@ -119,7 +122,8 @@ def load_data(dataset,
               sampling=False, 
               shuffle=False,
               njobs=None,
-              num_cls=None):
+              num_cls=None,
+              test_mode=False):
 
     if njobs is None:
         njobs = multiprocessing.cpu_count()//2
@@ -143,7 +147,7 @@ def load_data(dataset,
     dataset = dataset.map(lambda x: randomize(x, nsp_prob=nsp_prob))
 
     # FORMAT input 
-    dataset = dataset.map(lambda x: format_input(x, cls_token=-99., num_cls=num_cls))
+    dataset = dataset.map(lambda x: format_input(x, cls_token=-99., num_cls=num_cls, test_mode=test_mode))
 
     if shuffle:
         SHUFFLE_BUFFER = 10000
