@@ -5,7 +5,7 @@ import os
 from src.data.record import deserialize
 from src.data.preprocessing import to_windows, min_max_scaler
 from src.data.masking import get_probed
-from src.data.nsp import randomize
+from src.data.nsp import randomize, randomize_v2
 
 def load_records(records_dir):
     """
@@ -144,7 +144,7 @@ def load_data(dataset,
     dataset = dataset.map(lambda x: get_probed(x, probed=probed, njobs=njobs))
     
     # NSP
-    dataset = dataset.map(lambda x: randomize(x, nsp_prob=nsp_prob))
+    dataset = dataset.map(lambda x: randomize_v2(x, nsp_prob=nsp_prob))
 
     # FORMAT input 
     dataset = dataset.map(lambda x: format_input(x, cls_token=-99., num_cls=num_cls, test_mode=test_mode))
