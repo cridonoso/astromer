@@ -85,6 +85,7 @@ class Encoder(Model):
 		# adding embedding and position encoding.
 		x = tf.concat([data['magnitudes'], data['seg_emb']], axis=2, name='concat_mag_segemb')
 		x_transformed = self.inp_transform(x)        
+
 		x_pe = self.positional_encoder(data['times'])
 		x = x_transformed + x_pe        
 		
