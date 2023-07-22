@@ -21,7 +21,7 @@ from src.data.zero import pretraining_pipeline
 
 from src.models.second import build_input as build_input_II
 
-def get_astromer_encoder(path, version='zero'):
+def get_astromer_encoder(path, version='zero', trainable=False):
 
 	with open(os.path.join(path, 'config.toml'), 'r') as file:
 		config = toml.load(file)
@@ -60,7 +60,7 @@ def get_astromer_encoder(path, version='zero'):
 
 	astromer.load_weights(os.path.join(path, 'weights')).expect_partial()
 	encoder = astromer.get_layer('encoder')
-	encoder.trainable = False
+	encoder.trainable = trainable
 	return encoder, inp_placeholder
 
 def load_classification_data(path, window_size, batch_size, version='zero', test=False):
