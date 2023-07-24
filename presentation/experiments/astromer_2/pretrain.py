@@ -26,7 +26,8 @@ def run(opt):
 	# ========== DATA ========================================
 	train_batches = load_data(dataset=os.path.join(opt.data, 'train'), 
 							  batch_size=opt.bs, 
-							  probed=opt.probed,  
+							  probed=opt.probed,
+							  random_same=opt.rs,  
 							  window_size=opt.ws, 
 							  nsp_prob=opt.nsp_prob, 
 							  repeat=4, 
@@ -35,12 +36,13 @@ def run(opt):
 	valid_batches = load_data(dataset=os.path.join(opt.data, 'val'), 
 							  batch_size=opt.bs, 
 							  probed=opt.probed,  
+							  random_same=opt.rs,
 							  window_size=opt.ws, 
 							  nsp_prob=opt.nsp_prob, 
 							  repeat=1, 
 							  sampling=True,
 							  off_nsp=opt.off_nsp)
-	
+
 	if opt.nsp_prob == 0. or opt.off_nsp:
 		opt.rmse_factor = 1.
 
@@ -117,11 +119,13 @@ def run(opt):
 	test_batches = load_data(dataset=os.path.join(opt.data, 'test'), 
 							  batch_size=opt.bs, 
 							  probed=opt.probed,  
+							  random_same=opt.rs,
 							  window_size=opt.ws, 
 							  nsp_prob=opt.nsp_prob, 
 							  repeat=1, 
 							  sampling=True,
 							  off_nsp=opt.off_nsp)
+	
 	if opt.debug:
 		test_batches = test_batches.take(1)
 	
@@ -198,6 +202,8 @@ if __name__ == '__main__':
     parser.add_argument('--off-nsp',  action='store_true', help='Turn off the NSP input format (use to load Astromer I)')
     parser.add_argument('--probed', default=0.5, type=float,
                         help='Probed percentage')
+    parser.add_argument('--rs', default=0.2, type=float,
+                        help='Probed fraction to be randomized or unmasked')
     parser.add_argument('--nsp-prob', default=0.5, type=float,
                         help='Next segment prediction probability. The probability of randomize half of the light curve')
     parser.add_argument('--rmse-factor', default=0.5, type=float,
