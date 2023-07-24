@@ -1,7 +1,7 @@
 import tensorflow as tf
 
-from src.layers.attention import HeadAttentionMulti
 from src.layers.positional import positional_encoding, PositionalEncoder
+from src.layers.attention import HeadAttentionMulti
 
 from tensorflow.keras import Model
 
@@ -33,6 +33,7 @@ class AttentionBlock(tf.keras.layers.Layer):
 		attn_output, att_weights = self.mha(x, mask)  # (batch_size, input_seq_len, d_model)
 		attn_output = self.dropout1(attn_output, training=training)
 		attn_output = self.layernorm1(attn_output)
+		
 		ffn_output  = self.ffn(attn_output)  # (batch_size, input_seq_len, d_model)
 		ffn_output  = self.dropout2(ffn_output, training=training)
 		ffn_output  = self.layernorm2(ffn_output)
@@ -50,7 +51,8 @@ class AttentionBlock(tf.keras.layers.Layer):
 		})
 		return config
 
-class ConcatEncoder(Model):
+class Encoder(Model):
+	""" Encoder as it was defined in Astromer I """
 	def __init__(self, 
 				 window_size,
 				 num_layers, 
@@ -61,33 +63,47 @@ class ConcatEncoder(Model):
 				 pe_base=1000, 
 				 pe_dim=128,
 				 pe_c=1., 
+				 average_layers=False,
 				 **kwargs):
-		super(ConcatEncoder, self).__init__(**kwargs)
+		super(Encoder, self).__init__(**kwargs)
 
-		self.window_size = window_size
-		self.num_layers  = num_layers
-		self.num_heads   = num_heads
-		self.head_dim    = head_dim
-		self.mixer_size  = mixer_size
-		self.dropout     = dropout
-		self.pe_base     = pe_base
-		self.pe_c        = pe_c
-		self.pe_dim      = pe_dim
+		self.window_size 	= window_size
+		self.num_layers  	= num_layers
+		self.num_heads   	= num_heads
+		self.head_dim    	= head_dim
+		self.mixer_size  	= mixer_size
+		self.dropout     	= dropout
+		self.pe_base     	= pe_base
+		self.pe_c        	= pe_c
+		self.pe_dim         = pe_dim
+		self.average_layers = average_layers
+		self.inp_transform  = tf.keras.layers.Dense(self.pe_dim, name='inp_transform')
 
 		self.positional_encoder = PositionalEncoder(self.pe_dim, base=self.pe_base, c=self.pe_c, name='PosEncoding')
 		
-		self.enc_layers = [AttentionBlock(self.head_dim, self.num_heads, self.mixer_size, dropout=self.dropout)
-							for _ in range(self.num_layers)]
+		self.enc_layers = [AttentionBlock(self.head_dim, self.num_heads, self.mixer_size, dropout=self.dropout, name=f'att_layer_{i}')
+							for i in range(self.num_layers)]
+		
+		self.dropout_layer = tf.keras.layers.Dropout(self.dropout)
 
 	def call(self, data, training=False):
 		# adding embedding and position encoding.
+		x = tf.concat([data['magnitudes'], data['seg_emb']], axis=2, name='concat_mag_segemb')
+		x_transformed = self.inp_transform(x)        
+
 		x_pe = self.positional_encoder(data['times'])
-		x = tf.concat([x_pe, data['magnitudes'], data['seg_emb']], 2)
-		
+		x = x_transformed + x_pe        
+		x = self.dropout_layer(x, training=training)
+
 		layers_outputs = []
 		for i in range(self.num_layers):
 			z =  self.enc_layers[i](x, mask=data['att_mask'])
 			layers_outputs.append(z)
-		x = tf.reduce_mean(layers_outputs, 0)
+		
+		if self.average_layers:
+			x = tf.reduce_mean(layers_outputs, 0)
+		else:
+			x = layers_outputs[-1] # get the last output
+		
 		x = tf.reshape(x, [-1, self.window_size+1, self.num_heads*self.head_dim])
-		return   x # (batch_size, input_seq_len, d_model)
+		return  x # (batch_size, input_seq_len, d_model)

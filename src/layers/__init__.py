@@ -1,4 +1,5 @@
-from src.layers.encoder import ConcatEncoder
-from src.layers.encoder_old import Encoder
+from src.layers.encoder_conditioned import CondEncoder
 from src.layers.output import TransformLayer, RegLayer
-from src.layers.conditioned_encoder import CondEncoder
+from src.layers.encoder_concat import ConcatEncoder
+from src.layers.encoder_normal import Encoder
+

@@ -13,7 +13,7 @@ from tensorflow.keras.callbacks  import (ModelCheckpoint,
 										 TensorBoard)
 from src.models import get_ASTROMER_II
 from src.data import load_data
-
+from datetime import datetime
 
 ROOT = './presentation/experiments/astromer_2/'
 
@@ -46,7 +46,8 @@ def run(opt):
 		opt.epochs = 5
 
 	# ======= MODEL ========================================
-	model_name = '{}_{}_{}_rmse_{}'.format(opt.layers, opt.nh, opt.hdim, opt.rmse_factor)
+	now = datetime.now()
+	model_name = now.strftime("%Y-%m-%d_%H-%M-%S")
 	PTWEIGTHS = os.path.join(EXPDIR, model_name, 'pretraining')
 	os.makedirs(PTWEIGTHS, exist_ok=True)
 
@@ -83,6 +84,8 @@ def run(opt):
 				write_graph=True)]
 
 	print('\n')
+	print("[INFO] LOGS: ", os.path.join(EXPDIR, model_name) )
+	print(f'[INFO] AVG LAYERS: {opt.avg_layers}')
 	print(f'[INFO] ENCODER: {opt.encoder_mode}')
 	print('[INFO] BCE: {:.2f} RMSE: {:.2f}'.format(bce_factor, opt.rmse_factor))
 	print(f'[INFO] No LAYERS: {opt.layers}')
@@ -128,7 +131,7 @@ def run(opt):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--exp-name', default='nsp_adamw_factor', type=str,
+    parser.add_argument('--exp-name', default='pretrain', type=str,
                     help='Project name')
     parser.add_argument('--data', default='./data/records/macho_clean', type=str,
                     help='Data folder where tf.record files are located')
@@ -151,6 +154,7 @@ if __name__ == '__main__':
                         help='Units to be used on the hidden layer of a feed-forward network that combines head outputs within an attention layer')
     parser.add_argument('--dropout', default=0.1, type=float,
                         help='Dropout to use on the output of each attention layer (before mixer layer)')
+    parser.add_argument('--avg-layers', action='store_true', help='If averaging outputs of the attention layers to form the final embedding. There is no avg if layers=1 ')
 
     parser.add_argument('--lr', default=1e-5, type=float,
                         help='learning rate')

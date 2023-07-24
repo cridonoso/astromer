@@ -44,10 +44,13 @@ def get_ASTROMER(num_layers=2,
                  pe_c=1,
                  window_size=100,
                  batch_size=None,
-                 encoder_mode='normal'):
+                 encoder_mode='normal',
+                 average_layers=False):
     
     # LAYERS DEFINITION
     placeholder = build_input(window_size)
+
+
 
     if encoder_mode == 'normal':
         encoder = Encoder(window_size=window_size,
@@ -59,6 +62,7 @@ def get_ASTROMER(num_layers=2,
                           pe_base=pe_base,
                           pe_dim=pe_dim,
                           pe_c=pe_c,
+                          average_layers=average_layers,
                           name='encoder')
 
     if encoder_mode == 'concat':
@@ -71,6 +75,7 @@ def get_ASTROMER(num_layers=2,
                                 pe_base=pe_base,
                                 pe_dim=pe_dim,
                                 pe_c=pe_c,
+                                average_layers=average_layers,
                                 name='encoder')
 
     if encoder_mode == 'conditioned':
@@ -83,6 +88,7 @@ def get_ASTROMER(num_layers=2,
                               pe_base=pe_base,
                               pe_dim=pe_dim,
                               pe_c=pe_c,
+                              average_layers=average_layers,
                               name='encoder')
 
     transform_layer = TransformLayer(name='transform_layer')

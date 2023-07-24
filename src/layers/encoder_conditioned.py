@@ -64,7 +64,8 @@ class CondEncoder(tf.keras.layers.Layer):
 				dropout=0.1, 
 				pe_base=1000, 
 				pe_dim=128,
-				pe_c=1., 
+				pe_c=1.,
+				average_layers=False, 
 				**kwargs):
 		super(CondEncoder, self).__init__(**kwargs)
 
@@ -77,7 +78,7 @@ class CondEncoder(tf.keras.layers.Layer):
 		self.pe_base     = pe_base
 		self.pe_c        = pe_c
 		self.pe_dim      = pe_dim
-
+		self.average_layers = average_layers
 		self.positional_encoder = PositionalEncoder(self.pe_dim, base=self.pe_base, c=self.pe_c, name='PosEncoding')
 
 		self.att_time_block = AttentionBlock(self.head_dim, self.num_heads, self.mixer_size, dropout=self.dropout, name='time_att_block')
@@ -102,6 +103,9 @@ class CondEncoder(tf.keras.layers.Layer):
 		for i in range(self.num_layers):
 			z =  self.enc_layers[i](x, mask=data['att_mask'])
 			layers_outputs.append(z)
-		x = tf.reduce_mean(layers_outputs, 0)
+		if self.average_layers:
+			x = tf.reduce_mean(layers_outputs, 0)
+		else:
+			x = layers_outputs[-1] # get the last output
 		x = tf.reshape(x, [-1, self.window_size+1, self.num_heads*self.head_dim])
 		return   x # (batch_size, input_seq_len, d_model)
