@@ -27,6 +27,16 @@ def get_probed(input_dict, probed, njobs):
 
     return input_dict
 
+def create_mask(pre_mask, n_elements):
+    indices = tf.where(pre_mask)
+    indices = tf.random.shuffle(indices)
+    indices = tf.slice(indices, [0, 0], [n_elements, -1])
+
+    mask = tf.one_hot(indices, tf.shape(pre_mask)[0], dtype=tf.int32)
+    mask = tf.reduce_sum(mask, 0)
+    mask = tf.reshape(mask, [tf.shape(pre_mask)[0]])
+    
+    return mask
 
 def add_random(input_dict, random_frac, njobs):
     """ Add random observations to each sequence
@@ -37,39 +47,26 @@ def add_random(input_dict, random_frac, njobs):
     input_shape = tf.shape(input_dict['input'])
     input_dict['input_pre_nsp'] = input_dict['input'] 
 
+    # ====== RANDOM MASK =====
     n_probed = tf.reduce_sum(input_dict['probed_mask'], 1)
     n_random = tf.math.ceil(n_probed * random_frac)
     n_random = tf.cast(n_random, tf.int32)
-
-    # ====== RANDOM MASK =====
-    random_mask = tf.map_fn(lambda x: tf.one_hot(
-                                                tf.slice(
-                                                    tf.random.shuffle(
-                                                        tf.where(x[0])
-                                                        ), 
-                                                    [0, 0], [x[1], 1]),
-                                            input_shape[1], dtype=tf.int32), 
-                                  (tf.cast(input_dict['probed_mask'], tf.int32), n_random),
-                                  parallel_iterations=njobs,
-                                  fn_output_signature=tf.int32)
-    random_mask = tf.reduce_sum(random_mask, 1)
-    random_mask = tf.reshape(random_mask, [-1, input_shape[1]])
-
-    rest = tf.cast(input_dict['probed_mask'], tf.int32) * (1-random_mask)
+    random_mask = tf.map_fn(lambda x: create_mask(x[0], x[1]),
+                                (input_dict['probed_mask'], n_random),
+                                parallel_iterations=njobs,
+                                fn_output_signature=tf.int32)
 
     # ====== SAME MASK =====
-    same_mask = tf.map_fn(lambda x: tf.one_hot(
-                                                tf.slice(
-                                                    tf.random.shuffle(
-                                                        tf.where(x[0])
-                                                        ), 
-                                                    [0, 0], [x[1], -1]),
-                                            input_shape[1], dtype=tf.int32), 
-                                  (tf.cast(rest, tf.int32), n_random),
+    rest = tf.cast(input_dict['probed_mask'], tf.int32) * (1-random_mask)
+    n_rest = tf.reduce_sum(rest, 1)
+    n_same = tf.math.ceil(tf.cast(n_rest, tf.float32) * random_frac)
+    n_same = tf.cast(n_same, tf.int32)
+
+    same_mask = tf.map_fn(lambda x: create_mask(x[0], x[1]), 
+                                  (rest, n_same),
                                   parallel_iterations=njobs,
                                   fn_output_signature=tf.int32)
-    same_mask = tf.reduce_sum(same_mask, 1)
-    same_mask = tf.reshape(same_mask, [-1, input_shape[1]])
+
     # ===== REPLACEMENT ==== 
     random_replacement = tf.random.shuffle(tf.transpose(input_dict['input'], [1, 0, 2]))
     random_replacement = tf.transpose(random_replacement, [1, 0, 2])

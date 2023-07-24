@@ -117,7 +117,7 @@ def format_input_no_nsp(input_dict, num_cls=None, test_mode=False):
     times = tf.slice(input_dict['input'], [0, 0, 0], [-1, -1, 1])
     magnitudes = tf.slice(input_dict['input'], [0, 0, 1], [-1, -1, 1])
     att_mask = tf.expand_dims(input_dict['att_mask'], axis=-1)
-    
+
     inputs = {
         'magnitudes': magnitudes,
         'times': times,
@@ -171,11 +171,11 @@ def load_data(dataset,
     # STANDARDIZE
     dataset = dataset.map(lambda x: standardize_dataset(x, on='input'))
     dataset = dataset.map(lambda x: standardize_dataset(x, on='original'))
-
+    
     # MASKING
     dataset = dataset.map(lambda x: get_probed(x, probed=probed, njobs=njobs))
     dataset = dataset.map(lambda x: add_random(x, random_frac=random_same, njobs=njobs))
-    
+
     # NSP
     if off_nsp:
         dataset = dataset.map(lambda x: format_input_no_nsp(x, num_cls=num_cls, test_mode=test_mode))
