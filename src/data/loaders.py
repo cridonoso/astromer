@@ -112,6 +112,31 @@ def format_input(input_dict, cls_token=None, num_cls=None, test_mode=False):
 
     return inputs, outputs
 
+def format_input_no_nsp(input_dict, num_cls=None, test_mode=False):
+    times = tf.slice(input_dict['input'], [0, 0, 0], [-1, -1, 1])
+    magnitudes = tf.slice(input_dict['input'], [0, 0, 1], [-1, -1, 1])
+    att_mask = tf.expand_dims(input_dict['att_mask'], axis=-1)
+    
+    inputs = {
+        'magnitudes': magnitudes,
+        'times': times,
+        'att_mask': att_mask,
+    }
+    if test_mode:
+        inputs['original'] = input_dict['input']
+        inputs['mask'] = input_dict['mask']
+
+    if num_cls is not None:
+        outputs = tf.one_hot(input_dict['label'], num_cls)
+
+    else:
+        outputs = {
+            'magnitudes': magnitudes,
+            'probed_mask': tf.expand_dims(input_dict['probed_mask'], -1),
+        }
+
+    return inputs, outputs
+
 def load_data(dataset, 
               batch_size=16, 
               probed=0.4, 
@@ -123,7 +148,8 @@ def load_data(dataset,
               shuffle=False,
               njobs=None,
               num_cls=None,
-              test_mode=False):
+              test_mode=False,
+              off_nsp=False):
 
     if njobs is None:
         njobs = multiprocessing.cpu_count()//2
@@ -144,10 +170,11 @@ def load_data(dataset,
     dataset = dataset.map(lambda x: get_probed(x, probed=probed, njobs=njobs))
     
     # NSP
-    dataset = dataset.map(lambda x: randomize_v2(x, nsp_prob=nsp_prob))
-
-    # FORMAT input 
-    dataset = dataset.map(lambda x: format_input(x, cls_token=-99., num_cls=num_cls, test_mode=test_mode))
+    if off_nsp:
+        dataset = dataset.map(lambda x: format_input_no_nsp(x, num_cls=num_cls, test_mode=test_mode))
+    else:
+        dataset = dataset.map(lambda x: randomize_v2(x, nsp_prob=nsp_prob))
+        dataset = dataset.map(lambda x: format_input(x, cls_token=-99., num_cls=num_cls, test_mode=test_mode))
 
     if shuffle:
         SHUFFLE_BUFFER = 10000

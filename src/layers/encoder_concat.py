@@ -83,8 +83,11 @@ class ConcatEncoder(Model):
 	def call(self, data, training=False):
 		# adding embedding and position encoding.
 		x_pe = self.positional_encoder(data['times'])
-		x = tf.concat([x_pe, data['magnitudes'], data['seg_emb']], 2)
-		
+		if 'seg_emb' in data.keys():
+			x = tf.concat([x_pe, data['magnitudes'], data['seg_emb']], 2)
+		else:
+			x = tf.concat([x_pe, data['magnitudes']], 2)
+			
 		layers_outputs = []
 		for i in range(self.num_layers):
 			z =  self.enc_layers[i](x, mask=data['att_mask'])

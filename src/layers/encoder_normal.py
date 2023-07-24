@@ -88,7 +88,13 @@ class Encoder(Model):
 
 	def call(self, data, training=False):
 		# adding embedding and position encoding.
-		x = tf.concat([data['magnitudes'], data['seg_emb']], axis=2, name='concat_mag_segemb')
+		if 'seg_emb' in data.keys():
+			window_size = self.window_size + 1 # if seg_emb exists then NSP is being applied
+			x = tf.concat([data['magnitudes'], data['seg_emb']], axis=2, name='concat_mag_segemb')
+		else:
+			window_size = self.window_size
+			x = data['magnitudes']
+			
 		x_transformed = self.inp_transform(x)        
 
 		x_pe = self.positional_encoder(data['times'])
@@ -105,5 +111,5 @@ class Encoder(Model):
 		else:
 			x = layers_outputs[-1] # get the last output
 		
-		x = tf.reshape(x, [-1, self.window_size+1, self.num_heads*self.head_dim])
+		x = tf.reshape(x, [-1, window_size, self.num_heads*self.head_dim])
 		return  x # (batch_size, input_seq_len, d_model)

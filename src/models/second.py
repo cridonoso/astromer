@@ -6,29 +6,33 @@ import tensorflow as tf
 from tensorflow.keras.layers import Input
 from tensorflow.keras import Model
 
-from src.layers  import Encoder, CondEncoder, ConcatEncoder, TransformLayer
+from src.layers  import Encoder, CondEncoder, ConcatEncoder, TransformLayer, RegLayer
 from src.losses  import custom_rmse, custom_bce
 from src.metrics import custom_r2, custom_acc
 
 
-def build_input(window_size):
-    magnitudes  = Input(shape=(window_size+1, 1),
+def build_input(window_size, off_nsp):
+    if not off_nsp:
+        window_size = window_size + 1
+
+    magnitudes  = Input(shape=(window_size, 1),
                   batch_size=None,
                   name='magnitudes')
-    times       = Input(shape=(window_size+1, 1),
+    times       = Input(shape=(window_size, 1),
                   batch_size=None,
                   name='times')
-    att_mask    = Input(shape=(window_size+1, 1),
+    att_mask    = Input(shape=(window_size, 1),
                   batch_size=None,
-                  name='att_mask')
-    seg_emb     = Input(shape=(window_size+1, 1),
-                  batch_size=None,
-                  name='seg_emb')
+                  name='att_mask') 
     
     pholder = {'magnitudes':magnitudes,
                'times':times,
-               'att_mask':att_mask,
-               'seg_emb':seg_emb}
+               'att_mask':att_mask}
+
+    if not off_nsp:
+        pholder['seg_emb'] = Input(shape=(window_size+1, 1),
+                                          batch_size=None,
+                                          name='seg_emb')
 
     return pholder
 
@@ -45,10 +49,11 @@ def get_ASTROMER(num_layers=2,
                  window_size=100,
                  batch_size=None,
                  encoder_mode='normal',
-                 average_layers=False):
+                 average_layers=False,
+                 off_nsp=False):
     
     # LAYERS DEFINITION
-    placeholder = build_input(window_size)
+    placeholder = build_input(window_size, off_nsp=off_nsp)
 
 
 
@@ -91,20 +96,71 @@ def get_ASTROMER(num_layers=2,
                               average_layers=average_layers,
                               name='encoder')
 
-    transform_layer = TransformLayer(name='transform_layer')
+    if off_nsp:
+        reg_layer = RegLayer(name='regressor')    
+    else:
+        reg_layer = TransformLayer(name='regressor')
 
     x = encoder(placeholder)
-    x_nsp, x_rec = transform_layer(x)
 
-    return CustomModel(inputs=placeholder,
-                       outputs=[x_nsp, x_rec],
-                       name="ASTROMER_NSP")
+    outputs = reg_layer(x)
+
+    if off_nsp:
+        return CustomModel(inputs=placeholder,
+                           outputs=outputs,
+                           name="ASTROMER")
+    else:
+        return CustomModelNSP(inputs=placeholder,
+                           outputs=outputs,
+                           name="ASTROMER_NSP")
 
 class CustomModel(tf.keras.Model):
-    def compile(self, rmse_factor=1, bce_factor=1,*args, **kwargs):
+    def compile(self, rmse_factor=1, *args, **kwargs):
+        super().compile(*args, **kwargs)
+
+    '''
+    Custom functional model
+    '''
+    def train_step(self, data):
+        x, y = data
+        with tf.GradientTape() as tape:
+            x_pred = self(x, training=True)
+            loss = custom_rmse(y_true=y['magnitudes'],
+                               y_pred=x_pred,
+                               mask=y['probed_mask'])
+
+            r2_value = custom_r2(y_true=y['magnitudes'], 
+                                 y_pred=x_pred, 
+                                 mask=y['probed_mask'])
+
+        
+        grads = tape.gradient(loss, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        return {'loss':loss,
+                'r_square':r2_value}
+
+    def test_step(self, data):
+        x, y = data
+        with tf.GradientTape() as tape:
+            x_pred = self(x, training=False)
+            loss = custom_rmse(y_true=y['magnitudes'],
+                               y_pred=x_pred,
+                               mask=y['probed_mask'])
+
+            r2_value = custom_r2(y_true=y['magnitudes'], 
+                                 y_pred=x_pred, 
+                                 mask=y['probed_mask'])
+
+        return {'loss':loss,
+                'r_square':r2_value}
+
+
+class CustomModelNSP(tf.keras.Model):
+    def compile(self, rmse_factor=1, off_nsp=False, *args, **kwargs):
         super().compile(*args, **kwargs)
         self.rmse_factor = tf.cast(rmse_factor, tf.float32)
-        self.bce_factor = tf.cast(bce_factor, tf.float32)
+        self.bce_factor = 1 - self.rmse_factor
+        self.off_nsp = off_nsp
     '''
     Custom functional model
     '''
@@ -116,6 +172,7 @@ class CustomModel(tf.keras.Model):
             rmse = custom_rmse(y_true=y['magnitudes'],
                                y_pred=x_pred,
                                mask=y['probed_mask'])
+
             bce = custom_bce(y['nsp_label'], x_cls)
             
             loss = rmse*self.rmse_factor + bce*self.bce_factor

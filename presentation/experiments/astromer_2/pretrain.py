@@ -30,14 +30,20 @@ def run(opt):
 							  window_size=opt.ws, 
 							  nsp_prob=opt.nsp_prob, 
 							  repeat=4, 
-							  sampling=True)
+							  sampling=True,
+							  off_nsp=opt.off_nsp)
 	valid_batches = load_data(dataset=os.path.join(opt.data, 'val'), 
 							  batch_size=opt.bs, 
 							  probed=opt.probed,  
 							  window_size=opt.ws, 
 							  nsp_prob=opt.nsp_prob, 
 							  repeat=1, 
-							  sampling=True)
+							  sampling=True,
+							  off_nsp=opt.off_nsp)
+	
+	if opt.nsp_prob == 0. or opt.off_nsp:
+		opt.rmse_factor = 1.
+
 	# ========== DEBUG ======================================
 	if opt.debug:
 		print('[INFO] DEBGUGING MODE')
@@ -63,11 +69,16 @@ def run(opt):
 							   pe_dim=opt.pe_dim,
 							   pe_c=1,
 							   window_size=opt.ws,
-							   encoder_mode=opt.encoder_mode)
+							   encoder_mode=opt.encoder_mode,
+							   average_layers=opt.avg_layers,
+							   off_nsp=opt.off_nsp)
+	if opt.optimizer == 'adam':
+		optimizer = Adam(opt.lr)
+	if optimizer == 'adamw':
+		optimizer = AdamW(opt.lr)
 
-	optimizer = AdamW(opt.lr)
 	bce_factor    = 1.- opt.rmse_factor
-	astromer.compile(rmse_factor=opt.rmse_factor, bce_factor=bce_factor, optimizer=optimizer)
+	astromer.compile(rmse_factor=opt.rmse_factor, optimizer=optimizer)
 
 	callbacks = [
 			ModelCheckpoint(
@@ -86,11 +97,13 @@ def run(opt):
 	print('\n')
 	print("[INFO] LOGS: ", os.path.join(EXPDIR, model_name) )
 	print(f'[INFO] AVG LAYERS: {opt.avg_layers}')
+	print(f'[INFO] NSP OFF: {opt.off_nsp}')
 	print(f'[INFO] ENCODER: {opt.encoder_mode}')
 	print('[INFO] BCE: {:.2f} RMSE: {:.2f}'.format(bce_factor, opt.rmse_factor))
 	print(f'[INFO] No LAYERS: {opt.layers}')
 	print(f'[INFO] No HEADS: {opt.nh}')
 	print(f'[INFO] HEAD DIM: {opt.hdim}')
+	print(f'[INFO] USING {str(opt.optimizer).upper()} OPTIMIZER')
 	print('\n')
 
 	start = time.time()
@@ -107,26 +120,39 @@ def run(opt):
 							  window_size=opt.ws, 
 							  nsp_prob=opt.nsp_prob, 
 							  repeat=1, 
-							  sampling=True)
+							  sampling=True,
+							  off_nsp=opt.off_nsp)
 	if opt.debug:
 		test_batches = test_batches.take(1)
 	
-	acc, bce, loss, r2, rmse = astromer.evaluate(test_batches)   
-	with open(os.path.join(PTWEIGTHS, 'metrics.toml'), 'w') as fp:
-		toml.dump({'data':os.path.join(opt.data, 'test'),
-				   'training_time_sec': training_time,
-				   'val_rmse': float(tf.reduce_min(hist.history['val_rmse']).numpy()),
-				   'val_r2': float(tf.reduce_min(hist.history['val_r_square']).numpy()),
-				   'val_bce': float(tf.reduce_min(hist.history['val_bce']).numpy()),
-				   'val_acc': float(tf.reduce_min(hist.history['val_acc']).numpy()),
-				   'train_bce': float(tf.reduce_min(hist.history['bce']).numpy()),
-				   'train_acc': float(tf.reduce_min(hist.history['acc']).numpy()),
-				   'train_rmse': float(tf.reduce_min(hist.history['rmse']).numpy()),
-				   'r2': float(tf.reduce_min(hist.history['r_square']).numpy()),                   
-				   'test_acc': acc, 
-				   'test_r2':r2, 
-				   'test_rmse':rmse, 
-				   'test_bce':bce}, fp)
+	if opt.off_nsp:
+		loss, r2 = astromer.evaluate(test_batches) 
+		with open(os.path.join(PTWEIGTHS, 'metrics.toml'), 'w') as fp:
+			toml.dump({'data':os.path.join(opt.data, 'test'),
+					   'training_time_sec': training_time,
+					   'val_rmse': float(tf.reduce_min(hist.history['val_loss']).numpy()),
+					   'val_r2': float(tf.reduce_min(hist.history['val_r_square']).numpy()),
+					   'train_rmse': float(tf.reduce_min(hist.history['loss']).numpy()),
+					   'r2': float(tf.reduce_min(hist.history['r_square']).numpy()),                   
+					   'test_rmse':loss, 
+					   'test_r2':r2}, fp)
+	else:
+		acc, bce, loss, r2, rmse = astromer.evaluate(test_batches)   
+		with open(os.path.join(PTWEIGTHS, 'metrics.toml'), 'w') as fp:
+			toml.dump({'data':os.path.join(opt.data, 'test'),
+					   'training_time_sec': training_time,
+					   'val_rmse': float(tf.reduce_min(hist.history['val_rmse']).numpy()),
+					   'val_r2': float(tf.reduce_min(hist.history['val_r_square']).numpy()),
+					   'val_bce': float(tf.reduce_min(hist.history['val_bce']).numpy()),
+					   'val_acc': float(tf.reduce_min(hist.history['val_acc']).numpy()),
+					   'train_bce': float(tf.reduce_min(hist.history['bce']).numpy()),
+					   'train_acc': float(tf.reduce_min(hist.history['acc']).numpy()),
+					   'train_rmse': float(tf.reduce_min(hist.history['rmse']).numpy()),
+					   'r2': float(tf.reduce_min(hist.history['r_square']).numpy()),                   
+					   'test_acc': acc, 
+					   'test_r2':r2, 
+					   'test_rmse':rmse, 
+					   'test_bce':bce}, fp)
 
 
 if __name__ == '__main__':
@@ -166,7 +192,10 @@ if __name__ == '__main__':
                         help='Number of epochs')
     parser.add_argument('--ws', default=200, type=int,
                         help='windows size of the PSFs')
+    parser.add_argument('--optimizer', default='adam', type=str,
+                        help='adam, adamw')
 
+    parser.add_argument('--off-nsp',  action='store_true', help='Turn off the NSP input format (use to load Astromer I)')
     parser.add_argument('--probed', default=0.5, type=float,
                         help='Probed percentage')
     parser.add_argument('--nsp-prob', default=0.5, type=float,

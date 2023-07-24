@@ -89,6 +89,7 @@ def concat_segments(segment_0, segment_1, mask_0, mask_1, padding_mask=None):
     return tf.concat([sub_0, sub_1], axis=1).to_tensor()
 
 def randomize_v2(input_dict, nsp_prob):
+    ''' Mantain times from random light curve by shifting its times'''
     inp_size = tf.shape(input_dict['input'])
 
     indices = tf.range(0, inp_size[0], dtype=tf.int32)

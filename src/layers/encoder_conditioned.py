@@ -94,7 +94,11 @@ class CondEncoder(tf.keras.layers.Layer):
 		x_pe     = self.positional_encoder(data['times'])
 		time_att = self.att_time_block(x_pe)
 
-		x_mag   = tf.concat([data['magnitudes'], data['seg_emb']], 2)
+		if 'seg_emb' in data.keys():
+			x_mag   = tf.concat([data['magnitudes'], data['seg_emb']], 2)
+		else:
+			x_mag = data['magnitudes']
+			
 		mag_att = self.att_mag_block(x_mag)
 
 		x  = tf.concat([time_att, mag_att], 2, name='concat_time_mag_att')
