@@ -21,6 +21,7 @@ from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 # g34htgii 
 DEBUG = False
+TRAIN_ENCODER = False
 ROOT = './presentation/experiments/astromer_2/results_new'
 MASTER_PROJECT_NAME = 'downstream-a2-train'
 os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
@@ -70,6 +71,7 @@ def sweep_train(config=None):
         print('\n\n\n')
         print(model_config)
         print('\n\n\n')
+        
         astromer = get_ASTROMER_II(num_layers=model_config['layers'],
                                    num_heads=model_config['nh'],
                                    head_dim=model_config['hdim'],
@@ -208,7 +210,7 @@ def sweep_train(config=None):
             valid_batches = valid_batches.take(1)
             test_batches = test_batches.take(1)
 
-        clf_model = create_classifier(FTWEIGTHS, model_config['ws'], num_cls, clf_name=config.clf_name, trainable=True)
+        clf_model = create_classifier(FTWEIGTHS, model_config['ws'], num_cls, clf_name=config.clf_name, trainable=TRAIN_ENCODER)
 
         clf_model.compile(optimizer=Adam(1e-3),
                           loss=CategoricalCrossentropy(from_logits=True),

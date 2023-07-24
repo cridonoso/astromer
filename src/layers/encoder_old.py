@@ -33,6 +33,7 @@ class AttentionBlock(tf.keras.layers.Layer):
 		attn_output, att_weights = self.mha(x, mask)  # (batch_size, input_seq_len, d_model)
 		attn_output = self.dropout1(attn_output, training=training)
 		attn_output = self.layernorm1(attn_output)
+		
 		ffn_output  = self.ffn(attn_output)  # (batch_size, input_seq_len, d_model)
 		ffn_output  = self.dropout2(ffn_output, training=training)
 		ffn_output  = self.layernorm2(ffn_output)
@@ -80,6 +81,8 @@ class Encoder(Model):
 		
 		self.enc_layers = [AttentionBlock(self.head_dim, self.num_heads, self.mixer_size, dropout=self.dropout, name=f'att_layer_{i}')
 							for i in range(self.num_layers)]
+		
+		self.dropout_layer = tf.keras.layers.Dropout(self.dropout)
 
 	def call(self, data, training=False):
 		# adding embedding and position encoding.
@@ -88,7 +91,8 @@ class Encoder(Model):
 
 		x_pe = self.positional_encoder(data['times'])
 		x = x_transformed + x_pe        
-		
+		x = self.dropout_layer(x, training=training)
+
 		layers_outputs = []
 		for i in range(self.num_layers):
 			z =  self.enc_layers[i](x, mask=data['att_mask'])
@@ -96,4 +100,4 @@ class Encoder(Model):
 		
 		x = tf.reduce_mean(layers_outputs, 0)
 		x = tf.reshape(x, [-1, self.window_size+1, self.num_heads*self.head_dim])
-		return   x # (batch_size, input_seq_len, d_model)
+		return  x # (batch_size, input_seq_len, d_model)
