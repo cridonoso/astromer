@@ -95,8 +95,10 @@ class CondEncoder(tf.keras.layers.Layer):
 		time_att = self.att_time_block(x_pe)
 
 		if 'seg_emb' in data.keys():
+			window_size = self.window_size + 1 # if seg_emb exists then NSP is being applied
 			x_mag   = tf.concat([data['magnitudes'], data['seg_emb']], 2)
 		else:
+			window_size = self.window_size
 			x_mag = data['magnitudes']
 			
 		mag_att = self.att_mag_block(x_mag)
@@ -105,11 +107,11 @@ class CondEncoder(tf.keras.layers.Layer):
 
 		layers_outputs = []
 		for i in range(self.num_layers):
-			z =  self.enc_layers[i](x, mask=data['att_mask'])
-			layers_outputs.append(z)
+			x =  self.enc_layers[i](x, mask=data['att_mask'])
+			layers_outputs.append(x)
+
 		if self.average_layers:
 			x = tf.reduce_mean(layers_outputs, 0)
-		else:
-			x = layers_outputs[-1] # get the last output
-		x = tf.reshape(x, [-1, self.window_size+1, self.num_heads*self.head_dim])
-		return   x # (batch_size, input_seq_len, d_model)
+			
+		x = tf.reshape(x, [-1, window_size, self.num_heads*self.head_dim])
+		return  x # (batch_size, input_seq_len, d_model)

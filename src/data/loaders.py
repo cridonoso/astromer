@@ -88,7 +88,6 @@ def format_input(input_dict, cls_token=None, num_cls=None, test_mode=False):
         att_mask = tf.concat([1.-cls_vector, att_mask], axis=1)
         seg_emb = tf.concat([1.-cls_vector, seg_emb], axis=1)
 
-
     inputs = {
         'magnitudes': magnitudes,
         'times': times,

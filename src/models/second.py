@@ -14,7 +14,7 @@ from src.metrics import custom_r2, custom_acc
 def build_input(window_size, off_nsp):
     if not off_nsp:
         window_size = window_size + 1
-
+    
     magnitudes  = Input(shape=(window_size, 1),
                   batch_size=None,
                   name='magnitudes')
@@ -30,7 +30,7 @@ def build_input(window_size, off_nsp):
                'att_mask':att_mask}
 
     if not off_nsp:
-        pholder['seg_emb'] = Input(shape=(window_size+1, 1),
+        pholder['seg_emb'] = Input(shape=(window_size, 1),
                                           batch_size=None,
                                           name='seg_emb')
 

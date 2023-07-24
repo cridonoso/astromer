@@ -103,13 +103,11 @@ class Encoder(Model):
 
 		layers_outputs = []
 		for i in range(self.num_layers):
-			z =  self.enc_layers[i](x, mask=data['att_mask'])
-			layers_outputs.append(z)
+			x =  self.enc_layers[i](x, mask=data['att_mask'])
+			layers_outputs.append(x)
 		
 		if self.average_layers:
 			x = tf.reduce_mean(layers_outputs, 0)
-		else:
-			x = layers_outputs[-1] # get the last output
-		
+
 		x = tf.reshape(x, [-1, window_size, self.num_heads*self.head_dim])
 		return  x # (batch_size, input_seq_len, d_model)

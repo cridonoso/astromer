@@ -84,20 +84,19 @@ class ConcatEncoder(Model):
 		# adding embedding and position encoding.
 		x_pe = self.positional_encoder(data['times'])
 		if 'seg_emb' in data.keys():
+			window_size = self.window_size + 1 # if seg_emb exists then NSP is being applied
 			x = tf.concat([x_pe, data['magnitudes'], data['seg_emb']], 2)
 		else:
+			window_size = self.window_size
 			x = tf.concat([x_pe, data['magnitudes']], 2)
 			
 		layers_outputs = []
 		for i in range(self.num_layers):
-			z =  self.enc_layers[i](x, mask=data['att_mask'])
-			layers_outputs.append(z)
+			x =  self.enc_layers[i](x, mask=data['att_mask'])
+			layers_outputs.append(x)
 
 		if self.average_layers:
 			x = tf.reduce_mean(layers_outputs, 0)
-		else:
-			x = layers_outputs[-1] # get the last output
-		
-		x = tf.reshape(x, [-1, self.window_size+1, self.num_heads*self.head_dim])
 
-		return   x # (batch_size, input_seq_len, d_model)
+		x = tf.reshape(x, [-1, window_size, self.num_heads*self.head_dim])
+		return x # (batch_size, input_seq_len, d_model)
