@@ -13,6 +13,10 @@ def standardize_batch(input_tensor, axis=1):
 	input_tensor = input_tensor - input_mean
 	return input_tensor
 
+def standardize_dataset(input_tensor, on='input'):
+	input_tensor[on] = standardize_batch(input_tensor[on])
+	return input_tensor
+
 def min_max_scaler(tensor, axis=1, offset=1.):
 	offset = tf.cast(offset, tf.float32)
 	min_val = tf.reduce_min(tensor, axis=1)
@@ -113,6 +117,7 @@ def to_windows(dataset,
 
 
 	dataset = dataset.map(lambda x: {'input' :x['input'],
+									 'original' :x['input'],
 									 'lcid'  :x['lcid'],
 									 'length':x['length'],
 									 'mask'  :tf.ones(tf.shape(x['input'])[0]),
@@ -121,6 +126,7 @@ def to_windows(dataset,
 
 	sizes = {
 		'input': (window_size, None),
+		'original': (window_size, None),
 		'lcid': (),
 		'length': (),
 		'mask': (window_size),

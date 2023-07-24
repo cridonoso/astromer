@@ -3,8 +3,8 @@ import multiprocessing
 import os
 
 from src.data.record import deserialize
-from src.data.preprocessing import to_windows, min_max_scaler
-from src.data.masking import get_probed
+from src.data.preprocessing import to_windows, min_max_scaler, standardize_dataset
+from src.data.masking import get_probed, add_random
 from src.data.nsp import randomize, randomize_v2
 
 def load_records(records_dir):
@@ -97,7 +97,8 @@ def format_input(input_dict, cls_token=None, num_cls=None, test_mode=False):
     }
     
     if test_mode:
-        inputs['original'] = input_dict['input']
+        print('[INFO] TESTING MODE')
+        inputs['original'] = input_dict['original']
         inputs['mask'] = input_dict['mask']
 
     if num_cls is not None:
@@ -105,7 +106,7 @@ def format_input(input_dict, cls_token=None, num_cls=None, test_mode=False):
 
     else:
         outputs = {
-            'magnitudes': tf.slice(input_dict['nsp_input'], [0, 0, 1], [-1, -1, 1]),
+            'magnitudes': tf.slice(input_dict['input_pre_nsp'], [0, 0, 1], [-1, -1, 1]),
             'nsp_label': input_dict['nsp_label'],
             'probed_mask': tf.expand_dims(input_dict['probed_mask'], -1),
         }
@@ -123,7 +124,8 @@ def format_input_no_nsp(input_dict, num_cls=None, test_mode=False):
         'att_mask': att_mask,
     }
     if test_mode:
-        inputs['original'] = input_dict['input']
+        print('[INFO] TESTING MODE')
+        inputs['original'] = input_dict['original']
         inputs['mask'] = input_dict['mask']
 
     if num_cls is not None:
@@ -131,7 +133,7 @@ def format_input_no_nsp(input_dict, num_cls=None, test_mode=False):
 
     else:
         outputs = {
-            'magnitudes': magnitudes,
+            'magnitudes': tf.slice(input_dict['original'], [0, 0, 1], [-1, -1, 1]),
             'probed_mask': tf.expand_dims(input_dict['probed_mask'], -1),
         }
 
@@ -166,8 +168,13 @@ def load_data(dataset,
     # CREATE BATCHES
     dataset = dataset.padded_batch(batch_size, padded_shapes=sizes)
     
+    # STANDARDIZE
+    dataset = dataset.map(lambda x: standardize_dataset(x, on='input'))
+    dataset = dataset.map(lambda x: standardize_dataset(x, on='original'))
+
     # MASKING
     dataset = dataset.map(lambda x: get_probed(x, probed=probed, njobs=njobs))
+    dataset = dataset.map(lambda x: add_random(x, random_frac=random_same, njobs=njobs))
     
     # NSP
     if off_nsp:

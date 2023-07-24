@@ -97,7 +97,7 @@ def randomize_v2(input_dict, nsp_prob):
 
     # Probabilities to randomize
     probs = tf.random.uniform(shape=(inp_size[0],), minval=0, maxval=1)
-    binary_vector = tf.where(probs < nsp_prob, 1, 0)
+    binary_vector = tf.where(probs > nsp_prob, 1, 0)
     shuffle_indices = (shuffle_indices*(1-binary_vector)) + (indices*binary_vector)
 
     # Candidates for replacing
@@ -105,10 +105,6 @@ def randomize_v2(input_dict, nsp_prob):
     att_mask_replace = tf.gather(input_dict['att_mask'], shuffle_indices)
     prob_mask_replace = tf.gather(input_dict['probed_mask'], shuffle_indices)
     padding_mask_replace = tf.gather(input_dict['mask'], shuffle_indices)
-
-    # standardize magnitudes to have zero-mean
-    input_dict['input'] = standardize_batch(input_dict['input'])
-    x_replace           = standardize_batch(x_replace)
 
     # get number of observations to be part of each segment 
     length_0 = get_segment_length(input_dict['mask'], inp_size[1]) 
@@ -128,7 +124,7 @@ def randomize_v2(input_dict, nsp_prob):
     nsp_input   = concat_segments(input_dict['input'], x_replace, mask_0, mask_1, padding_mask=padding_mask_replace)
     att_mask    = concat_segments(input_dict['att_mask'], att_mask_replace, mask_0, mask_1)
     probed_mask = concat_segments(input_dict['probed_mask'], prob_mask_replace, mask_0, mask_1)
-    probed_mask = concat_segments(input_dict['mask'], padding_mask_replace, mask_0, mask_1)
+    padding_mask = concat_segments(input_dict['mask'], padding_mask_replace, mask_0, mask_1)
 
     # Segment embedding 
     segment_emb = (tf.cast(mask_0, tf.float32)+1.) * input_dict['mask']
@@ -136,7 +132,7 @@ def randomize_v2(input_dict, nsp_prob):
     input_dict['mask'] = padding_mask_replace * input_dict['mask']
     input_dict['nsp_label'] = tf.cast(tf.expand_dims(binary_vector, -1), tf.float32)
     input_dict['nsp_input'] = nsp_input
-    input_dict['nsp_pad_mask'] = probed_mask
+    input_dict['nsp_pad_mask'] = padding_mask
 
     input_dict['probed_mask'] = probed_mask
     input_dict['att_mask'] = att_mask
