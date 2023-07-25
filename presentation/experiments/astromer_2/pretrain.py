@@ -51,7 +51,7 @@ def run(opt):
 		print('[INFO] DEBGUGING MODE')
 		train_batches  = train_batches.take(2)
 		valid_batches  = valid_batches.take(2)
-		opt.epochs = 5
+		opt.epochs = 2
 
 	# ======= MODEL ========================================
 	now = datetime.now()
@@ -115,6 +115,8 @@ def run(opt):
 						callbacks=callbacks)      
 	training_time = time.time() - start
 
+	min_index = tf.argmin(hist.history['val_loss'])
+
 	# ======== TESTING =========================================
 	test_batches = load_data(dataset=os.path.join(opt.data, 'test'), 
 							  batch_size=opt.bs, 
@@ -134,10 +136,10 @@ def run(opt):
 		with open(os.path.join(PTWEIGTHS, 'metrics.toml'), 'w') as fp:
 			toml.dump({'data':os.path.join(opt.data, 'test'),
 					   'training_time_sec': training_time,
-					   'val_rmse': float(tf.reduce_min(hist.history['val_loss']).numpy()),
-					   'val_r2': float(tf.reduce_min(hist.history['val_r_square']).numpy()),
-					   'train_rmse': float(tf.reduce_min(hist.history['loss']).numpy()),
-					   'r2': float(tf.reduce_min(hist.history['r_square']).numpy()),                   
+					   'val_rmse': float(hist.history['val_loss'][min_index]),
+					   'val_r2': float(hist.history['val_r_square'][min_index]),
+					   'train_rmse': float(hist.history['loss'][min_index]),
+					   'r2': float(hist.history['r_square'][min_index]),                   
 					   'test_rmse':loss, 
 					   'test_r2':r2}, fp)
 	else:
@@ -145,14 +147,14 @@ def run(opt):
 		with open(os.path.join(PTWEIGTHS, 'metrics.toml'), 'w') as fp:
 			toml.dump({'data':os.path.join(opt.data, 'test'),
 					   'training_time_sec': training_time,
-					   'val_rmse': float(tf.reduce_min(hist.history['val_rmse']).numpy()),
-					   'val_r2': float(tf.reduce_min(hist.history['val_r_square']).numpy()),
-					   'val_bce': float(tf.reduce_min(hist.history['val_bce']).numpy()),
-					   'val_acc': float(tf.reduce_min(hist.history['val_acc']).numpy()),
-					   'train_bce': float(tf.reduce_min(hist.history['bce']).numpy()),
-					   'train_acc': float(tf.reduce_min(hist.history['acc']).numpy()),
-					   'train_rmse': float(tf.reduce_min(hist.history['rmse']).numpy()),
-					   'r2': float(tf.reduce_min(hist.history['r_square']).numpy()),                   
+					   'val_rmse': float(hist.history['val_rmse'][min_index]),
+					   'val_r2': float(hist.history['val_r_square'][min_index]),
+					   'val_bce': float(hist.history['val_bce'][min_index]),
+					   'val_acc': float(hist.history['val_acc'][min_index]),
+					   'train_bce': float(hist.history['bce'][min_index]),
+					   'train_acc': float(hist.history['acc'][min_index]),
+					   'train_rmse': float(hist.history['rmse'][min_index]),
+					   'r2': float(hist.history['r_square'][min_index]),                   
 					   'test_acc': acc, 
 					   'test_r2':r2, 
 					   'test_rmse':rmse, 

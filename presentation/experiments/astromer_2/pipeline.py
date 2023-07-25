@@ -251,11 +251,11 @@ def sweep_train(config=None):
         test_acc = accuracy_score(true_labels, pred_labels)
 
         summary_clf = {'clf_val_acc': val_acc,
-                   'clf_val_loss': val_loss,
-                   'clf_test_precision': p, 
-                   'clf_test_recall': r, 
-                   'clf_test_f1': f,
-                   'clf_test_acc': test_acc}
+                       'clf_val_loss': val_loss,
+                       'clf_test_precision': p, 
+                       'clf_test_recall': r, 
+                       'clf_test_f1': f,
+                       'clf_test_acc': test_acc}
         print(summary_clf)
         wandb.log(summary_clf)
 
