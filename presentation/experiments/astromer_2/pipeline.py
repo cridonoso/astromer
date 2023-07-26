@@ -81,7 +81,9 @@ def sweep_train(config=None):
                                    pe_dim=model_config['pe_dim'],
                                    pe_c=1,
                                    window_size=model_config['ws'],
-                                   encoder_mode=model_config['encoder_mode'])
+                                   encoder_mode=model_config['encoder_mode'],
+                                   average_layers=model_config['avg_layers'],
+                                   off_nsp=model_config['off_nsp'])
 
         print('[INFO] LOADING PRETRAINED WEIGHTS')
         astromer.load_weights(os.path.join(PTWEIGTHS, 'weights')).expect_partial()
@@ -114,37 +116,48 @@ def sweep_train(config=None):
             train_batches = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
                                       batch_size=32 if DEBUG else model_config['bs'], 
                                       probed=model_config['probed'],  
+                                      random_same=model_config['rs'],
                                       window_size=model_config['ws'], 
                                       nsp_prob=model_config['nsp_prob'], 
                                       repeat=1, 
-                                      sampling=False)
+                                      sampling=False,
+                                      off_nsp=model_config['off_nsp'])
             valid_batches = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'val'), 
                                       batch_size=32 if DEBUG else model_config['bs'], 
                                       probed=model_config['probed'],  
+                                      random_same=model_config['rs'],
                                       window_size=model_config['ws'], 
                                       nsp_prob=model_config['nsp_prob'], 
                                       repeat=1, 
-                                      sampling=False)
+                                      sampling=False,
+                                      off_nsp=model_config['off_nsp'])
             test_batches = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'test'), 
                                       batch_size=32 if DEBUG else model_config['bs'], 
                                       probed=model_config['probed'],  
+                                      random_same=model_config['rs'],
                                       window_size=model_config['ws'], 
                                       nsp_prob=model_config['nsp_prob'], 
                                       repeat=1, 
-                                      sampling=False)
+                                      sampling=False,
+                                      off_nsp=model_config['off_nsp'])
 
-            optimizer = AdamW(model_config['lr'], beta_1=0.9, beta_2=0.98, epsilon=1e-9)
-            astromer.compile(rmse_factor=model_config['rmse_factor'], 
-                             bce_factor=1.-model_config['rmse_factor'], optimizer=optimizer)
+            if model_config['optimizer'] == 'adam':
+                optimizer = Adam(model_config['lr'])
+            if model_config['optimizer'] == 'adamw':
+                optimizer = AdamW(model_config['lr'])
+
+            astromer.compile(rmse_factor=model_config['rmse_factor'], optimizer=optimizer)
 
             cbks =  [
                 ModelCheckpoint(
                     filepath=os.path.join(FTWEIGTHS, 'weights'),
                     save_weights_only=True,
                     monitor='val_loss',
+                    mode='min',
                     save_best_only=True),
                 EarlyStopping(monitor='val_loss',
                     patience = 20,
+                    mode='min',
                     restore_best_weights=True),
                 TensorBoard(
                     log_dir = os.path.join(FTWEIGTHS, 'logs'),
@@ -204,13 +217,19 @@ def sweep_train(config=None):
                                                                              window_size=model_config['ws'], 
                                                                              batch_size=512, 
                                                                              version='second',
-                                                                             test=True)
+                                                                             test=True,
+                                                                             off_nsp=model_config['off_nsp'])
         if DEBUG:
             train_batches = train_batches.take(1)
             valid_batches = valid_batches.take(1)
             test_batches = test_batches.take(1)
 
-        clf_model = create_classifier(FTWEIGTHS, model_config['ws'], num_cls, clf_name=config.clf_name, trainable=TRAIN_ENCODER)
+        clf_model = create_classifier(FTWEIGTHS, 
+                                      model_config['ws'], 
+                                      num_cls, 
+                                      clf_name=config.clf_name, 
+                                      trainable=TRAIN_ENCODER,
+                                      off_nsp=model_config['off_nsp'])
 
         clf_model.compile(optimizer=Adam(1e-3),
                           loss=CategoricalCrossentropy(from_logits=True),
@@ -219,9 +238,11 @@ def sweep_train(config=None):
             ModelCheckpoint(
                 filepath=os.path.join(CLFWEIGHTS, 'weights'),
                 save_weights_only=True,
+                mode='min',
                 monitor='val_loss',
                 save_best_only=True),
             EarlyStopping(monitor='val_loss',
+                mode='min',
                 patience = 20,
                 restore_best_weights=True),
             TensorBoard(

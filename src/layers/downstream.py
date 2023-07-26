@@ -41,12 +41,7 @@ def get_astromer_encoder(path, version='zero', trainable=False):
 								no_train=False)
 
 	if version == 'second':
-		if 'nsp_normal_bigpe' in path:
-			pe_dim = 256
-		else:
-			pe_dim = 128
-
-		inp_placeholder = build_input_II(config['ws'])
+		inp_placeholder = build_input_II(config['ws'], off_nsp=config['off_nsp'])
 		astromer = get_ASTROMER_II(num_layers=config['layers'],
 								   num_heads=config['nh'],
 								   head_dim=config['hdim'],
@@ -56,14 +51,16 @@ def get_astromer_encoder(path, version='zero', trainable=False):
 								   pe_dim=config['pe_dim'],
 								   pe_c=1,
 								   window_size=config['ws'],
-								   encoder_mode=config['encoder_mode'])
+								   encoder_mode=config['encoder_mode'],
+								   average_layers=config['avg_layers'],
+                                   off_nsp=config['off_nsp'])
 
 	astromer.load_weights(os.path.join(path, 'weights')).expect_partial()
 	encoder = astromer.get_layer('encoder')
 	encoder.trainable = trainable
 	return encoder, inp_placeholder
 
-def load_classification_data(path, window_size, batch_size, version='zero', test=False):
+def load_classification_data(path, window_size, batch_size, version='second', test=False, off_nsp=False):
 	num_cls = pd.read_csv(os.path.join(path, 'objects.csv')).shape[0]
 
 	if version == 'zero':
@@ -115,29 +112,35 @@ def load_classification_data(path, window_size, batch_size, version='zero', test
 		train_batches = load_data(dataset=os.path.join(path, 'train'), 
 								  batch_size=batch_size, 
 								  probed=1.,  
+								  random_same=0.,
 								  window_size=window_size, 
 								  nsp_prob=0., 
 								  repeat=1, 
 								  sampling=False,
+								  off_nsp=off_nsp,
 								  shuffle=True,
 								  num_cls=num_cls)
 		valid_batches = load_data(dataset=os.path.join(path, 'val'), 
 								  batch_size=batch_size, 
 								  probed=1.,  
+								  random_same=0.,
 								  window_size=window_size, 
 								  nsp_prob=0., 
 								  repeat=1, 
 								  sampling=False,
+								  off_nsp=off_nsp,
 								  shuffle=False,
 								  num_cls=num_cls)
 		if test:
 			test_batches = load_data(dataset=os.path.join(path, 'test'), 
 						  batch_size=batch_size, 
 						  probed=1.,  
+						  random_same=0.,
 						  window_size=window_size, 
 						  nsp_prob=0., 
 						  repeat=1, 
 						  sampling=False,
+						  off_nsp=off_nsp,
 						  shuffle=False,
 						  num_cls=num_cls)
 			return train_batches, valid_batches, test_batches, num_cls 
