@@ -51,6 +51,7 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 		self.wq = tf.keras.layers.Dense(self.d_model, name='WQ')
 		self.wk = tf.keras.layers.Dense(self.d_model, name='WK')
 		self.wv = tf.keras.layers.Dense(self.d_model, name='WV')
+		self.dense = tf.keras.layers.Dense(self.d_model, name='attmerge')
 
 	def split_heads(self, x, batch_size, name='qkv'):
 		"""Split the last dimension into (num_heads, depth).
@@ -79,9 +80,9 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 		concat_attention = tf.reshape(scaled_attention,
 										(batch_size, -1, self.d_model))  # (batch_size, seq_len_q, d_model)
 
-		# output = self.dense(concat_attention)  # (batch_size, seq_len_q, d_model)
+		output = self.dense(concat_attention)  # (batch_size, seq_len_q, d_model)
 		
-		return concat_attention, attention_weights
+		return output, attention_weights
 
 	def get_config(self):
 		config = super().get_config()
