@@ -96,8 +96,8 @@ class Encoder(Model):
 			x = data['magnitudes']
 			
 		x_transformed = self.inp_transform(x)        
-
 		x_pe = self.positional_encoder(data['times'])
+		
 		x = x_transformed + x_pe        
 		x = self.dropout_layer(x, training=training)
 

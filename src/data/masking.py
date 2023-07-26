@@ -87,9 +87,13 @@ def add_random(input_dict, random_frac, njobs):
     # Attention mask is 1 when masked. 
     # Random mask is 1 for masked observations selected to be randomized
     # then,
-    input_dict['att_mask'] = input_dict['att_mask'] * tf.cast(1 - random_mask, tf.float32)
+    att_mask    = tf.cast(input_dict['att_mask'], tf.bool)
+    random_mask = tf.cast(random_mask, tf.bool)
+    same_mask   = tf.cast(same_mask, tf.bool)
 
-    # We do the same but this time, unmasking observations to be visible during the attention mechanism
-    input_dict['att_mask'] = input_dict['att_mask'] + tf.cast(same_mask, tf.float32)
+    att_mask = tf.math.logical_xor(att_mask, random_mask)
+    att_mask = tf.math.logical_xor(att_mask, same_mask)
+
+    input_dict['att_mask'] = tf.cast(att_mask, tf.float32)
 
     return input_dict
