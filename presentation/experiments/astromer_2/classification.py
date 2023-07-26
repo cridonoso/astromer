@@ -39,8 +39,9 @@ def get_callbacks(path, patience=20, monitor='val_loss'):
 def create_classifier(pretrain_weights, window_size, n_classes, clf_name='mlp_att', trainable=False, off_nsp=False):
 	
 	if off_nsp:
+		print('[INFO] OFF NSP')
 		encoder, inp_placeholder = get_astromer_encoder(pretrain_weights, version='second',trainable=trainable)
-		embedding = encoder(inp_placeholder)
+		embedding = encoder(inp_placeholder, training=trainable)
 		mask = 1.-inp_placeholder['att_mask']
 		x = embedding * mask
 		x = tf.reduce_sum(x, 1)/tf.reduce_sum(mask, 1)
@@ -51,7 +52,7 @@ def create_classifier(pretrain_weights, window_size, n_classes, clf_name='mlp_at
 
 	if clf_name == 'mlp_att_zero':
 		encoder, inp_placeholder = get_astromer_encoder(pretrain_weights, version='zero', trainable=trainable)
-		x = encoder(inp_placeholder, training=True)
+		x = encoder(inp_placeholder, training=trainable)
 		mask = 1.-inp_placeholder['mask_in']
 		x = x * mask
 		x = tf.reduce_sum(x, 1)/tf.reduce_sum(mask, 1)
@@ -60,11 +61,10 @@ def create_classifier(pretrain_weights, window_size, n_classes, clf_name='mlp_at
 		x = Dense(256, activation='relu')(x)
 
 	# Multilayer Perceptron + Attention Embedding
-	if clf_name == 'mlp_att':
+	if clf_name == 'mlp_att' and not off_nsp:
 		encoder, inp_placeholder = get_astromer_encoder(pretrain_weights, version='second',trainable=trainable)
 		transform_layer = TransformLayer()
-		transform_layer.trainable = False
-		embedding = encoder(inp_placeholder)
+		embedding = encoder(inp_placeholder, training=trainable)
 		_, x = transform_layer(embedding)
 		mask = 1.-tf.slice(inp_placeholder['att_mask'], [0, 1, 0], [-1, -1, -1])
 		x = x * mask
@@ -74,19 +74,18 @@ def create_classifier(pretrain_weights, window_size, n_classes, clf_name='mlp_at
 		x = Dense(256, activation='relu')(x)
 
 	# Just the [CLS] token
-	if clf_name == 'mlp_cls':
+	if clf_name == 'mlp_cls' and not off_nsp:
 		encoder, inp_placeholder = get_astromer_encoder(pretrain_weights, version='second',trainable=trainable)
-		embedding = encoder(inp_placeholder)
+		embedding = encoder(inp_placeholder, training=trainable)
 		transform_layer = TransformLayer()
-		transform_layer.trainable = False
+		transform_layer.trainable = trainable
 		x, _ = transform_layer(embedding)
 
 	# [CLS] token concatenated with the average of the observation tokens
-	if clf_name == 'mlp_all':
+	if clf_name == 'mlp_all' and not off_nsp:
 		encoder, inp_placeholder = get_astromer_encoder(pretrain_weights, version='second',trainable=trainable)
 		transform_layer = TransformLayer()
-		transform_layer.trainable = False
-		embedding = encoder(inp_placeholder)
+		embedding = encoder(inp_placeholder, training=trainable)
 		x_cls, x_rec = transform_layer(embedding)
 		mask = 1.-tf.slice(inp_placeholder['att_mask'], [0, 1, 0], [-1, -1, -1])
 		x_rec = x_rec * mask
@@ -102,23 +101,27 @@ def create_classifier(pretrain_weights, window_size, n_classes, clf_name='mlp_at
 
 
 def run(opt):
+	with open(os.path.join(opt.pre_weights, 'config.toml'), 'r') as file:
+		config = toml.load(file)
+
 	# ==========================================================================================
 	train_batches, valid_batches, num_cls = load_classification_data(opt.data,
-																	 window_size=opt.ws, 
+																	 window_size=config['ws'], 
 																	 batch_size=opt.bs,
 																	 version='second',
-																	 off_nsp=opt.off_nsp)
+																	 off_nsp=config['off_nsp'])
 	
 	if opt.debug:
 		train_batches = train_batches.take(1)
 		valid_batches = valid_batches.take(1)
 		opt.epochs = 10
 		opt.bs = 16
+
 	clf_model = create_classifier(opt.pre_weights, 
-								  opt.ws, num_cls, 
+								  config['ws'], num_cls, 
 								  clf_name=opt.clf_name, 
 								  trainable=False,
-								  off_nsp=opt.off_nsp)
+								  off_nsp=config['off_nsp'])
 
 	clf_model.compile(optimizer=Adam(opt.lr),
 					  loss=CategoricalCrossentropy(from_logits=True),

@@ -64,7 +64,7 @@ def get_windows(sample, max_obs, binary=True):
 		input_dict = sample
 
 	sequence = input_dict['input']
-	rest = input_dict['length']%max_obs
+	rest = input_dict['length']%(max_obs)
 
 	pivots = tf.tile([max_obs], [tf.cast(input_dict['length']/max_obs, tf.int32)])
 	pivots = tf.concat([[0], pivots], 0)
