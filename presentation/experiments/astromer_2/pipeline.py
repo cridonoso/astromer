@@ -22,8 +22,8 @@ from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 # g34htgii 
 DEBUG = False
 TRAIN_ENCODER = False
-ROOT = './presentation/experiments/astromer_2/results_new'
-MASTER_PROJECT_NAME = 'downstream-a2-train'
+ROOT = './presentation/experiments/astromer_2/results'
+MASTER_PROJECT_NAME = 'classification-astromer2'
 os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
 
 # =====================================================================================
@@ -62,7 +62,6 @@ def sweep_train(config=None):
         # PRE-TRAINING =======================================================================
         # ====================================================================================
         PTWEIGTHS = os.path.join(ROOT, config.pt_model, 'pretraining')
-
 
         with open(os.path.join(PTWEIGTHS, 'config.toml'), 'r') as f:
             model_config = toml.load(f)
@@ -175,25 +174,34 @@ def sweep_train(config=None):
                                  callbacks=cbks) 
 
             best_epoch = np.argmin(hist.history['val_loss'])
-            val_loss = hist.history['val_loss'][best_epoch]
-            val_acc = hist.history['val_acc'][best_epoch]
-            val_rmse = hist.history['val_rmse'][best_epoch]
-            val_bce = hist.history['val_bce'][best_epoch]
-            val_r_square = hist.history['val_r_square'][best_epoch]
 
             print('[INFO] Testing')
-            test_acc, test_bce, test_loss, test_r2, test_rmse = astromer.evaluate(test_batches)   
+            if model_config['off_nsp']:
+                loss, r2 = astromer.evaluate(test_batches) 
+                val_loss = hist.history['val_loss'][best_epoch]
+                val_r_square = hist.history['val_r_square'][best_epoch]
+                ft_res = {'ft_val_loss':val_loss,
+                          'ft_val_r2':val_r_square, 
+                          'ft_test_loss':loss,
+                          'ft_test_r2':r2}
 
-            ft_res = {'ft_val_loss':val_loss,
-                      'ft_val_acc': val_acc, 
-                      'ft_val_r2':val_r_square, 
-                      'ft_val_rmse':val_rmse, 
-                      'ft_val_bce':val_bce,
-                      'ft_test_loss':test_loss,
-                      'ft_test_acc':test_acc,
-                      'ft_test_r2':test_r2,
-                      'ft_test_rmse':test_rmse,
-                      'ft_test_bce':test_bce}
+            else:
+                val_loss = hist.history['val_loss'][best_epoch]
+                val_acc = hist.history['val_acc'][best_epoch]
+                val_rmse = hist.history['val_rmse'][best_epoch]
+                val_bce = hist.history['val_bce'][best_epoch]
+                val_r_square = hist.history['val_r_square'][best_epoch]
+                test_acc, test_bce, test_loss, test_r2, test_rmse = astromer.evaluate(test_batches)   
+                ft_res = {'ft_val_loss':val_loss,
+                          'ft_val_acc': val_acc, 
+                          'ft_val_r2':val_r_square, 
+                          'ft_val_rmse':val_rmse, 
+                          'ft_val_bce':val_bce,
+                          'ft_test_loss':test_loss,
+                          'ft_test_acc':test_acc,
+                          'ft_test_r2':test_r2,
+                          'ft_test_rmse':test_rmse,
+                          'ft_test_bce':test_bce}
 
             with open(os.path.join(FTWEIGTHS, 'metrics.toml'), 'w') as fp:
                 toml.dump(ft_res, fp)
