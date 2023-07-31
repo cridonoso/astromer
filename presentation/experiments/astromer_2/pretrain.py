@@ -76,7 +76,7 @@ def run(opt):
 							   off_nsp=opt.off_nsp)
 	if opt.optimizer == 'adam':
 		optimizer = Adam(opt.lr)
-	if optimizer == 'adamw':
+	if opt.optimizer == 'adamw':
 		optimizer = AdamW(opt.lr)
 
 	bce_factor    = 1.- opt.rmse_factor
