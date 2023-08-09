@@ -27,10 +27,12 @@ def scaled_dot_product_attention(q, k, v, mask=None):
 
 	if mask is not None:
 		steps = tf.shape(scaled_attention_logits)[2]
-		mask_rshp = tf.tile(mask, [1,1,steps])
-		mask_rshp += tf.transpose(mask_rshp, [0,2,1])
-		mask_rshp = tf.minimum(1., mask_rshp)
-		mask_rshp = tf.expand_dims(mask_rshp, 1)
+		mask = tf.tile(mask, [1,1,steps])
+		mask_rshp_v = tf.reverse(mask, axis=[1])
+		mask_rshp_h = tf.transpose(mask, [0,2,1])
+		mask_rshp   = mask_rshp_v + mask_rshp_h
+		mask_rshp   = tf.minimum(1., mask_rshp)
+		mask_rshp   = tf.expand_dims(mask_rshp, 1)
 		scaled_attention_logits += (mask_rshp*-1e9)
 		
 	# softmax is normalized on the last axis (seq_len_k) so that the scores add up to 1.
