@@ -1,7 +1,6 @@
 *ted_hrlr_translate_pt_en_converter*
 *__pycache__
-data/raw_data
-data/records
+data
 .ipynb_checkpoints/
 runs
 .Trash-0/
@@ -15,3 +14,4 @@ data/records_new
 presentation/experiments/astromer_0/results*
 wandb
 presentation/experiments/astromer_0/backup/
+presentation/experiments/astromer_2/results_2/

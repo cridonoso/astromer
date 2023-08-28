@@ -28,4 +28,4 @@ class RegLayer(Layer):
 	def call(self, inputs):
 		x = self.bn_0(inputs)
 		x = self.reg_layer(x)
-		return 
+		return x

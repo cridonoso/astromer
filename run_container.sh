@@ -12,6 +12,8 @@ if [[ $gpu == *' nvidia '* ]]; then
     --privileged \
     --mount "type=bind,src=$(pwd),dst=/home/" \
     --workdir /home/ \
+    -v /etc/localtime:/etc/localtime:ro \
+    -v /etc/timezone:/etc/timezone:ro \
     -p 8888:8888 \
     -p 6006:6006 \
     --gpus all \
@@ -23,6 +25,8 @@ else
     --privileged \
     --mount "type=bind,src=$(pwd),dst=/home/" \
     --workdir /home/ \
+    -v /etc/localtime:/etc/localtime:ro \
+    -v /etc/timezone:/etc/timezone:ro \
     -p 8888:8888 \
     -p 6006:6006 \
     -e HOST="$(whoami)" \

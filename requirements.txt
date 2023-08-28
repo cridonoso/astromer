@@ -9,5 +9,6 @@ joblib
 pandas
 pydot
 tqdm
-tomli
 wandb
+tomli
+toml

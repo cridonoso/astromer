@@ -1,91 +1,92 @@
 import tensorflow as tf 
+import pandas as pd
+import numpy as np
 import wandb
 import sys
-import json
-import pandas as pd
+import toml
 import os
 
-from .utils import load_pt_data, load_clf_data, create_classifier, classify, get_callbacks, check_if_exist_finetuned_weights
+from tensorflow.keras.callbacks  import ModelCheckpoint, EarlyStopping, TensorBoard
+from tensorflow.keras.losses import CategoricalCrossentropy
+from tensorflow.keras.optimizers.experimental import AdamW
 from tensorflow.keras.optimizers import Adam
+from wandb.keras import WandbMetricsLogger
 
+from presentation.experiments.astromer_2.classification import create_classifier, load_classification_data
 from src.models import get_ASTROMER_II
+from src.data.loaders import load_light_curves
+from src.data import load_data
+
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 # g34htgii 
 DEBUG = False
-MASTER_PROJECT_NAME = 'nsp_script_02dp'
-ROOT = './presentation/experiments/astromer_2/'
-EXPDIR = os.path.join(ROOT, 'results', MASTER_PROJECT_NAME)
-os.makedirs(EXPDIR, exist_ok=True)
+TRAIN_ENCODER = False
+ROOT = sys.argv[3] #'./presentation/experiments/astromer_2/results/'
+MASTER_PROJECT_NAME = 'clf-50m'
+os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
 
 # =====================================================================================
 # ===== SEARCH SPACE ==================================================================
 # =====================================================================================
+folder_names = [os.path.join(x, xx)for x in os.listdir(ROOT) for xx in os.listdir(os.path.join(ROOT, x))]
+print(folder_names)
+print('\n')
 sweep_conf = {
-    'name': 'ASTROMER_II',
-    'method': 'grid',
-    'metric': {'goal': 'maximize', 'name': 'epoch/val_accuracy'},
-    'parameters': {
-        'pt_data':{'value':'./data/records/macho_clean'},
-        'n_layers': {'values':[1, 2]},
-        'fold':{'values':[0, 1, 2]},
-        'subdataset':{'values':['atlas', 'alcock']},
-        'clf_name':{'values':['mlp_att', 'mlp_cls', 'mlp_att_lite']},
-        'n_heads': {'value':4},
-        'head_dim': {'value':64},
-        'dff': {'value':64},
-        'dropout_rate': {'value': 0.},
-        'learning_rate':{'value':1e-5},
-        'window_size': {'value':200},
-        'probed':{'value': 0.6},
-        'rand': {'value':0.2},
-        'nsp_prob':{'value':0.5},
-        'nsp_fraction':{'value':0.5},
-        'n_epochs': {'value':10000},
-        'batch_size':{'value':2500}
-    }
+	'name': 'ASTROMER_II',
+	'method': 'grid',
+	'metric': {'goal': 'maximize', 'name': 'val_acc'},
+	'parameters': {
+		'pt_model': {'values':folder_names},
+		'fold':{'values':[0, 1, 2]},
+		'spc': {'values': [20, 100]},
+		'subdataset':{'values':['atlas', 'alcock']},
+		'clf_name':{'values':['mlp_att', 'mlp_cls', 'mlp_all']},
+	}
 }
 
-
+def check_if_exist_finetuned_weights(config, project_name):
+	api = wandb.Api()
+	runs = api.runs(project_name)
+	for run in runs:
+		if run.config['subdataset'] == config.subdataset and \
+		   run.config['fold']== config.fold and \
+		   run.state == 'finished':
+			return True
+	return False
+	
 def sweep_train(config=None):
     with wandb.init(config=config):
         config = wandb.config                   
-       
+
         # ====================================================================================
         # PRE-TRAINING =======================================================================
         # ====================================================================================
-        model_name = '{}_{}_{}'.format(config.n_layers, config.n_heads, config.head_dim)
-        PTWEIGTHS = os.path.join(EXPDIR, model_name, 'pretraining')
+        PTWEIGTHS = os.path.join(ROOT, config.pt_model)
+        print(PTWEIGTHS)
+        with open(os.path.join(PTWEIGTHS, 'config.toml'), 'r') as f:
+            model_config = toml.load(f)
+            wandb.log(model_config)
+
+        print('\n\n\n')
+        print(model_config)
+        print('\n\n\n')
         
-        d_model = config.head_dim*config.n_heads
-        astromer =  get_ASTROMER_II(num_layers=config.n_layers,
-                                    d_model=d_model,
-                                    num_heads=config.n_heads,
-                                    dff=config.dff,
-                                    base=10000,
-                                    dropout=config.dropout_rate,
-                                    maxlen=config.window_size,
-                                    pe_c=2)          
-        
-        if os.path.exists(os.path.join(PTWEIGTHS, 'results.json')):
-            print('[INFO] LOADING PRETRAINED WEIGHTS')
-            astromer.load_weights(os.path.join(PTWEIGTHS, 'weights'))
-        else:
-            print('[INFO] TRAINING FROM SCRATCH')
-            optimizer = Adam(config.learning_rate, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
-            astromer.compile(optimizer=optimizer)
-            loader = load_pt_data(config, sampling=True, debug=DEBUG)
-            cbks = get_callbacks(PTWEIGTHS, monitor='val_loss')
-            astromer.fit(loader['train'], 
-                     epochs=2 if DEBUG else config.n_epochs, 
-                     validation_data=loader['val'],
-                     callbacks=cbks)      
-            
-            acc, bce, loss, r2, rmse = astromer.evaluate(loader['test'])   
-            with open(os.path.join(PTWEIGTHS, 'results.json'), 'w') as fp:
-                json.dump({'test_acc': acc, 
-                           'test_r2':r2, 
-                           'test_rmse':rmse, 
-                           'test_bce':bce}, fp)
+        astromer = get_ASTROMER_II(num_layers=model_config['layers'],
+                                   num_heads=model_config['nh'],
+                                   head_dim=model_config['hdim'],
+                                   mixer_size=model_config['mixer'],
+                                   dropout=model_config['dropout'],
+                                   pe_base=1000,
+                                   pe_dim=model_config['pe_dim'],
+                                   pe_c=1,
+                                   window_size=model_config['ws'],
+                                   encoder_mode=model_config['encoder_mode'],
+                                   average_layers=model_config['avg_layers'],
+                                   off_nsp=model_config['off_nsp'])
+
+        print('[INFO] LOADING PRETRAINED WEIGHTS')
+        astromer.load_weights(os.path.join(PTWEIGTHS, 'weights')).expect_partial()
 
         # =====================================================================================
         # === FINETUNING STEP =================================================================
@@ -93,66 +94,200 @@ def sweep_train(config=None):
         DOWNSTREAM_DATA = os.path.join('./data/records', 
                                        config.subdataset,
                                        'fold_'+str(config.fold), 
-                                       config.subdataset+'_20')
-        FTWEIGTHS = os.path.join(EXPDIR, 
-                                 model_name,
+                                       '{}_{}'.format(config.subdataset, config.spc))
+        FTWEIGTHS = os.path.join(ROOT, 
+                                 config.pt_model,
                                  'finetuning',                                     
                                  config.subdataset,
                                  'fold_'+str(config.fold), 
-                                 config.subdataset+'_20')     
-        
+                                 '{}_{}'.format(config.subdataset, config.spc))     
+
+
         does_it_exists = check_if_exist_finetuned_weights(config, MASTER_PROJECT_NAME)
 
         if os.path.isfile(os.path.join(FTWEIGTHS, 'checkpoint')) and does_it_exists:
             print('[INFO] FINETUNED MODEL FOUND. LOADING WEIGHTS')
-            astromer.load_weights(os.path.join(FTWEIGTHS, 'weights'))
+            astromer.load_weights(os.path.join(FTWEIGTHS, 'weights')).expect_partial()
+            with open(os.path.join(FTWEIGTHS, 'metrics.toml'), 'r') as fp:
+                ft_res = toml.load(fp)
         else:
             print('[INFO] FINETUNING FROM SCRATCH')
-            optimizer = Adam(config.learning_rate, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
-            astromer.compile(optimizer=optimizer)
 
-            loader = load_pt_data(config, sampling=False, datapath=DOWNSTREAM_DATA, debug=DEBUG)
-            
-            cbks = get_callbacks(FTWEIGTHS, monitor='val_loss')
-            astromer.fit(loader['train'], 
-                         epochs=2 if DEBUG else config.n_epochs, 
-                         validation_data=loader['val'],
-                         callbacks=cbks) 
-            acc, bce, loss, r2, rmse = astromer.evaluate(loader['test'])   
-            wandb.log({'test_acc': acc, 'test_r2':r2, 'test_rmse':rmse, 'test_bce':bce})
+            train_batches = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
+                                      batch_size=32 if DEBUG else model_config['bs'], 
+                                      probed=model_config['probed'],  
+                                      random_same=model_config['rs'],
+                                      window_size=model_config['ws'], 
+                                      nsp_prob=model_config['nsp_prob'], 
+                                      repeat=1, 
+                                      sampling=False,
+                                      off_nsp=model_config['off_nsp'])
+            valid_batches = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'val'), 
+                                      batch_size=32 if DEBUG else model_config['bs'], 
+                                      probed=model_config['probed'],  
+                                      random_same=model_config['rs'],
+                                      window_size=model_config['ws'], 
+                                      nsp_prob=model_config['nsp_prob'], 
+                                      repeat=1, 
+                                      sampling=False,
+                                      off_nsp=model_config['off_nsp'])
+            test_batches = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'test'), 
+                                      batch_size=32 if DEBUG else model_config['bs'], 
+                                      probed=model_config['probed'],  
+                                      random_same=model_config['rs'],
+                                      window_size=model_config['ws'], 
+                                      nsp_prob=model_config['nsp_prob'], 
+                                      repeat=1, 
+                                      sampling=False,
+                                      off_nsp=model_config['off_nsp'])
 
+            if model_config['optimizer'] == 'adam':
+                optimizer = Adam(model_config['lr'])
+            if model_config['optimizer'] == 'adamw':
+                optimizer = AdamW(model_config['lr'])
+
+            astromer.compile(rmse_factor=model_config['rmse_factor'], optimizer=optimizer)
+
+            cbks =  [
+                ModelCheckpoint(
+                    filepath=os.path.join(FTWEIGTHS, 'weights'),
+                    save_weights_only=True,
+                    monitor='val_loss',
+                    mode='min',
+                    save_best_only=True),
+                EarlyStopping(monitor='val_loss',
+                    patience = 20,
+                    mode='min',
+                    restore_best_weights=True),
+                TensorBoard(
+                    log_dir = os.path.join(FTWEIGTHS, 'logs'),
+                    histogram_freq=1,
+                    write_graph=True)]
+
+            if DEBUG:
+                train_batches = train_batches.take(1)
+                valid_batches = valid_batches.take(1)
+                test_batches  = test_batches.take(1)
+
+            hist = astromer.fit(train_batches, 
+                                 epochs=2 if DEBUG else model_config['epochs'], 
+                                 validation_data=valid_batches,
+                                 callbacks=cbks) 
+
+            best_epoch = np.argmin(hist.history['val_loss'])
+
+            print('[INFO] Testing')
+            if model_config['off_nsp']:
+                loss, r2 = astromer.evaluate(test_batches) 
+                val_loss = hist.history['val_loss'][best_epoch]
+                val_r_square = hist.history['val_r_square'][best_epoch]
+                ft_res = {'ft_val_loss':val_loss,
+                          'ft_val_r2':val_r_square, 
+                          'ft_test_loss':loss,
+                          'ft_test_r2':r2}
+
+            else:
+                val_loss = hist.history['val_loss'][best_epoch]
+                val_acc = hist.history['val_acc'][best_epoch]
+                val_rmse = hist.history['val_rmse'][best_epoch]
+                val_bce = hist.history['val_bce'][best_epoch]
+                val_r_square = hist.history['val_r_square'][best_epoch]
+                test_acc, test_bce, test_loss, test_r2, test_rmse = astromer.evaluate(test_batches)   
+                ft_res = {'ft_val_loss':val_loss,
+                          'ft_val_acc': val_acc, 
+                          'ft_val_r2':val_r_square, 
+                          'ft_val_rmse':val_rmse, 
+                          'ft_val_bce':val_bce,
+                          'ft_test_loss':test_loss,
+                          'ft_test_acc':test_acc,
+                          'ft_test_r2':test_r2,
+                          'ft_test_rmse':test_rmse,
+                          'ft_test_bce':test_bce}
+
+            with open(os.path.join(FTWEIGTHS, 'metrics.toml'), 'w') as fp:
+                toml.dump(ft_res, fp)
+
+            with open(os.path.join(FTWEIGTHS, 'config.toml'), 'w') as f:
+                toml.dump(model_config, f)
+
+        wandb.log(ft_res)
         # ============================================================================
         # =========== CLASSIFICATION==================================================
         # ============================================================================
-        CLFWEIGHTS = os.path.join(EXPDIR, 
-                                  model_name,
+        CLFWEIGHTS = os.path.join(ROOT, 
+                                  config.pt_model,
                                   'classification', 
                                   config.subdataset, 
                                   'fold_'+str(config.fold), 
                                   config.subdataset+'_20')
-        
-        num_cls = pd.read_csv(
-                os.path.join(DOWNSTREAM_DATA, 'objects.csv')).shape[0]
-        
-        data = load_clf_data(config, 
-                             batch_size=512, 
-                             num_cls=num_cls, 
-                             datapath=DOWNSTREAM_DATA, 
-                             debug=DEBUG)
+        os.makedirs(CLFWEIGHTS, exist_ok=True)
 
-        clf_model = create_classifier(astromer, 
-                                      config, 
-                                      num_cls=num_cls, 
-                                      train_astromer=False, 
-                                      name=config.clf_name)
+        train_batches, valid_batches, test_batches, num_cls = load_classification_data(DOWNSTREAM_DATA, 
+                                                                             window_size=model_config['ws'], 
+                                                                             batch_size=512, 
+                                                                             version='second',
+                                                                             test=True,
+                                                                             off_nsp=model_config['off_nsp'])
+        if DEBUG:
+            train_batches = train_batches.take(1)
+            valid_batches = valid_batches.take(1)
+            test_batches = test_batches.take(1)
 
-        clf_model, backlog_df = classify(clf_model, 
-                                         data, 
-                                         CLFWEIGHTS, 
-                                         lr=1e-3, 
-                                         model_name=clf_model.name,
-                                         debug=DEBUG)
-        wandb.log(backlog_df)
+        clf_model = create_classifier(FTWEIGTHS, 
+                                      model_config['ws'], 
+                                      num_cls, 
+                                      clf_name=config.clf_name, 
+                                      trainable=TRAIN_ENCODER,
+                                      off_nsp=model_config['off_nsp'])
+
+        clf_model.compile(optimizer=Adam(1e-3),
+                          loss=CategoricalCrossentropy(from_logits=True),
+                          metrics=['accuracy'])
+        cbks =  [
+            ModelCheckpoint(
+                filepath=os.path.join(CLFWEIGHTS, 'weights'),
+                save_weights_only=True,
+                mode='min',
+                monitor='val_loss',
+                save_best_only=True),
+            EarlyStopping(monitor='val_loss',
+                mode='min',
+                patience = 20,
+                restore_best_weights=True),
+            TensorBoard(
+                log_dir = os.path.join(CLFWEIGHTS, 'logs'),
+                histogram_freq=1,
+                write_graph=True)]
+
+        hist = clf_model.fit(train_batches,
+                             epochs= 2 if DEBUG else 100000,
+                             callbacks=cbks,
+                             validation_data=valid_batches)
+
+        best_epoch = np.argmin(hist.history['val_loss'])
+        val_loss = hist.history['val_loss'][best_epoch]
+        val_acc = hist.history['val_accuracy'][best_epoch]
+
+        y_pred = clf_model.predict(test_batches)
+        y_true = tf.concat([y for _, y in test_batches], 0)
+        pred_labels = tf.argmax(y_pred, 1)
+        true_labels = tf.argmax(y_true, 1)
+        p, r, f, _ = precision_recall_fscore_support(true_labels,
+                                                     pred_labels,
+                                                     average='macro',
+                                                     zero_division=0.)
+
+
+        test_acc = accuracy_score(true_labels, pred_labels)
+
+        summary_clf = {'clf_val_acc': val_acc,
+                       'clf_val_loss': val_loss,
+                       'clf_test_precision': p, 
+                       'clf_test_recall': r, 
+                       'clf_test_f1': f,
+                       'clf_test_acc': test_acc}
+        print(summary_clf)
+        wandb.log(summary_clf)
 
 
 # =====================================================================================
@@ -160,11 +295,9 @@ def sweep_train(config=None):
 # =====================================================================================
 sweep_id = wandb.sweep(sweep_conf, project=MASTER_PROJECT_NAME)
 
-os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
-
 if sys.argv[2] != '0':
-    print('using previous id: ', sys.argv[2])
-    sweep_id = sys.argv[2]
+	print('using previous id: ', sys.argv[2])
+	sweep_id = sys.argv[2]
 
 wandb.agent(sweep_id, function=sweep_train, count=100)
 
