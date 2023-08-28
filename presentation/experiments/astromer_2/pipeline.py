@@ -22,8 +22,8 @@ from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 # g34htgii 
 DEBUG = False
 TRAIN_ENCODER = False
-ROOT = './presentation/experiments/astromer_2/results'
-MASTER_PROJECT_NAME = 'clf-best'
+ROOT = sys.argv[3] #'./presentation/experiments/astromer_2/results/'
+MASTER_PROJECT_NAME = 'clf-50m'
 os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
 
 # =====================================================================================
@@ -31,6 +31,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
 # =====================================================================================
 folder_names = [os.path.join(x, xx)for x in os.listdir(ROOT) for xx in os.listdir(os.path.join(ROOT, x))]
 print(folder_names)
+print('\n')
 sweep_conf = {
 	'name': 'ASTROMER_II',
 	'method': 'grid',
@@ -61,8 +62,8 @@ def sweep_train(config=None):
         # ====================================================================================
         # PRE-TRAINING =======================================================================
         # ====================================================================================
-        PTWEIGTHS = os.path.join(ROOT, config.pt_model, 'pretraining')
-
+        PTWEIGTHS = os.path.join(ROOT, config.pt_model)
+        print(PTWEIGTHS)
         with open(os.path.join(PTWEIGTHS, 'config.toml'), 'r') as f:
             model_config = toml.load(f)
             wandb.log(model_config)
