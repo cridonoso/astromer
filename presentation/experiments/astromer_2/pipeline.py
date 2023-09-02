@@ -23,7 +23,7 @@ from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 DEBUG = False
 TRAIN_ENCODER = False
 ROOT = sys.argv[3] #'./presentation/experiments/astromer_2/results/'
-MASTER_PROJECT_NAME = 'clf-50m'
+MASTER_PROJECT_NAME = 'clf-20m'
 os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
 
 # =====================================================================================
