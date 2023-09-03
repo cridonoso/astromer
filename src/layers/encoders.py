@@ -69,7 +69,7 @@ class Encoder(Model):
 
 		layers_outputs = []
 		for i in range(self.num_layers):
-			x =  self.enc_layers[i](x, mask=inputs['att_mask'])
+			x =  self.enc_layers[i](x, training=training, mask=inputs['att_mask'])
 			layers_outputs.append(x)
 		
 		x = self.output_format(layers_outputs, window_size) 

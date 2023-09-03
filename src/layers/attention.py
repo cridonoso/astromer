@@ -51,7 +51,6 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 		self.d_model = self.num_heads * self.head_dim
 		self.depth = self.d_model // self.num_heads # final dimension
 		
-	def build(self, input_shape):
 		self.wq = tf.keras.layers.Dense(self.d_model, name='WQ')
 		self.wk = tf.keras.layers.Dense(self.d_model, name='WK')
 		self.wv = tf.keras.layers.Dense(self.d_model, name='WV')
@@ -64,7 +63,7 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 		x = tf.reshape(x, (batch_size, -1, self.num_heads, self.depth))
 		return tf.transpose(x, perm=[0, 2, 1, 3], name=name)
 
-	def call(self, x, mask):
+	def call(self, x, training, mask=None):
 		batch_size = tf.shape(x)[0]
 
 		q = self.wq(x)  # (batch_size, seq_len, d_model)
