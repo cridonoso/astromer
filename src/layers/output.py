@@ -17,7 +17,7 @@ class TransformLayer(Layer):
 		x_prob = self.clf_layer(cls_token)
 		x_rec = self.reg_layer(rec_token)
 
-		return x_prob, x_rec
+		return {'nsp_label': x_prob, 'reconstruction':x_rec}
 
 class RegLayer(Layer):
 	def __init__(self, **kwargs):

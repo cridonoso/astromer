@@ -1,10 +1,10 @@
-
 import tensorflow as tf
 import argparse
 import sys
 import os
 
-from src.models.astromer_2 import get_ASTROMER, train_step, test_step
+from src.models.astromer_1 import get_ASTROMER, train_step, test_step
+
 from src.training.utils import train
 from src.data import load_data
 from datetime import datetime
@@ -15,7 +15,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 def run(opt):
 	os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
 
-	ROOT = './presentation/experiments/astromer_2/custom/'
+	ROOT = './presentation/experiments/astromer_1/'
 	trial = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 	EXPDIR = os.path.join(ROOT, 'results', opt.exp_name, trial, 'pretraining')
 	os.makedirs(EXPDIR, exist_ok=True)
@@ -26,7 +26,7 @@ def run(opt):
 							 probed=opt.probed,
 							 random_same=opt.rs,  
 							 window_size=opt.window_size, 
-							 nsp_prob=opt.nsp_prob, 
+							 off_nsp=True,  
 							 repeat=4, 
 							 sampling=True)
 	valid_loader = load_data(dataset=os.path.join(opt.data, 'val'), 
@@ -34,7 +34,7 @@ def run(opt):
 							 probed=opt.probed,  
 							 random_same=opt.rs,
 							 window_size=opt.window_size, 
-							 nsp_prob=opt.nsp_prob, 
+							 off_nsp=True,  
 							 repeat=1, 
 							 sampling=True)
 	test_loader = load_data(dataset=os.path.join(opt.data, 'test'), 
@@ -42,7 +42,7 @@ def run(opt):
 							 probed=opt.probed,  
 							 random_same=opt.rs,
 							 window_size=opt.window_size, 
-							 nsp_prob=opt.nsp_prob, 
+							 off_nsp=True, 
 							 repeat=1, 
 							 sampling=True)
 
