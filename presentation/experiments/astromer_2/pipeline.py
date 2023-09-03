@@ -1,6 +1,7 @@
 import tensorflow as tf 
 import pandas as pd
 import numpy as np
+import argparse
 import wandb
 import sys
 import toml
@@ -8,42 +9,15 @@ import os
 
 from tensorflow.keras.callbacks  import ModelCheckpoint, EarlyStopping, TensorBoard
 from tensorflow.keras.losses import CategoricalCrossentropy
-from tensorflow.keras.optimizers.experimental import AdamW
 from tensorflow.keras.optimizers import Adam
 from wandb.keras import WandbMetricsLogger
 
 from presentation.experiments.astromer_2.classification import create_classifier, load_classification_data
-from src.models import get_ASTROMER_II
-from src.data.loaders import load_light_curves
+from src.models.astromer_2 import get_ASTROMER, train_step, test_step
 from src.data import load_data
 
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
-# g34htgii 
-DEBUG = False
-TRAIN_ENCODER = False
-ROOT = sys.argv[3] #'./presentation/experiments/astromer_2/results/'
-MASTER_PROJECT_NAME = 'clf-20m'
-os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
-
-# =====================================================================================
-# ===== SEARCH SPACE ==================================================================
-# =====================================================================================
-folder_names = [os.path.join(x, xx)for x in os.listdir(ROOT) for xx in os.listdir(os.path.join(ROOT, x))]
-print(folder_names)
-print('\n')
-sweep_conf = {
-	'name': 'ASTROMER_II',
-	'method': 'grid',
-	'metric': {'goal': 'maximize', 'name': 'val_acc'},
-	'parameters': {
-		'pt_model': {'values':folder_names},
-		'fold':{'values':[0, 1, 2]},
-		'spc': {'values': [20, 100]},
-		'subdataset':{'values':['atlas', 'alcock']},
-		'clf_name':{'values':['mlp_att', 'mlp_cls', 'mlp_all']},
-	}
-}
 
 def check_if_exist_finetuned_weights(config, project_name):
 	api = wandb.Api()
@@ -56,6 +30,7 @@ def check_if_exist_finetuned_weights(config, project_name):
 	return False
 	
 def sweep_train(config=None):
+
     with wandb.init(config=config):
         config = wandb.config                   
 
@@ -63,7 +38,7 @@ def sweep_train(config=None):
         # PRE-TRAINING =======================================================================
         # ====================================================================================
         PTWEIGTHS = os.path.join(ROOT, config.pt_model)
-        print(PTWEIGTHS)
+
         with open(os.path.join(PTWEIGTHS, 'config.toml'), 'r') as f:
             model_config = toml.load(f)
             wandb.log(model_config)
@@ -71,22 +46,21 @@ def sweep_train(config=None):
         print('\n\n\n')
         print(model_config)
         print('\n\n\n')
-        
-        astromer = get_ASTROMER_II(num_layers=model_config['layers'],
-                                   num_heads=model_config['nh'],
-                                   head_dim=model_config['hdim'],
-                                   mixer_size=model_config['mixer'],
-                                   dropout=model_config['dropout'],
-                                   pe_base=1000,
-                                   pe_dim=model_config['pe_dim'],
-                                   pe_c=1,
-                                   window_size=model_config['ws'],
-                                   encoder_mode=model_config['encoder_mode'],
-                                   average_layers=model_config['avg_layers'],
-                                   off_nsp=model_config['off_nsp'])
+        return
+        model = get_ASTROMER(num_layers=model_config['num_layers'],
+                            num_heads=model_config['num_heads'],
+                            head_dim=model_config['head_dim'],
+                            mixer_size=model_config['mixer'],
+                            dropout=model_config['dropout'],
+                            pe_base=model_config['pe_base'],
+                            pe_dim=model_config['pe_dim'],
+                            pe_c=model_config['pe_exp'],
+                            window_size=model_config['window_size'],
+                            encoder_mode=model_config['encoder_mode'],
+                            average_layers=model_config['avg_layers'])
 
         print('[INFO] LOADING PRETRAINED WEIGHTS')
-        astromer.load_weights(os.path.join(PTWEIGTHS, 'weights')).expect_partial()
+        astromer.load_weights(os.path.join(PTWEIGTHS, 'weights', 'weights'))
 
         # =====================================================================================
         # === FINETUNING STEP =================================================================
@@ -290,14 +264,52 @@ def sweep_train(config=None):
         wandb.log(summary_clf)
 
 
-# =====================================================================================
-# ===== WandB =========================================================================
-# =====================================================================================
-sweep_id = wandb.sweep(sweep_conf, project=MASTER_PROJECT_NAME)
+if __name__ == '__main__':
 
-if sys.argv[2] != '0':
-	print('using previous id: ', sys.argv[2])
-	sweep_id = sys.argv[2]
 
-wandb.agent(sweep_id, function=sweep_train, count=100)
+    # =====================================================================================
+    # ===== SEARCH SPACE ==================================================================
+    # =====================================================================================
 
+    
+    MASTER_PROJECT_NAME = 'test_2'
+   
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--pt_folder', default='./presentation/experiments/astromer_2/results/', type=str,
+                    help='Project name')
+    parser.add_argument('--wandb_name', default='astromer_2_exp', type=str,
+                    help='Table name used in wandb')
+    parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
+    parser.add_argument('--train-astromer', action='store_true', help='train encoder when classifying')
+    parser.add_argument('--gpu', default='-1', type=str,
+                        help='GPU to be used. -1 means no GPU will be used')
+    opt = parser.parse_args()   
+    
+    os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
+
+    folder_names = [os.path.join(x, xx) for x in os.listdir(ROOT) for xx in os.listdir(os.path.join(ROOT, x))]
+    print(folder_names)
+    print('\n')
+
+    # sweep_conf = {
+    #     'name': 'ASTROMER_II',
+    #     'method': 'grid',
+    #     'metric': {'goal': 'maximize', 'name': 'val_acc'},
+    #     'parameters': {
+    #         'pt_model': {'values':folder_names},
+    #         'fold':{'values':[0, 1, 2]},
+    #         'spc': {'values': [20, 100]},
+    #         'subdataset':{'values':['atlas', 'alcock']},
+    #         'clf_name':{'values':['mlp_att', 'mlp_cls', 'mlp_all']},
+    #     }
+    # }
+
+
+    # sweep_id = wandb.sweep(sweep_conf, project=MASTER_PROJECT_NAME)
+    # wandb.config.update(args)
+
+    # if sys.argv[2] != '0':
+    #     print('using previous id: ', sys.argv[2])
+    #     sweep_id = sys.argv[2]
+
+    # wandb.agent(sweep_id, function=sweep_train, count=100)
