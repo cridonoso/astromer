@@ -9,7 +9,7 @@ import os
 from presentation.experiments.utils import train_classifier
 from wandb.keras import WandbMetricsLogger
 
-from src.models.astromer_2 import get_ASTROMER, build_input, train_step, test_step
+from src.models.astromer_1 import get_ASTROMER, build_input, train_step, test_step
 from src.training.utils import train
 from src.data import load_data
 
@@ -49,6 +49,7 @@ def sweep_train(config=None, opt=None):
 		with open(os.path.join(config.pt_model, 'config.toml'), 'r') as f:
 			model_config = toml.load(f)
 			wandb.log(model_config)
+
 
 		astromer = get_ASTROMER(num_layers=model_config['num_layers'],
 								num_heads=model_config['num_heads'],
@@ -93,7 +94,7 @@ def sweep_train(config=None, opt=None):
 									 probed=model_config['probed'],
 									 random_same=model_config['rs'],  
 									 window_size=model_config['window_size'], 
-									 nsp_prob=model_config['nsp_prob'], 
+									 off_nsp=True, 
 									 repeat=1, 
 									 sampling=False)
 			valid_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'val'), 
@@ -101,7 +102,7 @@ def sweep_train(config=None, opt=None):
 									 probed=model_config['probed'],  
 									 random_same=model_config['rs'],
 									 window_size=model_config['window_size'], 
-									 nsp_prob=model_config['nsp_prob'], 
+									 off_nsp=True,
 									 repeat=1, 
 									 sampling=False)
 			test_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'test'), 
@@ -109,7 +110,7 @@ def sweep_train(config=None, opt=None):
 									 probed=model_config['probed'],  
 									 random_same=model_config['rs'],
 									 window_size=model_config['window_size'], 
-									 nsp_prob=model_config['nsp_prob'], 
+									 off_nsp=True,
 									 repeat=1, 
 									 sampling=False)
 
@@ -157,6 +158,7 @@ def sweep_train(config=None, opt=None):
 								 probed=1.,
 								 random_same=0.,  
 								 window_size=model_config['window_size'], 
+								 off_nsp=True,
 								 nsp_prob=0., 
 								 repeat=1, 
 								 sampling=False,
@@ -167,6 +169,7 @@ def sweep_train(config=None, opt=None):
 								 probed=1.,
 								 random_same=0.,  
 								 window_size=model_config['window_size'], 
+								 off_nsp=True,
 								 nsp_prob=0., 
 								 repeat=1, 
 								 sampling=False,
@@ -176,6 +179,7 @@ def sweep_train(config=None, opt=None):
 								 probed=1.,
 								 random_same=0.,  
 								 window_size=model_config['window_size'], 
+								 off_nsp=True, 
 								 nsp_prob=0., 
 								 repeat=1, 
 								 sampling=False,
@@ -191,24 +195,10 @@ def sweep_train(config=None, opt=None):
 		encoder = astromer.get_layer('encoder')
 		encoder.trainable = opt.train_astromer
 		embedding = encoder(inp_placeholder)
-
-		if config.clf_name == 'cls_mlp':
-			embedding = tf.slice(embedding, [0, 0, 0], [-1, 1,-1], name='slice_cls')
-			embedding = tf.squeeze(embedding, axis=1)
-		if config.clf_name == 'att_mlp':
-			embedding = tf.slice(embedding, [0, 1, 0], [-1, 1,-1], name='slice_att')
-			embedding = embedding*(1.-inp_placeholder['att_mask'])
-			embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
-											  tf.reduce_sum(1.-inp_placeholder['att_mask']))
-		if config.clf_name == 'all_mlp':
-			cls_token  = tf.slice(embedding, [0, 0, 0], [-1, 1,-1], name='slice_cls')
-			cls_token = tf.squeeze(cls_token, axis=1)
-			att_tokens = tf.slice(embedding, [0, 1, 0], [-1, 1,-1], name='slice_att')
-			att_tokens = att_tokens*(1.-inp_placeholder['att_mask'])
-			att_tokens = tf.math.divide_no_nan(tf.reduce_sum(att_tokens, axis=1), 
-											  tf.reduce_sum(1.-inp_placeholder['att_mask']))
-			embedding = tf.concat([att_tokens, cls_token], axis=-1)
-
+		embedding = embedding*(1.-inp_placeholder['att_mask'])
+		embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
+										  tf.reduce_sum(1.-inp_placeholder['att_mask']))
+		
 		summary_clf = train_classifier(embedding,
 									   inp_placeholder=inp_placeholder,
 									   train_loader=train_loader,
@@ -226,7 +216,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--pt-folder', default='./presentation/experiments/astromer_2/results/*', type=str,
 					help='Pretraining folder(s) - use * to jump folders up to "pretraining" folder is found')
-	parser.add_argument('--wandb_name', default='astromer_2_exp', type=str,
+	parser.add_argument('--wandb_name', default='astromer_1_exp', type=str,
 					help='Table name used in wandb')
 	parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
 	parser.add_argument('--train-astromer', action='store_true', help='train encoder when classifying')
@@ -250,7 +240,7 @@ if __name__ == '__main__':
 			'fold':{'values':[0, 1, 2]},
 			'spc': {'values': [20, 100]},
 			'subdataset':{'values':['atlas', 'alcock']},
-			'clf_name':{'values':['all_mlp']}, #'cls+mlp', 'att+mlp', 
+			'clf_name':{'values':['att+mlp']}, 
 		}
 	}
 

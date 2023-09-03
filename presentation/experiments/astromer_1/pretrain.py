@@ -21,7 +21,7 @@ def run(opt):
 
 	# ========== DATA ========================================
 	train_loader = load_data(dataset=os.path.join(opt.data, 'train'), 
-							 batch_size=opt.bs, 
+							 batch_size=5 if opt.debug else opt.bs, 
 							 probed=opt.probed,
 							 random_same=opt.rs,  
 							 window_size=opt.window_size, 
@@ -29,7 +29,7 @@ def run(opt):
 							 repeat=4, 
 							 sampling=True)
 	valid_loader = load_data(dataset=os.path.join(opt.data, 'val'), 
-							 batch_size=opt.bs, 
+							 batch_size=5 if opt.debug else opt.bs, 
 							 probed=opt.probed,  
 							 random_same=opt.rs,
 							 window_size=opt.window_size, 
@@ -37,7 +37,7 @@ def run(opt):
 							 repeat=1, 
 							 sampling=True)
 	test_loader = load_data(dataset=os.path.join(opt.data, 'test'), 
-							 batch_size=opt.bs, 
+							 batch_size=5 if opt.debug else opt.bs, 
 							 probed=opt.probed,  
 							 random_same=opt.rs,
 							 window_size=opt.window_size, 

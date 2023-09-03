@@ -32,8 +32,11 @@ def train(model,
 		  train_step_fn=None,
 		  test_step_fn=None,
 		  argparse_dict=None):
-
+	
 	start = time.time()
+	
+	os.makedirs(project_path, exist_ok=True)
+
 	if debug:
 		print('[INFO] DEBGUGING MODE')
 		num_epochs   = 2
@@ -51,11 +54,12 @@ def train(model,
 	train_writer = tf.summary.create_file_writer(os.path.join(project_path, 'logs', 'train'))
 	valid_writer = tf.summary.create_file_writer(os.path.join(project_path, 'logs', 'validation'))
 	print('[INFO] Log values at: {}'.format(os.path.join(project_path, 'logs')))
-	optimizer = AdamW(lr)
+	optimizer = AdamW(lr, name='astromer_optimizer')
 	es_count = 0
 	min_loss = 1e9
-
+	best_train_log, best_val_log = None, None
 	ebar = tqdm(range(num_epochs), total=num_epochs)
+
 	for epoch in ebar:
 		train_logs, valid_logs = [], [] 
 		for x, y in train_loader:
@@ -74,6 +78,8 @@ def train(model,
 
 		if tf.math.greater(min_loss, epoch_valid_metrics['loss']):
 			min_loss = epoch_valid_metrics['loss']
+			best_train_log = epoch_train_metrics
+			best_val_log = epoch_valid_metrics
 			es_count = 0
 			model.save_weights(os.path.join(project_path, 'weights', 'weights'))
 		else:
@@ -100,4 +106,4 @@ def train(model,
 		tensorboard_log(test_metrics, test_writer, step=0)
 		tensorboard_log(test_metrics, test_writer, step=num_epochs)
 
-	return model
+	return model, (best_train_log, best_val_log, test_metrics)
