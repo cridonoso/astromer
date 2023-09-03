@@ -9,9 +9,8 @@ from src.training.utils import train
 from src.data import load_data
 from datetime import datetime
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-		
+
 def run(opt):
 	os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
 
@@ -79,7 +78,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--exp-name', default='pretrain', type=str,
 					help='Project name')
-	parser.add_argument('--data', default='./data/records/macho_clean', type=str,
+	parser.add_argument('--data', default='./data/records/macho', type=str,
 					help='Data folder where tf.record files are located')
 	parser.add_argument('--checkpoint', default='-1', type=str,
 						help='Restore training by using checkpoints. This is the route to the checkpoint folder.')
@@ -89,7 +88,7 @@ if __name__ == '__main__':
 
 	parser.add_argument('--encoder-mode', default='normal', type=str,
 						help='normal - conditioned')
-	parser.add_argument('--num-layers', default=1, type=int,
+	parser.add_argument('--num-layers', default=2, type=int,
 						help='Number of Attention Layers')
 	parser.add_argument('--num-heads', default=4, type=int,
 						help='Number of heads within the attention layer')
@@ -109,11 +108,11 @@ if __name__ == '__main__':
 
 	parser.add_argument('--lr', default=1e-5, type=float,
 						help='learning rate')
-	parser.add_argument('--bs', default=16, type=int,
+	parser.add_argument('--bs', default=2500, type=int,
 						help='Batch size')
 	parser.add_argument('--patience', default=20, type=int,
 						help='Earlystopping threshold in number of epochs')
-	parser.add_argument('--num_epochs', default=100000, type=int,
+	parser.add_argument('--num_epochs', default=10000, type=int,
 						help='Number of epochs')
 	parser.add_argument('--window-size', default=200, type=int,
 						help='windows size of the PSFs')\
