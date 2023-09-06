@@ -12,66 +12,69 @@ from datetime import datetime
 
 
 def run(opt):
-	os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
+    os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
 
-	ROOT = './presentation/experiments/astromer_1/'
-	trial = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-	EXPDIR = os.path.join(ROOT, 'results', opt.exp_name, trial, 'pretraining')
-	os.makedirs(EXPDIR, exist_ok=True)
+    ROOT = './presentation/experiments/astromer_1/'
+    trial = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    EXPDIR = os.path.join(ROOT, 'results', opt.exp_name, trial, 'pretraining')
+    os.makedirs(EXPDIR, exist_ok=True)
 
-	# ========== DATA ========================================
-	train_loader = load_data(dataset=os.path.join(opt.data, 'train'), 
-							 batch_size=5 if opt.debug else opt.bs, 
-							 probed=opt.probed,
-							 random_same=opt.rs,  
-							 window_size=opt.window_size, 
-							 off_nsp=True,  
-							 repeat=4, 
-							 sampling=True)
-	valid_loader = load_data(dataset=os.path.join(opt.data, 'val'), 
-							 batch_size=5 if opt.debug else opt.bs, 
-							 probed=opt.probed,  
-							 random_same=opt.rs,
-							 window_size=opt.window_size, 
-							 off_nsp=True,  
-							 repeat=1, 
-							 sampling=True)
-	test_loader = load_data(dataset=os.path.join(opt.data, 'test'), 
-							 batch_size=5 if opt.debug else opt.bs, 
-							 probed=opt.probed,  
-							 random_same=opt.rs,
-							 window_size=opt.window_size, 
-							 off_nsp=True, 
-							 repeat=1, 
-							 sampling=True)
+    # ========== DATA ========================================
+    train_loader = load_data(dataset=os.path.join(opt.data, 'train'), 
+                             batch_size=5 if opt.debug else opt.bs, 
+                             probed=opt.probed,
+                             random_same=opt.rs,  
+                             window_size=opt.window_size, 
+                             off_nsp=True,  
+                             repeat=4, 
+                             sampling=True)
+    valid_loader = load_data(dataset=os.path.join(opt.data, 'val'), 
+                             batch_size=5 if opt.debug else opt.bs, 
+                             probed=opt.probed,  
+                             random_same=opt.rs,
+                             window_size=opt.window_size, 
+                             off_nsp=True,  
+                             repeat=1, 
+                             sampling=True)
+    test_loader = load_data(dataset=os.path.join(opt.data, 'test'), 
+                             batch_size=5 if opt.debug else opt.bs, 
+                             probed=opt.probed,  
+                             random_same=opt.rs,
+                             window_size=opt.window_size, 
+                             off_nsp=True, 
+                             repeat=1, 
+                             sampling=True)
 
-	# ======= MODEL ========================================
-	model = get_ASTROMER(num_layers=opt.num_layers,
-						num_heads=opt.num_heads,
-						head_dim=opt.head_dim,
-						mixer_size=opt.mixer,
-						dropout=opt.dropout,
-						pe_base=opt.pe_base,
-						pe_dim=opt.pe_dim,
-						pe_c=opt.pe_exp,
-						window_size=opt.window_size,
-						encoder_mode=opt.encoder_mode,
-						average_layers=opt.avg_layers)
+    # ======= MODEL ========================================
+    model = get_ASTROMER(num_layers=opt.num_layers,
+                        num_heads=opt.num_heads,
+                        head_dim=opt.head_dim,
+                        mixer_size=opt.mixer,
+                        dropout=opt.dropout,
+                        pe_base=opt.pe_base,
+                        pe_dim=opt.pe_dim,
+                        pe_c=opt.pe_exp,
+                        window_size=opt.window_size,
+                        encoder_mode=opt.encoder_mode,
+                        average_layers=opt.avg_layers)
 
-	# ============================================================
-	
-	model = train(model,
-			  train_loader, 
-			  valid_loader, 
-			  num_epochs=opt.num_epochs, 
-			  lr=opt.lr, 
-			  test_loader=test_loader,
-			  project_path=EXPDIR,
-			  debug=opt.debug,
-			  patience=opt.patience,
-			  train_step_fn=train_step,
-			  test_step_fn=test_step,
-			  argparse_dict=opt.__dict__)
+    # ============================================================
+    if opt.checkpoint != '-1':
+        print('[INFO] Restoring previous training')
+        model.load_weights(os.path.join(opt.checkpoint, 'weights', 'weights'))
+        
+    model = train(model,
+              train_loader, 
+              valid_loader, 
+              num_epochs=opt.num_epochs, 
+              lr=opt.lr, 
+              test_loader=test_loader,
+              project_path=EXPDIR,
+              debug=opt.debug,
+              patience=opt.patience,
+              train_step_fn=train_step,
+              test_step_fn=test_step,
+              argparse_dict=opt.__dict__)
 
 
 if __name__ == '__main__':
