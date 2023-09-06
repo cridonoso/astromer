@@ -240,7 +240,7 @@ if __name__ == '__main__':
 			'fold':{'values':[0, 1, 2]},
 			'spc': {'values': [20, 100]},
 			'subdataset':{'values':['atlas', 'alcock']},
-			'clf_name':{'values':['att+mlp']}, 
+			'clf_name':{'values':['att_mlp']}, 
 		}
 	}
 

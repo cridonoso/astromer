@@ -13,7 +13,7 @@ from src.models.astromer_2 import get_ASTROMER, build_input, train_step, test_st
 from src.training.utils import train
 from src.data import load_data
 
-tf.config.run_functions_eagerly(True)
+tf.compat.v1.reset_default_graph()
 
 def adjust_fn(func, **karguments):
 	def wrap(*args, **kwargs):
