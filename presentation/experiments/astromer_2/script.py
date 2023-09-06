@@ -11,7 +11,7 @@ batch_size = 2500
 records_folder = './data/records/'
 ds_names = ['alcock', 'atlas']
 spc_list = [20, 100]
-clf_names = ['att_mlp']
+clf_names = ['cls_mlp', 'att_mlp', 'all_mlp']
  
 root = 'python -m presentation.experiments.astromer_2.downstream'
 for dataset in ds_names:
@@ -19,7 +19,7 @@ for dataset in ds_names:
     for spc in spc_list:
         for fold_n in range(3):
             start = time.time()
-            project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {} --debug'
+            project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {}'
 
             command1 = project_path.format(root, gpu, dataset, pt_folder, fold_n, spc)
 

@@ -205,7 +205,7 @@ if __name__ == '__main__':
 	parser.add_argument('--patience', default=20, type=int,	help='Earlystopping threshold in number of epochs')
 	parser.add_argument('--num_epochs', default=10000, type=int, help='Number of epochs')
 	parser.add_argument('--train-astromer', action='store_true', help='If train astromer when classifying')
-	parser.add_argument('--clf-name', default='normal', type=str, help='classifier name')
+	parser.add_argument('--clf-name', default='all_mlp', type=str, help='classifier name')
 
 	opt = parser.parse_args()        
 	run(opt)
