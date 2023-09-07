@@ -1,4 +1,6 @@
 import tensorflow as tf
+import toml
+import os
 
 from src.losses             import custom_rmse
 from src.metrics            import custom_r2
@@ -71,10 +73,52 @@ def train_step(model, x, y, optimizer):
 
 
 @tf.function
-def test_step(model, x, y):
+def test_step(model, x, y, return_pred=False):
 	x_pred = model(x, training=True)
 	rmse = custom_rmse(y_true=y['magnitudes'],
 					  y_pred=x_pred,
 					  mask=y['probed_mask'])
 	r2_value = custom_r2(y['magnitudes'], x_pred, y['probed_mask'])
+	if return_pred:
+		return x_pred
 	return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
+
+def predict(model, test_loader):
+	n_batches = sum([1 for _, _ in test_loader])
+	print('[INFO] Processing {} batches'.format(n_batches))
+	y_pred = tf.TensorArray(dtype=tf.float32, size=n_batches)
+	y_true = tf.TensorArray(dtype=tf.float32, size=n_batches)
+	masks  = tf.TensorArray(dtype=tf.float32, size=n_batches)
+	times  = tf.TensorArray(dtype=tf.float32, size=n_batches)
+	for index, (x, y) in enumerate(test_loader):
+		outputs = test_step(model, x, y, return_pred=True)
+		y_pred = y_pred.write(index, outputs)
+		y_true = y_true.write(index, y['magnitudes'])
+		masks  = masks.write(index, y['probed_mask'])
+		times = times.write(index, x['times'])
+
+	y_pred = tf.concat([times.concat(), y_pred.concat()], axis=2)
+	y_true = tf.concat([times.concat(), y_true.concat()], axis=2)
+	return y_pred, y_true, masks.concat()
+
+def restore_model(model_folder):
+	with open(os.path.join(model_folder, 'config.toml'), 'r') as f:
+		model_config = toml.load(f)
+
+
+	astromer = get_ASTROMER(num_layers=model_config['num_layers'],
+							num_heads=model_config['num_heads'],
+							head_dim=model_config['head_dim'],
+							mixer_size=model_config['mixer'],
+							dropout=model_config['dropout'],
+							pe_base=model_config['pe_base'],
+							pe_dim=model_config['pe_dim'],
+							pe_c=model_config['pe_exp'],
+							window_size=model_config['window_size'],
+							encoder_mode=model_config['encoder_mode'],
+							average_layers=model_config['avg_layers'])
+
+	print('[INFO] LOADING PRETRAINED WEIGHTS')
+	astromer.load_weights(os.path.join(model_folder, 'weights', 'weights'))
+
+	return astromer, model_config

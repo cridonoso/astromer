@@ -40,6 +40,7 @@ def run(opt):
 							window_size=model_config['window_size'],
 							encoder_mode=model_config['encoder_mode'],
 							average_layers=model_config['avg_layers'])
+
 	astromer.load_weights(os.path.join(opt.pt_folder, 'weights', 'weights'))
 	print('[INFO] Weights loaded')
 	# ====================================================================================
@@ -173,11 +174,6 @@ def run(opt):
 								   clf_name=opt.clf_name,
 								   debug=opt.debug)
 
-	with open(os.path.join(CLFWEIGHTS, 'metrics.toml'), 'w') as f:
-		toml.dump(summary_clf, f)
-
-
-
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
@@ -193,7 +189,7 @@ if __name__ == '__main__':
 	parser.add_argument('--patience', default=20, type=int,	help='Earlystopping threshold in number of epochs')
 	parser.add_argument('--num_epochs', default=10000, type=int, help='Number of epochs')
 	parser.add_argument('--train-astromer', action='store_true', help='If train astromer when classifying')
-	parser.add_argument('--clf-name', default='normal', type=str, help='classifier name')
+	parser.add_argument('--clf-name', default='att_mlp', type=str, help='classifier name')
 
 	opt = parser.parse_args()        
 	run(opt)

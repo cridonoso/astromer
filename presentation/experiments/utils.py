@@ -11,7 +11,9 @@ from tensorflow.keras import Model
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 def train_classifier(embedding, inp_placeholder, train_loader, valid_loader, test_loader, num_cls, project_path='', clf_name='emb_dense', debug=False):
-	os.makedirs(project_path, exist_ok=True)
+	os.makedirs(os.path.join(project_path, clf_name), exist_ok=True)
+	os.makedirs(os.path.join(project_path, clf_name), exist_ok=True)
+
 	if 'mlp' in clf_name:
 		x = Dense(1024, activation='relu')(embedding)
 		x = Dense(512, activation='relu')(x)
@@ -31,7 +33,7 @@ def train_classifier(embedding, inp_placeholder, train_loader, valid_loader, tes
 					  metrics=['accuracy'])
 	cbks =  [
 		ModelCheckpoint(
-			filepath=os.path.join(project_path, 'weights'),
+			filepath=os.path.join(project_path, clf_name, 'weights'),
 			save_weights_only=True,
 			mode='min',
 			monitor='val_loss',
@@ -41,7 +43,7 @@ def train_classifier(embedding, inp_placeholder, train_loader, valid_loader, tes
 			patience = 20,
 			restore_best_weights=True),
 		TensorBoard(
-			log_dir = os.path.join(project_path, 'logs'),
+			log_dir = os.path.join(project_path, clf_name, 'logs'),
 			histogram_freq=1,
 			write_graph=True)]
 
@@ -56,9 +58,8 @@ def train_classifier(embedding, inp_placeholder, train_loader, valid_loader, tes
 	y_pred = classifier.predict(test_loader)
 	y_true = tf.concat([y for _, y in test_loader], 0)
 
-	with open(os.path.join(project_path, 'predictions.pkl'), 'wb') as handle:
+	with open(os.path.join(project_path, clf_name,'predictions.pkl'), 'wb') as handle:
 		pickle.dump({'true':y_true, 'pred':y_pred}, handle)
-
 
 	pred_labels = tf.argmax(y_pred, 1)
 	true_labels = tf.argmax(y_true, 1)
@@ -76,5 +77,8 @@ def train_classifier(embedding, inp_placeholder, train_loader, valid_loader, tes
 				   'clf_test_recall': r, 
 				   'clf_test_f1': f,
 				   'clf_test_acc': test_acc}
+
+	with open(os.path.join(project_path, clf_name,'metrics.toml'), 'w') as f:
+		toml.dump(summary_clf, f)
 
 	return summary_clf

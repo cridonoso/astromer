@@ -16,17 +16,18 @@ clf_names = ['att_mlp']
 root = 'python -m presentation.experiments.astromer_1.downstream'
 for dataset in ds_names:
     print(dataset)
-    for spc in spc_list:
-        for fold_n in range(3):
-            start = time.time()
-            project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {}'
+    for clf_name in clf_names:
+        for spc in spc_list:
+            for fold_n in range(3):
+                start = time.time()
+                project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {} --clf-name {}'
 
-            command1 = project_path.format(root, gpu, dataset, pt_folder, fold_n, spc)
+                command1 = project_path.format(root, gpu, dataset, pt_folder, fold_n, spc, clf_name)
 
-            try:
-                subprocess.call(command1, shell=True)
-            except Exception as e:
-                print(e)
+                try:
+                    subprocess.call(command1, shell=True)
+                except Exception as e:
+                    print(e)
 
-            end = time. time()
-            print('{} takes {:.2f} sec'.format(dataset, (end - start)))
+                end = time. time()
+                print('{} takes {:.2f} sec'.format(dataset, (end - start)))

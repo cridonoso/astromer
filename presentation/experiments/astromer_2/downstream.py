@@ -184,11 +184,6 @@ def run(opt):
 								   clf_name=opt.clf_name,
 								   debug=opt.debug)
 
-	with open(os.path.join(CLFWEIGHTS, 'metrics.toml'), 'w') as f:
-		toml.dump(summary_clf, f)
-
-
-
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
