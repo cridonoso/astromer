@@ -11,8 +11,7 @@ batch_size = 2500
 records_folder = './data/records/'
 ds_names = ['alcock', 'atlas']
 spc_list = [20, 100]
-clf_names = ['cls_mlp', 'att_mlp', 'all_mlp']
- 
+clf_names = ['att_mlp'] #['cls_mlp', 'att_mlp', 'all_mlp']
 root = 'python -m presentation.experiments.astromer_2.downstream'
 for dataset in ds_names:
     for clf_name in clf_names:
