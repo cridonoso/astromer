@@ -89,19 +89,23 @@ def train_classifier(embedding, inp_placeholder, train_loader, valid_loader, tes
 
 def get_clf_summary(directory, tag=''):
 	clf_folders = glob.glob(os.path.join(directory, 'classification', '*', '*', '*', '*'))
-	ft_folders = glob.glob(os.path.join(directory, 'finetuning', '*', '*', '*'))
 
 	summary_metrics = []
-	for clfdir, ftdir in zip(clf_folders, ft_folders):
-		with open(os.path.join(ftdir, 'config.toml'), 'r') as file:
-			config = toml.load(file)
+	for clfdir in clf_folders:
 		clf_name = clfdir.split('/')[-1]    
-		ds_name  = ftdir.split('/')[-1].split('_')[0]
-		spc      = ftdir.split('/')[-1].split('_')[1]
+		ds_name  = clfdir.split('/')[-2].split('_')[0]
+		spc      = clfdir.split('/')[-2].split('_')[1]
+		
+		fold_n   = int(clfdir.split('/')[-3].split('_')[-1])
+		with open(os.path.join(directory, 'finetuning', ds_name, 'fold_{}'.format(fold_n), 
+							  '{}_{}'.format(ds_name, spc), 'config.toml'), 'r') as file:
+			config = toml.load(file)
+
 		with open(os.path.join(clfdir, 'metrics.toml'), 'r') as file:
 			metrics = toml.load(file)
 		metrics['tag'] = tag
 		metrics['clf_name'] = clf_name
+		metrics['fold'] = fold_n
 		metrics['downstream_data'] = ds_name
 		metrics['samples_per_class'] = spc
 		summary_metrics.append({**config, **metrics})

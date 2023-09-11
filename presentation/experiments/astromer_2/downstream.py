@@ -114,7 +114,7 @@ def run(opt):
 							  'classification', 
 							  opt.subdataset, 
 							  'fold_'+str(opt.fold), 
-							  opt.subdataset+'_20')
+							  opt.subdataset+'_'+str(opt.spc))
 	num_cls = pd.read_csv(os.path.join(DOWNSTREAM_DATA, 'objects.csv')).shape[0]
 
 	train_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
@@ -160,18 +160,20 @@ def run(opt):
 	if opt.clf_name == 'cls_mlp':
 		embedding = tf.slice(embedding, [0, 0, 0], [-1, 1,-1], name='slice_cls')
 		embedding = tf.squeeze(embedding, axis=1)
+
 	if opt.clf_name == 'att_mlp':
 		embedding = tf.slice(embedding, [0, 1, 0], [-1, 1,-1], name='slice_att')
 		embedding = embedding*(1.-inp_placeholder['att_mask'])
 		embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
-										  tf.reduce_sum(1.-inp_placeholder['att_mask']))
+										  tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
+		
 	if opt.clf_name == 'all_mlp':
 		cls_token  = tf.slice(embedding, [0, 0, 0], [-1, 1,-1], name='slice_cls')
 		cls_token = tf.squeeze(cls_token, axis=1)
 		att_tokens = tf.slice(embedding, [0, 1, 0], [-1, 1,-1], name='slice_att')
 		att_tokens = att_tokens*(1.-inp_placeholder['att_mask'])
 		att_tokens = tf.math.divide_no_nan(tf.reduce_sum(att_tokens, axis=1), 
-										  tf.reduce_sum(1.-inp_placeholder['att_mask']))
+										  tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
 		embedding = tf.concat([att_tokens, cls_token], axis=-1)
 
 	summary_clf = train_classifier(embedding,

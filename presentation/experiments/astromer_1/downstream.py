@@ -115,7 +115,7 @@ def run(opt):
 							  'classification', 
 							  opt.subdataset, 
 							  'fold_'+str(opt.fold), 
-							  opt.subdataset+'_20')
+							  opt.subdataset+'_'+str(opt.spc))
 	num_cls = pd.read_csv(os.path.join(DOWNSTREAM_DATA, 'objects.csv')).shape[0]
 
 	train_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
@@ -162,7 +162,7 @@ def run(opt):
 	embedding = encoder(inp_placeholder)
 	embedding = embedding*(1.-inp_placeholder['att_mask'])
 	embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
-									  tf.reduce_sum(1.-inp_placeholder['att_mask']))
+									  tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
 	
 	summary_clf = train_classifier(embedding,
 								   inp_placeholder=inp_placeholder,
