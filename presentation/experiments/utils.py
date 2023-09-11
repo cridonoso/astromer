@@ -1,5 +1,8 @@
 import tensorflow as tf
+import pandas as pd
 import pickle
+import glob
+import toml
 import os 
 
 from tensorflow.keras.callbacks  import ModelCheckpoint, EarlyStopping, TensorBoard
@@ -82,3 +85,25 @@ def train_classifier(embedding, inp_placeholder, train_loader, valid_loader, tes
 		toml.dump(summary_clf, f)
 
 	return summary_clf
+
+
+def get_clf_summary(directory, tag=''):
+	clf_folders = glob.glob(os.path.join(directory, 'classification', '*', '*', '*', '*'))
+	ft_folders = glob.glob(os.path.join(directory, 'finetuning', '*', '*', '*'))
+
+	summary_metrics = []
+	for clfdir, ftdir in zip(clf_folders, ft_folders):
+		with open(os.path.join(ftdir, 'config.toml'), 'r') as file:
+			config = toml.load(file)
+		clf_name = clfdir.split('/')[-1]    
+		ds_name  = ftdir.split('/')[-1].split('_')[0]
+		spc      = ftdir.split('/')[-1].split('_')[1]
+		with open(os.path.join(clfdir, 'metrics.toml'), 'r') as file:
+			metrics = toml.load(file)
+		metrics['tag'] = tag
+		metrics['clf_name'] = clf_name
+		metrics['downstream_data'] = ds_name
+		metrics['samples_per_class'] = spc
+		summary_metrics.append({**config, **metrics})
+	df = pd.DataFrame(summary_metrics)
+	return df 

@@ -23,7 +23,7 @@ def plot_cm(cm, ax, title='CM', fontsize=15, cbar=False, yticklabels=True, class
         if value < 0.01:
             labels[row][col] = '< 1%'
         else:
-            labels[row][col] = '{:2.1f}%'.format(value*100)
+            labels[row][col] = '{:2.1f}\\%'.format(value*100)
 
     ax = sns.heatmap(cm, annot = labels, fmt = '',
                      annot_kws={"size": fontsize},
@@ -39,7 +39,7 @@ def plot_cm(cm, ax, title='CM', fontsize=15, cbar=False, yticklabels=True, class
     try:
         if yticklabels and class_names is not None:
             ax.set_yticklabels(class_names, rotation=0, fontsize=fontsize+1)
-            ax.set_xticklabels(class_names, rotation=90, fontsize=fontsize+1)
+            ax.set_xticklabels(class_names, rotation=0, fontsize=fontsize+1)
     except:
         pass
     ax.set_title(title, fontsize=fontsize+5)
