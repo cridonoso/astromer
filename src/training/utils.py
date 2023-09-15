@@ -54,7 +54,7 @@ def train(model,
 	train_writer = tf.summary.create_file_writer(os.path.join(project_path, 'logs', 'train'))
 	valid_writer = tf.summary.create_file_writer(os.path.join(project_path, 'logs', 'validation'))
 	print('[INFO] Log values at: {}'.format(os.path.join(project_path, 'logs')))
-	optimizer = AdamW(lr, name='astromer_optimizer')
+	optimizer = Adam(lr, name='astromer_optimizer')
 	es_count = 0
 	min_loss = 1e9
 	best_train_log, best_val_log = None, None
@@ -89,10 +89,12 @@ def train(model,
 			print('[INFO] Early Stopping Triggered at epoch {:03d}'.format(epoch))
 			break
 
-		ebar.set_description('STOP: {:02d}/{:02d} LOSS: {:.3f}/{:.3f}'.format(es_count, 
+		ebar.set_description('STOP: {:02d}/{:02d} LOSS: {:.3f}/{:.3f} R2:{:.3f}/{:.3f}'.format(es_count, 
 																			patience, 
 																			epoch_train_metrics['loss'],
-																			epoch_valid_metrics['loss']))
+																			epoch_valid_metrics['loss'],
+																			epoch_train_metrics['r_square'],
+																			epoch_valid_metrics['r_square']))
 
 	elapsed = time.time() - start
 
