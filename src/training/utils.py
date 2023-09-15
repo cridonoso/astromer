@@ -49,11 +49,10 @@ def train(model,
 		with open(os.path.join(project_path, 'config.toml'), 'w') as f:
 			toml.dump(argparse_dict, f)
 
-
 	# ======= TRAINING LOOP =========
 	train_writer = tf.summary.create_file_writer(os.path.join(project_path, 'logs', 'train'))
 	valid_writer = tf.summary.create_file_writer(os.path.join(project_path, 'logs', 'validation'))
-	print('[INFO] Log values at: {}'.format(os.path.join(project_path, 'logs')))
+	print('[INFO] Logs: {}'.format(os.path.join(project_path, 'logs')))
 	optimizer = Adam(lr, name='astromer_optimizer')
 	es_count = 0
 	min_loss = 1e9
