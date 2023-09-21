@@ -3,7 +3,7 @@ import multiprocessing
 import os
 
 from src.data.record import deserialize
-from src.data.preprocessing import to_windows, min_max_scaler, standardize_dataset
+from src.data.preprocessing import to_windows, min_max_scaler, standardize_dataset, standardize
 from src.data.masking import get_probed, add_random
 from src.data.nsp import randomize, randomize_v2
 
@@ -164,12 +164,15 @@ def load_data(dataset,
     dataset, sizes = to_windows(dataset,
                          window_size=window_size,
                          sampling=sampling)
+
+    dataset = dataset.map(standardize)
+
     # CREATE BATCHES
     dataset = dataset.padded_batch(batch_size, padded_shapes=sizes)
     
     # STANDARDIZE
-    dataset = dataset.map(lambda x: standardize_dataset(x, on='input'))
-    dataset = dataset.map(lambda x: standardize_dataset(x, on='original'))
+    # dataset = dataset.map(lambda x: standardize_dataset(x, on='input'))
+    # dataset = dataset.map(lambda x: standardize_dataset(x, on='original'))
     
     # MASKING
     dataset = dataset.map(lambda x: get_probed(x, probed=probed, njobs=njobs))
