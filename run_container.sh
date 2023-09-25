@@ -23,8 +23,8 @@ else
     --privileged=true \
     --mount "type=bind,src=$(pwd),dst=/home/" \
     --workdir /home/ \
-    -p 8887:8887 \
-    -p 6006:6006 \
+    -p 8883:8883 \
+    -p 6003:6003 \
     -e HOST="$(whoami)" \
     astromer bash
 fi
