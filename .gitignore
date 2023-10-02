@@ -15,3 +15,5 @@ presentation/experiments/astromer_0/results*
 wandb
 presentation/experiments/astromer_0/backup/
 presentation/experiments/astromer_2/results_2/
+/spectral_3000
+.DS_Store
