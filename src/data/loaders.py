@@ -3,8 +3,8 @@ import multiprocessing
 import os
 
 from src.data.record import deserialize
-from src.data.preprocessing import to_windows, min_max_scaler, standardize_dataset
-from src.data.masking import get_probed, add_random
+from src.data.preprocessing import to_windows, min_max_scaler, standardize_dataset,get_moving_median,to_windows_astrospec,standardize_dataset_astrospec
+from src.data.masking import get_probed, add_random,get_probed_astrospec
 from src.data.nsp import randomize, randomize_v2
 
 def load_records(records_dir):
@@ -18,7 +18,7 @@ def load_records(records_dir):
     """
     rec_paths = []
     for folder in os.listdir(records_dir):
-        if folder.endswith('.csv'):
+        if folder.endswith('.csv') or folder.endswith('.DS_Store'):
             continue
         for x in os.listdir(os.path.join(records_dir, folder)):
             rec_paths.append(os.path.join(records_dir, folder, x))
@@ -181,6 +181,64 @@ def load_data(dataset,
     else:
         dataset = dataset.map(lambda x: randomize_v2(x, nsp_prob=nsp_prob))
         dataset = dataset.map(lambda x: format_input(x, cls_token=-99., num_cls=num_cls, test_mode=test_mode))
+
+    if shuffle:
+        SHUFFLE_BUFFER = 10000
+        dataset = dataset.shuffle(SHUFFLE_BUFFER)
+
+    # PREFETCH
+    dataset = dataset.prefetch(2)
+
+    return dataset
+
+def load_data_astrospec(dataset, 
+              batch_size=16,
+              no_of_observations=500, 
+              non_exclusive_fraction=0.02, 
+              exclusive_fraction=0.15,
+              iqr_threshold=0.4,
+              random_fraction=0,
+              same_fraction=0, 
+              moving_window_size=11, 
+              nsp_prob=.5, 
+              repeat=1, 
+              sampling=False, 
+              shuffle=False,
+              njobs=None,
+              num_cls=None,
+              test_mode=False,
+              off_nsp=False):
+
+    if njobs is None:
+        njobs = multiprocessing.cpu_count()//2
+
+    dataset = load_records(dataset)
+
+    # REPEAT
+    dataset = dataset.repeat(repeat)
+    
+    # MOVING MEDIAN CALCULATION
+    dataset = dataset.map(lambda x: get_moving_median(x,moving_window_size))
+
+    # CREATE WINDOWS
+    dataset, sizes = to_windows_astrospec(dataset,
+                         window_size=no_of_observations,
+                         sampling=sampling)
+    
+    # STANDARDIZE
+    dataset = dataset.map(lambda x: standardize_dataset_astrospec(x, on='input'))
+    dataset = dataset.map(lambda x: standardize_dataset_astrospec(x, on='moving_median_sequence'))
+    dataset = dataset.map(lambda x: standardize_dataset_astrospec(x, on='original'))
+    
+    # MASKING
+    dataset = dataset.map(lambda x: get_probed_astrospec(x, exclusive_fraction,non_exclusive_fraction,iqr_threshold,random_fraction,same_fraction,njobs=njobs))
+   
+    # PADDING
+    sizes['probed_mask']=(no_of_observations)
+    sizes['att_mask']=(no_of_observations)
+    dataset = dataset.padded_batch(batch_size,padded_shapes=sizes)
+    
+    dataset = dataset.map(lambda x: format_input_no_nsp(x, num_cls=num_cls, test_mode=test_mode))
 
     if shuffle:
         SHUFFLE_BUFFER = 10000
