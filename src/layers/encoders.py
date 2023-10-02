@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from src.layers.attblock import AttentionBlock
+from src.layers.attblock import AttentionBlock,AttentionBlock_astrospec
 from src.layers.positional import PositionalEncoder
 from tensorflow.keras.layers import Layer
 from tensorflow.keras import Model
@@ -18,6 +18,7 @@ class Encoder(Model):
 				 pe_dim=128,
 				 pe_c=1., 
 				 average_layers=False,
+				 astrospec_skip=False,
 				 **kwargs):
 		super(Encoder, self).__init__(**kwargs)
 
@@ -32,11 +33,16 @@ class Encoder(Model):
 		self.pe_dim         = pe_dim
 		self.average_layers = average_layers
 		self.inp_transform  = tf.keras.layers.Dense(self.pe_dim, name='inp_transform')
+		self.astrospec_skip = astrospec_skip
 
 		self.positional_encoder = PositionalEncoder(self.pe_dim, base=self.pe_base, c=self.pe_c, name='PosEncoding')
-		
-		self.enc_layers = [AttentionBlock(self.head_dim, self.num_heads, self.mixer_size, dropout=self.dropout, name=f'att_layer_{i}')
+  
+		if self.astrospec_skip:
+			self.enc_layers = [AttentionBlock_astrospec(self.head_dim, self.num_heads, self.mixer_size, dropout=self.dropout, name=f'att_layer_{i}')
 							for i in range(self.num_layers)]
+		else:
+			self.enc_layers = [AttentionBlock(self.head_dim, self.num_heads, self.mixer_size, dropout=self.dropout, name=f'att_layer_{i}')
+								for i in range(self.num_layers)]
 		
 		self.dropout_layer = tf.keras.layers.Dropout(self.dropout)
 
