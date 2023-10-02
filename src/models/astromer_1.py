@@ -36,6 +36,7 @@ def get_ASTROMER(num_layers=2,
 				 window_size=100,
 				 batch_size=None,
 				 encoder_mode='normal',
+				 astrospec_skip=False,
 				 average_layers=False):
 
 	placeholder = build_input(window_size)
@@ -50,6 +51,7 @@ def get_ASTROMER(num_layers=2,
 					  pe_dim=pe_dim,
 					  pe_c=pe_c,
 					  average_layers=average_layers,
+					  astrospec_skip=astrospec_skip,
 					  name='encoder')
 
 	x = encoder(placeholder)
