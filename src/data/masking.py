@@ -1,4 +1,7 @@
 import tensorflow as tf
+from src.data.preprocessing import calculate_iqr
+from src.data.zero import set_random
+
 
 def get_probed(input_dict, probed, njobs):
 
@@ -27,6 +30,67 @@ def get_probed(input_dict, probed, njobs):
 
     return input_dict
 
+def get_probed_astrospec(input_dict,exclusive_frac,non_exclusive_frac,iqr_threshold,random_fraction=0.2,same_fraction=0.2,njobs=None):
+    
+    input_sequence=input_dict['input']
+    moving_median_sequence=input_dict['moving_median_sequence']
+    
+    steps = tf.shape(input_sequence)[0]
+    indices = tf.range(steps)
+    
+    input_flux=tf.slice(input_sequence,[0,1],[-1,1])
+    moving_median_flux=tf.slice(moving_median_sequence,[0,1],[-1,1])
+    
+    squeezed_input_flux=tf.squeeze(input_flux)
+    squeezed_moving_median_flux=tf.squeeze(moving_median_flux)
+    
+    iqr=calculate_iqr(squeezed_moving_median_flux)
+    
+    exclusive_emission=tf.cast(((squeezed_input_flux)>(squeezed_moving_median_flux+iqr_threshold*iqr)),tf.int32)
+    exclusive_absorption=tf.cast(((squeezed_input_flux)<(squeezed_moving_median_flux-iqr_threshold*iqr)),tf.int32)
+    exclusive_zone=exclusive_emission+exclusive_absorption
+    
+    
+    emission_startidx_size=startidx_size_pair(exclusive_emission)
+    absorption_startidx_size=startidx_size_pair(exclusive_absorption)
+    
+    
+    exclusion_startidx_size=tf.concat([emission_startidx_size,absorption_startidx_size],axis=0)
+    shuffled_exclusive_startidx_size=tf.random.shuffle(exclusion_startidx_size)
+    
+    num_rows_exclusive=tf.cast(tf.multiply(tf.cast(tf.shape(exclusion_startidx_size)[0], tf.float32), exclusive_frac),tf.int32)
+    selected_rows_exclusive = tf.slice(shuffled_exclusive_startidx_size, [0, 0], [num_rows_exclusive, -1])
+    
+    exclusive_mask=tf.zeros_like(exclusive_zone)
+    exclusive_mask=update_mask(exclusive_mask,selected_rows_exclusive)
+    
+    
+    non_exclusive_zone=tf.math.logical_not(tf.cast(exclusive_zone,tf.bool))
+    non_exclusive_zone=tf.cast(non_exclusive_zone,tf.int32)
+    
+    
+    non_exclusive_startidx_size=startidx_size_pair(non_exclusive_zone)
+    shuffled_non_exclusive_startidx_size=tf.random.shuffle(non_exclusive_startidx_size)
+    
+    num_rows_non_exclusive=tf.cast(tf.multiply(tf.cast(tf.shape(non_exclusive_startidx_size)[0], tf.float32), non_exclusive_frac),tf.int32)
+    selected_rows_non_exclusive = tf.slice(shuffled_non_exclusive_startidx_size, [0, 0], [num_rows_non_exclusive, -1])
+    
+    non_exclusive_mask=tf.zeros_like(non_exclusive_zone)
+    non_exclusive_mask=update_mask(non_exclusive_mask,selected_rows_non_exclusive)
+    
+    exclusive_mask=tf.cast(exclusive_mask,dtype=tf.float32)
+    non_exclusive_mask=tf.cast(non_exclusive_mask,dtype=tf.float32)
+
+    probed_mask=exclusive_mask+non_exclusive_mask
+    
+    input_flux,attention_mask=set_random(input_flux,probed_mask,input_flux,same_fraction,name="set_same")
+    input_flux,attention_mask=set_random(input_flux,attention_mask,tf.random.shuffle(input_flux),random_fraction,name="set_random")
+    
+    input_dict['probed_mask']=probed_mask
+    input_dict['att_mask']=attention_mask
+    
+    return input_dict
+    
 def create_mask(pre_mask, n_elements):
     indices = tf.where(pre_mask)
     indices = tf.random.shuffle(indices)
@@ -97,3 +161,27 @@ def add_random(input_dict, random_frac, njobs):
     input_dict['att_mask'] = tf.cast(att_mask, tf.float32)
 
     return input_dict
+
+def startidx_size_pair(mask_sequence):
+	windows = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
+	start = 0
+	window_size = 0
+
+	for i in tf.range(tf.shape(mask_sequence)[0]):
+		if mask_sequence[i] == 1:
+			if window_size == 0:
+				start = i
+			window_size += 1
+		else:
+			if window_size > 1:
+				windows = windows.write(windows.size(), (start, window_size))
+			window_size = 0
+	return windows.stack()
+
+def update_mask(mask,selected_rows):
+    for k in tf.range(tf.shape(selected_rows)[0]):
+        indices_selected=tf.range(selected_rows[k][0],selected_rows[k][0]+selected_rows[k][1])
+        updates = tf.ones(selected_rows[k][1], dtype=mask.dtype)
+        reshaped_indices=tf.reshape(indices_selected,[-1,1])
+        mask = tf.tensor_scatter_nd_update(mask, reshaped_indices, updates)
+    return mask
