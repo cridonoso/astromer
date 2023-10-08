@@ -76,7 +76,7 @@ def train_step(model, x, y, optimizer):
 
 @tf.function
 def test_step(model, x, y, return_pred=False):
-	x_pred = model(x, training=True)
+	x_pred = model(x, training=False)
 	rmse = custom_rmse(y_true=y['magnitudes'],
 					  y_pred=x_pred,
 					  mask=y['probed_mask'])

@@ -4,6 +4,29 @@ from src.data.record import deserialize
 import numpy as np
 import tensorflow_probability as tfp
 
+def standardize(tensor, axis=0, return_mean=False):
+    """
+    Standardize a tensor subtracting the mean
+
+    Args:
+        tensor (1-dim tensorflow tensor): values
+        axis (int): axis on which we calculate the mean
+        return_mean (bool): output the mean of the tensor
+                            turning on the original scale
+    Returns:
+        tensor (1-dim tensorflow tensor): standardize tensor
+    """
+
+    mean_value = tf.reduce_mean(tensor['input'], axis, name='mean_value')
+    tensor['input'] = tensor['input'] - tf.expand_dims(mean_value, axis)
+
+    mean_value = tf.reduce_mean(tensor['original'], axis, name='mean_value')
+    tensor['original'] = tensor['original'] - tf.expand_dims(mean_value, axis)
+    return tensor
+    if return_mean:
+        return z, mean_value
+    else:
+        return z
 
 def standardize_batch(input_tensor, axis=1):
 	N = tf.where(tf.abs(input_tensor) > 0, 1., 0.)

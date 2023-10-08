@@ -13,7 +13,7 @@ ds_names = ['alcock', 'atlas']
 spc_list = [20, 100]
 clf_names = ['att_mlp']
  
-root = 'python -m presentation.experiments.astromer_1.downstream'
+root = 'python -m presentation.experiments.astromer_1.classify'
 for dataset in ds_names:
     print(dataset)
     for clf_name in clf_names:

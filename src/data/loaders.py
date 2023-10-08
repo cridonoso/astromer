@@ -164,12 +164,15 @@ def load_data(dataset,
     dataset, sizes = to_windows(dataset,
                          window_size=window_size,
                          sampling=sampling)
+
+    dataset = dataset.map(standardize)
+
     # CREATE BATCHES
     dataset = dataset.padded_batch(batch_size, padded_shapes=sizes)
     
     # STANDARDIZE
-    dataset = dataset.map(lambda x: standardize_dataset(x, on='input'))
-    dataset = dataset.map(lambda x: standardize_dataset(x, on='original'))
+    # dataset = dataset.map(lambda x: standardize_dataset(x, on='input'))
+    # dataset = dataset.map(lambda x: standardize_dataset(x, on='original'))
     
     # MASKING
     dataset = dataset.map(lambda x: get_probed(x, probed=probed, njobs=njobs))
