@@ -27,7 +27,7 @@ class AttentionBlock(tf.keras.layers.Layer):
 		self.dropout2 = tf.keras.layers.Dropout(self.dropout)
 
 	def call(self, x, training, mask=None, return_weights=False):
-		attn_output, att_weights = self.mha(x, mask)  # (batch_size, input_seq_len, d_model)
+		attn_output, att_weights = self.mha(x, training=training, mask=mask)  # (batch_size, input_seq_len, d_model)
 		attn_output = self.dropout1(attn_output, training=training)
 		attn_output = self.layernorm1(attn_output, training=training)
 		ffn_output  = self.ffn(attn_output)  # (batch_size, input_seq_len, d_model)
