@@ -14,7 +14,7 @@ class MergingLayer(tf.keras.layers.Layer):
 
 class AttentionBlock(tf.keras.layers.Layer):
 	def __init__(self, head_dim, num_heads, mixer_size, dropout=0.1, **kwargs):
-		super(AttentionBlock, self).__init__(head_dim, num_heads, mixer_size, dropout=0.1, **kwargs)
+		super(AttentionBlock, self).__init__(**kwargs)
 		self.head_dim = head_dim
 		self.num_heads = num_heads
 		self.mixer_size = mixer_size
@@ -37,9 +37,19 @@ class AttentionBlock(tf.keras.layers.Layer):
 			return ffn_output, att_weights
 		return ffn_output
 
-class AttentionBlock_astrospec(AttentionBlock):
-	def __init__(self, head_dim, num_heads, mixer_size, dropout=0.1, **kwargs):
-		super(AttentionBlock_astrospec, self).__init__(head_dim, num_heads, mixer_size, dropout=0.1, **kwargs)
+class AttentionBlock_astrospec(tf.keras.layers.Layer):
+	def __init__(self, head_dim, num_heads, mixer_size, dropout=0.1,**kwargs):
+		super(AttentionBlock_astrospec, self).__init__(**kwargs)
+		self.head_dim = head_dim
+		self.num_heads = num_heads
+		self.mixer_size = mixer_size
+		self.dropout = dropout
+		self.mha = HeadAttentionMulti(self.head_dim, self.num_heads)
+		self.ffn = MergingLayer(self.mixer_size, self.num_heads, self.head_dim, name='att_block_merging_layer')
+		self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+		self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+		self.dropout1 = tf.keras.layers.Dropout(self.dropout)
+		self.dropout2 = tf.keras.layers.Dropout(self.dropout)
 		self.skip_after_mha=tf.keras.layers.Dense(self.head_dim*self.num_heads)
 		self.skip_after_ffn=tf.keras.layers.Dense(self.head_dim*self.num_heads)
 
