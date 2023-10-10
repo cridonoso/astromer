@@ -3,6 +3,7 @@ import argparse
 import sys
 import os
 
+sys.path.append('./')
 from src.models.astromer_1 import get_ASTROMER, train_step, test_step
 
 from src.training.utils import train
