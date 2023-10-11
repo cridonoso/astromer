@@ -2,7 +2,8 @@ import tensorflow as tf
 
 from src.layers.attblock import AttentionBlock
 from src.layers.positional import PositionalEncoder
-from tensorflow.keras.layers import Layer
+from src.layers.nsp import ClassToken
+from tensorflow.keras.layers import Layer, Concatenate
 from tensorflow.keras import Model
 
 class Encoder(Model):
@@ -20,6 +21,7 @@ class Encoder(Model):
 				 average_layers=False,
 				 **kwargs):
 		super(Encoder, self).__init__(**kwargs)
+		# super().__init__(**kwargs)
 
 		self.window_size 	= window_size
 		self.num_layers  	= num_layers
@@ -84,4 +86,27 @@ class ConcatEncoder(Encoder):
 		else:
 			window_size = self.window_size
 			x = tf.concat([x_pe, inputs['magnitudes']], 2)
+		return x, window_size
+
+class NSPEncoder(Encoder):
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
+
+		self.cls_token = ClassToken()
+		self.concat_cls    = Concatenate(axis=1, name='concat_cls')
+
+	def input_format(self, inputs):
+		x = tf.concat([inputs['magnitudes'], inputs['seg_emb']], axis=2, name='concat_mag_segemb')
+		
+		x_transformed = self.inp_transform(x)   
+		x_pe = self.positional_encoder(inputs['times'])
+		x = x_transformed + x_pe   
+
+		x_cls = self.cls_token(x)
+		x = self.concat_cls([x_cls, x])
+
+		window_size = self.window_size + 1
+		msk_cls_tkn = tf.zeros([tf.shape(x)[0], 1, 1])
+		inputs['att_mask'] = self.concat_cls([msk_cls_tkn, inputs['att_mask']])
+
 		return x, window_size

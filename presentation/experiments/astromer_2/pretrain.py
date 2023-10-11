@@ -89,8 +89,8 @@ if __name__ == '__main__':
 						help='GPU to be used. -1 means no GPU will be used')
 	parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
 
-	parser.add_argument('--encoder-mode', default='normal', type=str,
-						help='normal - conditioned')
+	parser.add_argument('--encoder-mode', default='nsp', type=str,
+						help='nsp')
 	parser.add_argument('--num-layers', default=2, type=int,
 						help='Number of Attention Layers')
 	parser.add_argument('--num-heads', default=4, type=int,
