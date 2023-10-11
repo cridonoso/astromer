@@ -54,7 +54,7 @@ class AttentionBlock_astrospec(tf.keras.layers.Layer):
 		self.skip_after_ffn=tf.keras.layers.Dense(self.head_dim*self.num_heads)
 
 	def call(self, x, training, mask=None, return_weights=False):
-		attn_output, att_weights = self.mha(x, mask)  # (batch_size, input_seq_len, d_model)
+		attn_output, att_weights = self.mha(x,training=training,mask=mask)  # (batch_size, input_seq_len, d_model)
 		attn_output = self.dropout1(attn_output, training=training)
 		residual_mask=tf.where(tf.equal(mask,1), tf.zeros_like(mask), tf.ones_like(mask))
 		attn_output = self.layernorm1(self.skip_after_mha(x*residual_mask)+attn_output, training=training)
