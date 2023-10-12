@@ -19,6 +19,7 @@ depth   = d_model // num_heads # final dimension
 q = tf.random.normal([1, 10, head_dim*num_heads], dtype=tf.float32)
 k = tf.random.normal([1, 10, head_dim*num_heads], dtype=tf.float32)
 v = tf.random.normal([1, 10, head_dim*num_heads], dtype=tf.float32)
+
 q = split_heads(q, batch_size=1, num_heads=num_heads, depth=depth)
 k = split_heads(k, batch_size=1, num_heads=num_heads, depth=depth)
 v = split_heads(v, batch_size=1, num_heads=num_heads, depth=depth)
@@ -28,9 +29,9 @@ mask = tf.expand_dims(mask, axis=-1)
 
 
 out_0, w_0 = dot_prod_a0(q, k, v, mask=mask)
-out_1, w_1 = dot_prod_a1(q, k, v, mask=mask, mask_format='first')
+out_1, w_1 = dot_prod_a1(q, k, v, mask=mask, mask_format='first-r')
 
-fig, axes = plt.subplots(1, 3)
+fig, axes = plt.subplots(1, 3, dpi=300)
 axes[0].imshow(w_0[0, 0])
 im = axes[1].imshow(w_1[0, 0])
 axes[2].imshow(tf.abs(w_1[0, 0] - w_0[0, 0]))

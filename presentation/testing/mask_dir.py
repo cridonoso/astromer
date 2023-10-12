@@ -17,11 +17,11 @@ V = wv(magnitudes)
 
 matmul_qk = tf.matmul(Q, K, transpose_b=True) 
 
-# matmul_qk = tf.nn.softmax(matmul_qk, axis=-1, name='MaskedSoftMax') 
+matmul_qk = tf.nn.softmax(matmul_qk, axis=-1, name='MaskedSoftMax') 
 
 a = tf.reduce_sum(matmul_qk[0, 0], axis=-1)
 
-fig, axes = plt.subplots(1, 3, figsize=(10,10))
+fig, axes = plt.subplots(1, 3, figsize=(10,10), dpi=300)
 axes[0].imshow(Q[0, 0], cmap='Blues')
 
 axes[1].imshow(tf.transpose(K[0, 0]), cmap='Blues')
@@ -33,7 +33,8 @@ fig.colorbar(im, cax=cbar_ax)
 
 axes[0].set_title('Q')
 axes[1].set_title('K')
-axes[2].set_title('QK')
+axes[2].set_title('K')
+axes[2].set_ylabel('Q')
 
 for ax in axes[:-1]:
 	ax.axis('off')
