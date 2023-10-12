@@ -82,7 +82,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--exp-name', default='pretrain', type=str,
 					help='Project name')
-	parser.add_argument('--data', default='./data/records/macho_clean', type=str,
+	parser.add_argument('--data', default='./data/records/macho', type=str,
 					help='Data folder where tf.record files are located')
 	parser.add_argument('--checkpoint', default='-1', type=str,
 						help='Restore training by using checkpoints. This is the route to the checkpoint folder.')
