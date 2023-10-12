@@ -104,9 +104,9 @@ if __name__ == '__main__':
 						help='Positional encoder base')
 	parser.add_argument('--pe-exp', default=2, type=int,
 						help='Positional encoder exponent')
-	parser.add_argument('--mixer', default=256, type=int,
+	parser.add_argument('--mixer', default=128, type=int,
 						help='Units to be used on the hidden layer of a feed-forward network that combines head outputs within an attention layer')
-	parser.add_argument('--dropout', default=0.1, type=float,
+	parser.add_argument('--dropout', default=0., type=float,
 						help='Dropout to use on the output of each attention layer (before mixer layer)')
 	parser.add_argument('--avg-layers', action='store_true', help='If averaging outputs of the attention layers to form the final embedding. There is no avg if layers=1 ')
 	parser.add_argument('--mask-format', default='first', type=str,
