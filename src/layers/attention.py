@@ -91,21 +91,14 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 		return tf.transpose(x, perm=[0, 2, 1, 3], name=name)
 	
 	def _output_format(self, query, value, key=None):
-        
-        if hasattr(query, "shape"):
-            self._query_shape = tf.TensorShape(query.shape)
-        else:
-            self._query_shape = tf.TensorShape(query)
-        if hasattr(value, "shape"):
-            self._value_shape = tf.TensorShape(value.shape)
-        else:
-            self._value_shape = tf.TensorShape(value)
-        if key is None:
-            self._key_shape = self._value_shape
-        elif hasattr(key, "shape"):
-            self._key_shape = tf.TensorShape(key.shape)
-        else:
-            self._key_shape = tf.TensorShape(key)
+
+		if hasattr(query, "shape"): self._query_shape = tf.TensorShape(query.shape)
+		else: self._query_shape = tf.TensorShape(query)
+		if hasattr(value, "shape"): self._value_shape = tf.TensorShape(value.shape)
+		else: self._value_shape = tf.TensorShape(value)
+		if key is None: self._key_shape = self._value_shape
+		elif hasattr(key, "shape"): self._key_shape = tf.TensorShape(key.shape)
+		else: self._key_shape = tf.TensorShape(key)
 
 	def call(self, x, training, mask=None):
 		batch_size = tf.shape(x)[0]
@@ -139,8 +132,8 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 			"head_dim": self.head_dim,
 			"num_heads": self.num_heads,
 			"query_shape": self._query_shape,
-            "key_shape": self._key_shape,
-            "value_shape": self._value_shape,
+			"key_shape": self._key_shape,
+			"value_shape": self._value_shape,
 		})
 		return config
 
@@ -150,7 +143,7 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 			"head_dim": self.head_dim,
 			"num_heads": self.num_heads,
 			"query_shape": self._query_shape,
-            "key_shape": self._key_shape,
-            "value_shape": self._value_shape,
+			"key_shape": self._key_shape,
+			"value_shape": self._value_shape,
 		}
 		return {**base_config, **config}
