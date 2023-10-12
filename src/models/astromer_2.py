@@ -45,7 +45,8 @@ def get_ASTROMER(num_layers=2,
 				 window_size=100,
 				 batch_size=None,
 				 encoder_mode='normal',
-				 average_layers=False):
+				 average_layers=False,
+				 mask_format='first'): # first / zero
 	
 	placeholder = build_input(window_size)
 
@@ -60,6 +61,7 @@ def get_ASTROMER(num_layers=2,
 						  pe_dim=pe_dim,
 						  pe_c=pe_c,
 						  average_layers=average_layers,
+						  mask_format=mask_format,
 						  name='encoder')
 
 	if encoder_mode == 'nsp':
@@ -74,6 +76,7 @@ def get_ASTROMER(num_layers=2,
 							 pe_dim=pe_dim,
 							 pe_c=pe_c,
 							 average_layers=average_layers,
+							 mask_format=mask_format,
 							 name='encoder')
 
 	if encoder_mode == 'concat':
@@ -87,6 +90,7 @@ def get_ASTROMER(num_layers=2,
 								pe_dim=pe_dim,
 								pe_c=pe_c,
 								average_layers=average_layers,
+								mask_format=mask_format,
 								name='encoder')
 
 	reg_layer = TransformLayer(name='regressor')

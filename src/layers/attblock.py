@@ -13,13 +13,14 @@ class MergingLayer(tf.keras.layers.Layer):
 		return self.layer_1(x)
 
 class AttentionBlock(tf.keras.layers.Layer):
-	def __init__(self, head_dim, num_heads, mixer_size, dropout=0.1, **kwargs):
+	def __init__(self, head_dim, num_heads, mixer_size, dropout=0.1, mask_format='first', **kwargs):
 		super(AttentionBlock, self).__init__(**kwargs)
 		self.head_dim = head_dim
 		self.num_heads = num_heads
 		self.mixer_size = mixer_size
 		self.dropout = dropout
-		self.mha = HeadAttentionMulti(self.head_dim, self.num_heads)
+		self.mask_format = mask_format
+		self.mha = HeadAttentionMulti(self.head_dim, self.num_heads, mask_format=mask_format)
 		self.ffn = MergingLayer(self.mixer_size, self.num_heads, self.head_dim, name='att_block_merging_layer')
 		self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 		self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
@@ -44,6 +45,7 @@ class AttentionBlock(tf.keras.layers.Layer):
 			"num_heads": self.num_heads,
 			"dff": self.dff,
 			"dropout": self.rate,
+			"mask_format": self.mask_format,
 			"mha": serialize_keras_object(self.mha),
 			"ffn": serialize_keras_object(self.ffn),
 		})

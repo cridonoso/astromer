@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 
-def scaled_dot_product_attention(q, k, v, mask=None, return_mask=False):
+def scaled_dot_product_attention(q, k, v, mask=None, return_mask=False, mask_format='first'):
 	"""Calculate the attention weights.
 	q, k, v must have matching leading dimensions.
 	k, v must have matching penultimate dimension, i.e.: seq_len_k = seq_len_v.
@@ -25,15 +25,42 @@ def scaled_dot_product_attention(q, k, v, mask=None, return_mask=False):
 	dk = tf.cast(tf.shape(k)[-1], tf.float32)
 	scaled_attention_logits = matmul_qk / tf.math.sqrt(dk)
 
-	if mask is not None:
-		steps = tf.shape(scaled_attention_logits)[2]
-		mask = tf.tile(mask, [1,1,steps])
-		mask_rshp_v = tf.reverse(mask, axis=[1])
-		mask_rshp_h = tf.transpose(mask, [0,2,1])
-		mask_rshp   = mask_rshp_v + mask_rshp_h
-		mask_rshp   = tf.minimum(1., mask_rshp)
-		mask_rshp   = tf.expand_dims(mask_rshp, 1)
-		scaled_attention_logits += (mask_rshp*-1e9)
+	if mask is not None:		
+		if mask_format == 'first':
+			steps = tf.shape(scaled_attention_logits)[2]
+			mask_rshp = tf.tile(mask, [1,1,steps])
+			mask_rshp += tf.transpose(mask_rshp, [0,2,1])
+			mask_rshp = tf.minimum(1., mask_rshp)
+			mask_rshp = tf.expand_dims(mask_rshp, 1)
+			scaled_attention_logits += (mask_rshp*-1e9)
+
+		if mask_format == 'first-r':
+			steps = tf.shape(scaled_attention_logits)[2]
+			mask = tf.tile(mask, [1,1,steps])
+			mask_rshp_v = tf.reverse(mask, axis=[1])
+			mask_rshp_h = tf.transpose(mask, [0,2,1])
+			mask_rshp   = mask_rshp_v + mask_rshp_h
+			mask_rshp   = tf.minimum(1., mask_rshp)
+			mask_rshp   = tf.expand_dims(mask_rshp, 1)
+			scaled_attention_logits += (mask_rshp*-1e9)
+
+		if mask_format == 'zero-r':
+			steps = tf.shape(scaled_attention_logits)[2]
+			mask = tf.tile(mask, [1,1,steps])
+			mask_rshp_v = tf.reverse(mask, axis=[1])
+			mask_rshp_h = tf.transpose(mask, [0,2,1])
+			mask_rshp   = mask_rshp_v + mask_rshp_h
+			mask_rshp   = tf.minimum(1., mask_rshp)
+			mask_rshp   = tf.expand_dims(mask_rshp, 1)
+			scaled_attention_logits += mask_rshp
+
+		if mask_format == 'zero':
+			steps = tf.shape(scaled_attention_logits)[2]
+			mask_rshp = tf.tile(mask, [1,1,steps])
+			mask_rshp += tf.transpose(mask_rshp, [0,2,1])
+			mask_rshp = tf.minimum(1., mask_rshp)
+			mask_rshp = tf.expand_dims(mask_rshp, 1)
+			scaled_attention_logits += mask_rshp
 
 	# softmax is normalized on the last axis (seq_len_k) so that the scores add up to 1.
 	attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
@@ -43,11 +70,11 @@ def scaled_dot_product_attention(q, k, v, mask=None, return_mask=False):
 	return output, attention_weights
 
 class HeadAttentionMulti(tf.keras.layers.Layer):
-	def __init__(self, head_dim, num_heads):
+	def __init__(self, head_dim, num_heads, mask_format):
 		super(HeadAttentionMulti, self).__init__()
 		self.num_heads = num_heads
 		self.head_dim = head_dim
-		
+		self.mask_format = mask_format
 		self.d_model = self.num_heads * self.head_dim
 		self.depth = self.d_model // self.num_heads # final dimension
 		
@@ -76,7 +103,7 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 
 		# scaled_attention.shape == (batch_size, num_heads, seq_len_q, depth)
 		# attention_weights.shape == (batch_size, num_heads, seq_len_q, seq_len_k)
-		scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask=mask)
+		scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask=mask, mask_format=self.mask_format)
 
 		scaled_attention = tf.transpose(scaled_attention, perm=[0, 2, 1, 3])  # (batch_size, seq_len_q, num_heads, depth)
 

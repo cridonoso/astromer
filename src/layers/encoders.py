@@ -19,6 +19,7 @@ class Encoder(Model):
 				 pe_dim=128,
 				 pe_c=1., 
 				 average_layers=False,
+				 mask_format='first',
 				 **kwargs):
 		super(Encoder, self).__init__(**kwargs)
 		# super().__init__(**kwargs)
@@ -33,11 +34,12 @@ class Encoder(Model):
 		self.pe_c        	= pe_c
 		self.pe_dim         = pe_dim
 		self.average_layers = average_layers
+		self.mask_format    = mask_format
 		self.inp_transform  = tf.keras.layers.Dense(self.pe_dim, name='inp_transform')
 
 		self.positional_encoder = PositionalEncoder(self.pe_dim, base=self.pe_base, c=self.pe_c, name='PosEncoding')
 		
-		self.enc_layers = [AttentionBlock(self.head_dim, self.num_heads, self.mixer_size, dropout=self.dropout, name=f'att_layer_{i}')
+		self.enc_layers = [AttentionBlock(self.head_dim, self.num_heads, self.mixer_size, dropout=self.dropout, mask_format=self.mask_format, name=f'att_layer_{i}')
 							for i in range(self.num_layers)]
 		
 		self.dropout_layer = tf.keras.layers.Dropout(self.dropout)

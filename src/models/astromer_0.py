@@ -6,7 +6,7 @@ from tensorflow.keras.layers import Input
 from tensorflow.keras        import Model
 
 from src.layers.positional import positional_encoding
-from src.data import reshape_mask
+
 from tensorflow.keras.layers import Input, Layer, Dense
 import tensorflow as tf
 

@@ -56,7 +56,8 @@ def run(opt):
                         pe_c=opt.pe_exp,
                         window_size=opt.window_size,
                         encoder_mode=opt.encoder_mode,
-                        average_layers=opt.avg_layers)
+                        average_layers=opt.avg_layers,
+                        mask_format=opt.mask_format)
 
     # ============================================================
     if opt.checkpoint != '-1':
@@ -108,7 +109,8 @@ if __name__ == '__main__':
 	parser.add_argument('--dropout', default=0.1, type=float,
 						help='Dropout to use on the output of each attention layer (before mixer layer)')
 	parser.add_argument('--avg-layers', action='store_true', help='If averaging outputs of the attention layers to form the final embedding. There is no avg if layers=1 ')
-
+	parser.add_argument('--mask-format', default='first', type=str,
+						help='first - zero')
 	parser.add_argument('--lr', default=1e-5, type=float,
 						help='learning rate')
 	parser.add_argument('--bs', default=2500, type=int,
