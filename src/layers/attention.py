@@ -89,6 +89,23 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 		"""
 		x = tf.reshape(x, (batch_size, -1, self.num_heads, self.depth))
 		return tf.transpose(x, perm=[0, 2, 1, 3], name=name)
+	
+	def _output_format(self, query, value, key=None):
+        
+        if hasattr(query, "shape"):
+            self._query_shape = tf.TensorShape(query.shape)
+        else:
+            self._query_shape = tf.TensorShape(query)
+        if hasattr(value, "shape"):
+            self._value_shape = tf.TensorShape(value.shape)
+        else:
+            self._value_shape = tf.TensorShape(value)
+        if key is None:
+            self._key_shape = self._value_shape
+        elif hasattr(key, "shape"):
+            self._key_shape = tf.TensorShape(key.shape)
+        else:
+            self._key_shape = tf.TensorShape(key)
 
 	def call(self, x, training, mask=None):
 		batch_size = tf.shape(x)[0]
@@ -104,7 +121,9 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 		# scaled_attention.shape == (batch_size, num_heads, seq_len_q, depth)
 		# attention_weights.shape == (batch_size, num_heads, seq_len_q, seq_len_k)
 		scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask=mask, mask_format=self.mask_format)
-
+		
+		self._output_format(q, v, k)
+		
 		scaled_attention = tf.transpose(scaled_attention, perm=[0, 2, 1, 3])  # (batch_size, seq_len_q, num_heads, depth)
 
 		concat_attention = tf.reshape(scaled_attention,
@@ -119,6 +138,9 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 		config.update({
 			"head_dim": self.head_dim,
 			"num_heads": self.num_heads,
+			"query_shape": self._query_shape,
+            "key_shape": self._key_shape,
+            "value_shape": self._value_shape,
 		})
 		return config
 
@@ -127,5 +149,8 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 		config = {
 			"head_dim": self.head_dim,
 			"num_heads": self.num_heads,
+			"query_shape": self._query_shape,
+            "key_shape": self._key_shape,
+            "value_shape": self._value_shape,
 		}
 		return {**base_config, **config}
