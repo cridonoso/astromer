@@ -78,10 +78,14 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 		self.d_model = self.num_heads * self.head_dim
 		self.depth = self.d_model // self.num_heads # final dimension
 		
+		
 		self.wq = tf.keras.layers.Dense(self.d_model, name='WQ')
 		self.wk = tf.keras.layers.Dense(self.d_model, name='WK')
 		self.wv = tf.keras.layers.Dense(self.d_model, name='WV')
+
+		self._query_shape, self._key_shape, self._value_shape =None,None,None		
 		self.dense = tf.keras.layers.Dense(self.d_model, name='attmerge')
+
 
 	def split_heads(self, x, batch_size, name='qkv'):
 		"""Split the last dimension into (num_heads, depth).
@@ -106,16 +110,18 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 		q = self.wq(x)  # (batch_size, seq_len, d_model)
 		k = self.wk(x)  # (batch_size, seq_len, d_model)
 		v = self.wv(x)  # (batch_size, seq_len, d_model)
-
+		
+		
 		q = self.split_heads(q, batch_size, name='Q')  # (batch_size, num_heads, seq_len_q, depth)
 		k = self.split_heads(k, batch_size, name='K')  # (batch_size, num_heads, seq_len_k, depth)
 		v = self.split_heads(v, batch_size, name='V')  # (batch_size, num_heads, seq_len_v, depth)
-
+		
+		
 		# scaled_attention.shape == (batch_size, num_heads, seq_len_q, depth)
 		# attention_weights.shape == (batch_size, num_heads, seq_len_q, seq_len_k)
 		scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask=mask, mask_format=self.mask_format)
 		
-		self._output_format(q, v, k)
+		
 		
 		scaled_attention = tf.transpose(scaled_attention, perm=[0, 2, 1, 3])  # (batch_size, seq_len_q, num_heads, depth)
 
