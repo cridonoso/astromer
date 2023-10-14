@@ -501,7 +501,7 @@ def pretraining_pipeline(dataset,
               'input_modified': [None, None],
               'mask_in': [None, None],
               'mask_out': [None, None]}
-
+    
     dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
 
     # FORMAT INPUT DICTONARY

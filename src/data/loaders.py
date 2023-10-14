@@ -108,6 +108,7 @@ def format_input(input_dict, cls_token=None, num_cls=None, test_mode=False):
             'magnitudes': tf.slice(input_dict['input_pre_nsp'], [0, 0, 1], [-1, -1, 1]),
             'nsp_label': input_dict['nsp_label'],
             'probed_mask': tf.expand_dims(input_dict['probed_mask'], -1),
+            'lcid': input_dict['lcid']
         }
 
     return inputs, outputs
@@ -170,8 +171,7 @@ def load_data(dataset,
 
     # CREATE BATCHES
     dataset = dataset.padded_batch(batch_size, padded_shapes=sizes)
-
-    
+            
     # MASKING
     dataset = dataset.map(lambda x: get_probed(x, probed=probed, njobs=njobs))
     dataset = dataset.map(lambda x: add_random(x, random_frac=random_same, njobs=njobs))

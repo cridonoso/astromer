@@ -39,7 +39,8 @@ def run(opt):
 							pe_c=model_config['pe_exp'],
 							window_size=model_config['window_size'],
 							encoder_mode=model_config['encoder_mode'],
-							average_layers=model_config['avg_layers'])
+							average_layers=model_config['avg_layers'],
+							mask_format=model_config['mask_format'])
 
 	astromer.load_weights(os.path.join(opt.pt_folder, 'weights', 'weights'))
 	print('[INFO] Weights loaded')
