@@ -75,7 +75,8 @@ def run(opt):
               patience=opt.patience,
               train_step_fn=train_step,
               test_step_fn=test_step,
-              argparse_dict=opt.__dict__)
+              argparse_dict=opt.__dict__,
+              scheduler=opt.scheduler)
 
 
 if __name__ == '__main__':
@@ -89,7 +90,7 @@ if __name__ == '__main__':
 	parser.add_argument('--gpu', default='-1', type=str,
 						help='GPU to be used. -1 means no GPU will be used')
 	parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
-
+	parser.add_argument('--scheduler', action='store_true', help='Use Custom Scheduler during training')
 	parser.add_argument('--encoder-mode', default='normal', type=str,
 						help='normal - conditioned')
 	parser.add_argument('--num-layers', default=2, type=int,

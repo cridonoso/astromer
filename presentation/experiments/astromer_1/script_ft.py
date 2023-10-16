@@ -9,8 +9,8 @@ gpu        = sys.argv[1]
 pt_folder  = sys.argv[2] #until pretraining
 batch_size = 2500    
 records_folder = './data/records/'
-ds_names = ['alcock', 'atlas', 'ogle']
-spc_list = [20, 100, 500]
+ds_names = ['alcock']
+spc_list = [20, 100]
  
 root = 'python -m presentation.experiments.astromer_1.finetune'
 for dataset in ds_names:

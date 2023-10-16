@@ -108,72 +108,72 @@ def run(opt):
 	with open(os.path.join(FTWEIGTHS, 'config.toml'), 'w') as f:
 		toml.dump(model_config, f)
 
-	# ====================================================================================
-	# =============== DOWNSTREAM TASK  ===================================================
-	# ====================================================================================
-	CLFWEIGHTS = os.path.join( opt.pt_folder,
-							  '..',
-							  'classification', 
-							  opt.subdataset, 
-							  'fold_'+str(opt.fold), 
-							  opt.subdataset+'_'+str(opt.spc))
-	num_cls = pd.read_csv(os.path.join(DOWNSTREAM_DATA, 'objects.csv')).shape[0]
+# 	# ====================================================================================
+# 	# =============== DOWNSTREAM TASK  ===================================================
+# 	# ====================================================================================
+# 	CLFWEIGHTS = os.path.join( opt.pt_folder,
+# 							  '..',
+# 							  'classification', 
+# 							  opt.subdataset, 
+# 							  'fold_'+str(opt.fold), 
+# 							  opt.subdataset+'_'+str(opt.spc))
+# 	num_cls = pd.read_csv(os.path.join(DOWNSTREAM_DATA, 'objects.csv')).shape[0]
 
-	train_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
-							 batch_size= 5 if opt.debug else 512, 
-							 probed=1.,
-							 random_same=0.,  
-							 window_size=model_config['window_size'], 
-							 off_nsp=True,
-							 nsp_prob=0., 
-							 repeat=1, 
-							 sampling=False,
-							 shuffle=True,
-							 num_cls=num_cls)
-	valid_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'val'), 
-							 batch_size= 5 if opt.debug else 512, 
-							 probed=1.,
-							 random_same=0.,  
-							 window_size=model_config['window_size'], 
-							 off_nsp=True,
-							 nsp_prob=0., 
-							 repeat=1, 
-							 sampling=False,
-							 num_cls=num_cls)
-	test_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'test'), 
-							 batch_size= 5 if opt.debug else 512, 
-							 probed=1.,
-							 random_same=0.,  
-							 window_size=model_config['window_size'], 
-							 off_nsp=True, 
-							 nsp_prob=0., 
-							 repeat=1, 
-							 sampling=False,
-							 num_cls=num_cls)
+# 	train_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
+# 							 batch_size= 5 if opt.debug else 512, 
+# 							 probed=1.,
+# 							 random_same=0.,  
+# 							 window_size=model_config['window_size'], 
+# 							 off_nsp=True,
+# 							 nsp_prob=0., 
+# 							 repeat=1, 
+# 							 sampling=False,
+# 							 shuffle=True,
+# 							 num_cls=num_cls)
+# 	valid_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'val'), 
+# 							 batch_size= 5 if opt.debug else 512, 
+# 							 probed=1.,
+# 							 random_same=0.,  
+# 							 window_size=model_config['window_size'], 
+# 							 off_nsp=True,
+# 							 nsp_prob=0., 
+# 							 repeat=1, 
+# 							 sampling=False,
+# 							 num_cls=num_cls)
+# 	test_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'test'), 
+# 							 batch_size= 5 if opt.debug else 512, 
+# 							 probed=1.,
+# 							 random_same=0.,  
+# 							 window_size=model_config['window_size'], 
+# 							 off_nsp=True, 
+# 							 nsp_prob=0., 
+# 							 repeat=1, 
+# 							 sampling=False,
+# 							 num_cls=num_cls)
 
-	if opt.debug:
-		train_loader = train_loader.take(1)
-		valid_loader = valid_loader.take(1)
-		test_loader  = test_loader.take(1)
+# 	if opt.debug:
+# 		train_loader = train_loader.take(1)
+# 		valid_loader = valid_loader.take(1)
+# 		test_loader  = test_loader.take(1)
 
 
-	inp_placeholder = build_input(model_config['window_size'])
-	encoder = astromer.get_layer('encoder')
-	encoder.trainable = opt.train_astromer
-	embedding = encoder(inp_placeholder)
-	embedding = embedding*(1.-inp_placeholder['att_mask'])
-	embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
-									  tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
+# 	inp_placeholder = build_input(model_config['window_size'])
+# 	encoder = astromer.get_layer('encoder')
+# 	encoder.trainable = opt.train_astromer
+# 	embedding = encoder(inp_placeholder)
+# 	embedding = embedding*(1.-inp_placeholder['att_mask'])
+# 	embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
+# 									  tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
 	
-	summary_clf = train_classifier(embedding,
-								   inp_placeholder=inp_placeholder,
-								   train_loader=train_loader,
-								   valid_loader=valid_loader, 
-								   test_loader=test_loader,
-								   num_cls=num_cls, 
-								   project_path=CLFWEIGHTS,
-								   clf_name=opt.clf_name,
-								   debug=opt.debug)
+# 	summary_clf = train_classifier(embedding,
+# 								   inp_placeholder=inp_placeholder,
+# 								   train_loader=train_loader,
+# 								   valid_loader=valid_loader, 
+# 								   test_loader=test_loader,
+# 								   num_cls=num_cls, 
+# 								   project_path=CLFWEIGHTS,
+# 								   clf_name=opt.clf_name,
+# 								   debug=opt.debug)
 
 
 if __name__ == '__main__':
