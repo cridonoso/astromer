@@ -1,0 +1,6 @@
+outs:
+- md5: a19f38e4e0d1a7cc9cafd606a91f1e00.dir
+  size: 110204220
+  nfiles: 5
+  hash: md5
+  path: filtered_macho_10000
