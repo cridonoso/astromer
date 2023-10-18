@@ -6,7 +6,6 @@ import os
 from src.models.astromer_0 import get_ASTROMER, train_step, test_step
 
 from src.training.utils import train
-from src.data import load_data
 from datetime import datetime
 
 from src.data.zero import pretraining_pipeline
