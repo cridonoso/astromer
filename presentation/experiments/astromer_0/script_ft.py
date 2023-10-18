@@ -18,7 +18,7 @@ for dataset in ds_names:
     for spc in spc_list:
         for fold_n in range(3):
             start = time.time()
-            project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {}'
+            project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {} --debug'
 
             command1 = project_path.format(root, gpu, dataset, pt_folder, fold_n, spc)
 
