@@ -7,6 +7,13 @@ import os, sys
 
 gpu        = sys.argv[1]
 pt_folder  = sys.argv[2] #until pretraining
+all_visible = sys.argv[3].lower() == 'true'
+try:
+    exp_name   = sys.argv[4] 
+except:
+    exp_name = 'finetuning'
+    
+
 batch_size = 2500    
 records_folder = './data/records/'
 ds_names = ['alcock', 'atlas']
@@ -18,10 +25,12 @@ for dataset in ds_names:
     for spc in spc_list:
         for fold_n in range(3):
             start = time.time()
-            project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {}'
-
-            command1 = project_path.format(root, gpu, dataset, pt_folder, fold_n, spc)
-
+            
+            project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {} --exp-name {}'
+            command1 = project_path.format(root, gpu, dataset, pt_folder, fold_n, spc, exp_name)
+            if all_visible:
+                command1+=' --allvisible'
+                
             try:
                 subprocess.call(command1, shell=True)
             except Exception as e:

@@ -152,7 +152,7 @@ def load_data(dataset,
               num_cls=None,
               test_mode=False,
               off_nsp=False):
-
+    print('[INFO] Probed: {:.2f} Random: {:.2f}'.format(probed, random_same))
     if njobs is None:
         njobs = multiprocessing.cpu_count()//2
 
