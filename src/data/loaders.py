@@ -153,6 +153,8 @@ def load_data(dataset,
               test_mode=False,
               off_nsp=False):
     print('[INFO] Probed: {:.2f} Random: {:.2f}'.format(probed, random_same))
+    if not off_nsp:
+        print('[INFO] NSP PROB: {:.2f}'.format(nsp_prob))
     if njobs is None:
         njobs = multiprocessing.cpu_count()//2
 
@@ -175,7 +177,7 @@ def load_data(dataset,
     # MASKING
     dataset = dataset.map(lambda x: get_probed(x, probed=probed, njobs=njobs))
     dataset = dataset.map(lambda x: add_random(x, random_frac=random_same, njobs=njobs))
-
+    return dataset
     # NSP
     if off_nsp:
         dataset = dataset.map(lambda x: format_input_no_nsp(x, num_cls=num_cls, test_mode=test_mode))
