@@ -3,7 +3,7 @@ import multiprocessing
 import os
 
 from src.data.record import deserialize
-from src.data.preprocessing import to_windows, min_max_scaler, standardize_dataset
+from src.data.preprocessing import to_windows, min_max_scaler, standardize_dataset, standardize
 from src.data.masking import get_probed, add_random
 from src.data.nsp import randomize, randomize_v2
 
@@ -108,6 +108,7 @@ def format_input(input_dict, cls_token=None, num_cls=None, test_mode=False):
             'magnitudes': tf.slice(input_dict['input_pre_nsp'], [0, 0, 1], [-1, -1, 1]),
             'nsp_label': input_dict['nsp_label'],
             'probed_mask': tf.expand_dims(input_dict['probed_mask'], -1),
+            'lcid': input_dict['lcid']
         }
 
     return inputs, outputs
@@ -151,7 +152,7 @@ def load_data(dataset,
               num_cls=None,
               test_mode=False,
               off_nsp=False):
-
+    print('[INFO] Probed: {:.2f} Random: {:.2f}'.format(probed, random_same))
     if njobs is None:
         njobs = multiprocessing.cpu_count()//2
 
@@ -164,13 +165,13 @@ def load_data(dataset,
     dataset, sizes = to_windows(dataset,
                          window_size=window_size,
                          sampling=sampling)
+
+    # STANDARDIZE
+    dataset = dataset.map(standardize)
+
     # CREATE BATCHES
     dataset = dataset.padded_batch(batch_size, padded_shapes=sizes)
-    
-    # STANDARDIZE
-    dataset = dataset.map(lambda x: standardize_dataset(x, on='input'))
-    dataset = dataset.map(lambda x: standardize_dataset(x, on='original'))
-    
+            
     # MASKING
     dataset = dataset.map(lambda x: get_probed(x, probed=probed, njobs=njobs))
     dataset = dataset.map(lambda x: add_random(x, random_frac=random_same, njobs=njobs))
@@ -180,7 +181,7 @@ def load_data(dataset,
         dataset = dataset.map(lambda x: format_input_no_nsp(x, num_cls=num_cls, test_mode=test_mode))
     else:
         dataset = dataset.map(lambda x: randomize_v2(x, nsp_prob=nsp_prob))
-        dataset = dataset.map(lambda x: format_input(x, cls_token=-99., num_cls=num_cls, test_mode=test_mode))
+        dataset = dataset.map(lambda x: format_input(x, num_cls=num_cls, test_mode=test_mode))
 
     if shuffle:
         SHUFFLE_BUFFER = 10000

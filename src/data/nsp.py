@@ -27,7 +27,7 @@ def randomize(input_dict, nsp_prob):
     binary_vector = tf.where(probs < nsp_prob, 1., 0.)
     binary_vector = tf.expand_dims(binary_vector, -1)
 
-    mask_replace  = binary_vector*mask
+    mask_replace  = binary_vector*mask # random = 1 & original = 0
     mask_replace = tf.expand_dims(mask_replace, -1)
     mask_preserve = 1.-mask_replace
 
