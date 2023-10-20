@@ -73,6 +73,7 @@ def combine_sequences(seq_0, seq_1, mask_0):
 def randomize_v2(input_dict, nsp_prob):
     ''' Mantain times from random light curve by shifting its times'''
     inp_size = tf.shape(input_dict['input'])
+
     indices = tf.range(0, inp_size[0], dtype=tf.int32)
     shuffle_indices = tf.random.shuffle(indices)
 
@@ -115,8 +116,23 @@ def randomize_v2(input_dict, nsp_prob):
                                                 mask_0=mask_original_obs)
     # Correct for times
     t_original = tf.slice(input_original, [0, 0, 0], [-1, -1, 1])
-    t_original = tf.slice(input_original, [0, 0, 0], [-1, -1, 1])
+    t_replace  = tf.slice(input_replace, [0, 0, 0], [-1, -1, 1])
 
+    t_min = tf.expand_dims(tf.reduce_min(t_replace, axis=1), axis=1)
+    t_max = tf.expand_dims(tf.reduce_max(t_replace, axis=1), axis=1)
+    to_max = tf.expand_dims(tf.reduce_max(t_original, axis=1), axis=1)
+    
+    t_replace = tf.math.divide_no_nan(t_replace - t_min, t_max - t_min)
+    t_replace = t_replace + to_max
+    t_replace = t_replace * tf.expand_dims(padding_mask_replace, axis=-1)
+
+    time_to_replace = combine_sequences(seq_0=t_original,
+                                        seq_1=t_replace, 
+                                        mask_0=mask_original_obs)
+
+
+    x_rest = tf.slice(input_randomized, [0, 0, 1], [-1, -1, -1])
+    input_randomized = tf.concat([time_to_replace, x_rest], axis=2)
 
     # Segment embedding 
     segment_emb = (tf.cast(mask_original_obs, tf.float32)+1.) * padding_mask_randomized

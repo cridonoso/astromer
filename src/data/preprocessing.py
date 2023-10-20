@@ -15,16 +15,15 @@ def standardize(tensor, axis=0, return_mean=False):
         tensor (1-dim tensorflow tensor): standardize tensor
     """
 
-    mean_value = tf.reduce_mean(tensor['input'], axis, name='mean_value')
-    tensor['input'] = tensor['input'] - tf.expand_dims(mean_value, axis)
+    times = tf.slice(tensor['input'], [0, 0], [-1, 1])
+    rest = tf.slice(tensor['input'], [0, 1], [-1, -1])
 
-    mean_value = tf.reduce_mean(tensor['original'], axis, name='mean_value')
-    tensor['original'] = tensor['original'] - tf.expand_dims(mean_value, axis)
+    mean_value = tf.reduce_mean(rest, axis, name='mean_value')
+    rest = rest - tf.expand_dims(mean_value, axis)
+
+    tensor['input'] = tf.concat([times, rest], axis=1)
+
     return tensor
-    if return_mean:
-        return z, mean_value
-    else:
-        return z
 
 def standardize_batch(input_tensor, axis=1):
 	N = tf.where(tf.abs(input_tensor) > 0, 1., 0.)
