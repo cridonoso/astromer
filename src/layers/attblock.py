@@ -12,6 +12,12 @@ class MergingLayer(tf.keras.layers.Layer):
 		x = self.layer_0(inputs)
 		return self.layer_1(x)
 
+def point_wise_feed_forward_network(d_model, dff):
+    return tf.keras.Sequential([
+        tf.keras.layers.Dense(dff, activation='tanh'),  # (batch_size, seq_len, dff)
+        tf.keras.layers.Dense(d_model)  # (batch_size, seq_len, d_model)
+    ])
+
 class AttentionBlock(tf.keras.layers.Layer):
 	def __init__(self, head_dim, num_heads, mixer_size, dropout=0.1, mask_format='first', **kwargs):
 		super(AttentionBlock, self).__init__(**kwargs)
@@ -21,7 +27,8 @@ class AttentionBlock(tf.keras.layers.Layer):
 		self.dropout = dropout
 		self.mask_format = mask_format
 		self.mha = HeadAttentionMulti(self.head_dim, self.num_heads, mask_format=mask_format)
-		self.ffn = MergingLayer(self.mixer_size, self.num_heads, self.head_dim, name='att_block_merging_layer')
+		# self.ffn = MergingLayer(self.mixer_size, self.num_heads, self.head_dim, name='att_block_merging_layer')
+		self.ffn = point_wise_feed_forward_network(self.num_heads*self.head_dim, self.mixer_size)
 		self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 		self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 		self.dropout1 = tf.keras.layers.Dropout(self.dropout)

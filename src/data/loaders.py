@@ -177,7 +177,7 @@ def load_data(dataset,
     # MASKING
     dataset = dataset.map(lambda x: get_probed(x, probed=probed, njobs=njobs))
     dataset = dataset.map(lambda x: add_random(x, random_frac=random_same, njobs=njobs))
-    return dataset
+
     # NSP
     if off_nsp:
         dataset = dataset.map(lambda x: format_input_no_nsp(x, num_cls=num_cls, test_mode=test_mode))
