@@ -5,7 +5,7 @@ import os
 from src.data.record import deserialize
 from src.data.preprocessing import to_windows, min_max_scaler, standardize_dataset, standardize
 from src.data.masking import get_probed, add_random
-from src.data.nsp import randomize, randomize_v2
+from src.data.nsp import randomize_v2
 
 def load_records(records_dir):
     """
@@ -153,6 +153,8 @@ def load_data(dataset,
               test_mode=False,
               off_nsp=False):
     print('[INFO] Probed: {:.2f} Random: {:.2f}'.format(probed, random_same))
+    if not off_nsp:
+        print('[INFO] NSP PROB: {:.2f}'.format(nsp_prob))
     if njobs is None:
         njobs = multiprocessing.cpu_count()//2
 

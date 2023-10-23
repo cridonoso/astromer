@@ -8,7 +8,7 @@ import os
 from presentation.experiments.utils import train_classifier
 from src.models.astromer_1 import get_ASTROMER, build_input, train_step, test_step
 from src.training.utils import train
-from src.data import load_data
+from src.data.zero import pretraining_pipeline
 from datetime import datetime
 
 
@@ -58,30 +58,58 @@ def run(opt):
                              'fold_'+str(opt.fold), 
                              '{}_{}'.format(opt.subdataset, opt.spc))   
 
-    train_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
-                             batch_size= 5 if opt.debug else opt.bs, 
-                             probed=1. if opt.allvisible else model_config['probed'],
-                             random_same=0. if opt.allvisible else model_config['rs'],
-                             window_size=model_config['window_size'], 
-                             off_nsp=True, 
-                             repeat=1, 
-                             sampling=False)
-    valid_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'val'), 
-                             batch_size= 5 if opt.debug else opt.bs, 
-                             probed=1. if opt.allvisible else model_config['probed'],
-                             random_same=0. if opt.allvisible else model_config['rs'],
-                             window_size=model_config['window_size'], 
-                             off_nsp=True,
-                             repeat=1, 
-                             sampling=False)
-    test_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'test'), 
-                             batch_size= 5 if opt.debug else opt.bs, 
-                             probed=1. if opt.allvisible else model_config['probed'], 
-                             random_same=0. if opt.allvisible else model_config['rs'],
-                             window_size=model_config['window_size'], 
-                             off_nsp=True,
-                             repeat=1, 
-                             sampling=False)
+    train_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'train'),
+                                        batch_size= 5 if opt.debug else opt.bs, 
+                                        window_size=model_config['window_size'],
+                                        shuffle=True,
+                                        sampling=False,
+                                        repeat=1,
+                                        msk_frac=model_config['probed'],
+                                        rnd_frac=model_config['rs'],
+                                        same_frac=model_config['rs'],
+                                        key_format='1')
+    valid_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'val'),
+                                        batch_size=5 if opt.debug else opt.bs,
+                                        window_size=model_config['window_size'],
+                                        shuffle=False,
+                                        sampling=False,
+                                        msk_frac=model_config['probed'],
+                                        rnd_frac=model_config['rs'],
+                                        same_frac=model_config['rs'],
+                                        key_format='1')
+    test_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'test'),
+                                        batch_size=5 if opt.debug else opt.bs,
+                                        window_size=model_config['window_size'],
+                                        shuffle=False,
+                                        sampling=False,
+                                        msk_frac=model_config['probed'],
+                                        rnd_frac=model_config['rs'],
+                                        same_frac=model_config['rs'],
+                                        key_format='1')
+    # train_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
+    #                          batch_size= 5 if opt.debug else opt.bs, 
+    #                          probed=1. if opt.allvisible else model_config['probed'],
+    #                          random_same=0. if opt.allvisible else model_config['rs'],
+    #                          window_size=model_config['window_size'], 
+    #                          off_nsp=True, 
+    #                          repeat=1, 
+    #                          sampling=False)
+    # valid_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'val'), 
+    #                          batch_size= 5 if opt.debug else opt.bs, 
+    #                          probed=1. if opt.allvisible else model_config['probed'],
+    #                          random_same=0. if opt.allvisible else model_config['rs'],
+    #                          window_size=model_config['window_size'], 
+    #                          off_nsp=True,
+    #                          repeat=1, 
+    #                          sampling=False)
+    # test_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'test'), 
+    #                          batch_size= 5 if opt.debug else opt.bs, 
+    #                          probed=1. if opt.allvisible else model_config['probed'], 
+    #                          random_same=0. if opt.allvisible else model_config['rs'],
+    #                          window_size=model_config['window_size'], 
+    #                          off_nsp=True,
+    #                          repeat=1, 
+    #                          sampling=False)
     astromer, \
     (best_train_metrics,
     best_val_metrics,

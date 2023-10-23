@@ -70,13 +70,8 @@ class Encoder(Model):
 		# adding embedding and position encoding.
 		x, window_size = self.input_format(inputs)  
 		x = self.dropout_layer(x, training=training)
-
-		layers_outputs = []
 		for i in range(self.num_layers):
 			x =  self.enc_layers[i](x, training=training, mask=inputs['att_mask'])
-			layers_outputs.append(x)
-		
-		x = self.output_format(layers_outputs, window_size) 
 		return  x # (batch_size, input_seq_len, d_model)
 
 class ConcatEncoder(Encoder):
