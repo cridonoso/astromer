@@ -23,6 +23,15 @@ Training ASTROMER from scratch can be expensive. However, we provide pre-trained
 - Data preprocessing, saving and reading [tf.Records](https://www.tensorflow.org/tutorials/load_data/tfrecord) (`/src/data.py`)
 - Dockerfile and scripts for building (`build_container.sh`) and run (`run_container.sh`) the ASTROMER container
 
+## Weights
+
+| Version Tag | Pretraining data | Description | Test RMSE/R-square | Link |
+| --- | --- | --- | --- | --- |
+| v0 | MACHO | Paper's model | 0.147/0.80 | [Download Weights](https://github.com/astromer-science/weights/raw/nightly/macho_0.zip)
+| v0c | MACHO Clean | Paper's model trained on Clean MACHO | 0.149/0.80 | [Download Weights](https://github.com/astromer-science/weights/raw/nightly/macho_0c.zip)
+| v1 | MACHO | New implementation of the paper's model | 0.173/0.72 | [Download Weights](https://github.com/astromer-science/weights/raw/nightly/macho_1.zip)
+| v1c | MACHO Clean | New implementation of the paper's model trained on Clean MACHO | -/- | Still training
+
 ## Directory tree
 ```
 📦astromer
