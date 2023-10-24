@@ -30,14 +30,14 @@ def get_ASTROMER(num_layers=2,
 				 head_dim=64,
 				 mixer_size=256,
 				 dropout=0.1,
-				 pe_base=1000,
-				 pe_dim=128,
-				 pe_c=1,
+				 pe_type='pe',
+				 pe_config=None,
+				 pe_func_name='pe',
+				 residual_type=None,
 				 window_size=100,
 				 batch_size=None,
 				 encoder_mode='normal',
-				 average_layers=False,
-				 mask_format='first'):
+				 average_layers=False):
 
 	placeholder = build_input(window_size)
 
@@ -47,11 +47,11 @@ def get_ASTROMER(num_layers=2,
 					  head_dim=head_dim,
 					  mixer_size=mixer_size,
 					  dropout=dropout,
-					  pe_base=pe_base,
-					  pe_dim=pe_dim,
-					  pe_c=pe_c,
+					  pe_type=pe_type,
+					  pe_config=pe_config,
+					  pe_func_name=pe_func_name,
+					  residual_type=residual_type,
 					  average_layers=average_layers,
-					  mask_format=mask_format,
 					  name='encoder')
 
 	x = encoder(placeholder)
@@ -85,6 +85,7 @@ def test_step(model, x, y, return_pred=False):
 		return x_pred
 	return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
 
+
 def predict(model, test_loader):
 	n_batches = sum([1 for _, _ in test_loader])
 	print('[INFO] Processing {} batches'.format(n_batches))
@@ -104,26 +105,29 @@ def predict(model, test_loader):
 	return y_pred, y_true, masks.concat()
 
 def restore_model(model_folder, mask_format=None):
-    with open(os.path.join(model_folder, 'config.toml'), 'r') as f:
-        model_config = toml.load(f)
-    
-    if 'mask_format' in model_config:
-        mask_format = model_config['mask_format']
+	with open(os.path.join(model_folder, 'config.toml'), 'r') as f:
+		model_config = toml.load(f)
 
-    astromer = get_ASTROMER(num_layers=model_config['num_layers'],
-                            num_heads=model_config['num_heads'],
-                            head_dim=model_config['head_dim'],
-                            mixer_size=model_config['mixer'],
-                            dropout=model_config['dropout'],
-                            pe_base=model_config['pe_base'],
-                            pe_dim=model_config['pe_dim'],
-                            pe_c=model_config['pe_exp'],
-                            window_size=model_config['window_size'],
-                            encoder_mode=model_config['encoder_mode'],
-                            average_layers=model_config['avg_layers'],
-                            mask_format=mask_format)
-    print(mask_format)
-    print('[INFO] LOADING PRETRAINED WEIGHTS')
-    astromer.load_weights(os.path.join(model_folder, 'weights', 'weights'))
+	if 'residual_type' not in model_config:
+		model_config['residual_type'] = None
 
-    return astromer, model_config
+	with open(os.path.join(model_folder, 'pe_config.toml'), 'r') as f:
+		pe_config = toml.load(f)
+
+	astromer = get_ASTROMER(num_layers=model_config['num_layers'],
+							num_heads=model_config['num_heads'],
+							head_dim=model_config['head_dim'],
+							mixer_size=model_config['mixer'],
+							dropout=model_config['dropout'],
+							pe_type=model_config['pe_type'],
+							pe_config=pe_config,
+							pe_func_name=model_config['pe_func_name'],
+							residual_type=model_config['residual_type'],
+							window_size=model_config['window_size'],
+							encoder_mode=model_config['encoder_mode'],
+							average_layers=model_config['avg_layers'])
+
+	print('[INFO] LOADING PRETRAINED WEIGHTS')
+	astromer.load_weights(os.path.join(model_folder, 'weights', 'weights'))
+
+	return astromer, model_config

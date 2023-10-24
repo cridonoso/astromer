@@ -1,0 +1,71 @@
+[PE]
+pe_layer  = true
+ff1_layer = false
+att_layer = false
+ff2_layer = false
+
+[FF1]
+pe_layer  = false
+ff1_layer = true
+att_layer = false
+ff2_layer = false
+
+[FF1_PE]
+pe_layer  = true
+ff1_layer = true
+att_layer = false
+ff2_layer = false
+
+[ATT]
+pe_layer  = false
+ff1_layer = false
+att_layer = true
+ff2_layer = false
+
+[PE_ATT]
+pe_layer  = true
+ff1_layer = false
+att_layer = true
+ff2_layer = false
+
+[FF1_ATT]
+pe_layer  = false
+ff1_layer = true
+att_layer = true
+ff2_layer = false
+
+[ATT_FF2]
+pe_layer  = false
+ff1_layer = false
+att_layer = true
+ff2_layer = true
+
+[PE_FF2]
+pe_layer  = true
+ff1_layer = false
+att_layer = false
+ff2_layer = true
+
+[FF1_FF2]
+pe_layer  = false
+ff1_layer = true
+att_layer = false
+ff2_layer = true
+
+[FF1_PE_ATT]
+pe_layer  = true
+ff1_layer = true
+att_layer = true
+ff2_layer = false
+
+[FF1_ATT_FF2]
+pe_layer  = false
+ff1_layer = true
+att_layer = true
+ff2_layer = true
+
+[FF1_PE_ATT_FF2]
+pe_layer  = true
+ff1_layer = true
+att_layer = true
+ff2_layer = true
