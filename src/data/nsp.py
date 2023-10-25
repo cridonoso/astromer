@@ -1,5 +1,5 @@
 import tensorflow as tf
-
+import tensorflow as tfp
 
 def get_segment_length(mask, divide_factor=2):
     window_size = tf.shape(mask)[1]
@@ -46,7 +46,7 @@ def concat_segments(segment_0, segment_1, mask_0, mask_1, padding_mask=None):
      
     return tf.concat([sub_0, sub_1], axis=1).to_tensor()
 
-def combine_sequences(seq_0, seq_1, mask_0):
+def combine_sequences(seq_0, seq_1, mask_0, norm_time=False):
     if tf.rank(seq_0) == 3:
         mask_0 = tf.expand_dims(mask_0, axis=-1)
 
@@ -60,12 +60,19 @@ def combine_sequences(seq_0, seq_1, mask_0):
     
     # Make zero all original observations. Keep randomized ones.
     replace_masked = seq_1 * mask_1
+    if norm_time:
+        N_r = tf.cast(tf.reduce_sum(mask_0, 1), tf.int32)
+
+        first_mask = tf.one_hot(N_r, tf.shape(mask_0)[1])
+        first_mask = tf.transpose(first_mask, [0, 2, 1])
+        first_t = tf.boolean_mask(replace_masked, first_mask)
+        replace_masked = replace_masked-tf.reshape(first_t, [-1, 1, 1])
+        replace_masked = replace_masked + tf.expand_dims(tf.reduce_max(original_masked, 1), axis=1)
+        replace_masked = replace_masked*mask_1
 
     # Sum both masked_original and masked_raplace to create the final input
-    print(original_masked[0])
-    print(replace_masked[0])
     randomized_input = original_masked + replace_masked
-    print(randomized_input[0])
+
     return randomized_input
 
 
@@ -103,38 +110,44 @@ def randomize(input_dict, nsp_prob):
     mask_original_obs = creat_mask_given_lenghts(length_0, max_len=inp_size[1])
 
     # Combine sequences
-    # magnitudes_randomized   = combine_sequences(seq_0=magnitudes_original,
-    #                                             seq_1=magnitudes_replace, 
-    #                                             mask_0=mask_original_obs)
-    # times_randomized        = combine_sequences(seq_0=times_original,
-    #                                             seq_1=times_replace, 
-    #                                             mask_0=mask_original_obs)
-    # att_mask_randomized     = combine_sequences(seq_0=att_mask_original,
-    #                                             seq_1=att_mask_replace, 
-    #                                             mask_0=mask_original_obs)
-    # prob_mask_randomized    = combine_sequences(seq_0=prob_mask_original,
-    #                                             seq_1=prob_mask_replace, 
-    #                                             mask_0=mask_original_obs)
+    magnitudes_randomized   = combine_sequences(seq_0=magnitudes_original,
+                                                seq_1=magnitudes_replace, 
+                                                mask_0=mask_original_obs)
+    att_mask_randomized     = combine_sequences(seq_0=att_mask_original,
+                                                seq_1=att_mask_replace, 
+                                                mask_0=mask_original_obs)
+    prob_mask_randomized    = combine_sequences(seq_0=prob_mask_original,
+                                                seq_1=prob_mask_replace, 
+                                                mask_0=mask_original_obs)
     padding_mask_randomized = combine_sequences(seq_0=padding_mask_original,
                                                 seq_1=padding_mask_replace, 
                                                 mask_0=mask_original_obs)
 
-
-    # # Segment embedding 
-    # segment_emb = (tf.cast(mask_original_obs, tf.float32)+1.) * padding_mask_randomized
+    # Segment embedding 
+    segment_emb = (tf.cast(mask_original_obs, tf.float32)+1.) * padding_mask_randomized
     
-    # t_mean = tf.slice(input_dict['mean_values'], [0, 0, 0], [-1, -1, 1])
+    t_mean = tf.slice(input_dict['mean_values'], [0, 0, 0], [-1, -1, 1])
+    t_0 = times_original+t_mean
+    t_1 = times_replace + tf.gather(t_mean, shuffle_indices)
 
-    # input_dict['nsp_label'] = tf.cast(tf.expand_dims(binary_vector, -1), tf.float32)
-    # input_dict['nsp_magnitudes'] = magnitudes_randomized
-    # input_dict['nsp_times'] = (times_original + t_mean) * tf.expand_dims(padding_mask_original, axis=-1)
-    # input_dict['nsp_pad_mask'] = padding_mask_randomized
+    times_randomized = combine_sequences(seq_0=t_0,
+                                         seq_1=t_1, 
+                                         mask_0=mask_original_obs,
+                                         norm_time=True)
+    mean_val = tf.reduce_mean(times_randomized, 1)
+    mean_val = tf.expand_dims(mean_val, 1)
+    times_randomized = times_randomized - mean_val
 
-    # input_dict['probed_mask'] = prob_mask_randomized
-    # input_dict['att_mask'] = att_mask_randomized * (1.-tf.expand_dims(padding_mask_randomized, axis=-1))
-    # input_dict['seg_emb'] = segment_emb
+    input_dict['nsp_label'] = tf.cast(tf.expand_dims(binary_vector, -1), tf.float32)
+    input_dict['nsp_magnitudes'] = magnitudes_randomized
+    input_dict['nsp_times'] = (times_randomized) * tf.expand_dims(padding_mask_randomized, axis=-1)
+    input_dict['nsp_pad_mask'] = padding_mask_randomized
 
-    return input_dict
+    input_dict['probed_mask'] = prob_mask_randomized
+    input_dict['att_mask'] = att_mask_randomized * (1.-tf.expand_dims(padding_mask_randomized, axis=-1))
+    input_dict['seg_emb'] = segment_emb
+
+    return input_dict, t_1
 
 def apply_nsp(dataset, nsp_prob=0.5):
 
