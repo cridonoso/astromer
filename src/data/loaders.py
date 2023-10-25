@@ -105,7 +105,7 @@ def format_inp_astromer(batch,
         inputs['att_mask']   = batch['att_mask']
         inputs['seg_emb']    = batch['seg_emb']
         
-        outputs['magnitudes']  = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
+        outputs['magnitudes']  = batch['target_magnitudes']
         outputs['error']       = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
         outputs['probed_mask'] = batch['probed_mask']
         outputs['nsp_label'] = batch['nsp_label']
@@ -177,7 +177,6 @@ def get_loader(dataset,
 
     dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
 
-    return dataset
     if aversion == '2':
         print('[INFO] NSP format activated')
         dataset = apply_nsp(dataset, nsp_prob)

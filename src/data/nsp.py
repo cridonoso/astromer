@@ -90,6 +90,7 @@ def randomize(input_dict, nsp_prob):
     shuffle_indices = (shuffle_indices*(1-binary_vector)) + (indices*binary_vector)
 
     # Original vector
+    target_original       = tf.slice(input_dict['input'], [0,0,1], [-1,-1,1])
     magnitudes_original   = input_dict['input_modified']
     times_original        = tf.slice(input_dict['input'] , [0, 0, 0], [-1, -1, 1])  
     att_mask_original     = input_dict['att_mask']
@@ -97,6 +98,7 @@ def randomize(input_dict, nsp_prob):
     padding_mask_original = input_dict['mask']
 
     # Candidates for replacing
+    target_replace       = tf.gather(target_original, shuffle_indices) 
     magnitudes_replace   = tf.gather(magnitudes_original, shuffle_indices) 
     times_replace        = tf.gather(times_original, shuffle_indices)    
     att_mask_replace     = tf.gather(att_mask_original, shuffle_indices)
@@ -110,6 +112,9 @@ def randomize(input_dict, nsp_prob):
     mask_original_obs = creat_mask_given_lenghts(length_0, max_len=inp_size[1])
 
     # Combine sequences
+    target_randomized   = combine_sequences(seq_0=target_original,
+                                                seq_1=target_replace, 
+                                                mask_0=mask_original_obs)
     magnitudes_randomized   = combine_sequences(seq_0=magnitudes_original,
                                                 seq_1=magnitudes_replace, 
                                                 mask_0=mask_original_obs)
@@ -139,6 +144,7 @@ def randomize(input_dict, nsp_prob):
     times_randomized = times_randomized - mean_val
 
     input_dict['nsp_label'] = tf.cast(tf.expand_dims(binary_vector, -1), tf.float32)
+    input_dict['target_magnitudes'] = target_randomized
     input_dict['nsp_magnitudes'] = magnitudes_randomized
     input_dict['nsp_times'] = (times_randomized) * tf.expand_dims(padding_mask_randomized, axis=-1)
     input_dict['nsp_pad_mask'] = padding_mask_randomized
@@ -147,7 +153,7 @@ def randomize(input_dict, nsp_prob):
     input_dict['att_mask'] = att_mask_randomized * (1.-tf.expand_dims(padding_mask_randomized, axis=-1))
     input_dict['seg_emb'] = segment_emb
 
-    return input_dict, t_1
+    return input_dict
 
 def apply_nsp(dataset, nsp_prob=0.5):
 
