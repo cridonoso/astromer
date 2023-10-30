@@ -6,9 +6,9 @@ import sys
 import os
 
 from presentation.experiments.utils import train_classifier
-from src.models.astromer_1 import get_ASTROMER, build_input, train_step, test_step
+from src.models.astromer_2 import get_ASTROMER, build_input, train_step, test_step
 from src.training.utils import train
-from src.data.zero import pretraining_pipeline
+from src.data import get_loader
 from datetime import datetime
 
 
@@ -49,8 +49,7 @@ def run(opt):
                             pe_c=model_config['pe_exp'],
                             window_size=model_config['window_size'],
                             encoder_mode=model_config['encoder_mode'],
-                            average_layers=model_config['avg_layers'],
-                            mask_format=model_config['mask_format'])
+                            average_layers=model_config['avg_layers'])
 
     astromer.load_weights(os.path.join(FTWEIGTHS, 'weights', 'weights'))
     print('[INFO] Weights loaded')
@@ -72,68 +71,41 @@ def run(opt):
                               opt.subdataset+'_'+str(opt.spc))
     num_cls = pd.read_csv(os.path.join(DOWNSTREAM_DATA, 'objects.csv')).shape[0]
 
-    train_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'train'),
-                                        batch_size= 5 if opt.debug else 512, 
-                                        window_size=model_config['window_size'],
-                                        shuffle=True,
-                                        sampling=False,
-                                        repeat=1,
-                                        msk_frac=0.,
-                                        rnd_frac=0.,
-                                        same_frac=0.,
-                                        num_cls=num_cls,
-                                        key_format='1')
-    valid_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'val'),
-                                        batch_size=5 if opt.debug else 512,
-                                        window_size=model_config['window_size'],
-                                        shuffle=False,
-                                        sampling=False,
-                                        msk_frac=0.,
-                                        rnd_frac=0.,
-                                        same_frac=0.,
-                                        num_cls=num_cls,
-                                        key_format='1')
-    test_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'test'),
-                                        batch_size=5 if opt.debug else 512,
-                                        window_size=model_config['window_size'],
-                                        shuffle=False,
-                                        sampling=False,
-                                        msk_frac=0.,
-                                        rnd_frac=0.,
-                                        same_frac=0.,
-                                        num_cls=num_cls,
-                                        key_format='1')
-    # train_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
-    #                          batch_size= 5 if opt.debug else 512, 
-    #                          probed=1.,
-    #                          random_same=0.,  
-    #                          window_size=model_config['window_size'], 
-    #                          off_nsp=True,
-    #                          nsp_prob=0., 
-    #                          repeat=1, 
-    #                          sampling=False,
-    #                          shuffle=True,
-    #                          num_cls=num_cls)
-    # valid_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'val'), 
-    #                          batch_size= 5 if opt.debug else 512, 
-    #                          probed=1.,
-    #                          random_same=0.,  
-    #                          window_size=model_config['window_size'], 
-    #                          off_nsp=True,
-    #                          nsp_prob=0., 
-    #                          repeat=1, 
-    #                          sampling=False,
-    #                          num_cls=num_cls)
-    # test_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'test'), 
-    #                          batch_size= 5 if opt.debug else 512, 
-    #                          probed=1.,
-    #                          random_same=0.,  
-    #                          window_size=model_config['window_size'], 
-    #                          off_nsp=True, 
-    #                          nsp_prob=0., 
-    #                          repeat=1, 
-    #                          sampling=False,
-    #                          num_cls=num_cls)
+    train_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'train'),
+                              batch_size= 5 if opt.debug else 512, 
+                              window_size=model_config['window_size'],
+                              probed_frac=0.,
+                              random_frac=0.,
+                              nsp_prob=0.,
+                              sampling=False,
+                              shuffle=True,
+                              repeat=1,
+                              num_cls=num_cls,
+                              aversion='2')
+
+    valid_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'val'),
+                              batch_size=5 if opt.debug else 512,
+                              window_size=model_config['window_size'],
+                              probed_frac=0.,
+                              random_frac=0.,
+                              nsp_prob=0.,
+                              sampling=False,
+                              shuffle=False,
+                              repeat=1,
+                              num_cls=num_cls,
+                              aversion='2')
+
+    test_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'test'),
+                              batch_size=5 if opt.debug else 512,
+                              window_size=model_config['window_size'],
+                              probed_frac=0.,
+                              random_frac=0.,
+                              nsp_prob=0.,
+                              sampling=False,
+                              shuffle=False,
+                              repeat=1,
+                              num_cls=num_cls,
+                              aversion='2')
 
     if opt.debug:
         train_loader = train_loader.take(1)
@@ -145,9 +117,25 @@ def run(opt):
     encoder = astromer.get_layer('encoder')
     encoder.trainable = opt.train_astromer
     embedding = encoder(inp_placeholder)
-    embedding = embedding*(1.-inp_placeholder['att_mask'])
-    embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
-                                      tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
+
+    if opt.clf_name == 'cls_mlp':
+        embedding = tf.slice(embedding, [0, 0, 0], [-1, 1,-1], name='slice_cls')
+        embedding = tf.squeeze(embedding, axis=1)
+
+    if opt.clf_name == 'att_mlp':
+        embedding = tf.slice(embedding, [0, 1, 0], [-1, 1,-1], name='slice_att')
+        embedding = embedding*(1.-inp_placeholder['att_mask'])
+        embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
+                                          tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
+        
+    if opt.clf_name == 'all_mlp':
+        cls_token  = tf.slice(embedding, [0, 0, 0], [-1, 1,-1], name='slice_cls')
+        cls_token = tf.squeeze(cls_token, axis=1)
+        att_tokens = tf.slice(embedding, [0, 1, 0], [-1, 1,-1], name='slice_att')
+        att_tokens = att_tokens*(1.-inp_placeholder['att_mask'])
+        att_tokens = tf.math.divide_no_nan(tf.reduce_sum(att_tokens, axis=1), 
+                                          tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
+        embedding = tf.concat([att_tokens, cls_token], axis=-1)
 
     summary_clf = train_classifier(embedding,
                                    inp_placeholder=inp_placeholder,

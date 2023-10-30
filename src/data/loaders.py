@@ -103,7 +103,7 @@ def format_inp_astromer(batch,
         inputs['magnitudes'] = batch['nsp_magnitudes']
         inputs['times']      = batch['nsp_times']
         inputs['att_mask']   = batch['att_mask']
-        inputs['seg_emb']    = batch['seg_emb']
+        inputs['seg_emb']    = tf.expand_dims(batch['seg_emb'], axis=-1)
         
         outputs['magnitudes']  = batch['target_magnitudes']
         outputs['error']       = tf.slice(batch['input'], [0,0,2], [-1,-1,1])

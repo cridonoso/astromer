@@ -93,7 +93,8 @@ class NSPEncoder(Encoder):
 		self.concat_cls    = Concatenate(axis=1, name='concat_cls')
 
 	def input_format(self, inputs):
-		x = tf.concat([inputs['magnitudes'], inputs['seg_emb']], axis=2, name='concat_mag_segemb')
+		x = tf.concat([inputs['magnitudes'], inputs['seg_emb']], axis=2, 
+						name='concat_mag_segemb')
 		
 		x_transformed = self.inp_transform(x)   
 		x_pe = self.positional_encoder(inputs['times'])
