@@ -122,6 +122,12 @@ def format_inp_astromer(batch,
 
     return inputs, outputs
 
+def filter_fn(input_dict):
+    if tf.less(tf.shape(input_dict['input'])[0], 5):
+        return False
+    else:
+        return True
+    
 def get_loader(dataset,
                batch_size=None,
                window_size=200,
@@ -147,7 +153,7 @@ def get_loader(dataset,
 
     if isinstance(dataset, str):
         dataset = load_records(dataset)
-
+    
     if shuffle:
         SHUFFLE_BUFFER = 10000
         dataset = dataset.shuffle(SHUFFLE_BUFFER)
@@ -156,6 +162,8 @@ def get_loader(dataset,
     if repeat is not None:
         print('[INFO] Repeating dataset x{} times'.format(repeat))
         dataset = dataset.repeat(repeat)
+    
+    dataset = dataset.filter(filter_fn)
 
     # CREATE WINDOWS
     dataset = to_windows(dataset,
@@ -167,16 +175,17 @@ def get_loader(dataset,
 
     if normalize == 'minmax':
         dataset = dataset.map(min_max_scaler)
-
+        
+    
     print('[INFO] Loading PT task: Masking')
     dataset, shapes = mask_dataset(dataset,
                            msk_frac=probed_frac,
                            rnd_frac=random_frac,
                            same_frac=random_frac,
                            window_size=window_size)
-
+    
     dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
-
+    
     if aversion == '2':
         print('[INFO] NSP format activated')
         dataset = apply_nsp(dataset, nsp_prob)

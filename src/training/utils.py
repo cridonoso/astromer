@@ -42,8 +42,8 @@ def train(model,
     if debug:
         print('[INFO] DEBGUGING MODE')
         num_epochs   = 2
-        train_loader = train_loader.take(2)
-        valid_loader = valid_loader.take(2)
+        train_loader = train_loader.take(5)
+        valid_loader = valid_loader.take(5)
         if test_loader is not None:
             test_loader = test_loader.take(1)
 
