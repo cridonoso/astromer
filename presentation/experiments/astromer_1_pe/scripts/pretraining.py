@@ -33,7 +33,7 @@ def run(opt):
                                         batch_size= 5 if opt.debug else opt.bs, 
                                         window_size=opt.window_size,
                                         shuffle=True,
-                                        sampling=True,
+                                        sampling=True if opt.sampling else False,
                                         repeat=opt.repeat,
                                         msk_frac=opt.probed,
                                         rnd_frac=opt.rs,
@@ -141,6 +141,8 @@ if __name__ == '__main__':
                         help='Number of times for sampling windows from single LC')
 	parser.add_argument('--window-size', default=200, type=int,
 						help='windows size of the PSFs')
+	parser.add_argument('--sampling', action='store_true', 
+                        help='a debugging flag to be used when testing.')
 
     # Arquitecture
 	parser.add_argument('--encoder-mode', default='normal', type=str,
