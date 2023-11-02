@@ -1,3 +1,9 @@
+[nontrain]
+pe_layer  = false
+ff1_layer = false
+att_layer = false
+ff2_layer = false
+
 [PE]
 pe_layer  = true
 ff1_layer = false

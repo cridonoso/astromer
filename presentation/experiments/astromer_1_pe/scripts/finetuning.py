@@ -1,18 +1,12 @@
-import tensorflow as tf
 import pandas as pd
 import argparse
 import toml
-import sys
+import yaml
 import os
 
-import copy
-import numpy as np
-
-from presentation.experiments.utils import train_classifier
-from src.models.astromer_1 import get_ASTROMER, build_input, train_step, test_step
+from src.models.astromer_1 import get_ASTROMER, train_step, test_step
 from src.training.utils import train
 from src.data.zero import pretraining_pipeline
-from datetime import datetime
 
 
 def maybe_str_or_int(arg):
@@ -66,6 +60,11 @@ def run(opt):
 	else:
 		data_name = '{}_{}'.format(opt.dataset, opt.spc)
 
+	# To scale de PE freq
+	data_to_scale = None
+	if opt.scale_pe_freq:
+		data_to_scale = opt.dataset
+
 	# =========================================================================
 	# =============== LOADING SETTING =========================================
 	# ========================================================================+
@@ -75,20 +74,26 @@ def run(opt):
 		layers_config = toml.load(f)
 
 	# Pretraining configs
-	with open(os.path.join(ROOT, opt.pt_folder, 'config.toml'), 'r') as f:
-		model_config = toml.load(f)
+	file = open(os.path.join(ROOT, opt.pt_folder, 'config.yaml'), "r")
+	model_config = yaml.load(file, Loader=yaml.FullLoader) 
 
-	model_config = get_none_values(model_config)
+	file = open(os.path.join(ROOT, opt.pt_folder, 'pe_config.yaml'), "r")
+	pe_config = yaml.load(file, Loader=yaml.FullLoader) 
 
-	with open(os.path.join(ROOT, opt.pt_folder, 'pe_config.toml'), 'r') as f:
-		pe_config = toml.load(f)
-	
+	#with open(os.path.join(ROOT, opt.pt_folder, 'config.toml'), 'r') as f:
+	#	model_config = toml.load(f)
+	#
+	#model_config = get_none_values(model_config)
+
+	#with open(os.path.join(ROOT, opt.pt_folder, 'pe_config.toml'), 'r') as f:
+	#	pe_config = toml.load(f)
+
 	# Update model config
 	dict_model_config = dict({
 		'Pretraining': model_config,
 		'Finetuning': opt.__dict__
 	})
-	
+
 	# Update PE config
 	dict_pe = dict({model_config['pe_func_name']: pe_config[model_config['pe_func_name']]})
 	dict_pe[model_config['pe_func_name']]['pe_trainable'] = layers_config[opt.ft_science_case]['pe_layer']
@@ -102,7 +107,7 @@ def run(opt):
 							   	   '{}'.format(data_name)) 
 
 	train_loader = pretraining_pipeline(os.path.join(FINETUNING_DATA, 'train'),
-										batch_size= 5 if opt.debug else opt.bs, 
+										batch_size=5 if opt.debug else opt.bs, 
 										window_size=model_config['window_size'],
 										shuffle=True,
 										sampling=False,
@@ -145,38 +150,11 @@ def run(opt):
                             residual_type=model_config['residual_type'],
 							window_size=model_config['window_size'],
 							encoder_mode=model_config['encoder_mode'],
-							average_layers=model_config['avg_layers'])
-
-	pre_load = []
-	for layer in astromer.get_layer('encoder').layers:
-		if layer.name.find('att_') != -1:
-			pre_load.append(copy.deepcopy(layer.weights)) 
+							average_layers=model_config['avg_layers'],
+							data_name=data_to_scale)
 
 	astromer.load_weights(os.path.join(ROOT, opt.pt_folder, 'weights', 'weights'))
 	print('[INFO] Weights loaded')
-
-	#checkpoint = tf.train.load_checkpoint(os.path.join(ROOT, opt.pt_folder, 'weights', 'weights'))
-	#cont = 0
-	#for layer in astromer.get_layer('encoder').layers:
-	#	print(f'Name layers: {layer.name}')	
-#
-	#	if layer.name.find('att_') != -1:
-	#		layer.mha.wq.assign(checkpoint.get_tensor('layer_with_weights-0/enc_layers/{}/mha/wq/kernel/.ATTRIBUTES/VARIABLE_VALUE'.format(cont)))
-	#		layer.mha.wk.assign(checkpoint.get_tensor('layer_with_weights-0/enc_layers/{}/mha/wk/kernel/.ATTRIBUTES/VARIABLE_VALUE'.format(cont)))
-	#		layer.mha.wv.assign(checkpoint.get_tensor('layer_with_weights-0/enc_layers/{}/mha/wv/kernel/.ATTRIBUTES/VARIABLE_VALUE'.format(cont)))
-	#		layer.mha.bq.assign(checkpoint.get_tensor('layer_with_weights-0/enc_layers/{}/mha/wq/bias/.ATTRIBUTES/VARIABLE_VALUE'.format(cont)))
-	#		layer.mha.bk.assign(checkpoint.get_tensor('layer_with_weights-0/enc_layers/{}/mha/wk/bias/.ATTRIBUTES/VARIABLE_VALUE'.format(cont)))
-	#		layer.mha.bv.assign(checkpoint.get_tensor('layer_with_weights-0/enc_layers/{}/mha/wv/bias/.ATTRIBUTES/VARIABLE_VALUE'.format(cont)))
-	#		cont += 1		
-#
-	#pos_load = []
-	#for layer in astromer.get_layer('encoder').layers:
-	#	if layer.name.find('att_') != -1:
-	#		pos_load.append(copy.deepcopy(layer.weights))
-#
-	#for pre_layers, pos_layers in zip(pre_load, pos_load):
-	#	for w_pre, w_pos in zip(pre_layers, pos_layers):
-	#		print('{}: {} == {}'.format(np.sum((w_pre == w_pos).numpy()), w_pre.name, w_pos.name))
 
 	# ====================================================================================
 	# =============== FINETUNING MODEL  ==================================================
@@ -198,31 +176,33 @@ def run(opt):
 		astromer.summary(print_fn=lambda x: f.write(x + '\n'))
 			
 	# Save PE configuration
-	with open(os.path.join(FTWEIGTHS, 'pe_config.toml'), 'w') as f:
-		toml.dump(dict_pe, f)
+	file = open(os.path.join(FTWEIGTHS, 'pe_config.yaml'), "w")
+	yaml.dump(dict_pe, file)
+	file.close()
 
-    # Training
+	#with open(os.path.join(FTWEIGTHS, 'pe_config.toml'), 'w') as f:
+	#	toml.dump(dict_pe, f)
+
+	# Training
 	astromer, \
 	(best_train_metrics,
-	best_val_metrics,
-	test_metrics)  = train(astromer,
-						   train_loader, 
-						   valid_loader, 
-						   num_epochs=opt.num_epochs, 
-						   lr=opt.lr, 
-						   test_loader=test_loader,
-						   project_path=FTWEIGTHS,
-						   debug=opt.debug,
-						   patience=opt.patience,
-						   train_step_fn=train_step,
-						   test_step_fn=test_step,
-						   argparse_dict=dict_model_config)
+	best_val_metrics)  = train(astromer,
+							train_loader, 
+							valid_loader, 
+							num_epochs=opt.num_epochs, 
+							lr=opt.lr, 
+							test_loader=test_loader,
+							project_path=FTWEIGTHS,
+							debug=opt.debug,
+							patience=opt.patience,
+							train_step_fn=train_step,
+							test_step_fn=test_step,
+							argparse_dict=dict_model_config)
 
 	metrics = merge_metrics(train=best_train_metrics, 
-							val=best_val_metrics, 
-							test=test_metrics)
+							val=best_val_metrics)
 
-	with open(os.path.join(FTWEIGTHS, 'metrics.toml'), 'w') as fp:
+	with open(os.path.join(FTWEIGTHS, 'train_val_metrics.toml'), 'w') as fp:
 		toml.dump(metrics, fp)
 
 
@@ -240,6 +220,7 @@ if __name__ == '__main__':
 	parser.add_argument('--ft-folder', default='results/finetuning/P02R01/macho_pe_nontrainable_prueba', 
 						type=str, help='pretrained model folder')
 	parser.add_argument('--ft-science-case', default='FF1_ATT_FF2', type=str, help='Layers trainables')
+	parser.add_argument('--scale-pe-freq', action='store_true', help='a debugging flag to be used when testing.')
 	parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
 
 	parser.add_argument('--lr', default='scheduler', type=str, help='learning rate')

@@ -16,7 +16,7 @@ class TransformLayer(Layer):
 		rec_token = tf.slice(inputs, [0, 1, 0], [-1, -1, -1], name='rec_token')
 
 		x_prob = self.clf_layer(cls_token)
-		rec_token = self.bn_0(rec_token, training=training)
+		rec_token = self.bn_0(rec_token, training=False)
 		x_rec = self.reg_layer(rec_token)
 
 		return {'nsp_label': x_prob, 'reconstruction':x_rec}
@@ -28,6 +28,6 @@ class RegLayer(Layer):
 		self.bn_0 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 
 	def call(self, inputs, training):
-		x = self.bn_0(inputs, training=training)
+		x = self.bn_0(inputs, training=False)
 		x = self.reg_layer(x)
 		return x

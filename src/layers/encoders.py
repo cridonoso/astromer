@@ -20,6 +20,7 @@ class Encoder(tf.keras.Model):
 				 pe_func_name='pe',
 				 residual_type=None,
 				 average_layers=False,
+				 data_name=None,
 				 **kwargs):
 		super(Encoder, self).__init__(**kwargs)
 
@@ -33,6 +34,7 @@ class Encoder(tf.keras.Model):
 		self.residual_type	 = residual_type
 		self.pe_func_name 	 = pe_func_name
 		self.average_layers  = average_layers
+		self.data_name		 = data_name
 
 		self.d_model = num_heads*head_dim
 
@@ -45,6 +47,10 @@ class Encoder(tf.keras.Model):
 		elif self.pe_type == 'MixPE':
 			self.pe_transform = self.__select_pos_emb(pe_config)
 			self.rel_embedding   = tf.keras.layers.Dense(self.d_model, name='rel_embedding')
+		elif self.pe_type == 'MixPE_v1':
+			self.pe_transform = self.__select_pos_emb(pe_config)
+			self.rel_embedding_q = tf.keras.layers.Dense(self.d_model, name='rel_embedding_q')
+			self.rel_embedding_k = tf.keras.layers.Dense(self.d_model, name='rel_embedding_k')
 		else:
 			raise ValueError("Unknown positional encoding type")
 
@@ -59,6 +65,7 @@ class Encoder(tf.keras.Model):
 			'APE': self.combine_type_APE,
 			'RPE': self.combine_type_RPE,
 			'MixPE': self.combine_type_MixPE,
+			'MixPE_v1': self.combine_type_MixPE_v1,
 		}
 					
 		self.dropout_layer = tf.keras.layers.Dropout(self.dropout)
@@ -174,6 +181,39 @@ class Encoder(tf.keras.Model):
 
 		return x
 
+	def combine_type_MixPE_v1(self, inputs, mask, training):
+		''' Absolute and Relative Positional Embedding '''
+
+		emb_x = self.inp_transform(inputs['magnitudes']) 
+		pe_t = 0
+
+		if self.pe_func_name not in ['not_pe_module', 'pea']:
+			pe_t = self.pe_transform(inputs['times'])
+
+		pos_rel = inputs['times'] - tf.transpose(inputs['times'], perm=[0,2,1])
+		Q_pe_rel_t = self.rel_embedding_q(pos_rel)
+		K_pe_rel_t = self.rel_embedding_k(pos_rel)
+
+		emb_x = self.dropout_layer(emb_x, training=training)
+		pe_t = self.dropout_layer(pe_t, training=training)
+		Q_pe_rel_t = self.dropout_layer(Q_pe_rel_t, training=training)
+		K_pe_rel_t = self.dropout_layer(K_pe_rel_t, training=training)
+
+		layers_outputs = []
+		inputs_emb = [emb_x, pe_t, Q_pe_rel_t, K_pe_rel_t, layers_outputs, self.num_layers, 0]
+		for i in range(self.num_layers):
+			inputs_emb[-1] = i
+			x, _ =  self.enc_layers[i](inputs_emb, mask=mask, training=training)
+			layers_outputs.append(x)
+
+		x = self.output_format(layers_outputs, self.window_size) 
+
+		if self.pe_func_name == 'pea':
+			pe_t = self.pe_transform(inputs['times'])
+			x = x + pe_t
+
+		return x
+
 
 	def __select_pos_emb(self, pe_config):
 		if pe_config is None:
@@ -191,6 +231,7 @@ class Encoder(tf.keras.Model):
 											   initializer	= pe_config[self.pe_func_name]['initializer'], 
 											   min_period	= pe_config[self.pe_func_name]['min_period'], 
 											   max_period	= pe_config[self.pe_func_name]['max_period'],
+											   data_name	= self.data_name,
 											   name			= 'PosEncoding')
 			
 		elif self.pe_func_name == 'pe_mlp':

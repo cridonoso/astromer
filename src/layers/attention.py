@@ -21,7 +21,8 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 		self.combine_attention = {
 			'APE': self.combine_attention_APE,
 			'RPE': self.combine_attention_RPE,
-			'MixPE': self.combine_attention_MixPE
+			'MixPE': self.combine_attention_MixPE,
+			'MixPE_v1': self.combine_attention_MixPE_v1
 		}
 
 	def split_heads(self, x, batch_size, name='qkv'):
@@ -188,17 +189,81 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 		return output, attention_weights
 	
 
+	def combine_attention_MixPE_v1(self, inputs, mask, training):
+		emb_x, pe_t, Q_pe_rel_t, K_pe_rel_t, layers_outputs, num_layers, i_layer = inputs
+		batch_size = tf.shape(emb_x)[0]
+
+		if len(layers_outputs) == 0:	
+			Q_c = self.wq(emb_x)
+			K_c = self.wk(emb_x)
+			V_c = self.wv(emb_x)
+
+			Q_c, Q_r = self.split_heads(Q_c, batch_size, name='Q_c'), self.split_heads(Q_pe_rel_t, batch_size, name='Q_r')  # (batch_size, num_heads, seq_len_q, depth)
+			K_c, K_r = self.split_heads(K_c, batch_size, name='K_c'), self.split_heads(K_pe_rel_t, batch_size, name='K_r')  # (batch_size, num_heads, seq_len_k, depth)
+			V_c = self.split_heads(V_c, batch_size, name='V_c')  # (batch_size, num_heads, seq_len_v, depth)
+
+			# Scaled dot product
+			matmul_Qc_Kc = tf.matmul(Q_c, K_c, transpose_b=True) # (..., seq_len_q, seq_len_k)
+			matmul_Qr_Kc = tf.matmul(Q_r, K_c, transpose_b=True) # (..., seq_len_q, seq_len_k)
+			matmul_Qc_Kr = tf.matmul(Q_c, K_r, transpose_b=True) # (..., seq_len_q, seq_len_k)
+
+			matmul_qk = matmul_Qc_Kc + matmul_Qr_Kc + matmul_Qc_Kr
+
+		else: 
+			x = layers_outputs[-1]
+			Q_c = self.wq(x) # (batch_size, seq_len, d_model)
+			K_c = self.wk(x) # (batch_size, seq_len, d_model)
+			V_c = self.wv(x) # (batch_size, seq_len, d_model)
+
+			Q_c = self.split_heads(Q_c, batch_size, name='Q_c') # (batch_size, num_heads, seq_len_q, depth)
+			K_c = self.split_heads(K_c, batch_size, name='K_c') # (batch_size, num_heads, seq_len_k, depth)
+			V_c = self.split_heads(V_c, batch_size, name='V_c') # (batch_size, num_heads, seq_len_v, depth)
+
+			matmul_qk = tf.matmul(Q_c, K_c, transpose_b=True) # (..., seq_len_q, seq_len_k)
+
+		# Residual connections
+		if i_layer > 0:
+			Wq_pos_Wk_pos = 0.
+			if self.residual_type is not None:
+				Wq_pos_Wk_pos = self.get_p2p_term(pe_t, i_layer, num_layers, Wq_pos_Wk_pos, batch_size)
+
+			matmul_qk += Wq_pos_Wk_pos
+
+		# scale matmul_qk
+		dk = tf.cast(tf.shape(K_c)[-1], tf.float32)
+		scaled_attention_logits = matmul_qk / tf.math.sqrt(dk)
+
+		if mask is not None:
+			print('Using masking...')
+			scaled_attention_logits = self.get_mask(scaled_attention_logits, mask)
+
+		# softmax is normalized on the last axis (seq_len_k) so that the scores add up to 1.
+		attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
+		scaled_attention = tf.matmul(attention_weights, V_c, name='Z')  # (..., seq_len_q, depth_v)
+
+		scaled_attention = tf.transpose(scaled_attention, perm=[0, 2, 1, 3])  # (batch_size, seq_len_q, num_heads, depth)
+
+		concat_attention = tf.reshape(scaled_attention,
+										(batch_size, -1, self.d_model))  # (batch_size, seq_len_q, d_model)
+
+		output = self.dense(concat_attention)
+		
+		return output, attention_weights
+
 	def get_input_embedding(self, emb_x, pe_t, dropout, layers_outputs, training):
 		
 		if len(layers_outputs) == 0:
-			if self.pe_func_name == 'pe_tm':
-				alpha, beta = pe_t
-				x = emb_x * alpha + beta
+			if self.residual_type == 'residual_in_last_attblock':
+				x = dropout(emb_x, training=training)
 			else:
-				x = emb_x + pe_t
+				if self.pe_func_name == 'pe_tm':
+					alpha, beta = pe_t
+					x = emb_x * alpha + beta
+				else:
+					x = emb_x + pe_t
 
-			x = dropout(x, training=training)
-			
+				x = dropout(x, training=training)
+				
 		else:
 			x = layers_outputs[-1]
 		

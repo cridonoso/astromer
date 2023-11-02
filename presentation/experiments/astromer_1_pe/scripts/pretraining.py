@@ -1,6 +1,7 @@
 import tensorflow as tf
 import argparse
 import toml
+import yaml
 import sys
 import os
 
@@ -60,9 +61,12 @@ def run(opt):
                                         key_format='1')
 
     # ======= MODEL ========================================
-    path_pe_config = '{}/pe_config.toml'.format(ROOT)
-    with open(path_pe_config, mode="r") as fp:
-        pe_config = toml.load(fp)
+    file = open('{}/pe_config.yaml'.format(ROOT), "r")
+    pe_config = yaml.load(file, Loader=yaml.FullLoader) 
+
+    #path_pe_config = '{}/pe_config.toml'.format(ROOT)
+    #with open(path_pe_config, mode="r") as fp:
+    #    pe_config = toml.load(fp)
 
     astromer = get_ASTROMER(num_layers=opt.num_layers,
                             num_heads=opt.num_heads,
@@ -75,7 +79,8 @@ def run(opt):
                             residual_type=opt.residual_type,
                             window_size=opt.window_size,
                             encoder_mode=opt.encoder_mode,
-                            average_layers=opt.avg_layers)
+                            average_layers=opt.avg_layers,
+                            data_name=None)
 
     # ============================================================
     if opt.checkpoint != '-1':
@@ -83,8 +88,11 @@ def run(opt):
         astromer.load_weights(os.path.join(opt.checkpoint, 'weights', 'weights'))
 
     dict_pe = dict({opt.pe_func_name: pe_config[opt.pe_func_name]})
-    with open(os.path.join(EXPDIR, 'pe_config.toml'), 'w') as f:
-        toml.dump(dict_pe, f)
+    file = open(os.path.join(EXPDIR, 'pe_config.yaml'), "w")
+    yaml.dump(dict_pe, file)
+    file.close()
+    #with open(os.path.join(EXPDIR, 'pe_config.toml'), 'w') as f:
+    #    toml.dump(dict_pe, f)
 
     print(astromer.summary())
     with open('{}/model_summary.txt'.format(EXPDIR), 'w') as f:
@@ -92,8 +100,7 @@ def run(opt):
 
     astromer, \
 	(best_train_metrics,
-	best_val_metrics,
-	test_metrics) = train(astromer,
+	best_val_metrics) = train(astromer,
                           train_loader, 
                           valid_loader, 
                           num_epochs=opt.num_epochs, 
@@ -107,10 +114,9 @@ def run(opt):
                           argparse_dict=opt.__dict__)
 
     metrics = merge_metrics(train=best_train_metrics, 
-                            val=best_val_metrics, 
-                            test=test_metrics)
+                            val=best_val_metrics)
 
-    with open(os.path.join(EXPDIR, 'metrics.toml'), 'w') as fp:
+    with open(os.path.join(EXPDIR, 'train_val_metrics.toml'), 'w') as fp:
         toml.dump(metrics, fp)
 
 
@@ -122,7 +128,7 @@ if __name__ == '__main__':
 					help='Project name')    
 	parser.add_argument('--exp-name', default='macho_pe_nontrainable_repeat4', type=str,
 					help='Project name')
-	parser.add_argument('--data', default='./data/records/macho', type=str,
+	parser.add_argument('--data', default='./data/records/macho_clean', type=str,
 					help='Data folder where tf.record files are located')
 	parser.add_argument('--checkpoint', default='-1', type=str,
 						help='Restore training by using checkpoints. This is the route to the checkpoint folder.')

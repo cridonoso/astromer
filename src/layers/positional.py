@@ -16,20 +16,20 @@ def get_positions(inputs):
 
 class PositionalEmbedding(tf.keras.layers.Layer):
 	def __init__(self, d_model, base=1000, c=1, use_mjd=True, pe_trainable=False, 
-			  	 initializer='pe_astromer', min_period=0.01, max_period=5.*365, **kwargs):
+			  	 initializer='pe_astromer', min_period=0.01, max_period=5.*365, data_name=None, **kwargs):
 		super(PositionalEmbedding, self).__init__(**kwargs)
 		self.d_model = d_model
 		self.base = base
 		self.c = tf.cast(c, tf.float32)
 		self.min_period = min_period
 		self.max_period = max_period
+		self.data_name = data_name
 
 		self.use_mjd = use_mjd
 	
 		self.pe_trainable = pe_trainable
 		self.initializer = initializer
 		self.init_freq = self.__select_initializer(initializer)
-
 
 	def build(self, input_shape):
 		self.w = self.add_weight(shape=(input_shape[-1], self.d_model),
@@ -87,6 +87,21 @@ class PositionalEmbedding(tf.keras.layers.Layer):
 
 		frequency = tf.pow(tf.cast(self.base, dtype=tf.float32), exponent)
 		frequency = tf.math.reciprocal(frequency)
+		
+		if self.data_name is not None:
+			print('We are using the correction from {} data'.format(self.data_name))
+			data_mean_ratio = {
+				'alcock': 0.752,
+				'atlas': 1.005,
+				'ogle': 0.800,
+				'kepler': 122.505,
+				'kepler_alcock_linear': 0.739,
+				'kepler_atlas_linear': 0.663,
+				'kepler_ogle_linear': 0.829,
+			}
+
+			frequency = frequency * data_mean_ratio[self.data_name]
+
 		return frequency
 
 	def __get_frequency_Vaswani(self):
@@ -117,7 +132,8 @@ class PositionalEmbedding(tf.keras.layers.Layer):
 			"pe_trainable": self.pe_trainable,
 			"initializer": self.initializer,
 			"min_period": self.min_period,
-			"max_period": self.max_period
+			"max_period": self.max_period,
+			"data_name": self.data_name
 		})
 		return config
 
