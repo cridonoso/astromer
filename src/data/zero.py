@@ -58,6 +58,8 @@ def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
         rand_mask = tf.expand_dims(rand_mask, 1)
         rand_mask = tf.tile(rand_mask, [1, tf.shape(serie_2)[-1]])
         
+        # print(rand_mask)
+        
         len_s1 = tf.minimum(tf.shape(serie_2)[0],
                             tf.shape(rand_mask)[0])
 
@@ -68,12 +70,30 @@ def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
         keep_mask = tf.math.floor(tf.math.cos(rand_mask))
 
         serie_1 = tf.multiply(serie_1, keep_mask, name='seriemul')
-
         keep_mask = tf.slice(keep_mask, [0,0], [-1,1])
+        # print(keep_mask)
         mask_1  = tf.multiply(mask_1, tf.squeeze(keep_mask), name='maskmul2')
         serie_1 = tf.add(serie_1, rand_vals)
 
         return serie_1, mask_1
+    
+def pad_inputs(max_obs, time_steps, mask_out, mask_in, seq_magn, seq_time, orig_magn, input_dict):
+    
+    mask_fill = tf.ones([max_obs - time_steps, 1], dtype=tf.float32)
+    mask_out  = tf.concat([mask_out,  1-mask_fill], 0) #The original number of masked values 
+    mask_in   = tf.concat([mask_in,     mask_fill], 0) #The mask after removing random_same and random_values 
+    seq_magn  = tf.concat([seq_magn,  1-mask_fill], 0)
+    seq_time  = tf.concat([seq_time,  1-mask_fill], 0)
+    orig_magn = tf.concat([orig_magn, 1-mask_fill], 0)
+    input_dict['mask'] =  tf.concat([input_dict['mask'],
+                                    1-tf.reshape(mask_fill, [tf.shape(mask_fill)[0]])], 0)
+
+    reshaped_mask = tf.zeros([max_obs - time_steps,
+                                tf.shape(input_dict['input'])[-1]],
+                                dtype=tf.float32)
+    input_dict['input'] = tf.concat([input_dict['input'], reshaped_mask], 0)
+    
+    return mask_out, mask_in, seq_magn, seq_time, orig_magn, input_dict
 
 def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
     '''
@@ -114,20 +134,17 @@ def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
     mask_out = tf.reshape(mask_out, [time_steps, 1])
     mask_in = tf.reshape(mask_in, [time_steps, 1])
 
+    ### Test get masked with padding
+    ## Put it outside 
     if time_steps < max_obs:
-        mask_fill = tf.ones([max_obs - time_steps, 1], dtype=tf.float32)
-        mask_out  = tf.concat([mask_out,  1-mask_fill], 0)
-        mask_in   = tf.concat([mask_in,     mask_fill], 0)
-        seq_magn  = tf.concat([seq_magn,  1-mask_fill], 0)
-        seq_time  = tf.concat([seq_time,  1-mask_fill], 0)
-        orig_magn = tf.concat([orig_magn, 1-mask_fill], 0)
-        input_dict['mask'] =  tf.concat([input_dict['mask'],
-                                        1-tf.reshape(mask_fill, [tf.shape(mask_fill)[0]])], 0)
-
-        reshaped_mask = tf.zeros([max_obs - time_steps,
-                                  tf.shape(input_dict['input'])[-1]],
-                                  dtype=tf.float32)
-        input_dict['input'] = tf.concat([input_dict['input'], reshaped_mask], 0)
+        mask_out, mask_in, seq_magn, seq_time, orig_magn, input_dict = pad_inputs(mask_out=mask_out,
+                                                                                  mask_in=mask_in,
+                                                                                  seq_magn=seq_magn,
+                                                                                  seq_time=seq_time,
+                                                                                  orig_magn=orig_magn,
+                                                                                  input_dict=input_dict,
+                                                                                  time_steps=time_steps,
+                                                                                  max_obs=max_obs)
 
     input_dict['input_modified'] = seq_magn
     input_dict['mask_in']  = mask_in
