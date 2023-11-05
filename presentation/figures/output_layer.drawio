@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2023-11-05T21:33:25.186Z" agent="Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0" etag="SB2YuK82tBjYMBkQP2tP" version="22.0.8" type="github">
+<mxfile host="app.diagrams.net" modified="2023-11-05T21:35:11.901Z" agent="Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0" etag="XWq7H_8H6i2nGswG08Sl" version="22.0.8" type="github">
   <diagram name="Page-1" id="Op2igGFpyRgjVSwSjKm9">
     <mxGraphModel dx="1704" dy="1117" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="1" shadow="0">
       <root>
@@ -13,7 +13,7 @@
         <mxCell id="_tx1lnFHPkT80V72l1tq-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontFamily=Garamond;fontSize=14;" edge="1" parent="1" source="_tx1lnFHPkT80V72l1tq-3" target="_tx1lnFHPkT80V72l1tq-6">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="_tx1lnFHPkT80V72l1tq-3" value="$$Z_{obs}$$" style="rounded=1;whiteSpace=wrap;html=1;rotation=-90;fontFamily=Garamond;fontSize=14;" vertex="1" parent="1">
+        <mxCell id="_tx1lnFHPkT80V72l1tq-3" value="$$Z_{OBS}$$" style="rounded=1;whiteSpace=wrap;html=1;rotation=-90;fontFamily=Garamond;fontSize=14;" vertex="1" parent="1">
           <mxGeometry x="175" y="295" width="110" height="30" as="geometry" />
         </mxCell>
         <mxCell id="_tx1lnFHPkT80V72l1tq-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontFamily=Garamond;fontSize=14;" edge="1" parent="1" source="_tx1lnFHPkT80V72l1tq-4" target="_tx1lnFHPkT80V72l1tq-5">
