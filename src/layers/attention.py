@@ -22,7 +22,8 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 			'APE': self.combine_attention_APE,
 			'RPE': self.combine_attention_RPE,
 			'MixPE': self.combine_attention_MixPE,
-			'MixPE_v1': self.combine_attention_MixPE_v1
+			'MixPE_v1': self.combine_attention_MixPE_v1,
+			'ALiBi': self.combine_attention_ALiBi,
 		}
 
 	def split_heads(self, x, batch_size, name='qkv'):
@@ -126,6 +127,50 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 
 		return output, attention_weights
 
+
+	def combine_attention_ALiBi(self, inputs, mask, training):
+		emb_x, alibi, layers_outputs = inputs
+		batch_size = tf.shape(emb_x)[0]
+
+		if len(layers_outputs) > 0:	
+			emb_x = layers_outputs[-1]
+
+		Q_c = self.wq(emb_x)
+		K_c = self.wk(emb_x)
+		V_c = self.wv(emb_x)
+
+		Q_c = self.split_heads(Q_c, batch_size, name='Q_c')  # (batch_size, num_heads, seq_len_q, depth)
+		K_c = self.split_heads(K_c, batch_size, name='K_c')  # (batch_size, num_heads, seq_len_k, depth)
+		V_c = self.split_heads(V_c, batch_size, name='V_c')  # (batch_size, num_heads, seq_len_v, depth)
+
+		# Scaled dot product
+		matmul_qk = tf.matmul(Q_c, K_c, transpose_b=True) # (..., seq_len_q, seq_len_k)
+		matmul_qk += alibi
+
+		# Residual connections
+		if self.residual_type is not None:
+			raise TypeError("RPE doesn't have residual connections")
+
+		# scale matmul_qk
+		dk = tf.cast(tf.shape(K_c)[-1], tf.float32)
+		scaled_attention_logits = matmul_qk / tf.math.sqrt(dk)
+
+		if mask is not None:
+			print('Using masking...')
+			scaled_attention_logits = self.get_mask(scaled_attention_logits, mask)
+
+		# softmax is normalized on the last axis (seq_len_k) so that the scores add up to 1.
+		attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
+		scaled_attention = tf.matmul(attention_weights, V_c, name='Z')  # (..., seq_len_q, depth_v)
+
+		scaled_attention = tf.transpose(scaled_attention, perm=[0, 2, 1, 3])  # (batch_size, seq_len_q, num_heads, depth)
+
+		concat_attention = tf.reshape(scaled_attention,
+										(batch_size, -1, self.d_model))  # (batch_size, seq_len_q, d_model)
+
+		output = self.dense(concat_attention)
+
+		return output, attention_weights
 
 	def combine_attention_MixPE(self, inputs, mask, training):
 		emb_x, pe_t, pe_rel_t, layers_outputs, num_layers, i_layer = inputs

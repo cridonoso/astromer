@@ -51,6 +51,31 @@ class Encoder(tf.keras.Model):
 			self.pe_transform = self.__select_pos_emb(pe_config)
 			self.rel_embedding_q = tf.keras.layers.Dense(self.d_model, name='rel_embedding_q')
 			self.rel_embedding_k = tf.keras.layers.Dense(self.d_model, name='rel_embedding_k')
+		elif self.pe_type == 'ALiBi':
+			context_position = tf.range(self.window_size)[:, None]
+			memory_position = tf.range(self.window_size)[None, :]
+			relative_position = tf.abs(memory_position - context_position)
+			relative_position = tf.cast(relative_position, dtype=tf.float32)
+			relative_position = tf.expand_dims(relative_position, axis=0)
+		
+			def get_slopes(n):
+				def get_slopes_power_of_2(n):
+					start = tf.constant((2**(-2**-(math.log2(n)-3))), dtype=tf.float32)
+					ratio = start
+					return [start * ratio**i for i in range(n)]
+
+				if math.log2(n).is_integer():
+					return get_slopes_power_of_2(n)
+				else:
+					closest_power_of_2 = 2**math.floor(math.log2(n))
+					slopes = get_slopes_power_of_2(closest_power_of_2)
+					slopes += get_slopes(2 * closest_power_of_2)[0::2][:n - closest_power_of_2]
+					return slopes
+
+			slopes = tf.convert_to_tensor(get_slopes(self.num_heads), dtype=tf.float32) * -1
+			self.alibi = tf.reshape(slopes, (1, self.num_heads, 1, 1)) * relative_position
+			self.alibi = tf.reshape(self.alibi, (1, self.num_heads, self.window_size, self.window_size))
+
 		else:
 			raise ValueError("Unknown positional encoding type")
 
@@ -66,6 +91,7 @@ class Encoder(tf.keras.Model):
 			'RPE': self.combine_type_RPE,
 			'MixPE': self.combine_type_MixPE,
 			'MixPE_v1': self.combine_type_MixPE_v1,
+			'ALiBi': self.combine_type_ALiBi,
 		}
 					
 		self.dropout_layer = tf.keras.layers.Dropout(self.dropout)
@@ -104,13 +130,10 @@ class Encoder(tf.keras.Model):
 		''' Absolute Positional Embedding '''
 
 		emb_x = self.inp_transform(inputs['magnitudes']) 
-		pe_t = 0
+		pe_t = 0.
 
-		if self.pe_func_name not in ['not_pe_module', 'pea']:
+		if self.pe_func_name not in ['not_times', 'pea']:
 			pe_t = self.pe_transform(inputs['times'])
-
-		#emb_x = self.dropout_layer(emb_x, training=training)
-		#pe_t = self.dropout_layer(pe_t, training=training)
 
 		layers_outputs = []
 		inputs_emb = [emb_x, pe_t, self.dropout_layer, layers_outputs, self.num_layers, 0]
@@ -149,14 +172,30 @@ class Encoder(tf.keras.Model):
 
 		return x
 
+	def combine_type_ALiBi(self, inputs, mask, training):
+		''' Relative Positional Embedding '''
+
+		emb_x = self.inp_transform(inputs['magnitudes'])
+		emb_x = self.dropout_layer(emb_x, training=training)
+
+		layers_outputs = []
+		inputs_emb = [emb_x, self.alibi, layers_outputs]
+		for i in range(self.num_layers):
+			x, _ =  self.enc_layers[i](inputs_emb, mask=mask, training=training)
+			layers_outputs.append(x)
+
+		x = self.output_format(layers_outputs, self.window_size) 
+
+		return x
+
 
 	def combine_type_MixPE(self, inputs, mask, training):
 		''' Absolute and Relative Positional Embedding '''
 
 		emb_x = self.inp_transform(inputs['magnitudes']) 
-		pe_t = 0
+		pe_t = 0.
 
-		if self.pe_func_name not in ['not_pe_module', 'pea']:
+		if self.pe_func_name not in ['not_times', 'pea']:
 			pe_t = self.pe_transform(inputs['times'])
 
 		pos_rel = inputs['times'] - tf.transpose(inputs['times'], perm=[0,2,1])
@@ -185,9 +224,9 @@ class Encoder(tf.keras.Model):
 		''' Absolute and Relative Positional Embedding '''
 
 		emb_x = self.inp_transform(inputs['magnitudes']) 
-		pe_t = 0
+		pe_t = 0.
 
-		if self.pe_func_name not in ['not_pe_module', 'pea']:
+		if self.pe_func_name not in ['not_times', 'pea']:
 			pe_t = self.pe_transform(inputs['times'])
 
 		pos_rel = inputs['times'] - tf.transpose(inputs['times'], perm=[0,2,1])
@@ -219,8 +258,8 @@ class Encoder(tf.keras.Model):
 		if pe_config is None:
 			raise Exception("You don't use correctly the config pe path.")
 
-		if self.pe_func_name == 'not_pe':
-			pass
+		elif self.pe_func_name == 'not_times':
+			return
 
 		elif self.pe_func_name == 'pe':
 			pe_transform = PositionalEmbedding(d_model		= self.d_model, 
@@ -232,36 +271,84 @@ class Encoder(tf.keras.Model):
 											   min_period	= pe_config[self.pe_func_name]['min_period'], 
 											   max_period	= pe_config[self.pe_func_name]['max_period'],
 											   data_name	= self.data_name,
-											   name			= 'PosEncoding')
+											   name			= 'PosEncoding') # No puedo cambiar el nombre porque ya tengo el modelo entrenado
 			
-		elif self.pe_func_name == 'pe_mlp':
+
+		elif self.pe_func_name == 'mlp':
 			pe_transform = PosEmbeddingMLP(d_model	= self.d_model, 
 										   m_layers = pe_config[self.pe_func_name]['m_layers'],
 										   use_mjd  = pe_config[self.pe_func_name]['use_mjd'],
-										   name		= 'pos_embedding_mlp')
+										   name		= 'pos_embedding_mlp') # No puedo cambiar el nombre porque ya tengo el modelo entrenado
 
-		elif self.pe_func_name == 'pe_rnn':
+
+		elif self.pe_func_name == 'rnn':
 			pe_transform = PosEmbeddingRNN(d_model  = self.d_model, 
 										   rnn_type = pe_config[self.pe_func_name]['rnn_type'], 
 										   use_mjd  = pe_config[self.pe_func_name]['use_mjd'],
-										   name		= 'pos_embedding_rnn') 
+										   name		= 'rnn') 
 
-		elif self.pe_func_name == 'pe_tm':
+
+		elif self.pe_func_name == 'tm':
 			pe_transform = PosTimeModulation(d_model  	  = self.d_model, 
 											 T_max		  = pe_config[self.pe_func_name]['T_max'], 
 											 H			  = pe_config[self.pe_func_name]['H'],  
 											 use_mjd	  = pe_config[self.pe_func_name]['use_mjd'],  
 											 pe_trainable = pe_config[self.pe_func_name]['pe_trainable'],  
 											 initializer  = pe_config[self.pe_func_name]['initializer'],
-											 name		  = 'pos_time_modulation')
+											 name		  = 'pos_time_modulation') # No puedo cambiar el nombre porque ya tengo el modelo entrenado
+			
 
-		elif self.pe_func_name == 'pe_astromer_mlp':
-			pass
+		elif self.pe_func_name == 'rnn_proj':
+			pos_embbeding_rnn = PosEmbeddingRNN(d_model  = self.d_model, 
+												rnn_type = pe_config[self.pe_func_name]['rnn_type'], 
+												use_mjd  = pe_config[self.pe_func_name]['use_mjd'],
+												name	 = 'pos_embbeding_rnn') 
+			proj_w = tf.keras.layers.Dense(self.d_model, use_bias=True, name='proj_w')
+			pe_transform = tf.keras.Sequential([pos_embbeding_rnn, proj_w], name='rnn_proj')
+
+
+		elif self.pe_func_name == 'pe_mlp':
+			pe_transform_a = PositionalEmbedding(d_model	 = self.d_model, 
+												base		 = pe_config[self.pe_func_name]['base'], 
+												c			 = pe_config[self.pe_func_name]['c'],  
+												use_mjd		 = pe_config[self.pe_func_name]['use_mjd'], 
+												pe_trainable = pe_config[self.pe_func_name]['pe_trainable'], 
+												initializer	 = pe_config[self.pe_func_name]['initializer'], 
+												min_period	 = pe_config[self.pe_func_name]['min_period'], 
+												max_period	 = pe_config[self.pe_func_name]['max_period'],
+												data_name	 = self.data_name,
+												name		 = 'PosEncoding')
+			pe_transform_b = PosEmbeddingMLP(d_model	= self.d_model, 
+											 m_layers 	= pe_config[self.pe_func_name]['m_layers'],
+											 use_mjd  	= pe_config[self.pe_func_name]['use_mjd'],
+											 name		= 'pos_embedding_mlp')
+			pe_transform = tf.keras.Sequential([pe_transform_a, pe_transform_b], name='pe_mlp')
+
+
+		elif self.pe_func_name == 'pe_rnn_proj':
+			pe_transform_a = PositionalEmbedding(d_model	  = self.d_model, 
+												 base		  = pe_config[self.pe_func_name]['base'], 
+												 c			  = pe_config[self.pe_func_name]['c'],  
+												 use_mjd	  = pe_config[self.pe_func_name]['use_mjd'], 
+												 pe_trainable = pe_config[self.pe_func_name]['pe_trainable'], 
+												 initializer  = pe_config[self.pe_func_name]['initializer'], 
+												 min_period	  = pe_config[self.pe_func_name]['min_period'], 
+												 max_period	  = pe_config[self.pe_func_name]['max_period'],
+												 data_name	  = self.data_name, 
+												 name		  = 'PosEncoding') 
+			pe_transform_b = PosEmbeddingRNN(d_model  = self.d_model, 
+											 rnn_type = pe_config[self.pe_func_name]['rnn_type'], 
+											 use_mjd  = pe_config[self.pe_func_name]['use_mjd'], 
+											 name	  = 'pos_embbeding_rnn') 
+			proj_w = tf.keras.layers.Dense(self.d_model, use_bias=True, name='proj_w')
+			pe_transform = tf.keras.Sequential([pe_transform_a, pe_transform_b, proj_w], name='pe_rnn_proj')
+			
 
 		else:
 			raise ValueError("Unknown positional encoding name function")
 
 		return pe_transform
+	
 
 
 class ConcatEncoder(Encoder):

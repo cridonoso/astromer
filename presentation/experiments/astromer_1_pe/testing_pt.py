@@ -31,20 +31,21 @@ def average_logs(logs):
 
 ###########################################################
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
 #ds_names = ['alcock', 'ogle', 'atlas']
 #ds_names = ['kepler', 'kepler_alcock_linear', 'kepler_atlas_linear', 'kepler_ogle_linear']
-ds_names = ['alcock', 'ogle', 'atlas', 'kepler', 'kepler_alcock_linear', 'kepler_atlas_linear', 'kepler_ogle_linear']
-#ds_names = ['kepler']
+#ds_names = ['alcock', 'ogle', 'atlas', 'kepler', 'kepler_alcock_linear', 'kepler_atlas_linear', 'kepler_ogle_linear']
+ds_names = ['kepler']
+#ds_names = ['macho_clean']
+scale_pe_freq = True
 
 folds = [0, 1, 2]
 spc_list = [50]
 #spc_list = ['all']
-scale_pe_freq = False
 
 ROOT = './presentation/experiments/astromer_1_pe'
-pt_folder = 'results/pretraining/P02R01/pretrained_weights'
+pt_folder = 'results/pretraining/P02R01_clean/exp_000_a'
 
 train_step_fn = train_step
 test_step_fn = test_step
@@ -84,15 +85,20 @@ for spc in spc_list:
         for fold in folds:    
             print('Testing {} - fold {}'.format(ds_name.upper(), fold))
 
-            if isinstance(spc, str):
-                path_data = './data/records/{}/fold_{}/{}'.format(ds_name, fold, ds_name)
-                path_save = os.path.join(ROOT, pt_folder, 'test_metrics_datasets')
+            if ds_name == 'macho' or ds_name == 'macho_clean':
+                path_data = './data/records/{}'.format(ds_name)
+                path_save = os.path.join(ROOT, pt_folder, 'test_metrics')
+
             else:
-                path_data = './data/records/{}/fold_{}/{}_{}'.format(ds_name, fold, ds_name, spc)
-                path_save = os.path.join(ROOT, pt_folder, 'test_metrics_datasets_{}'.format(spc))
+                if isinstance(spc, str):
+                    path_data = './data/records/{}/fold_{}/{}'.format(ds_name, fold, ds_name)
+                    path_save = os.path.join(ROOT, pt_folder, 'test_metrics_datasets')
+                else:
+                    path_data = './data/records/{}/fold_{}/{}_{}'.format(ds_name, fold, ds_name, spc)
+                    path_save = os.path.join(ROOT, pt_folder, 'test_metrics_datasets_{}'.format(spc))
 
             if scale_pe_freq:
-                path_save += path_save + '_pe_by_mean'
+                path_save += '_pe_by_mean_1.47'
 
             test_loader = pretraining_pipeline(os.path.join(path_data, 'test'),
                                                 batch_size=5 if config['debug'] else config['bs'],

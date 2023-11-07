@@ -77,8 +77,20 @@ def run(opt):
 	file = open(os.path.join(ROOT, opt.pt_folder, 'config.yaml'), "r")
 	model_config = yaml.load(file, Loader=yaml.FullLoader) 
 
-	file = open(os.path.join(ROOT, opt.pt_folder, 'pe_config.yaml'), "r")
-	pe_config = yaml.load(file, Loader=yaml.FullLoader) 
+	# Update model config
+	dict_model_config = dict({
+		'Pretraining': model_config.copy(),
+		'Finetuning': opt.__dict__
+	})
+
+	if opt.pe_func_name == 'same':
+		file = open(os.path.join(ROOT, opt.pt_folder, 'pe_config.yaml'), "r")
+		pe_config = yaml.load(file, Loader=yaml.FullLoader) 
+	else:
+		file = open('{}/pe_config.yaml'.format(ROOT), "r")
+		pe_config = yaml.load(file, Loader=yaml.FullLoader) 
+		model_config['pe_func_name'] = opt.pe_func_name
+
 
 	#with open(os.path.join(ROOT, opt.pt_folder, 'config.toml'), 'r') as f:
 	#	model_config = toml.load(f)
@@ -87,12 +99,6 @@ def run(opt):
 
 	#with open(os.path.join(ROOT, opt.pt_folder, 'pe_config.toml'), 'r') as f:
 	#	pe_config = toml.load(f)
-
-	# Update model config
-	dict_model_config = dict({
-		'Pretraining': model_config,
-		'Finetuning': opt.__dict__
-	})
 
 	# Update PE config
 	dict_pe = dict({model_config['pe_func_name']: pe_config[model_config['pe_func_name']]})
@@ -227,6 +233,9 @@ if __name__ == '__main__':
 	parser.add_argument('--bs', default=2000, type=int,	help='Batch size')
 	parser.add_argument('--patience', default=20, type=int,	help='Earlystopping threshold in number of epochs')
 	parser.add_argument('--num-epochs', default=10000, type=int, help='Number of epochs')
+
+	parser.add_argument('--pe-func-name', default='same', type=str,
+						help='You can select: ["not_pe_module", "use_t", "pe", "pe_mlp", "pe_rnn", "pe_tm", "pe_att"]')
 
 	opt = parser.parse_args()        
 	run(opt)

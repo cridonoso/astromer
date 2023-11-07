@@ -43,8 +43,9 @@ spc_list = [50]
 #spc_list = ['all']
 
 ROOT = './presentation/experiments/astromer_1_pe'
-id_exp = 'lr_1e-10_pe_by_mean'
+id_exp = 'exp_004_a/lr_scheduler'
 ft_science_cases = ['PE'] #, 'FF1_PE', 'FF1_ATT_FF2', 'FF1_PE_ATT_FF2']
+ft_science_cases = ['FF1_ATT_FF2', 'FF1_PE_ATT_FF2']
 
 for ft_science_case in ft_science_cases:
     for spc in spc_list:
@@ -59,11 +60,11 @@ for ft_science_case in ft_science_cases:
                     path_data = './data/records/{}/fold_{}/{}_{}'.format(ds_name, fold, ds_name, spc)
                     data_name = '{}_{}'.format(ds_name, spc)
 
-                ft_folder = 'results/finetuning/P02R01/pretrained_weights/{}/{}/{}/fold_{}/{}'.format(id_exp, 
-                                                                                                      ft_science_case,
-                                                                                                      ds_name,
-                                                                                                      fold,
-                                                                                                      data_name)
+                ft_folder = 'results/finetuning/P02R01_clean/{}/{}/{}/fold_{}/{}'.format(id_exp, 
+                                                                                         ft_science_case,
+                                                                                         ds_name,
+                                                                                         fold,
+                                                                                         data_name)
 
                 test_step_fn = test_step
 

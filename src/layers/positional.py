@@ -94,11 +94,12 @@ class PositionalEmbedding(tf.keras.layers.Layer):
 				'alcock': 0.752,
 				'atlas': 1.005,
 				'ogle': 0.800,
-				'kepler': 122.505,
+				'kepler': 1.47, # 122.505,
 				'kepler_alcock_linear': 0.739,
 				'kepler_atlas_linear': 0.663,
 				'kepler_ogle_linear': 0.829,
 			}
+			print(data_mean_ratio[self.data_name])
 
 			frequency = frequency * data_mean_ratio[self.data_name]
 
@@ -179,6 +180,7 @@ class PosEmbeddingRNN(tf.keras.layers.Layer):
 
 		RNNLayer = self.__select_rnn_type(rnn_type)
 		self.RNN = RNNLayer(self.d_model, return_sequences=True, name='pos_rnn_emb')
+		#self.mlp_proj = tf.keras.layers.Dense(self.d_model, use_bias=True, name='mlp_proj')
 
 	def call(self, inputs):
         # Irregular or regular times

@@ -17,15 +17,16 @@ folds = [0, 1, 2]
 #spc_list = ['all']
 spc_list = [50]
 
-id_exp = 'exp_000_a' # weights_pretrained
-pt_folder = 'results/pretraining/P02R01_clean/{}'.format(id_exp)
+id_parent_file = 'exp_000_a' # weights_pretrained
+pt_folder = 'results/pretraining/P02R01_clean/{}'.format(id_parent_file)
 
 lr = 'scheduler'
 bs = 1000
 patience = 40
 num_epochs = 10000
 
-ft_folder = 'results/finetuning/P02R01_clean/{}/lr_{}'.format(id_exp, lr)
+pe_func_name = 'pe_mlp'
+ft_folder = 'results/finetuning/P02R01_clean/new_PEs/{}/lr_{}'.format(pe_func_name, lr)
 #ft_science_cases = ['PE']
 ft_science_cases = ['PE', 'FF1_ATT_FF2', 'FF1_PE_ATT_FF2'] #, 'FF1_PE_ATT_FF2']  # 'nontrain'
 scale_pe_freq = False
@@ -55,19 +56,21 @@ for ft_science_case in ft_science_cases:
                             --lr {} \
                             --bs {} \
                             --patience {} \
-                            --num-epochs {}'.format(root,
-                                                    gpu, 
-                                                    dataset, 
-                                                    fold,
-                                                    spc,
-                                                    pt_folder,
-                                                    ft_folder, 
-                                                    ft_science_case,
-                                                    lr,
-                                                    bs,
-                                                    patience,
-                                                    num_epochs
-                                                    )
+                            --num-epochs {} \
+                            --pe-func-name {}'.format(root,
+                                                gpu, 
+                                                dataset, 
+                                                fold,
+                                                spc,
+                                                pt_folder,
+                                                ft_folder, 
+                                                ft_science_case,
+                                                lr,
+                                                bs,
+                                                patience,
+                                                num_epochs,
+                                                pe_func_name,
+                                                )
 
                 if scale_pe_freq:
                     command1 += ' --scale-pe-freq'
