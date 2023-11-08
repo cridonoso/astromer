@@ -25,6 +25,7 @@ bs = 1000
 patience = 40
 num_epochs = 10000
 
+##### ARREGLAR FINETUNING
 pe_func_name = 'pe_mlp'
 ft_folder = 'results/finetuning/P02R01_clean/new_PEs/{}/lr_{}'.format(pe_func_name, lr)
 #ft_science_cases = ['PE']

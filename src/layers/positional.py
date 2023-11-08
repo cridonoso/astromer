@@ -45,7 +45,6 @@ class PositionalEmbedding(tf.keras.layers.Layer):
 		x_pe_embedding = tf.matmul(inputs, self.w)
 		x_pe_embedding = self.get_concat(x_pe_embedding)
 		#x_pe_embedding = tf.cast(x_pe_embedding, dtype=tf.float32)
-
 		return x_pe_embedding
 
 	
@@ -65,7 +64,8 @@ class PositionalEmbedding(tf.keras.layers.Layer):
 		cos = tf.math.cos(x_pe_embedding[:, :, 1::2])
 
 		stack_sin_cos = tf.stack([sin, cos], axis=-1)          
-		astromer_concat = tf.reshape(stack_sin_cos, [batch_size, seq_len, -1])
+		#astromer_concat = tf.reshape(stack_sin_cos, [batch_size, seq_len, -1]) # d_model impar
+		astromer_concat = tf.reshape(stack_sin_cos, [batch_size, seq_len, self.d_model])
 		return astromer_concat
 
 	def __select_initializer(self, initializer):

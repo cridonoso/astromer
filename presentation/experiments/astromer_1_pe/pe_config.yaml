@@ -47,3 +47,13 @@ pe_rnn_proj:
   max_period  : 1825  # 5.*365
   rnn_type    : gru
   use_mjd     : true
+
+pe_tupe:
+  base        : 1000
+  c           : 1
+  use_mjd     : true
+  pe_trainable: false
+  initializer : pe_astromer 
+  min_period  : 0.01
+  max_period  : 1825  # 5.*365
+  term_att    : 'p2p'

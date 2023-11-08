@@ -83,13 +83,13 @@ def run(opt):
 		'Finetuning': opt.__dict__
 	})
 
-	if opt.pe_func_name == 'same':
-		file = open(os.path.join(ROOT, opt.pt_folder, 'pe_config.yaml'), "r")
-		pe_config = yaml.load(file, Loader=yaml.FullLoader) 
-	else:
-		file = open('{}/pe_config.yaml'.format(ROOT), "r")
-		pe_config = yaml.load(file, Loader=yaml.FullLoader) 
-		model_config['pe_func_name'] = opt.pe_func_name
+	#if opt.pe_func_name == 'same':
+	file = open(os.path.join(ROOT, opt.pt_folder, 'pe_config.yaml'), "r")
+	pe_config = yaml.load(file, Loader=yaml.FullLoader) 
+	#else:
+	#	file = open('{}/pe_config.yaml'.format(ROOT), "r")
+	#	pe_config = yaml.load(file, Loader=yaml.FullLoader) 
+	#	model_config['pe_func_name'] = opt.pe_func_name
 
 
 	#with open(os.path.join(ROOT, opt.pt_folder, 'config.toml'), 'r') as f:

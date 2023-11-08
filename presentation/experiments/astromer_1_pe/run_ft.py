@@ -10,12 +10,12 @@ gpu = '1'
 #ds_names = ['alcock', 'atlas', 'ogle']
 #ds_names = ['kepler', 'kepler_alcock_linear', 'kepler_atlas_linear', 'kepler_ogle_linear']
 ds_names = ['alcock', 'atlas', 'ogle', 'kepler', 'kepler_alcock_linear', 'kepler_atlas_linear', 'kepler_ogle_linear']
-#ds_names = ['kepler']
+ds_names = ['kepler']
 
 folds = [0, 1, 2]
 #spc_list = [500]
 #spc_list = ['all']
-spc_list = [50]
+spc_list = ['all']
 
 id_exp = 'exp_000_a' # weights_pretrained
 pt_folder = 'results/pretraining/P02R01_clean/{}'.format(id_exp)
@@ -25,9 +25,10 @@ bs = 1000
 patience = 40
 num_epochs = 10000
 
+id_exp = 'kepler/exp_000_a' # weights_pretrained
 ft_folder = 'results/finetuning/P02R01_clean/{}/lr_{}'.format(id_exp, lr)
 #ft_science_cases = ['PE']
-ft_science_cases = ['PE', 'FF1_ATT_FF2', 'FF1_PE_ATT_FF2'] #, 'FF1_PE_ATT_FF2']  # 'nontrain'
+ft_science_cases = ['FF1', 'FF1_PE_ATT_FF2'] #, 'FF1_PE_ATT_FF2']  # 'nontrain'
 scale_pe_freq = False
 debug = False
 
