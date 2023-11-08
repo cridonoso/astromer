@@ -107,6 +107,7 @@ def format_inp_astromer(batch,
         
         outputs['magnitudes']  = batch['target_magnitudes']
         outputs['error']       = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
+        outputs['original']    = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
         outputs['probed_mask'] = batch['probed_mask']
         outputs['nsp_label'] = batch['nsp_label']
 

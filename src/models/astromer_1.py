@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 import toml
 import os
 
@@ -61,7 +62,7 @@ def get_ASTROMER(num_layers=2,
 
 
 @tf.function
-def train_step(model, x, y, optimizer):
+def train_step(model, x, y, optimizer, **kwargs):
 	with tf.GradientTape() as tape:
 		x_pred = model(x, training=True)
 		rmse = custom_rmse(y_true=y['magnitudes'],
@@ -75,7 +76,7 @@ def train_step(model, x, y, optimizer):
 
 
 @tf.function
-def test_step(model, x, y, return_pred=False):
+def test_step(model, x, y, return_pred=False, **kwargs):
 	x_pred = model(x, training=False)
 	rmse = custom_rmse(y_true=y['magnitudes'],
 					  y_pred=x_pred,
@@ -127,3 +128,15 @@ def restore_model(model_folder, mask_format=None):
     astromer.load_weights(os.path.join(model_folder, 'weights', 'weights'))
 
     return astromer, model_config
+
+def get_embeddings(astromer, dataset):
+    encoder = astromer.get_layer('encoder')
+    embeddings = []
+    for x, y in dataset:
+        Z = encoder(x)
+        embeddings.append(Z.numpy())
+
+    embeddings = np.concatenate(embeddings, axis=0)
+    embeddings = embeddings.reshape([-1, 200*256])
+    return embeddings
+

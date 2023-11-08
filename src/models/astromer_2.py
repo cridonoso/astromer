@@ -71,7 +71,7 @@ def get_ASTROMER(num_layers=2,
     return Model(inputs=placeholder, outputs=outputs, name="ASTROMER_NSP")
 
 @tf.function
-def train_step(model, x, y, optimizer, rmse_factor=0.5):
+def train_step(model, x, y, optimizer, **kwargs):
     with tf.GradientTape() as tape:
         outputs = model(x, training=True)
         
@@ -81,7 +81,7 @@ def train_step(model, x, y, optimizer, rmse_factor=0.5):
 
         bce = custom_bce(y['nsp_label'], outputs['nsp_label'])
         
-        loss = rmse_factor*rmse + (1.-rmse_factor)*bce
+        loss = kwargs['rmse_factor']*rmse + (1.-kwargs['rmse_factor'])*bce
 
         r2_value = custom_r2(y_true=y['magnitudes'], 
                              y_pred=outputs['reconstruction'], 
@@ -99,7 +99,7 @@ def train_step(model, x, y, optimizer, rmse_factor=0.5):
             'acc':nsp_acc}
 
 @tf.function
-def test_step(model, x, y, rmse_factor=0.5, return_pred=False):
+def test_step(model, x, y, return_pred=False, **kwargs):
     outputs = model(x, training=False)
     
     rmse = custom_rmse(y_true=y['magnitudes'],
@@ -108,7 +108,7 @@ def test_step(model, x, y, rmse_factor=0.5, return_pred=False):
 
     bce = custom_bce(y['nsp_label'], outputs['nsp_label'])
     
-    loss = rmse_factor*rmse + (1.-rmse_factor)*bce
+    loss = kwargs['rmse_factor']*rmse + (1.-kwargs['rmse_factor'])*bce
 
     r2_value = custom_r2(y_true=y['magnitudes'], 
                          y_pred=outputs['reconstruction'], 
@@ -127,30 +127,35 @@ def test_step(model, x, y, rmse_factor=0.5, return_pred=False):
 def predict(model, test_loader):
     n_batches = sum([1 for _, _ in test_loader])
     print('[INFO] Processing {} batches'.format(n_batches))
-    y_pred = tf.TensorArray(dtype=tf.float32, size=n_batches)
-    y_true = tf.TensorArray(dtype=tf.float32, size=n_batches)
-    masks  = tf.TensorArray(dtype=tf.float32, size=n_batches)
-    times  = tf.TensorArray(dtype=tf.float32, size=n_batches)
-    cls_pred = tf.TensorArray(dtype=tf.float32, size=n_batches)
-    cls_true = tf.TensorArray(dtype=tf.float32, size=n_batches)
+    
+    y_pred = []
+    y_true = []
+    masks  = []
+    times  = []
+    cls_pred = []
+    cls_true = []
 
     tbar = tqdm(test_loader, total=n_batches)
     index = 0
     for x, y in tbar:
-        outputs = test_step(model, x, y, return_pred=True)
-        y_pred = y_pred.write(index, outputs['reconstruction'])
-        y_true = y_true.write(index, y['magnitudes'])
-        masks  = masks.write(index, y['probed_mask'])
-        times = times.write(index, x['times'])
-        cls_pred = cls_pred.write(index, outputs['nsp_label'])
-        cls_true = cls_true.write(index, y['nsp_label'])
-        index+=1
-
-    times = times.concat()
-    times = tf.slice(times, [0, 1, 0], [-1, -1, -1])
-    y_pred = tf.concat([times, y_pred.concat()], axis=2)
-    y_true = tf.concat([times, y_true.concat()], axis=2)
-    return y_pred, y_true, masks.concat(), cls_pred.concat(), cls_true.concat()
+        outputs = test_step(model, x, y, return_pred=True, rmse_factor=0.5)
+        y_pred.append(outputs['reconstruction'])
+        y_true.append(y['magnitudes'])
+        
+        masks.append(y['probed_mask'])
+        times.append(x['times'])
+        cls_pred.append(outputs['nsp_label'])
+        cls_true.append(y['nsp_label'])
+     
+    y_pred = tf.concat(y_pred, axis=0)
+    y_true = tf.concat(y_true, axis=0)
+    times  = tf.concat(times, axis=0)
+    masks  = tf.concat(masks, axis=0)
+    cls_pred = tf.concat(cls_pred, axis=0)
+    cls_true = tf.concat(cls_true, axis=0)
+    y_pred = tf.concat([times, y_pred], axis=2)
+    y_true = tf.concat([times, y_true], axis=2)
+    return y_pred, y_true, masks, cls_pred, cls_true
 
 def restore_model(model_folder):
     with open(os.path.join(model_folder, 'config.toml'), 'r') as f:
@@ -173,3 +178,20 @@ def restore_model(model_folder):
     astromer.load_weights(os.path.join(model_folder, 'weights', 'weights'))
 
     return astromer, model_config
+
+
+def get_embeddings(astromer, dataset):
+    encoder = astromer.get_layer('encoder')
+    embeddings = []
+    for x, y in dataset:
+        Z = encoder(x)
+        embeddings.append(Z.numpy())
+
+    embeddings = np.concatenate(embeddings, axis=0)
+    
+    cls_emb = embeddings[:, :1, :][:, 0, :]
+    obs_emb = embeddings[:, 1:, :]
+    obs_emb_flat = obs_emb.reshape([-1, 200*256])
+    
+    return cls_emb, obs_emb
+

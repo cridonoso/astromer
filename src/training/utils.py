@@ -72,11 +72,11 @@ def train(model,
     for epoch in ebar:
         train_logs, valid_logs = [], [] 
         for x, y in train_loader:
-            logs = train_step_fn(model, x, y, optimizer)
+            logs = train_step_fn(model, x, y, optimizer, rmse_factor=argparse_dict['rmse_factor'])
             train_logs.append(logs)
 
         for x, y in valid_loader:
-            logs = test_step_fn(model, x, y)
+            logs = test_step_fn(model, x, y, rmse_factor=argparse_dict['rmse_factor'])
             valid_logs.append(logs)
 
         epoch_train_metrics = average_logs(train_logs)
