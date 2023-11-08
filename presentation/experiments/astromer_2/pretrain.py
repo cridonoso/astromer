@@ -5,6 +5,8 @@ import sys
 import os
 
 from src.models.astromer_2 import get_ASTROMER, train_step, test_step
+from src.training.callbacks import SaveCheckpoint, TestModel
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
 from src.training.utils import train
 from src.data import get_loader
 from datetime import datetime
@@ -71,18 +73,27 @@ def run(opt):
         
     # ============================================================
 
+
+    cbks = [SaveCheckpoint(frequency=10, project_path=EXPDIR), 
+            TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
+            EarlyStopping(monitor='val_loss', patience=opt.patience),
+            TestModel(test_batches=test_loader.take(1) if opt.debug else test_loader, 
+                      project_path=os.path.join(EXPDIR, 'tensorboard'),
+                      test_step_fn=test_step,
+                      params=opt.__dict__)
+            ]
     model = train(model,
-              train_loader, 
-              valid_loader, 
-              num_epochs=opt.num_epochs, 
-              lr=opt.lr, 
-              test_loader=test_loader,
-              project_path=EXPDIR,
-              debug=opt.debug,
-              patience=opt.patience,
-              train_step_fn=train_step,
-              test_step_fn=test_step,
-              argparse_dict=opt.__dict__)
+                  train_loader, 
+                  valid_loader, 
+                  num_epochs=opt.num_epochs, 
+                  lr=opt.lr, 
+                  project_path=EXPDIR,
+                  debug=opt.debug,
+                  patience=opt.patience,
+                  train_step_fn=train_step,
+                  test_step_fn=test_step,
+                  argparse_dict=opt.__dict__,
+                  callbacks=cbks)
 
 
 if __name__ == '__main__':

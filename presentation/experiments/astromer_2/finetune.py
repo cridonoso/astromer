@@ -6,17 +6,11 @@ import sys
 import os
 
 from src.models.astromer_2 import get_ASTROMER, build_input, train_step, test_step
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
+from src.training.callbacks import SaveCheckpoint, TestModel
 from src.training.utils import train
 from src.data import get_loader
 from datetime import datetime
-
-
-def merge_metrics(**kwargs):
-	merged = {}
-	for key, value in kwargs.items():
-		for subkey, subvalue in value.items():
-			merged['{}_{}'.format(key, subkey)] = subvalue
-	return merged
 
 
 def run(opt):
@@ -88,29 +82,28 @@ def run(opt):
                               shuffle=False,
                               repeat=1,
                               aversion='2')
-    
-    astromer, \
-    (best_train_metrics,
-    best_val_metrics,
-    test_metrics)  = train(astromer,
-                           train_loader, 
-                           valid_loader, 
-                           num_epochs=opt.num_epochs, 
-                           lr=model_config['lr'], 
-                           test_loader=test_loader,
-                           project_path=FTWEIGTHS,
-                           debug=opt.debug,
-                           patience=opt.patience,
-                           train_step_fn=train_step,
-                           test_step_fn=test_step,
-                           argparse_dict=opt.__dict__)
 
-    metrics = merge_metrics(train=best_train_metrics, 
-                            val=best_val_metrics, 
-                            test=test_metrics)
+    cbks = [TensorBoard(log_dir=os.path.join(FTWEIGTHS, 'tensorboard')),
+            EarlyStopping(monitor='val_loss', patience=opt.patience),
+            TestModel(test_batches=test_loader.take(1) if opt.debug else test_loader, 
+                      project_path=os.path.join(FTWEIGTHS, 'tensorboard'),
+                      test_step_fn=test_step,
+                      params=model_config)
+            ]
 
-    with open(os.path.join(FTWEIGTHS, 'metrics.toml'), 'w') as fp:
-        toml.dump(metrics, fp)
+    model = train(astromer,
+                  train_loader, 
+                  valid_loader, 
+                  num_epochs=opt.num_epochs, 
+                  lr=model_config['lr'], 
+                  project_path=FTWEIGTHS,
+                  debug=opt.debug,
+                  patience=opt.patience,
+                  train_step_fn=train_step,
+                  test_step_fn=test_step,
+                  argparse_dict=opt.__dict__,
+                  callbacks=cbks,
+                  rmse_factor=model_config['rmse_factor'])
 
     with open(os.path.join(FTWEIGTHS, 'config.toml'), 'w') as f:
         toml.dump(model_config, f)
