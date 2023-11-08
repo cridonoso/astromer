@@ -75,3 +75,17 @@ pe_layer  = true
 ff1_layer = true
 att_layer = true
 ff2_layer = true
+
+[PE_ATT1]
+pe_layer  = true
+ff1_layer = false
+att_layer_1 = true
+att_layer_2 = false
+ff2_layer = false
+
+[PE_ATT2]
+pe_layer  = true
+ff1_layer = false
+att_layer_1 = false
+att_layer_2 = true
+ff2_layer = false

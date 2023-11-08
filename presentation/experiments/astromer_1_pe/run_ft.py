@@ -28,7 +28,7 @@ num_epochs = 10000
 id_exp = 'kepler/exp_000_a' # weights_pretrained
 ft_folder = 'results/finetuning/P02R01_clean/{}/lr_{}'.format(id_exp, lr)
 #ft_science_cases = ['PE']
-ft_science_cases = ['FF1', 'FF1_PE_ATT_FF2'] #, 'FF1_PE_ATT_FF2']  # 'nontrain'
+ft_science_cases = ['PE_ATT1', 'PE_ATT2', 'PE_FF2']    #     ] #, 'FF1_PE_ATT_FF2']  # 'nontrain'
 scale_pe_freq = False
 debug = False
 

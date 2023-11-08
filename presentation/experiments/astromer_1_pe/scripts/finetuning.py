@@ -29,11 +29,21 @@ def set_trainable_layers(model, ft_science_case, layers_config):
 	print(f'Processing science_case: {ft_science_case}...')
 
 	for layer in model.get_layer('encoder').layers:
-		print(f'Name layers: {layer.name}')		
-		if layer.name == 'inp_transform':  
-			layer.trainable = layers_config[ft_science_case]['ff1_layer']
-		elif layer.name.find('att_') != -1:
-			layer.trainable = layers_config[ft_science_case]['att_layer']
+		print(f'Name layers: {layer.name}')
+		print('ft_science_case: {}'.format(ft_science_case))
+		if ft_science_case.find('ATT1') != -1 and ft_science_case.find('ATT2') != -1:
+			if layer.name == 'inp_transform':  
+				layer.trainable = layers_config[ft_science_case]['ff1_layer']
+			elif layer.name.find('att_') != -1:
+				layer.trainable = layers_config[ft_science_case]['att_layer']
+
+		else:
+			if layer.name == 'inp_transform':  
+				layer.trainable = layers_config[ft_science_case]['ff1_layer']
+			elif layer.name == 'att_layer_0':
+				layer.trainable = layers_config[ft_science_case]['att_layer_1']
+			elif layer.name == 'att_layer_1':
+				layer.trainable = layers_config[ft_science_case]['att_layer_2']
 
 	for layer in model.layers:
 		if layer.name != 'encoder':
