@@ -43,13 +43,8 @@ def run(opt):
                                opt.subdataset,
                                'fold_'+str(opt.fold), 
                                '{}_{}'.format(opt.subdataset, opt.spc))
-    FTWEIGTHS = os.path.join(opt.pt_folder,
-                             '..',
-                             opt.exp_name,                                     
-                             opt.subdataset,
-                             'fold_'+str(opt.fold), 
-                             '{}_{}'.format(opt.subdataset, opt.spc))   
-    
+    FTWEIGTHS = opt.target_dir
+
     train_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'train'),
                               batch_size=5 if opt.debug else opt.bs,
                               window_size=model_config['window_size'],
@@ -110,21 +105,23 @@ def run(opt):
 
 
 if __name__ == '__main__':
-	parser = argparse.ArgumentParser()
-	parser.add_argument('--gpu', default='-1', type=str, help='GPU to be used. -1 means no GPU will be used')
-	parser.add_argument('--subdataset', default='alcock', type=str, help='Data folder where tf.record files are located')
-	parser.add_argument('--pt-folder', default='./results/pretraining*', type=str, help='pretrained model folder')
-	parser.add_argument('--fold', default=0, type=int, help='Fold to use')
-	parser.add_argument('--spc', default=20, type=int, help='Samples per class')
-	parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
-	parser.add_argument('--exp-name', default='finetuning', type=str, help='folder name where logs/weights will be stored')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--gpu', default='-1', type=str, help='GPU to be used. -1 means no GPU will be used')
+    parser.add_argument('--subdataset', default='alcock', type=str, help='Data folder where tf.record files are located')
+    parser.add_argument('--pt-folder', default='./results/pretraining*', type=str, help='pretrained model folder')
+    parser.add_argument('--target-dir', default='./results/finetuning/alcock/fold_0/alcock_20', type=str, help='target directory')
+    
+    parser.add_argument('--fold', default=0, type=int, help='Fold to use')
+    parser.add_argument('--spc', default=20, type=int, help='Samples per class')
+    parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
+    parser.add_argument('--exp-name', default='finetuning', type=str, help='folder name where logs/weights will be stored')
 
-	parser.add_argument('--allvisible', action='store_true', help='Disable masking task. All observations are visible')
-	parser.add_argument('--bs', default=2000, type=int,	help='Batch size')
-	parser.add_argument('--patience', default=20, type=int,	help='Earlystopping threshold in number of epochs')
-	parser.add_argument('--num_epochs', default=10000, type=int, help='Number of epochs')
-	parser.add_argument('--train-astromer', action='store_true', help='If train astromer when classifying')
-	parser.add_argument('--clf-name', default='att_mlp', type=str, help='classifier name')
+    parser.add_argument('--allvisible', action='store_true', help='Disable masking task. All observations are visible')
+    parser.add_argument('--bs', default=2000, type=int, help='Batch size')
+    parser.add_argument('--patience', default=20, type=int, help='Earlystopping threshold in number of epochs')
+    parser.add_argument('--num_epochs', default=10000, type=int, help='Number of epochs')
+    parser.add_argument('--train-astromer', action='store_true', help='If train astromer when classifying')
+    parser.add_argument('--clf-name', default='att_mlp', type=str, help='classifier name')
 
-	opt = parser.parse_args()        
-	run(opt)
+    opt = parser.parse_args()        
+    run(opt)

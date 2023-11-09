@@ -26,8 +26,14 @@ for dataset in ds_names:
         for fold_n in range(3):
             start = time.time()
             
-            project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {} --exp-name {}'
-            command1 = project_path.format(root, gpu, dataset, pt_folder, fold_n, spc, exp_name)
+            project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {} --exp-name {} --target-dir {}'
+            FTWEIGTHS = os.path.join(pt_folder, 
+                                     '..', 
+                                     exp_name, 
+                                     dataset, 
+                                     'fold_'+str(fold_n), 
+                                     '{}_{}'.format(dataset, spc))   
+            command1 = project_path.format(root, gpu, dataset, pt_folder, fold_n, spc, exp_name, FTWEIGTHS)
             if all_visible:
                 command1+=' --allvisible'
                 

@@ -25,9 +25,14 @@ for dataset in ds_names:
         for spc in spc_list:
             for fold_n in range(3):
                 start = time.time()
-                project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {} --clf-name {} --ft-name {}'
-
-                command1 = project_path.format(root, gpu, dataset, pt_folder, fold_n, spc, clf_name, exp_name)
+                project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {} --clf-name {} --ft-name {} --target-dir {}'
+                FTWEIGTHS = os.path.join(pt_folder,
+                                         '..',
+                                         exp_name, #'finetuning',                                     
+                                         dataset,
+                                         'fold_'+str(fold_n), 
+                                         '{}_{}'.format(dataset, spc))   
+                command1 = project_path.format(root, gpu, dataset, pt_folder, fold_n, spc, clf_name, exp_name, FTWEIGTHS)
 
                 try:
                     subprocess.call(command1, shell=True)
