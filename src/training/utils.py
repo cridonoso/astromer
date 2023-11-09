@@ -45,7 +45,8 @@ def train(model,
           argparse_dict=None,
           scheduler=False,
           callbacks=None,
-          rmse_factor=0.5):
+          rmse_factor=0.5,
+          reset_states=False):
 
     start = time.time()
 
@@ -69,7 +70,7 @@ def train(model,
     if scheduler:
         print('[INFO] Using Custom Scheduler')
         lr = CustomSchedule(argparse_dict['head_dim'])
-        
+    if reset_states: print('[INFO] Reset state activated')
     optimizer = Adam(lr, 
                      beta_1=0.9,
                      beta_2=0.98,
@@ -92,6 +93,8 @@ def train(model,
             train_logs.append(logs)
             __callbacks.on_train_batch_end(batch, logs=logs)
             __callbacks.on_batch_end(batch, logs=logs)
+        
+        if reset_states: model.reset_states()
 
         for x, y in valid_loader:
             __callbacks.on_batch_begin(batch, logs=logs)

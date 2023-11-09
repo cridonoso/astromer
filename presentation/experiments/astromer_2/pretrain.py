@@ -82,6 +82,7 @@ def run(opt):
                       test_step_fn=test_step,
                       params=opt.__dict__)
             ]
+
     model = train(model,
                   train_loader, 
                   valid_loader, 
@@ -93,7 +94,8 @@ def run(opt):
                   train_step_fn=train_step,
                   test_step_fn=test_step,
                   argparse_dict=opt.__dict__,
-                  callbacks=cbks)
+                  callbacks=cbks,
+                  reset_states=opt.reset_states)
 
 
 if __name__ == '__main__':
@@ -127,7 +129,11 @@ if __name__ == '__main__':
     parser.add_argument('--dropout', default=0., type=float,
                         help='Dropout to use on the output of each attention layer (before mixer layer)')
     parser.add_argument('--avg-layers', action='store_true', help='If averaging outputs of the attention layers to form the final embedding. There is no avg if layers=1 ')
-
+    
+    parser.add_argument('--rmse-factor', default=0.5, type=float,
+                        help='RMSE weight factor. The loss function will be loss = rmse_factor*rmse + (1 - rmse_factor)*bce')
+    parser.add_argument('--reset-states', action='store_true', 
+                        help='During training. Reset the network states at the end of each forward-pass')
     parser.add_argument('--lr', default=1e-5, type=float,
                         help='learning rate')
     parser.add_argument('--bs', default=2500, type=int,
@@ -145,9 +151,6 @@ if __name__ == '__main__':
                         help='Probed fraction to be randomized or unmasked')
     parser.add_argument('--nsp-prob', default=0.5, type=float,
                         help='Next segment prediction probability. The probability of randomize half of the light curve')
-    parser.add_argument('--rmse-factor', default=0.5, type=float,
-                        help='RMSE weight factor. The loss function will be loss = rmse_factor*rmse + (1 - rmse_factor)*bce')
-
 
     opt = parser.parse_args()        
     run(opt)
