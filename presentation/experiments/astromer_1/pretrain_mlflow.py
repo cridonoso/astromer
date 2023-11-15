@@ -1,7 +1,6 @@
 import tensorflow as tf
 import argparse
 import sys
-sys.path.append("C:/Users/user/astromer")
 import mlflow as mf
 import optuna
 import yaml
