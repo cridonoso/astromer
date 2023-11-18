@@ -218,7 +218,7 @@ def get_ASTROMER(num_layers=2,
 
 
 @tf.function
-def train_step(model, x, y, optimizer):
+def train_step(model, x, y, optimizer, **kwargs):
     with tf.GradientTape() as tape:
         x_pred = model(x, training=True)
         rmse = custom_rmse(y_true=y['target'],
@@ -232,7 +232,7 @@ def train_step(model, x, y, optimizer):
 
 
 @tf.function
-def test_step(model, x, y, return_pred=False):
+def test_step(model, x, y, return_pred=False, **kwargs):
     x_pred = model(x, training=False)
     rmse = custom_rmse(y_true=y['target'],
                       y_pred=x_pred,

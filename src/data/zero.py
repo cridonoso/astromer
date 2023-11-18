@@ -433,7 +433,8 @@ def pretraining_pipeline(dataset,
                          normalize='zero-mean', # 'minmax'
                          cache=False,
                          return_ids=False,
-                         return_lengths=False):
+                         return_lengths=False,
+                         key_format='zero'):
     """ Data preprocessing pipeline. It contains Next Segment Prediciton (NSP)
 
     :param dataset: Records folder or list of numpy array light curves
@@ -525,7 +526,8 @@ def pretraining_pipeline(dataset,
     dataset = dataset.map(lambda x: format_inp_astromer(x,
                                                 return_ids=return_ids,
                                                 return_lengths=return_lengths,
-                                                num_cls=num_cls),
+                                                num_cls=num_cls,
+                                                key_format=key_format),
                   num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     if cache:
@@ -536,7 +538,8 @@ def pretraining_pipeline(dataset,
 
     return dataset
 
-def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=None, nsp_test=False):
+def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=None, nsp_test=False, 
+                        key_format='0'):
     """
     Buildng ASTROMER input
 
@@ -576,5 +579,13 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
         inputs['ids'] = batch['lcid']
     if return_lengths:
         inputs['length'] = batch['length']
+
+    if key_format == '1':
+        inputs['magnitudes'] = inputs.pop('input')
+        inputs['att_mask']   = inputs.pop('mask_in')
+        del inputs['mask_out']
+        if num_cls is None:
+            outputs['magnitudes'] = outputs.pop('target')
+            outputs['probed_mask'] = outputs.pop('mask_out')
 
     return inputs, outputs

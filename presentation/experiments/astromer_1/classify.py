@@ -8,7 +8,7 @@ import os
 from presentation.experiments.utils import train_classifier
 from src.models.astromer_1 import get_ASTROMER, build_input, train_step, test_step
 from src.training.utils import train
-from src.data import load_data
+from src.data.zero import pretraining_pipeline
 from datetime import datetime
 
 
@@ -72,37 +72,68 @@ def run(opt):
                               opt.subdataset+'_'+str(opt.spc))
     num_cls = pd.read_csv(os.path.join(DOWNSTREAM_DATA, 'objects.csv')).shape[0]
 
-    train_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
-                             batch_size= 5 if opt.debug else 512, 
-                             probed=1.,
-                             random_same=0.,  
-                             window_size=model_config['window_size'], 
-                             off_nsp=True,
-                             nsp_prob=0., 
-                             repeat=1, 
-                             sampling=False,
-                             shuffle=True,
-                             num_cls=num_cls)
-    valid_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'val'), 
-                             batch_size= 5 if opt.debug else 512, 
-                             probed=1.,
-                             random_same=0.,  
-                             window_size=model_config['window_size'], 
-                             off_nsp=True,
-                             nsp_prob=0., 
-                             repeat=1, 
-                             sampling=False,
-                             num_cls=num_cls)
-    test_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'test'), 
-                             batch_size= 5 if opt.debug else 512, 
-                             probed=1.,
-                             random_same=0.,  
-                             window_size=model_config['window_size'], 
-                             off_nsp=True, 
-                             nsp_prob=0., 
-                             repeat=1, 
-                             sampling=False,
-                             num_cls=num_cls)
+    train_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'train'),
+                                        batch_size= 5 if opt.debug else 512, 
+                                        window_size=model_config['window_size'],
+                                        shuffle=True,
+                                        sampling=False,
+                                        repeat=1,
+                                        msk_frac=0.,
+                                        rnd_frac=0.,
+                                        same_frac=0.,
+                                        num_cls=num_cls,
+                                        key_format='1')
+    valid_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'val'),
+                                        batch_size=5 if opt.debug else 512,
+                                        window_size=model_config['window_size'],
+                                        shuffle=False,
+                                        sampling=False,
+                                        msk_frac=0.,
+                                        rnd_frac=0.,
+                                        same_frac=0.,
+                                        num_cls=num_cls,
+                                        key_format='1')
+    test_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'test'),
+                                        batch_size=5 if opt.debug else 512,
+                                        window_size=model_config['window_size'],
+                                        shuffle=False,
+                                        sampling=False,
+                                        msk_frac=0.,
+                                        rnd_frac=0.,
+                                        same_frac=0.,
+                                        num_cls=num_cls,
+                                        key_format='1')
+    # train_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
+    #                          batch_size= 5 if opt.debug else 512, 
+    #                          probed=1.,
+    #                          random_same=0.,  
+    #                          window_size=model_config['window_size'], 
+    #                          off_nsp=True,
+    #                          nsp_prob=0., 
+    #                          repeat=1, 
+    #                          sampling=False,
+    #                          shuffle=True,
+    #                          num_cls=num_cls)
+    # valid_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'val'), 
+    #                          batch_size= 5 if opt.debug else 512, 
+    #                          probed=1.,
+    #                          random_same=0.,  
+    #                          window_size=model_config['window_size'], 
+    #                          off_nsp=True,
+    #                          nsp_prob=0., 
+    #                          repeat=1, 
+    #                          sampling=False,
+    #                          num_cls=num_cls)
+    # test_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'test'), 
+    #                          batch_size= 5 if opt.debug else 512, 
+    #                          probed=1.,
+    #                          random_same=0.,  
+    #                          window_size=model_config['window_size'], 
+    #                          off_nsp=True, 
+    #                          nsp_prob=0., 
+    #                          repeat=1, 
+    #                          sampling=False,
+    #                          num_cls=num_cls)
 
     if opt.debug:
         train_loader = train_loader.take(1)

@@ -70,13 +70,8 @@ class Encoder(Model):
 		# adding embedding and position encoding.
 		x, window_size = self.input_format(inputs)  
 		x = self.dropout_layer(x, training=training)
-
-		layers_outputs = []
 		for i in range(self.num_layers):
 			x =  self.enc_layers[i](x, training=training, mask=inputs['att_mask'])
-			layers_outputs.append(x)
-		
-		x = self.output_format(layers_outputs, window_size) 
 		return  x # (batch_size, input_seq_len, d_model)
 
 class ConcatEncoder(Encoder):
@@ -98,7 +93,8 @@ class NSPEncoder(Encoder):
 		self.concat_cls    = Concatenate(axis=1, name='concat_cls')
 
 	def input_format(self, inputs):
-		x = tf.concat([inputs['magnitudes'], inputs['seg_emb']], axis=2, name='concat_mag_segemb')
+		x = tf.concat([inputs['magnitudes'], inputs['seg_emb']], axis=2, 
+						name='concat_mag_segemb')
 		
 		x_transformed = self.inp_transform(x)   
 		x_pe = self.positional_encoder(inputs['times'])
