@@ -8,6 +8,8 @@ from src.metrics            import custom_r2
 from tensorflow.keras.layers import Input, Layer, Dense
 from tensorflow.keras        import Model
 import tensorflow as tf
+from pathlib import Path
+import joblib
 
 from src.layers import Encoder, RegLayer
 
@@ -105,7 +107,7 @@ def predict(model, test_loader):
 	return y_pred, y_true, masks.concat()
 
 def restore_model(model_folder, mask_format=None):
-    with open(os.path.join(model_folder, 'config.toml'), 'r') as f:
+    with open(os.path.join((model_folder,"config.toml")), 'r') as f:
         model_config = toml.load(f)
     
     if 'mask_format' in model_config:
@@ -129,14 +131,23 @@ def restore_model(model_folder, mask_format=None):
 
     return astromer, model_config
 
-def get_embeddings(astromer, dataset):
+def get_embeddings(astromer, dataset, model_config):
     encoder = astromer.get_layer('encoder')
     embeddings = []
     for x, y in dataset:
         Z = encoder(x)
         embeddings.append(Z.numpy())
+        
+    max_seq_len = model_config.window_size
+    embedding_dim = model_config.mixer
 
     embeddings = np.concatenate(embeddings, axis=0)
-    embeddings = embeddings.reshape([-1, 200*256])
+    embeddings = embeddings.reshape([-1, max_seq_len *embedding_dim])
     return embeddings
 
+def save_embeddings(embeddings, output_path, file_name):
+    extension = ".joblib"
+    path = Path(f"{output_path}/{file_name}{extension}")
+    with open(path, "wb") as f:
+        joblib.dump(embeddings, f)
+    print(f"[INFO] Successfully stored embeddings at path {path}")
