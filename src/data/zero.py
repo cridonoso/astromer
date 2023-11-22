@@ -92,8 +92,14 @@ def pad_inputs(max_obs, time_steps, mask_out, mask_in, seq_magn, seq_time, orig_
                                 tf.shape(input_dict['input'])[-1]],
                                 dtype=tf.float32)
     input_dict['input'] = tf.concat([input_dict['input'], reshaped_mask], 0)
+    input_dict['input_modified'] = seq_magn
+    input_dict['mask_in']  = mask_in
+    input_dict['mask_out'] = mask_out
     
-    return mask_out, mask_in, seq_magn, seq_time, orig_magn, input_dict
+    input_dict['seq_time']  = seq_time
+    input_dict['orig_magn'] = orig_magn
+    
+    return input_dict
 
 def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
     '''
@@ -134,17 +140,20 @@ def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
     mask_out = tf.reshape(mask_out, [time_steps, 1])
     mask_in = tf.reshape(mask_in, [time_steps, 1])
 
-    ### Test get masked with padding
-    ## Put it outside 
     if time_steps < max_obs:
-        mask_out, mask_in, seq_magn, seq_time, orig_magn, input_dict = pad_inputs(mask_out=mask_out,
-                                                                                  mask_in=mask_in,
-                                                                                  seq_magn=seq_magn,
-                                                                                  seq_time=seq_time,
-                                                                                  orig_magn=orig_magn,
-                                                                                  input_dict=input_dict,
-                                                                                  time_steps=time_steps,
-                                                                                  max_obs=max_obs)
+        mask_fill = tf.ones([max_obs - time_steps, 1], dtype=tf.float32)
+        mask_out  = tf.concat([mask_out,  1-mask_fill], 0)
+        mask_in   = tf.concat([mask_in,     mask_fill], 0)
+        seq_magn  = tf.concat([seq_magn,  1-mask_fill], 0)
+        seq_time  = tf.concat([seq_time,  1-mask_fill], 0)
+        orig_magn = tf.concat([orig_magn, 1-mask_fill], 0)
+        input_dict['mask'] =  tf.concat([input_dict['mask'],
+                                        1-tf.reshape(mask_fill, [tf.shape(mask_fill)[0]])], 0)
+
+        reshaped_mask = tf.zeros([max_obs - time_steps,
+                                  tf.shape(input_dict['input'])[-1]],
+                                  dtype=tf.float32)
+        input_dict['input'] = tf.concat([input_dict['input'], reshaped_mask], 0)
 
     input_dict['input_modified'] = seq_magn
     input_dict['mask_in']  = mask_in
@@ -553,8 +562,8 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
     inputs = {
         'input': batch['input_modified'],
         'times': tf.slice(batch['input'], [0,0,0], [-1,-1,1]),
-        'mask_in': batch['mask_in'],
-        'mask_out':batch['mask_out']
+        'mask_in': tf.expand_dims(batch['mask_in'], -1),
+        'mask_out':tf.expand_dims(batch['mask_out'], -1)
         
     }
         
@@ -575,8 +584,7 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
 
     if nsp_test:
         inputs['original_input'] = batch['original_input']
-    if return_ids:
-        inputs['ids'] = batch['lcid']
+        
     if return_lengths:
         inputs['length'] = batch['length']
 
@@ -587,5 +595,8 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
         if num_cls is None:
             outputs['magnitudes'] = outputs.pop('target')
             outputs['probed_mask'] = outputs.pop('mask_out')
-
+            
+    if return_ids:
+        return outputs, batch['lcid']
+        
     return inputs, outputs

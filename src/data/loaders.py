@@ -97,7 +97,7 @@ def format_inp_astromer(batch,
 
         outputs['magnitudes']  = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
         outputs['error']       = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
-        outputs['probed_mask'] = batch['probed_mask'],
+        outputs['probed_mask'] = batch['probed_mask']
 
     if aversion == '2':
         inputs['magnitudes'] = batch['nsp_magnitudes']

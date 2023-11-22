@@ -89,25 +89,27 @@ def test_step(model, x, y, return_pred=False, **kwargs):
 	return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
 
 def predict(model, test_loader):
-	n_batches = sum([1 for _, _ in test_loader])
-	print('[INFO] Processing {} batches'.format(n_batches))
-	y_pred = tf.TensorArray(dtype=tf.float32, size=n_batches)
-	y_true = tf.TensorArray(dtype=tf.float32, size=n_batches)
-	masks  = tf.TensorArray(dtype=tf.float32, size=n_batches)
-	times  = tf.TensorArray(dtype=tf.float32, size=n_batches)
-	for index, (x, y) in enumerate(test_loader):
-		outputs = test_step(model, x, y, return_pred=True)
-		y_pred = y_pred.write(index, outputs)
-		y_true = y_true.write(index, y['magnitudes'])
-		masks  = masks.write(index, y['probed_mask'])
-		times = times.write(index, x['times'])
+    n_batches = sum([1 for _, _ in test_loader])
+    print('[INFO] Processing {} batches'.format(n_batches))
+    y_pred = tf.TensorArray(dtype=tf.float32, size=n_batches)
+    y_true = tf.TensorArray(dtype=tf.float32, size=n_batches)
+    masks  = tf.TensorArray(dtype=tf.float32, size=n_batches)
+    times  = tf.TensorArray(dtype=tf.float32, size=n_batches)
+    for index, (x, y) in enumerate(test_loader):
+        outputs = test_step(model, x, y, return_pred=True)
+        y_pred = y_pred.write(index, outputs)
+        y_true = y_true.write(index, y['magnitudes'])
+        print(y['probed_mask'].shape)
 
-	y_pred = tf.concat([times.concat(), y_pred.concat()], axis=2)
-	y_true = tf.concat([times.concat(), y_true.concat()], axis=2)
-	return y_pred, y_true, masks.concat()
+        masks  = masks.write(index, y['probed_mask'])
+        times = times.write(index, x['times'])
+
+    y_pred = tf.concat([times.concat(), y_pred.concat()], axis=2)
+    y_true = tf.concat([times.concat(), y_true.concat()], axis=2)
+    return y_pred, y_true, masks.concat()
 
 def restore_model(model_folder, mask_format=None):
-    with open(os.path.join((model_folder,"config.toml")), 'r') as f:
+    with open(os.path.join(model_folder, "config.toml"), 'r') as f:
         model_config = toml.load(f)
     
     if 'mask_format' in model_config:
@@ -125,7 +127,7 @@ def restore_model(model_folder, mask_format=None):
                             encoder_mode=model_config['encoder_mode'],
                             average_layers=model_config['avg_layers'],
                             mask_format=mask_format)
-    print(mask_format)
+
     print('[INFO] LOADING PRETRAINED WEIGHTS')
     astromer.load_weights(os.path.join(model_folder, 'weights', 'weights'))
 
@@ -138,15 +140,16 @@ def get_embeddings(astromer, dataset, model_config):
         Z = encoder(x)
         embeddings.append(Z.numpy())
         
-    max_seq_len = model_config.window_size
-    embedding_dim = model_config.mixer
+    max_seq_len = model_config['window_size']
+    embedding_dim = model_config['mixer']
 
     embeddings = np.concatenate(embeddings, axis=0)
     return embeddings
 
 def save_embeddings(embeddings, output_path, file_name):
-    extension = ".joblib"
-    path = Path(f"{output_path}/{file_name}{extension}")
+    os.makedirs(output_path, exist_ok=True)
+    path = os.path.join(output_path, '{}.joblib'.format(file_name))   
     with open(path, "wb") as f:
         joblib.dump(embeddings, f)
     print(f"[INFO] Successfully stored embeddings at path {path}")
+
