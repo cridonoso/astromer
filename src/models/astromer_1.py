@@ -142,7 +142,6 @@ def get_embeddings(astromer, dataset, model_config):
     embedding_dim = model_config.mixer
 
     embeddings = np.concatenate(embeddings, axis=0)
-    embeddings = embeddings.reshape([-1, max_seq_len *embedding_dim])
     return embeddings
 
 def save_embeddings(embeddings, output_path, file_name):

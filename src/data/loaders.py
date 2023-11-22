@@ -110,16 +110,15 @@ def format_inp_astromer(batch,
         outputs['original']    = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
         outputs['probed_mask'] = batch['probed_mask']
         outputs['nsp_label'] = batch['nsp_label']
-
+    
     if num_cls is not None:
         outputs = tf.one_hot(batch['label'], num_cls)
-    if return_ids:
-        outputs['ids']    = batch['lcid']
+    
+    if return_ids:     
+        outputs = tf.one_hot(batch['label'], num_cls), batch['lcid']
+        
     if return_lengths:
-        outputs['length'] = batch['length']
-
-
-
+        outputs = tf.one_hot(batch['label'], num_cls), batch['lenght']
 
     return inputs, outputs
 

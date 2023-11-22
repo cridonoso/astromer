@@ -19,7 +19,7 @@ except:
 
 batch_size = 2500    
 records_folder = './data/records/'
-ds_names = ['alcock', 'atlas']
+ds_names = ['alcock']
 spc_list = [20, 100]
  
 root = 'python -m presentation.experiments.astromer_2.finetune'
@@ -37,7 +37,7 @@ for ckpt_w in ckpt_weights:
             for fold_n in range(3):
                 start = time.time()
                 
-                project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {} --exp-name {} --target-dir {}'
+                project_path = '{} --gpu {} --subdataset {} --num-epochs 500 --pt-folder {} --fold {} --spc {} --exp-name {} --target-dir {}'
 
                 FTWEIGTHS = os.path.join(ckpt_w, 
                                          exp_name, 

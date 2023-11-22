@@ -119,7 +119,7 @@ if __name__ == '__main__':
     parser.add_argument('--allvisible', action='store_true', help='Disable masking task. All observations are visible')
     parser.add_argument('--bs', default=2000, type=int, help='Batch size')
     parser.add_argument('--patience', default=20, type=int, help='Earlystopping threshold in number of epochs')
-    parser.add_argument('--num_epochs', default=10000, type=int, help='Number of epochs')
+    parser.add_argument('--num-epochs', default=10000, type=int, help='Number of epochs')
     parser.add_argument('--train-astromer', action='store_true', help='If train astromer when classifying')
     parser.add_argument('--clf-name', default='att_mlp', type=str, help='classifier name')
 

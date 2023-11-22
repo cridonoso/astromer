@@ -26,7 +26,7 @@ def run(opt):
     # ====================================================================================
     # =============== FINETUNING MODEL  ==================================================
     # ====================================================================================
-    FTWEIGTHS = opt.target_dir
+    FTWEIGTHS = opt.pt_folder
     # FTWEIGTHS = os.path.join(opt.pt_folder,
     #                          '..',
     #                          opt.ft_name, #'finetuning',                                     
@@ -52,7 +52,7 @@ def run(opt):
                             encoder_mode=model_config['encoder_mode'],
                             average_layers=model_config['avg_layers'])
 
-    astromer.load_weights(os.path.join(FTWEIGTHS, 'weights', 'weights'))
+    astromer.load_weights(os.path.join(opt.pt_folder, 'weights', 'weights'))
     print('[INFO] Weights loaded')
 
     # ====================================================================================
@@ -64,12 +64,7 @@ def run(opt):
                                'fold_'+str(opt.fold), 
                                '{}_{}'.format(opt.subdataset, opt.spc))
 
-    CLFWEIGHTS = os.path.join( opt.pt_folder,
-                              '..',
-                              'classification_{}'.format(opt.ft_name), 
-                              opt.subdataset, 
-                              'fold_'+str(opt.fold), 
-                              opt.subdataset+'_'+str(opt.spc))
+    CLFWEIGHTS = opt.target_dir
     num_cls = pd.read_csv(os.path.join(DOWNSTREAM_DATA, 'objects.csv')).shape[0]
 
     train_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'train'),

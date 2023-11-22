@@ -12,7 +12,7 @@ gpu        = sys.argv[1]
 pt_folder  = sys.argv[2] #until pretraining
 batch_size = 2500    
 records_folder = './data/records/'
-ds_names = ['alcock', 'atlas']
+ds_names = ['alcock']
 spc_list = [20, 100]
 clf_names = ['att_mlp', 'cls_mlp', 'all_mlp']
 
@@ -36,12 +36,18 @@ for ckpt_w in ckpt_weights:
                 for fold_n in range(3):
                     start = time.time()
                     project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {} --clf-name {} --ft-name {} --target-dir {}'
+                    print(ckpt_w)
                     FTWEIGTHS = os.path.join(ckpt_w,
                                              exp_name, #'finetuning',                                     
                                              dataset,
                                              'fold_'+str(fold_n), 
                                              '{}_{}'.format(dataset, spc))   
-                    command1 = project_path.format(root, gpu, dataset, ckpt_w, fold_n, spc, clf_name, exp_name, FTWEIGTHS)
+                    CLFWEIGTHS = os.path.join(ckpt_w,
+                                             'classification', #'finetuning',                                     
+                                             dataset,
+                                             'fold_'+str(fold_n), 
+                                             '{}_{}'.format(dataset, spc))   
+                    command1 = project_path.format(root, gpu, dataset, FTWEIGTHS, fold_n, spc, clf_name, exp_name, CLFWEIGTHS)
 
                     try:
                         subprocess.call(command1, shell=True)
