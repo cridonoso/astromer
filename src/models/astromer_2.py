@@ -2,8 +2,11 @@
 ASTROMER + Skip connections + Next Segment Prediction
 '''
 import tensorflow as tf
+import numpy as np
+import joblib
 import toml
 import os 
+
 
 from tensorflow.keras.layers import Input
 from tensorflow.keras import Model
@@ -180,18 +183,23 @@ def restore_model(model_folder):
     return astromer, model_config
 
 
-def get_embeddings(astromer, dataset):
+def get_embeddings(astromer, dataset, model_config):
     encoder = astromer.get_layer('encoder')
     embeddings = []
     for x, y in dataset:
         Z = encoder(x)
         embeddings.append(Z.numpy())
+        
+    max_seq_len = model_config['window_size']
+    embedding_dim = model_config['mixer']
 
     embeddings = np.concatenate(embeddings, axis=0)
-    
-    cls_emb = embeddings[:, :1, :][:, 0, :]
-    obs_emb = embeddings[:, 1:, :]
-    obs_emb_flat = obs_emb.reshape([-1, 200*256])
-    
-    return cls_emb, obs_emb
+    return embeddings
+
+def save_embeddings(embeddings, output_path, file_name):
+    os.makedirs(output_path, exist_ok=True)
+    path = os.path.join(output_path, '{}.joblib'.format(file_name))   
+    with open(path, "wb") as f:
+        joblib.dump(embeddings, f)
+    print(f"[INFO] Successfully stored embeddings at path {path}")
 

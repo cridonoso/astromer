@@ -6,8 +6,7 @@ import toml
 import sys
 import os
 
-from src.models.astromer_1 import restore_model, predict, get_embeddings, save_embeddings
-from src.data.zero import pretraining_pipeline
+from src.models.astromer_2 import restore_model, predict, get_embeddings, save_embeddings
 from src.data import get_loader
 from datetime import datetime
 from tqdm import tqdm
@@ -31,7 +30,7 @@ def run(opt):
                              sampling=False,
                              shuffle=False,
                              repeat=1,
-                             aversion='1',
+                             aversion='2',
                              num_cls=num_cls,
                              return_ids=True)
 

@@ -91,22 +91,26 @@ def test_step(model, x, y, return_pred=False, **kwargs):
 def predict(model, test_loader):
     n_batches = sum([1 for _, _ in test_loader])
     print('[INFO] Processing {} batches'.format(n_batches))
-    y_pred = tf.TensorArray(dtype=tf.float32, size=n_batches)
-    y_true = tf.TensorArray(dtype=tf.float32, size=n_batches)
-    masks  = tf.TensorArray(dtype=tf.float32, size=n_batches)
-    times  = tf.TensorArray(dtype=tf.float32, size=n_batches)
+    
+    y_pred = []
+    y_true = []
+    masks  = []
+    times  = []
     for index, (x, y) in enumerate(test_loader):
         outputs = test_step(model, x, y, return_pred=True)
-        y_pred = y_pred.write(index, outputs)
-        y_true = y_true.write(index, y['magnitudes'])
-        print(y['probed_mask'].shape)
-
-        masks  = masks.write(index, y['probed_mask'])
-        times = times.write(index, x['times'])
-
-    y_pred = tf.concat([times.concat(), y_pred.concat()], axis=2)
-    y_true = tf.concat([times.concat(), y_true.concat()], axis=2)
-    return y_pred, y_true, masks.concat()
+        y_pred.append(outputs)
+        y_true.append(y['magnitudes'])
+        masks.append(y['probed_mask'])
+        times.append(x['times'])
+    
+    y_pred = tf.concat(y_pred, 0)
+    y_true = tf.concat(y_true, 0)
+    masks  = tf.concat(masks, 0)
+    times  = tf.concat(times, 0)
+    
+    y_pred = tf.concat([times, y_pred], axis=2)
+    y_true = tf.concat([times, y_true], axis=2)
+    return y_pred, y_true, masks
 
 def restore_model(model_folder, mask_format=None):
     with open(os.path.join(model_folder, "config.toml"), 'r') as f:
