@@ -12,7 +12,7 @@ from tensorflow.keras.layers import Input
 from tensorflow.keras import Model
 from tqdm import tqdm
 from src.layers  import Encoder, ConcatEncoder, TransformLayer, RegLayer, NSPEncoder
-from src.losses  import custom_rmse, custom_bce
+from src.losses  import rmse_for_nsp, custom_bce
 from src.metrics import custom_r2, custom_acc
 
 
@@ -78,9 +78,11 @@ def train_step(model, x, y, optimizer, **kwargs):
     with tf.GradientTape() as tape:
         outputs = model(x, training=True)
         
-        rmse = custom_rmse(y_true=y['magnitudes'],
+        rmse = rmse_for_nsp(y_true=y['magnitudes'],
                            y_pred=outputs['reconstruction'],
-                           mask=y['probed_mask'])
+                           mask=y['probed_mask'],
+                           nsp_label=y['nsp_label'],
+                           segment_emb=y['seg_emb'])
 
         bce = custom_bce(y['nsp_label'], outputs['nsp_label'])
         
@@ -105,9 +107,11 @@ def train_step(model, x, y, optimizer, **kwargs):
 def test_step(model, x, y, return_pred=False, **kwargs):
     outputs = model(x, training=False)
     
-    rmse = custom_rmse(y_true=y['magnitudes'],
+    rmse = rmse_for_nsp(y_true=y['magnitudes'],
                        y_pred=outputs['reconstruction'],
-                       mask=y['probed_mask'])
+                       mask=y['probed_mask'],
+                       nsp_label=y['nsp_label'],
+                       segment_emb=y['seg_emb'])
 
     bce = custom_bce(y['nsp_label'], outputs['nsp_label'])
     
