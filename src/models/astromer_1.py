@@ -145,9 +145,15 @@ def get_embeddings(astromer, dataset, model_config):
     embeddings = embeddings.reshape([-1, max_seq_len *embedding_dim])
     return embeddings
 
+def create_universal_path(output_path, file_name):
+    universal_path = os.path.join(output_path, file_name)
+    return universal_path
+
 def save_embeddings(embeddings, output_path, file_name):
 	extension = ".joblib"
-	path = Path(f"{output_path}/{file_name}{extension}")
+	path = create_universal_path(output_path=output_path, file_name=file_name) + extension
+	if not os.path.exists(output_path):
+		os.makedirs(output_path)
 	with open(path, "wb") as f:
 		joblib.dump(embeddings, f)
 	print(f"[INFO] Successfully stored embeddings at path {path}")
