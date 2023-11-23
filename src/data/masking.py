@@ -122,11 +122,12 @@ def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
         reshaped_mask = tf.zeros([max_obs - time_steps,
                                   tf.shape(input_dict['input'])[-1]],
                                   dtype=tf.float32)
+
         input_dict['input'] = tf.concat([input_dict['input'], reshaped_mask], 0)
 
     input_dict['input_modified'] = seq_magn
-    input_dict['att_mask']  = mask_in
-    input_dict['probed_mask'] = mask_out
+    input_dict['att_mask']       = mask_in
+    input_dict['probed_mask']    = mask_out
 
     return input_dict
 

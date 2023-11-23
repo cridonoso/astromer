@@ -129,6 +129,7 @@ def randomize(input_dict, nsp_prob):
     
     # Segment embedding 
     segment_emb = (tf.cast(mask_original_obs, tf.float32)+1.) * padding_mask_randomized
+
     t_mean = tf.slice(input_dict['mean_values'], [0, 0, 0], [-1, -1, 1])
     t_0 = times_original+t_mean
     t_1 = times_replace + tf.gather(t_mean, shuffle_indices)
@@ -150,7 +151,7 @@ def randomize(input_dict, nsp_prob):
 
     input_dict['probed_mask'] = prob_mask_randomized
     input_dict['att_mask'] = att_mask_randomized * (1.-tf.expand_dims(padding_mask_randomized, axis=-1))
-    input_dict['seg_emb'] = segment_emb
+    input_dict['seg_emb'] = tf.where(segment_emb == 2., -1., segment_emb)
 
     return input_dict
 

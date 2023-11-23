@@ -109,7 +109,8 @@ def format_inp_astromer(batch,
         outputs['error']       = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
         outputs['original']    = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
         outputs['probed_mask'] = batch['probed_mask']
-        outputs['nsp_label'] = batch['nsp_label']
+        outputs['seg_emb']     = tf.where(inputs['seg_emb'] == -1., 1., 0.)
+        outputs['nsp_label']   = batch['nsp_label']
     
     if num_cls is not None:
         outputs = tf.one_hot(batch['label'], num_cls)
