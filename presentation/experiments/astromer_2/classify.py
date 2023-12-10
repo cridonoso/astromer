@@ -26,18 +26,18 @@ def run(opt):
     # ====================================================================================
     # =============== FINETUNING MODEL  ==================================================
     # ====================================================================================
-    FTWEIGTHS = opt.pt_folder
-    # FTWEIGTHS = os.path.join(opt.pt_folder,
-    #                          '..',
-    #                          opt.ft_name, #'finetuning',                                     
-    #                          opt.subdataset,
-    #                          'fold_'+str(opt.fold), 
-    #                          '{}_{}'.format(opt.subdataset, opt.spc))   
+#     FTWEIGTHS = opt.pt_folder
+    FTWEIGTHS = os.path.join(opt.pt_folder,
+                             '..',
+                             opt.ft_name, #'finetuning',                                     
+                             opt.subdataset,
+                             'fold_'+str(opt.fold), 
+                             '{}_{}'.format(opt.subdataset, opt.spc))   
 
     # ====================================================================================
     # =============== LOADING PRETRAINED MODEL ===========================================
     # ====================================================================================
-    with open(os.path.join(FTWEIGTHS, 'config.toml'), 'r') as f:
+    with open(os.path.join(opt.pt_folder, 'config.toml'), 'r') as f:
         model_config = toml.load(f)
 
     astromer = get_ASTROMER(num_layers=model_config['num_layers'],
@@ -148,7 +148,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', default='-1', type=str, help='GPU to be used. -1 means no GPU will be used')
     parser.add_argument('--subdataset', default='alcock', type=str, help='Data folder where tf.record files are located')
-    parser.add_argument('--pt-folder', default='./results/pretraining*', type=str, help='pretrained model folder')
+    parser.add_argument('--pt-folder', default='./results/pretraining', type=str, help='pretrained model folder')
     parser.add_argument('--fold', default=0, type=int, help='Fold to use')
     parser.add_argument('--ft-name', default='finetuning', type=str, help='Finetuning folder')
     parser.add_argument('--spc', default=20, type=int, help='Samples per class')

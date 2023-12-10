@@ -16,7 +16,7 @@ def rmse_for_nsp(y_true, y_pred, mask=None, nsp_label=None, segment_emb=None):
     
     mse_mean = tf.math.divide_no_nan(tf.reduce_sum(loss_total, 1), N)
     mse_mean = tf.reduce_mean(mse_mean)
-    return tf.math.sqrt(mse_mean)
+    return mse_mean
 
 @tf.function
 def custom_rmse(y_true, y_pred, mask=None):
@@ -27,4 +27,4 @@ def custom_rmse(y_true, y_pred, mask=None):
     residuals  = tf.reduce_sum(residuals, 1)
     mse_mean = tf.math.divide_no_nan(residuals, tf.reduce_sum(mask, 1))
     mse_mean = tf.reduce_mean(mse_mean)
-    return tf.math.sqrt(mse_mean)
+    return mse_mean

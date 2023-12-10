@@ -72,9 +72,7 @@ def run(opt):
         model.load_weights(os.path.join(opt.checkpoint, 'weights', 'weights'))
         
     # ============================================================
-
-
-    cbks = [SaveCheckpoint(frequency=10, project_path=EXPDIR), 
+    cbks = [SaveCheckpoint(frequency=None, project_path=EXPDIR), 
             TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
             EarlyStopping(monitor='val_loss', patience=opt.patience),
             TestModel(test_batches=test_loader.take(1) if opt.debug else test_loader, 
