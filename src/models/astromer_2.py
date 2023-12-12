@@ -16,18 +16,18 @@ from src.losses  import rmse_for_nsp, custom_bce
 from src.metrics import custom_r2, custom_acc
 
 
-def build_input(window_size):
+def build_input(window_size, batch_size=None):
     magnitudes  = Input(shape=(window_size, 1),
-                  batch_size=None,
+                  batch_size=batch_size,
                   name='magnitudes')
     times       = Input(shape=(window_size, 1),
-                  batch_size=None,
+                  batch_size=batch_size,
                   name='times')
     att_mask    = Input(shape=(window_size, 1),
-                  batch_size=None,
+                  batch_size=batch_size,
                   name='att_mask') 
     seg_emb     = Input(shape=(window_size, 1),
-                  batch_size=None,
+                  batch_size=batch_size,
                   name='seg_emb')
 
     pholder = {'magnitudes':magnitudes,

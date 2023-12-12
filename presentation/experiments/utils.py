@@ -13,34 +13,37 @@ from tensorflow.keras import Model
 
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
+
+def get_mlp_att(inputs, num_cls):
+    x = Dense(1024, activation='relu')(inputs)
+    x = Dense(512, activation='relu')(x)
+    x = Dense(256, activation='relu')(x)
+    x = LayerNormalization(name='layer_norm')(x)
+    y_pred = Dense(num_cls, name='output_layer')(x)
+    y_pred = tf.reshape(y_pred, [-1, num_cls])
+    return y_pred
+
+def get_linear(inputs, num_cls):
+    y_pred = Dense(num_cls, name='output_layer')(inputs)
+    y_pred = tf.reshape(y_pred, [-1, num_cls])
+    return y_pred
+
 def train_classifier(embedding, inp_placeholder, train_loader, valid_loader, test_loader, num_cls, project_path='', clf_name='emb_dense', debug=False):
     os.makedirs(os.path.join(project_path, clf_name), exist_ok=True)
     os.makedirs(os.path.join(project_path, clf_name), exist_ok=True)
 
     if 'mlp' in clf_name:
-        x = Dense(1024, activation='relu')(embedding)
-        x = Dense(512, activation='relu')(x)
-        x = Dense(256, activation='relu')(x)
-        x = LayerNormalization(name='layer_norm')(x)
-        y_pred = Dense(num_cls, name='output_layer')(x)
-        y_pred = tf.reshape(y_pred, [-1, num_cls])
-        classifier = Model(inputs=inp_placeholder, outputs=y_pred, name=clf_name)
-        classifier.compile(optimizer=Adam(1e-3),
-                          loss=CategoricalCrossentropy(from_logits=True),
-                          metrics=['accuracy'])
-    
-    if 'l2' in clf_name:
-        print('L2 Regularizer')
-        classifier = tf.keras.Sequential()
-        classifier.add(tf.keras.Input(shape=(256)))
-        classifier.add(Dense(1024, activation='relu', kernel_regularizer='l2'))
-        classifier.add(Dense(512, activation='relu', kernel_regularizer='l2'))
-        classifier.add(Dense(256, activation='relu', kernel_regularizer='l2'))
-        classifier.compile(optimizer='adam', loss=CategoricalCrossentropy(from_logits=True))
+        print('[INFO] Training MLP')
+        y_pred = get_mlp_att(embedding, num_cls)
         
     if 'linear':
-        x = embedding
+        print('[INFO] Training Linear')
+        y_pred = get_linear(embedding, num_cls)
 
+    classifier = Model(inputs=inp_placeholder, outputs=y_pred, name=clf_name)
+    classifier.compile(optimizer=Adam(1e-3),
+                      loss=CategoricalCrossentropy(from_logits=True),
+                      metrics=['accuracy'])
 
     cbks =  [
         ModelCheckpoint(

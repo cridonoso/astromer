@@ -11,7 +11,7 @@ batch_size = 2500
 records_folder = './data/records/'
 ds_names = ['alcock', 'atlas']
 spc_list = [20, 100]
-clf_names = ['att_mlp', 'cls_mlp', 'all_mlp']
+clf_names = ['att_linear', 'cls_linear', 'all_linear']
 
 try:
     exp_name   = sys.argv[3] 
@@ -25,18 +25,26 @@ for dataset in ds_names:
         for spc in spc_list:
             for fold_n in range(3):
                 start = time.time()
-                project_path = '{} --gpu {} --subdataset {} --pt-folder {} --fold {} --spc {} --clf-name {} --ft-name {} --target-dir {}'
-#                 FTWEIGTHS = os.path.join(pt_folder,                                     
-#                                          dataset,
-#                                          'fold_'+str(fold_n), 
-#                                          '{}_{}'.format(dataset, spc))   
+                project_path = '{} --gpu {} --data {} --pt-folder {}  --ft-folder {} --clf-folder {} --clf-name {}'
+
+                DATAPATH = os.path.join(records_folder,                                  
+                                        dataset,
+                                        'fold_'+str(fold_n), 
+                                        '{}_{}'.format(dataset, spc))  
+
+                FTWEIGTHS = os.path.join(pt_folder, 
+                                         'finetuning',                                    
+                                         dataset,
+                                         'fold_'+str(fold_n), 
+                                         '{}_{}'.format(dataset, spc))   
+
                 CLFWEIGHTS = os.path.join(pt_folder,
-                                          '..',
-                                          exp_name, #'finetuning',                                     
+                                          'classification',                                     
                                           dataset,
                                           'fold_'+str(fold_n), 
                                           '{}_{}'.format(dataset, spc))
-                command1 = project_path.format(root, gpu, dataset, pt_folder, fold_n, spc, clf_name, exp_name, CLFWEIGHTS)
+
+                command1 = project_path.format(root, gpu, DATAPATH, pt_folder, FTWEIGTHS, CLFWEIGHTS, clf_name)
 
                 try:
                     subprocess.call(command1, shell=True)

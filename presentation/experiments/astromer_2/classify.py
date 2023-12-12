@@ -24,17 +24,6 @@ def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
 
     # ====================================================================================
-    # =============== FINETUNING MODEL  ==================================================
-    # ====================================================================================
-#     FTWEIGTHS = opt.pt_folder
-    FTWEIGTHS = os.path.join(opt.pt_folder,
-                             '..',
-                             opt.ft_name, #'finetuning',                                     
-                             opt.subdataset,
-                             'fold_'+str(opt.fold), 
-                             '{}_{}'.format(opt.subdataset, opt.spc))   
-
-    # ====================================================================================
     # =============== LOADING PRETRAINED MODEL ===========================================
     # ====================================================================================
     with open(os.path.join(opt.pt_folder, 'config.toml'), 'r') as f:
@@ -52,23 +41,16 @@ def run(opt):
                             encoder_mode=model_config['encoder_mode'],
                             average_layers=model_config['avg_layers'])
 
-    astromer.load_weights(os.path.join(opt.pt_folder, 'weights', 'weights'))
+    astromer.load_weights(os.path.join(opt.ft_folder, 'weights', 'weights'))
     print('[INFO] Weights loaded')
 
     # ====================================================================================
     # =============== DOWNSTREAM TASK  ===================================================
     # ====================================================================================
+    num_cls = pd.read_csv(os.path.join(opt.data, 'objects.csv')).shape[0]
 
-    DOWNSTREAM_DATA = os.path.join('./data/records', 
-                               opt.subdataset,
-                               'fold_'+str(opt.fold), 
-                               '{}_{}'.format(opt.subdataset, opt.spc))
-
-    CLFWEIGHTS = opt.target_dir
-    num_cls = pd.read_csv(os.path.join(DOWNSTREAM_DATA, 'objects.csv')).shape[0]
-
-    train_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'train'),
-                              batch_size= 5 if opt.debug else 512, 
+    train_loader = get_loader(os.path.join(opt.data, 'train'),
+                              batch_size= 5 if opt.debug else opt.bs, 
                               window_size=model_config['window_size'],
                               probed_frac=0.,
                               random_frac=0.,
@@ -79,8 +61,8 @@ def run(opt):
                               num_cls=num_cls,
                               aversion='2')
 
-    valid_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'val'),
-                              batch_size=5 if opt.debug else 512,
+    valid_loader = get_loader(os.path.join(opt.data, 'val'),
+                              batch_size=5 if opt.debug else opt.bs,
                               window_size=model_config['window_size'],
                               probed_frac=0.,
                               random_frac=0.,
@@ -91,8 +73,8 @@ def run(opt):
                               num_cls=num_cls,
                               aversion='2')
 
-    test_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'test'),
-                              batch_size=5 if opt.debug else 512,
+    test_loader = get_loader(os.path.join(opt.data, 'test'),
+                              batch_size=5 if opt.debug else opt.bs,
                               window_size=model_config['window_size'],
                               probed_frac=0.,
                               random_frac=0.,
@@ -114,17 +96,21 @@ def run(opt):
     encoder.trainable = opt.train_astromer
     embedding = encoder(inp_placeholder)
 
-    if opt.clf_name == 'cls_mlp':
+    if 'cls' in opt.clf_name:
+        print('[INFO] Using CLS tokens')
         embedding = tf.slice(embedding, [0, 0, 0], [-1, 1,-1], name='slice_cls')
         embedding = tf.squeeze(embedding, axis=1)
 
-    if opt.clf_name == 'att_mlp':
+    print(opt.clf_name)
+    if 'att' in opt.clf_name:
+        print('[INFO] Using OBS tokens')
         embedding = tf.slice(embedding, [0, 1, 0], [-1, 1,-1], name='slice_att')
         embedding = embedding*(1.-inp_placeholder['att_mask'])
         embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
                                           tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
-        
-    if opt.clf_name == 'all_mlp':
+
+    if 'all' in opt.clf_name:
+        print('[INFO] Using ALL tokens')
         cls_token  = tf.slice(embedding, [0, 0, 0], [-1, 1,-1], name='slice_cls')
         cls_token = tf.squeeze(cls_token, axis=1)
         att_tokens = tf.slice(embedding, [0, 1, 0], [-1, 1,-1], name='slice_att')
@@ -139,27 +125,28 @@ def run(opt):
                                    valid_loader=valid_loader, 
                                    test_loader=test_loader,
                                    num_cls=num_cls, 
-                                   project_path=CLFWEIGHTS,
+                                   project_path=opt.clf_folder,
                                    clf_name=opt.clf_name,
                                    debug=opt.debug)
-
+    
+    with open(os.path.join(opt.clf_folder, 'config.toml'), 'w') as f:
+        toml.dump(model_config, f)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', default='-1', type=str, help='GPU to be used. -1 means no GPU will be used')
-    parser.add_argument('--subdataset', default='alcock', type=str, help='Data folder where tf.record files are located')
-    parser.add_argument('--pt-folder', default='./results/pretraining', type=str, help='pretrained model folder')
-    parser.add_argument('--fold', default=0, type=int, help='Fold to use')
-    parser.add_argument('--ft-name', default='finetuning', type=str, help='Finetuning folder')
-    parser.add_argument('--spc', default=20, type=int, help='Samples per class')
+    parser.add_argument('--data', default='./data/records/alcock/fold_0/alcock_20', type=str, help='Data folder where tf.record files are located')
+    parser.add_argument('--pt-folder', default='./presentation/experiments/astromer_2/results/epoch_3090/', type=str, help='Pretraining folder')
+    parser.add_argument('--ft-folder', default='./presentation/experiments/astromer_2/results/epoch_3090/finetuning/alcock/fold_0/alcock_20', type=str, help='Finetuning folder')
+    parser.add_argument('--clf-folder', default='./presentation/experiments/astromer_2/results/epoch_3090/classification/', type=str, help='Classification folder')
+    
     parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
-    parser.add_argument('--target-dir', default='./results/finetuning/alcock/fold_0/alcock_20', type=str, help='target directory')
-
-    parser.add_argument('--bs', default=2000, type=int, help='Batch size')
+    parser.add_argument('--bs', default=256, type=int, help='Batch size')
     parser.add_argument('--patience', default=20, type=int, help='Earlystopping threshold in number of epochs')
     parser.add_argument('--num_epochs', default=10000, type=int, help='Number of epochs')
+
     parser.add_argument('--train-astromer', action='store_true', help='If train astromer when classifying')
-    parser.add_argument('--clf-name', default='att_mlp', type=str, help='classifier name')
+    parser.add_argument('--clf-name', default='att_linear', type=str, help='classifier name')
 
     opt = parser.parse_args()        
     run(opt)
