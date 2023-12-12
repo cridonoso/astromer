@@ -5,14 +5,10 @@ import os
 
 from src.models.astromer_1 import get_ASTROMER, train_step, test_step
 
-from src.training.callbacks import SaveCheckpoint, TestModel
-from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
-
 from src.training.utils_old import train
 from datetime import datetime
 
 from src.data.zero import pretraining_pipeline
-from src.data import get_loader
 
 
 def run(opt):
@@ -24,43 +20,37 @@ def run(opt):
     os.makedirs(EXPDIR, exist_ok=True)
 
     # ========== DATA ========================================
-    train_loader = get_loader(os.path.join(opt.data, 'train'),
-                              batch_size=5 if opt.debug else opt.bs,
-                              window_size=opt.window_size,
-                              probed_frac=opt.probed,
-                              random_frac=opt.rs,
-                              sampling=True,
-                              shuffle=True,
-                              repeat=4,
-                              aversion='1')
+    train_loader = pretraining_pipeline(os.path.join(opt.data, 'train'),
+                                        batch_size= 5 if opt.debug else opt.bs, 
+                                        window_size=opt.window_size,
+                                        shuffle=True,
+                                        sampling=True,
+                                        repeat=4,
+                                        msk_frac=opt.probed,
+                                        rnd_frac=opt.rs,
+                                        same_frac=opt.rs,
+                                        key_format='1')
 
-    valid_loader = get_loader(os.path.join(opt.data, 'val'),
-                              batch_size=5 if opt.debug else opt.bs,
-                              window_size=opt.window_size,
-                              probed_frac=opt.probed,
-                              random_frac=opt.rs,
-                              sampling=False,
-                              shuffle=False,
-                              repeat=1,
-                              aversion='1')
+    valid_loader = pretraining_pipeline(os.path.join(opt.data, 'val'),
+                                        batch_size=5 if opt.debug else opt.bs,
+                                        window_size=opt.window_size,
+                                        shuffle=False,
+                                        sampling=True,
+                                        msk_frac=opt.probed,
+                                        rnd_frac=opt.rs,
+                                        same_frac=opt.rs,
+                                        key_format='1')
 
-    test_loader = get_loader(os.path.join(opt.data, 'test'),
-                              batch_size=5 if opt.debug else opt.bs,
-                              window_size=opt.window_size,
-                              probed_frac=opt.probed,
-                              random_frac=opt.rs,
-                              sampling=False,
-                              shuffle=False,
-                              repeat=1,
-                              aversion='1')
-    cbks = [SaveCheckpoint(frequency=None, project_path=EXPDIR), 
-            TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
-            EarlyStopping(monitor='val_loss', patience=opt.patience),
-            TestModel(test_batches=test_loader.take(1) if opt.debug else test_loader, 
-                      project_path=os.path.join(EXPDIR, 'tensorboard'),
-                      test_step_fn=test_step,
-                      params=opt.__dict__)
-            ]
+    test_loader = pretraining_pipeline(os.path.join(opt.data, 'test'),
+                                        batch_size=5 if opt.debug else opt.bs,
+                                        window_size=opt.window_size,
+                                        shuffle=False,
+                                        sampling=True,
+                                        msk_frac=opt.probed,
+                                        rnd_frac=opt.rs,
+                                        same_frac=opt.rs,
+                                        key_format='1')
+
     # ======= MODEL ========================================
     model = get_ASTROMER(num_layers=opt.num_layers,
                         num_heads=opt.num_heads,

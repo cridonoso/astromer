@@ -16,11 +16,13 @@ class SaveCheckpoint(tf.keras.callbacks.Callback):
             self.best_loss = logs['val_loss']
             self.best_model = self.model
         
-        if epoch % self.frequency == 0:
-            self.model.save_weights(os.path.join(self.project_path, 'ckpts', 'epoch_{}'.format(epoch), 'weights', 'weights'))
-            
         if epoch is None:
             self.best_model.save_weights(os.path.join(self.project_path, 'weights', 'weights'))
+        else:
+            if epoch % self.frequency == 0:
+                self.model.save_weights(os.path.join(self.project_path, 'ckpts', 'epoch_{}'.format(epoch), 'weights', 'weights'))
+
+
             
 class TestModel(tf.keras.callbacks.Callback):
     def __init__(self, test_batches, project_path, test_step_fn, params, **kwargs):

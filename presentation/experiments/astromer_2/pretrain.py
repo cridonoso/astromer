@@ -29,7 +29,7 @@ def run(opt):
                               nsp_prob=opt.nsp_prob,
                               sampling=True,
                               shuffle=True,
-                              repeat=1,
+                              repeat=4,
                               aversion='2')
 
     valid_loader = get_loader(os.path.join(opt.data, 'val'),
