@@ -6,6 +6,7 @@ from src.data.record import deserialize
 from src.data.preprocessing import to_windows, standardize, min_max_scaler
 from src.data.masking import mask_dataset
 from src.data.nsp import apply_nsp
+from src.data.gap import set_gap_prediction
 
 
 def load_records(records_dir):
@@ -77,7 +78,7 @@ def format_inp_astromer(batch,
                         return_lengths=False, 
                         num_cls=None, 
                         nsp_test=False,
-                        aversion='0'):
+                        aversion='base'):
     """
     Buildng ASTROMER input
 
@@ -90,7 +91,7 @@ def format_inp_astromer(batch,
 
     inputs, outputs = {}, {}
 
-    if aversion == '1':
+    if aversion == 'base':
         inputs['magnitudes'] = batch['input_modified']
         inputs['times']      = tf.slice(batch['input'], [0,0,0], [-1,-1,1])
         inputs['att_mask']   = batch['att_mask']
@@ -99,7 +100,7 @@ def format_inp_astromer(batch,
         outputs['error']       = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
         outputs['probed_mask'] = batch['probed_mask']
 
-    if aversion == '2':
+    if aversion == 'nsp':
         inputs['magnitudes'] = batch['nsp_magnitudes']
         inputs['times']      = batch['nsp_times']
         inputs['att_mask']   = batch['att_mask']
@@ -112,6 +113,8 @@ def format_inp_astromer(batch,
         outputs['seg_emb']     = tf.where(inputs['seg_emb'] == -1., 1., 0.)
         outputs['nsp_label']   = batch['nsp_label']
     
+    if aversion == 'gap':
+        pass
     if num_cls is not None:
         outputs = tf.one_hot(batch['label'], num_cls)
     
@@ -143,7 +146,7 @@ def get_loader(dataset,
                cache=False,
                return_ids=False,
                return_lengths=False,
-               aversion='2'):
+               aversion='gap'):
 
 
     assert isinstance(dataset, (list, str)), '[ERROR] Invalid format'
@@ -187,22 +190,26 @@ def get_loader(dataset,
     
     dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
     
-    if aversion == '2':
+    if aversion == 'nsp':
         print('[INFO] NSP format activated')
         dataset = apply_nsp(dataset, nsp_prob)
 
-    # FORMAT INPUT DICTONARY
-    dataset = dataset.map(lambda x: format_inp_astromer(x,
-                                                return_ids=return_ids,
-                                                return_lengths=return_lengths,
-                                                num_cls=num_cls,
-                                                aversion=aversion),
-                  num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    # if aversion == 'gap':
+    #     dataset = set_gap_prediction(dataset)
 
-    if cache:
-        dataset = dataset.cache()
 
-    #PREFETCH BATCHES
-    dataset = dataset.prefetch(2)
+    # # FORMAT INPUT DICTONARY
+    # dataset = dataset.map(lambda x: format_inp_astromer(x,
+    #                                             return_ids=return_ids,
+    #                                             return_lengths=return_lengths,
+    #                                             num_cls=num_cls,
+    #                                             aversion=aversion),
+    #               num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    # if cache:
+    #     dataset = dataset.cache()
+
+    # #PREFETCH BATCHES
+    # dataset = dataset.prefetch(2)
 
     return dataset
