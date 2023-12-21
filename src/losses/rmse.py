@@ -19,6 +19,25 @@ def rmse_for_nsp(y_true, y_pred, mask=None, nsp_label=None, segment_emb=None):
     return mse_mean
 
 @tf.function
+def rmse_for_delta_gap(y_true, y_pred):
+    residuals = tf.square(y_true - y_pred)
+    mse_mean = tf.reduce_mean(residuals)
+    mse_mean = tf.math.sqrt(mse_mean)
+    return mse_mean
+
+@tf.function
+def rmse_for_gap(y_true, y_pred, gap_mask):
+    residuals = tf.square(y_true - y_pred)
+    residuals = residuals * gap_mask
+
+    mse_mean = tf.math.divide_no_nan(
+            tf.reduce_sum(residuals, axis=1),
+            tf.reduce_sum(gap_mask, axis=1),
+        ) 
+    mse_mean = tf.reduce_mean(residuals)
+    return mse_mean
+
+@tf.function
 def custom_rmse(y_true, y_pred, mask=None):
     inp_shp = tf.shape(y_true)
     

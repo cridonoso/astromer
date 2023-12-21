@@ -6,7 +6,7 @@ from src.data.record import deserialize
 from src.data.preprocessing import to_windows, standardize, min_max_scaler
 from src.data.masking import mask_dataset
 from src.data.nsp import apply_nsp
-from src.data.gap import set_gap_prediction
+from src.data.gap import set_gap, invert_mask
 
 
 def load_records(records_dir):
@@ -114,7 +114,77 @@ def format_inp_astromer(batch,
         outputs['nsp_label']   = batch['nsp_label']
     
     if aversion == 'gap':
-        pass
+        inputs['magnitudes'] = batch['input_modified']
+        inputs['times']      = tf.slice(batch['input'], [0,0], [-1,1])
+        inputs['att_mask']   = batch['att_mask'] * batch['gap_mask']
+        inputs['seg_emb']    = batch['seg_emb']
+
+        outputs['magnitudes']  = tf.slice(batch['input'], [0,1], [-1,1])
+        outputs['error']       = tf.slice(batch['input'], [0,2], [-1,1])
+        outputs['probed_mask'] = batch['probed_mask']
+        outputs['gap_mask']    = batch['gap_mask']
+        outputs['gap_dt']      = batch['dt']
+        outputs['gap_0']       = batch['t0']
+        outputs['gap_1']       = batch['t1']
+
+    if num_cls is not None:
+        outputs = tf.one_hot(batch['label'], num_cls)
+    
+    if return_ids:     
+        outputs = tf.one_hot(batch['label'], num_cls), batch['lcid']
+        
+    if return_lengths:
+        outputs = tf.one_hot(batch['label'], num_cls), batch['lenght']
+
+    return inputs, outputs
+
+def format_inp_gap(batch, 
+                   window_size,
+                   return_ids=False, 
+                   return_lengths=False, 
+                   num_cls=None, 
+                   nsp_test=False):
+    """
+    Buildng ASTROMER input
+
+    Args:
+        batch (type): a batch of windows and their properties
+
+    Returns:
+        type: A tuple (x, y) tuple where x are the inputs and y the labels
+    """
+
+
+    inputs, outputs = {}, {}
+
+    inputs['magnitudes'] = batch['input_modified']
+    inputs['times']      = tf.slice(batch['input'], [0,0], [-1,1])
+    inputs['att_mask']   = batch['att_mask'] * batch['gap_mask']
+    inputs['seg_emb']    = batch['seg_emb']
+
+    outputs['magnitudes']  = tf.slice(batch['input'], [0,1], [-1,1])
+    outputs['error']       = tf.slice(batch['input'], [0,2], [-1,1])
+    outputs['probed_mask'] = batch['probed_mask'] * batch['gap_mask']
+    outputs['gap_dt']      = batch['dt']
+    outputs['gap_0']       = batch['t0']
+    outputs['gap_1']       = batch['t1']
+    outputs['pad_mask']    = tf.expand_dims(batch['mask'], axis=-1)
+    outputs['gap_mask']    = (1.-batch['gap_mask']) * outputs['pad_mask'] 
+
+    time_steps = tf.shape(inputs['magnitudes'])[0]    
+    if time_steps < window_size:
+        pad_mask = tf.zeros([window_size - time_steps, 1], name='pad_mask')
+        inputs['magnitudes'] = tf.concat([inputs['magnitudes'], pad_mask], axis=0)
+        inputs['times']      = tf.concat([inputs['times'], pad_mask], axis=0)
+        inputs['att_mask']   = tf.concat([inputs['att_mask'], pad_mask], axis=0)
+        inputs['seg_emb']    = tf.concat([inputs['seg_emb'], pad_mask], axis=0)
+
+        outputs['magnitudes']  = tf.concat([outputs['magnitudes'], pad_mask], axis=0)
+        outputs['error']       = tf.concat([outputs['error'], pad_mask], axis=0)
+        outputs['probed_mask'] = tf.concat([outputs['probed_mask'], pad_mask], axis=0)
+        outputs['gap_mask']    = tf.concat([outputs['gap_mask'], pad_mask], axis=0)
+        outputs['pad_mask']    = tf.concat([outputs['pad_mask'], pad_mask], axis=0)
+
     if num_cls is not None:
         outputs = tf.one_hot(batch['label'], num_cls)
     
@@ -142,6 +212,7 @@ def get_loader(dataset,
                shuffle=False,
                repeat=1,
                num_cls=None,
+               max_gap=0.2,
                normalize='zero-mean', # 'minmax'
                cache=False,
                return_ids=False,
@@ -188,28 +259,36 @@ def get_loader(dataset,
                            same_frac=random_frac,
                            window_size=window_size)
     
-    dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
+    if aversion == 'gap':
+        dataset = set_gap(dataset, max_gap=max_gap)
+        dataset = dataset.map(lambda x: format_inp_gap(x,
+                                                    window_size=window_size,
+                                                    return_ids=return_ids,
+                                                    return_lengths=return_lengths,
+                                                    num_cls=num_cls),
+                      num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        dataset = dataset.batch(batch_size)        
+        dataset = dataset.map(invert_mask)
+    else:
+        dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
     
     if aversion == 'nsp':
         print('[INFO] NSP format activated')
         dataset = apply_nsp(dataset, nsp_prob)
 
-    # if aversion == 'gap':
-    #     dataset = set_gap_prediction(dataset)
+    # FORMAT INPUT DICTONARY
+    if aversion != 'gap':
+        dataset = dataset.map(lambda x: format_inp_astromer(x,
+                                                    return_ids=return_ids,
+                                                    return_lengths=return_lengths,
+                                                    num_cls=num_cls,
+                                                    aversion=aversion),
+                      num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-
-    # # FORMAT INPUT DICTONARY
-    # dataset = dataset.map(lambda x: format_inp_astromer(x,
-    #                                             return_ids=return_ids,
-    #                                             return_lengths=return_lengths,
-    #                                             num_cls=num_cls,
-    #                                             aversion=aversion),
-    #               num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
-    # if cache:
-    #     dataset = dataset.cache()
+    if cache:
+        dataset = dataset.cache()
 
     # #PREFETCH BATCHES
-    # dataset = dataset.prefetch(2)
+    dataset = dataset.prefetch(2)
 
     return dataset

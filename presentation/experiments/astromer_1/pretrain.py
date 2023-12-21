@@ -8,7 +8,7 @@ from src.models.astromer_1 import get_ASTROMER, train_step, test_step
 from src.training.callbacks import SaveCheckpoint, TestModel
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
 
-from src.training.utils_old import train
+from src.training.utils import train
 from datetime import datetime
 
 from src.data.zero import pretraining_pipeline
@@ -32,7 +32,7 @@ def run(opt):
                               sampling=True,
                               shuffle=True,
                               repeat=4,
-                              aversion='1')
+                              aversion='base')
 
     valid_loader = get_loader(os.path.join(opt.data, 'val'),
                               batch_size=5 if opt.debug else opt.bs,
@@ -42,7 +42,7 @@ def run(opt):
                               sampling=False,
                               shuffle=False,
                               repeat=1,
-                              aversion='1')
+                              aversion='base')
 
     test_loader = get_loader(os.path.join(opt.data, 'test'),
                               batch_size=5 if opt.debug else opt.bs,
@@ -52,7 +52,7 @@ def run(opt):
                               sampling=False,
                               shuffle=False,
                               repeat=1,
-                              aversion='1')
+                              aversion='base')
     cbks = [SaveCheckpoint(frequency=None, project_path=EXPDIR), 
             TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
             EarlyStopping(monitor='val_loss', patience=opt.patience),
@@ -85,13 +85,13 @@ def run(opt):
               valid_loader, 
               num_epochs=opt.num_epochs, 
               lr=opt.lr, 
-              test_loader=test_loader,
               project_path=EXPDIR,
               debug=opt.debug,
               patience=opt.patience,
               train_step_fn=train_step,
               test_step_fn=test_step,
               argparse_dict=opt.__dict__,
+              callbacks=cbks,
               scheduler=opt.scheduler)
 
 

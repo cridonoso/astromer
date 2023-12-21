@@ -108,6 +108,7 @@ def train(model,
         epoch_valid_metrics = average_logs(valid_logs)
         logs = merge_metrics(train=epoch_train_metrics, val=epoch_valid_metrics)
         __callbacks.on_epoch_end(epoch, logs=logs)
+        
         ebar.set_description('STOP: {:02d}/{:02d} LOSS: {:.3f}/{:.3f} R2:{:.3f}/{:.3f}'.format(es_count, 
                                                                             patience, 
                                                                             logs['loss'],

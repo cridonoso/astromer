@@ -8,9 +8,12 @@ import os
 from presentation.experiments.utils import train_classifier
 from src.models.astromer_1 import get_ASTROMER, build_input, train_step, test_step
 from src.training.utils import train
-from src.data.zero import pretraining_pipeline
+# from src.data.zero import pretraining_pipeline
+from src.data.loaders import get_loader
 from datetime import datetime
 
+from src.training.callbacks import SaveCheckpoint, TestModel
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
 
 def merge_metrics(**kwargs):
 	merged = {}
@@ -58,58 +61,46 @@ def run(opt):
                              'fold_'+str(opt.fold), 
                              '{}_{}'.format(opt.subdataset, opt.spc))   
 
-    train_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'train'),
-                                        batch_size= 5 if opt.debug else opt.bs, 
-                                        window_size=model_config['window_size'],
-                                        shuffle=True,
-                                        sampling=False,
-                                        repeat=1,
-                                        msk_frac=model_config['probed'],
-                                        rnd_frac=model_config['rs'],
-                                        same_frac=model_config['rs'],
-                                        key_format='1')
-    valid_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'val'),
-                                        batch_size=5 if opt.debug else opt.bs,
-                                        window_size=model_config['window_size'],
-                                        shuffle=False,
-                                        sampling=False,
-                                        msk_frac=model_config['probed'],
-                                        rnd_frac=model_config['rs'],
-                                        same_frac=model_config['rs'],
-                                        key_format='1')
-    test_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'test'),
-                                        batch_size=5 if opt.debug else opt.bs,
-                                        window_size=model_config['window_size'],
-                                        shuffle=False,
-                                        sampling=False,
-                                        msk_frac=model_config['probed'],
-                                        rnd_frac=model_config['rs'],
-                                        same_frac=model_config['rs'],
-                                        key_format='1')
-    # train_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
-    #                          batch_size= 5 if opt.debug else opt.bs, 
-    #                          probed=1. if opt.allvisible else model_config['probed'],
-    #                          random_same=0. if opt.allvisible else model_config['rs'],
-    #                          window_size=model_config['window_size'], 
-    #                          off_nsp=True, 
-    #                          repeat=1, 
-    #                          sampling=False)
-    # valid_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'val'), 
-    #                          batch_size= 5 if opt.debug else opt.bs, 
-    #                          probed=1. if opt.allvisible else model_config['probed'],
-    #                          random_same=0. if opt.allvisible else model_config['rs'],
-    #                          window_size=model_config['window_size'], 
-    #                          off_nsp=True,
-    #                          repeat=1, 
-    #                          sampling=False)
-    # test_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'test'), 
-    #                          batch_size= 5 if opt.debug else opt.bs, 
-    #                          probed=1. if opt.allvisible else model_config['probed'], 
-    #                          random_same=0. if opt.allvisible else model_config['rs'],
-    #                          window_size=model_config['window_size'], 
-    #                          off_nsp=True,
-    #                          repeat=1, 
-    #                          sampling=False)
+    train_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'train'),
+                              batch_size=5 if opt.debug else opt.bs,
+                              window_size=model_config['window_size'],
+                              probed_frac=model_config['probed'],
+                              random_frac=model_config['rs'],
+                              sampling=False,
+                              shuffle=True,
+                              repeat=1,
+                              aversion='base')
+
+    valid_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'val'),
+                              batch_size=5 if opt.debug else opt.bs,
+                              window_size=model_config['window_size'],
+                              probed_frac=model_config['probed'],
+                              random_frac=model_config['rs'],
+                              sampling=False,
+                              shuffle=False,
+                              repeat=1,
+                              aversion='base')
+
+    test_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'test'),
+                              batch_size=5 if opt.debug else opt.bs,
+                              window_size=model_config['window_size'],
+                              probed_frac=model_config['probed'],
+                              random_frac=model_config['rs'],
+                              sampling=False,
+                              shuffle=False,
+                              repeat=1,
+                              aversion='base')
+
+
+    cbks = [SaveCheckpoint(frequency=None, project_path=EXPDIR), 
+            TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
+            EarlyStopping(monitor='val_loss', patience=opt.patience),
+            TestModel(test_batches=test_loader.take(1) if opt.debug else test_loader, 
+                      project_path=os.path.join(EXPDIR, 'tensorboard'),
+                      test_step_fn=test_step,
+                      params=opt.__dict__)
+            ]
+
     astromer, \
     (best_train_metrics,
     best_val_metrics,
@@ -124,7 +115,8 @@ def run(opt):
                            patience=opt.patience,
                            train_step_fn=train_step,
                            test_step_fn=test_step,
-                           argparse_dict=opt.__dict__)
+                           argparse_dict=opt.__dict__,
+                           callbacks=cbks)
 
     metrics = merge_metrics(train=best_train_metrics, 
                             val=best_val_metrics, 

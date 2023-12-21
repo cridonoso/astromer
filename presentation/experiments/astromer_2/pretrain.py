@@ -4,7 +4,7 @@ import argparse
 import sys
 import os
 
-from src.models.astromer_2 import get_ASTROMER, train_step, test_step
+from src.models.astromer_gap import get_ASTROMER, train_step, test_step
 from src.training.callbacks import SaveCheckpoint, TestModel
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
 from src.training.utils import train
@@ -30,7 +30,7 @@ def run(opt):
                               sampling=True,
                               shuffle=True,
                               repeat=4,
-                              aversion='2')
+                              aversion='gap')
 
     valid_loader = get_loader(os.path.join(opt.data, 'val'),
                               batch_size=5 if opt.debug else opt.bs,
@@ -41,7 +41,7 @@ def run(opt):
                               sampling=True,
                               shuffle=False,
                               repeat=1,
-                              aversion='2')
+                              aversion='gap')
 
     test_loader = get_loader(os.path.join(opt.data, 'test'),
                               batch_size=5 if opt.debug else opt.bs,
@@ -52,7 +52,7 @@ def run(opt):
                               sampling=True,
                               shuffle=False,
                               repeat=1,
-                              aversion='2')
+                              aversion='gap')
 
     # ======= MODEL ========================================
     model = get_ASTROMER(num_layers=opt.num_layers,

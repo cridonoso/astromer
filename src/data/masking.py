@@ -61,13 +61,12 @@ def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
         rand_vals = tf.multiply(serie_2, rand_mask, name='randvalsmul')
 
         keep_mask = tf.math.floor(tf.math.cos(rand_mask))
-
         serie_1 = tf.multiply(serie_1, keep_mask, name='seriemul')
 
         keep_mask = tf.slice(keep_mask, [0,0], [-1,1])
         mask_1  = tf.multiply(mask_1, tf.squeeze(keep_mask), name='maskmul2')
-        serie_1 = tf.add(serie_1, rand_vals)
 
+        serie_1 = tf.add(serie_1, rand_vals)
         return serie_1, mask_1
 
 def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
