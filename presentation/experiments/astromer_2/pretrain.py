@@ -4,7 +4,7 @@ import argparse
 import sys
 import os
 
-from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
 from tensorflow.keras.optimizers import Adam
 
 from src.models.astromer_skip import get_ASTROMER as ASTROMER_SKIP
@@ -87,7 +87,12 @@ def run(opt):
         
     # ============================================================
     cbks = [TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
-            EarlyStopping(monitor='val_loss', patience=opt.patience)]
+            EarlyStopping(monitor='val_loss', patience=opt.patience),
+            ModelCheckpoint(filepath=os.path.join(EXPDIR, 'weights'),
+                save_weights_only=True,
+                save_best_only=True,
+                save_freq='epoch',
+                verbose=1)]
 
 
     model.compile(optimizer=Adam(1e-3))
