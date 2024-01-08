@@ -5,15 +5,13 @@ import toml
 import sys
 import os
 
-from presentation.experiments.utils import train_classifier
-from src.models.astromer_1 import get_ASTROMER, build_input, train_step, test_step
-from src.training.utils import train
-# from src.data.zero import pretraining_pipeline
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
+
+from src.models.astromer_1 import get_ASTROMER
 from src.data.loaders import get_loader
+
 from datetime import datetime
 
-from src.training.callbacks import SaveCheckpoint, TestModel
-from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
 
 def merge_metrics(**kwargs):
 	merged = {}
@@ -21,7 +19,6 @@ def merge_metrics(**kwargs):
 		for subkey, subvalue in value.items():
 			merged['{}_{}'.format(key, subkey)] = subvalue
 	return merged
-
 
 def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
@@ -92,14 +89,8 @@ def run(opt):
                               aversion='base')
 
 
-    cbks = [SaveCheckpoint(frequency=None, project_path=EXPDIR), 
-            TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
-            EarlyStopping(monitor='val_loss', patience=opt.patience),
-            TestModel(test_batches=test_loader.take(1) if opt.debug else test_loader, 
-                      project_path=os.path.join(EXPDIR, 'tensorboard'),
-                      test_step_fn=test_step,
-                      params=opt.__dict__)
-            ]
+    cbks = [TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
+            EarlyStopping(monitor='val_loss', patience=opt.patience)]
 
     astromer, \
     (best_train_metrics,

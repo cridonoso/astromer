@@ -11,9 +11,9 @@ import os
 from tensorflow.keras.layers import Input
 from tensorflow.keras import Model
 from tqdm import tqdm
-from src.layers  import Encoder, TransformLayer_GAP, RegLayer, NSPEncoder
-from src.losses  import custom_rmse, rmse_for_delta_gap, rmse_for_gap
-from src.metrics import custom_r2
+from src.layers  import Encoder, TransformLayer, RegLayer, NSPEncoder
+from src.losses  import rmse_for_nsp, custom_bce
+from src.metrics import custom_r2, custom_acc
 
 
 def build_input(window_size, batch_size=None):
@@ -47,6 +47,7 @@ def get_ASTROMER(num_layers=2,
                  pe_c=1,
                  window_size=100,
                  batch_size=None,
+                 encoder_mode='normal',
                  mask_format='first'): # first / zero
     
     placeholder = build_input(window_size)
@@ -64,13 +65,9 @@ def get_ASTROMER(num_layers=2,
                          mask_format=mask_format,
                          name='encoder')
 
-    reg_layer = TransformLayer_GAP(name='regressor')
-    
+    reg_layer = TransformLayer(name='regressor')
     x = encoder(placeholder)
-    x_gap, x_rec, x_gap_rec = reg_layer(x)
-
-    outputs = {'gap': x_gap, 'reconstruction':x_rec, 'gap_rec': x_gap_rec}
-
+    outputs = reg_layer(x)
     return CustomModel(inputs=placeholder, outputs=outputs, name="ASTROMER_GAP")
 
 class CustomModel(Model):
@@ -81,22 +78,22 @@ class CustomModel(Model):
         x, y = data
         with tf.GradientTape() as tape:
             outputs = self(x, training=True)  # Forward pass
-            rmse = custom_rmse(y_true=y['magnitudes'],
+
+            rmse = rmse_for_nsp(y_true=y['magnitudes'],
                                y_pred=outputs['reconstruction'],
-                               mask=y['probed_mask'])
+                               mask=y['probed_mask'],
+                               nsp_label=y['nsp_label'],
+                               segment_emb=y['seg_emb'])
 
-            rmse_dt_gap = rmse_for_delta_gap(y_true=y['gap_dt'], 
-                                          y_pred=outputs['gap'])
+            bce = custom_bce(y['nsp_label'], outputs['nsp_label'])
             
-            rmse_gap = rmse_for_gap(y_true=y['magnitudes'],
-                                    y_pred=outputs['gap_rec'],
-                                    gap_mask=y['gap_mask'])
-
-            loss = rmse + rmse_dt_gap + rmse_gap
+            loss = rmse + bce
 
             r2_value = custom_r2(y_true=y['magnitudes'], 
                                  y_pred=outputs['reconstruction'], 
                                  mask=y['probed_mask'])
+
+            nsp_acc  = custom_acc(y['nsp_label'], outputs['nsp_label'])
 
         trainable_vars = self.trainable_variables
         gradients = tape.gradient(loss, trainable_vars)
@@ -105,28 +102,31 @@ class CustomModel(Model):
         return {'loss':loss,
                 'rmse': rmse,
                 'r_square':r2_value,
-                'rmse_gap': rmse_gap}
+                'bce':bce,
+                'acc':nsp_acc}
 
     def test_step(self, data):
         x, y = data
         outputs = self(x, training=False)
-        rmse = custom_rmse(y_true=y['magnitudes'],
+        rmse = rmse_for_nsp(y_true=y['magnitudes'],
                            y_pred=outputs['reconstruction'],
-                           mask=y['probed_mask'])
+                           mask=y['probed_mask'],
+                           nsp_label=y['nsp_label'],
+                           segment_emb=y['seg_emb'])
 
-        rmse_dt_gap = rmse_for_delta_gap(y_true=y['gap_dt'], 
-                                      y_pred=outputs['gap'])
-
-        rmse_gap = rmse_for_gap(y_true=y['magnitudes'],
-                                y_pred=outputs['gap_rec'],
-                                gap_mask=y['gap_mask'])
-
-        loss = rmse + rmse_dt_gap + rmse_gap
+        bce = custom_bce(y['nsp_label'], outputs['nsp_label'])
+        
+        loss = rmse + bce
 
         r2_value = custom_r2(y_true=y['magnitudes'], 
                              y_pred=outputs['reconstruction'], 
                              mask=y['probed_mask'])
+
+        nsp_acc  = custom_acc(y['nsp_label'], outputs['nsp_label'])
+
         return {'loss':loss,
                 'rmse': rmse,
                 'r_square':r2_value,
-                'rmse_gap': rmse_gap}
+                'bce':bce,
+                'acc':nsp_acc}
+

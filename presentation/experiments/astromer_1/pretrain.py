@@ -6,8 +6,6 @@ import os
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
 from tensorflow.keras.optimizers import Adam
 
-from src.losses.astromer_1 import MaskedMeanSquaredError
-from src.metrics.astromer_1 import MaskedRSquare
 from src.models.astromer_1 import get_ASTROMER
 from src.data import get_loader
 
@@ -65,17 +63,14 @@ def run(opt):
                         pe_c=opt.pe_exp,
                         window_size=opt.window_size,
                         encoder_mode=opt.encoder_mode,
-                        average_layers=opt.avg_layers,
                         mask_format=opt.mask_format)
 
     # ============================================================
     if opt.checkpoint != '-1':
         print('[INFO] Restoring previous training')
         model.load_weights(os.path.join(opt.checkpoint, 'weights', 'weights'))
-        
-    model.compile(optimizer=Adam(1e-3), 
-                  loss=[MaskedMeanSquaredError()],
-                  metrics=[MaskedRSquare()])
+    
+    model.compile(optimizer=Adam(1e-3))
 
     model.fit(train_loader, 
               epochs=2 if opt.debug else opt.num_epochs, 

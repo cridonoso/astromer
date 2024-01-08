@@ -1,32 +1,38 @@
+''''
+ASTROMER + Skip connections + Next Segment Prediction
+'''
 import tensorflow as tf
 import numpy as np
-import toml
-import os
-
-from src.losses             import custom_rmse
-from src.metrics            import custom_r2
-from tensorflow.keras.layers import Input, Layer, Dense
-from tensorflow.keras        import Model
-import tensorflow as tf
-from pathlib import Path
 import joblib
+import toml
+import os 
 
-from src.layers import Encoder, RegLayer
 
-def build_input(length):
-    serie  = Input(shape=(length, 1),
-                  batch_size=None,
-                  name='input')
-    times  = Input(shape=(length, 1),
-                  batch_size=None,
+from tensorflow.keras.layers import Input
+from tensorflow.keras import Model
+from tqdm import tqdm
+
+from src.layers  import SkipEncoder, RegLayer
+from src.losses  import custom_rmse
+from src.metrics import custom_r2
+
+
+def build_input(window_size, batch_size=None):
+    magnitudes  = Input(shape=(window_size, 1),
+                  batch_size=batch_size,
+                  name='magnitudes')
+    times       = Input(shape=(window_size, 1),
+                  batch_size=batch_size,
                   name='times')
-    mask   = Input(shape=(length, 1),
-                  batch_size=None,
-                  name='mask')
+    att_mask    = Input(shape=(window_size, 1),
+                  batch_size=batch_size,
+                  name='att_mask') 
 
-    return {'magnitudes':serie,
-            'att_mask':mask,
-            'times':times}
+    pholder = {'magnitudes':magnitudes,
+               'times':times,
+               'att_mask':att_mask}
+
+    return pholder
 
 def get_ASTROMER(num_layers=2,
                  num_heads=2,
@@ -38,11 +44,12 @@ def get_ASTROMER(num_layers=2,
                  pe_c=1,
                  window_size=100,
                  batch_size=None,
-                 mask_format='first'):
-
+                 mask_format='first'): # first / zero
+    
     placeholder = build_input(window_size)
 
-    encoder = Encoder(window_size=window_size,
+    print('[INFO] NSP Encoder')
+    x = SkipEncoder(window_size=window_size,
                       num_layers=num_layers,
                       num_heads=num_heads,
                       head_dim=head_dim,
@@ -51,13 +58,11 @@ def get_ASTROMER(num_layers=2,
                       pe_base=pe_base,
                       pe_dim=pe_dim,
                       pe_c=pe_c,
-                      mask_format=mask_format,
-                      name='encoder')
+                      name='encoder')(placeholder)
 
-    x = encoder(placeholder)
-    x = RegLayer(name='regression')(x)
+    outputs = RegLayer(name='regresor')(x)
 
-    return CustomModel(inputs=placeholder, outputs=x, name="ASTROMER-1")
+    return CustomModel(inputs=placeholder, outputs=outputs, name="ASTROMER_SKIP")
 
 class CustomModel(Model):
     def __init__(self, *args, **kwargs):
@@ -92,3 +97,4 @@ class CustomModel(Model):
                              y_pred=y_pred, 
                              mask=y['probed_mask'])
         return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
+

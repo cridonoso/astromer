@@ -18,7 +18,6 @@ class Encoder(Model):
 				 pe_base=1000, 
 				 pe_dim=128,
 				 pe_c=1., 
-				 average_layers=False,
 				 mask_format='first',
 				 **kwargs):
 		super(Encoder, self).__init__(**kwargs)
@@ -33,13 +32,19 @@ class Encoder(Model):
 		self.pe_base     	= pe_base
 		self.pe_c        	= pe_c
 		self.pe_dim         = pe_dim
-		self.average_layers = average_layers
 		self.mask_format    = mask_format
 		self.inp_transform  = tf.keras.layers.Dense(self.pe_dim, name='inp_transform')
 
-		self.positional_encoder = PositionalEncoder(self.pe_dim, base=self.pe_base, c=self.pe_c, name='PosEncoding')
+		self.positional_encoder = PositionalEncoder(self.pe_dim, 
+													base=self.pe_base, 
+													c=self.pe_c, 
+													name='PosEncoding')
 		
-		self.enc_layers = [AttentionBlock(self.head_dim, self.num_heads, self.mixer_size, dropout=self.dropout, mask_format=self.mask_format, name=f'att_layer_{i}')
+		self.enc_layers = [AttentionBlock(self.head_dim, 
+										  self.num_heads, 
+										  self.mixer_size, 
+										  dropout=self.dropout, 
+										  mask_format=self.mask_format, name=f'att_layer_{i}')
 							for i in range(self.num_layers)]
 		
 		self.dropout_layer = tf.keras.layers.Dropout(self.dropout)
@@ -57,15 +62,6 @@ class Encoder(Model):
 		x = x_transformed + x_pe   
 		return x , window_size
 
-	def output_format(self, outputs, window_size):
-		if self.average_layers:
-			x = tf.reduce_mean(outputs, 0)
-		else:
-			x = outputs[-1]
-
-		x = tf.reshape(x, [-1, window_size, self.num_heads*self.head_dim])
-		return x
-
 	def call(self, inputs, training=False):
 		# adding embedding and position encoding.
 		x, window_size = self.input_format(inputs)  
@@ -74,16 +70,20 @@ class Encoder(Model):
 			x =  self.enc_layers[i](x, training=training, mask=inputs['att_mask'])
 		return  x # (batch_size, input_seq_len, d_model)
 
-class ConcatEncoder(Encoder):
-	def input_format(self, inputs):
-		x_pe = self.positional_encoder(inputs['times'])
-		if 'seg_emb' in inputs.keys():
-			window_size = self.window_size + 1
-			x = tf.concat([x_pe, inputs['magnitudes'], inputs['seg_emb']], 2)
-		else:
-			window_size = self.window_size
-			x = tf.concat([x_pe, inputs['magnitudes']], 2)
-		return x, window_size
+class SkipEncoder(Encoder):
+	def call(self, inputs, training=False):
+		# adding embedding and position encoding.
+		x, window_size = self.input_format(inputs)  
+		x = self.dropout_layer(x, training=training)
+
+		att_outputs = tf.TensorArray(dtype=tf.float32, 
+									 size=self.num_layers, 
+									 name='skip_att')
+		for i in range(self.num_layers):
+			x =  self.enc_layers[i](x, training=training, mask=inputs['att_mask'])
+			att_outputs = att_outputs.write(i, x)
+		out = tf.reduce_mean(att_outputs.stack(), axis=0)
+		return out  # (batch_size, input_seq_len, d_model)
 
 class NSPEncoder(Encoder):
 	def __init__(self, **kwargs):

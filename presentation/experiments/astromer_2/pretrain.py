@@ -7,9 +7,10 @@ import os
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
 from tensorflow.keras.optimizers import Adam
 
-from src.models.astromer_gap import get_ASTROMER
-from src.losses.astromer_1 import MaskedMeanSquaredError
-from src.metrics.astromer_1 import MaskedRSquare
+from src.models.astromer_skip import get_ASTROMER as ASTROMER_SKIP
+from src.models.astromer_gap import get_ASTROMER as ASTROMER_GAP
+from src.models.astromer_nsp import get_ASTROMER as ASTROMER_NSP
+
 from src.data import get_loader
 
 
@@ -33,7 +34,7 @@ def run(opt):
                               sampling=True,
                               shuffle=True,
                               repeat=4,
-                              aversion='gap')
+                              aversion=opt.encoder_mode)
 
     valid_loader = get_loader(os.path.join(opt.data, 'val'),
                               batch_size=5 if opt.debug else opt.bs,
@@ -44,31 +45,41 @@ def run(opt):
                               sampling=True,
                               shuffle=False,
                               repeat=1,
-                              aversion='gap')
-
-    test_loader = get_loader(os.path.join(opt.data, 'test'),
-                              batch_size=5 if opt.debug else opt.bs,
-                              window_size=opt.window_size,
-                              probed_frac=opt.probed,
-                              random_frac=opt.rs,
-                              nsp_prob=opt.nsp_prob,
-                              sampling=True,
-                              shuffle=False,
-                              repeat=1,
-                              aversion='gap')
+                              aversion=opt.encoder_mode)
 
     # ======= MODEL ========================================
-    model = get_ASTROMER(num_layers=opt.num_layers,
-                        num_heads=opt.num_heads,
-                        head_dim=opt.head_dim,
-                        mixer_size=opt.mixer,
-                        dropout=opt.dropout,
-                        pe_base=opt.pe_base,
-                        pe_dim=opt.pe_dim,
-                        pe_c=opt.pe_exp,
-                        window_size=opt.window_size,
-                        encoder_mode=opt.encoder_mode,
-                        average_layers=opt.avg_layers)
+    if opt.encoder_mode == 'nsp':
+        model = ASTROMER_NSP(num_layers=opt.num_layers,
+                            num_heads=opt.num_heads,
+                            head_dim=opt.head_dim,
+                            mixer_size=opt.mixer,
+                            dropout=opt.dropout,
+                            pe_base=opt.pe_base,
+                            pe_dim=opt.pe_dim,
+                            pe_c=opt.pe_exp,
+                            window_size=opt.window_size)
+
+    if opt.encoder_mode == 'gap':
+        model = ASTROMER_GAP(num_layers=opt.num_layers,
+                            num_heads=opt.num_heads,
+                            head_dim=opt.head_dim,
+                            mixer_size=opt.mixer,
+                            dropout=opt.dropout,
+                            pe_base=opt.pe_base,
+                            pe_dim=opt.pe_dim,
+                            pe_c=opt.pe_exp,
+                            window_size=opt.window_size)
+
+    if opt.encoder_mode == 'skip':
+        model = ASTROMER_SKIP(num_layers=opt.num_layers,
+                            num_heads=opt.num_heads,
+                            head_dim=opt.head_dim,
+                            mixer_size=opt.mixer,
+                            dropout=opt.dropout,
+                            pe_base=opt.pe_base,
+                            pe_dim=opt.pe_dim,
+                            pe_c=opt.pe_exp,
+                            window_size=opt.window_size)
 
     if opt.checkpoint != '-1':
         print('[INFO] Restoring previous training')
@@ -79,9 +90,7 @@ def run(opt):
             EarlyStopping(monitor='val_loss', patience=opt.patience)]
 
 
-    model.compile(optimizer=Adam(1e-3), 
-                  loss=MaskedMeanSquaredError(),
-                  metrics=MaskedRSquare())
+    model.compile(optimizer=Adam(1e-3))
 
     model.fit(train_loader, 
               epochs=2 if opt.debug else opt.num_epochs, 
@@ -101,8 +110,8 @@ if __name__ == '__main__':
                         help='GPU to be used. -1 means no GPU will be used')
     parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
 
-    parser.add_argument('--encoder-mode', default='nsp', type=str,
-                        help='nsp')
+    parser.add_argument('--encoder-mode', default='skip', type=str,
+                        help='skip/nsp')
     parser.add_argument('--num-layers', default=2, type=int,
                         help='Number of Attention Layers')
     parser.add_argument('--num-heads', default=4, type=int,
@@ -119,12 +128,9 @@ if __name__ == '__main__':
                         help='Units to be used on the hidden layer of a feed-forward network that combines head outputs within an attention layer')
     parser.add_argument('--dropout', default=0., type=float,
                         help='Dropout to use on the output of each attention layer (before mixer layer)')
-    parser.add_argument('--avg-layers', action='store_true', help='If averaging outputs of the attention layers to form the final embedding. There is no avg if layers=1 ')
     
     parser.add_argument('--rmse-factor', default=0.5, type=float,
                         help='RMSE weight factor. The loss function will be loss = rmse_factor*rmse + (1 - rmse_factor)*bce')
-    parser.add_argument('--reset-states', action='store_true', 
-                        help='During training. Reset the network states at the end of each forward-pass')
     parser.add_argument('--lr', default=1e-5, type=float,
                         help='learning rate')
     parser.add_argument('--bs', default=2500, type=int,

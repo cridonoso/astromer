@@ -100,6 +100,20 @@ def format_inp_astromer(batch,
         outputs['error']       = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
         outputs['probed_mask'] = batch['probed_mask']
 
+    if aversion == 'skip':
+        inputs['magnitudes'] = batch['input_modified']
+        times = tf.slice(batch['input'], [0,0,0], [-1,-1,1])
+        inp_size = tf.shape(batch['input'])
+        t0 = tf.slice(batch['input'], [0,0,0], [-1,inp_size[1]-1,1])
+        t1 = tf.slice(batch['input'], [0,1,0], [-1,-1,1])
+        dt = t1 - t0
+        inputs['times']      = tf.concat([tf.zeros([inp_size[0], 1, 1]), dt], axis=1)
+        inputs['att_mask']   = batch['att_mask']
+
+        outputs['magnitudes']  = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
+        outputs['error']       = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
+        outputs['probed_mask'] = batch['probed_mask']
+    
     if aversion == 'nsp':
         inputs['magnitudes'] = batch['nsp_magnitudes']
         inputs['times']      = batch['nsp_times']
