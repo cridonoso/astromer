@@ -92,7 +92,7 @@ class CustomModel(Model):
                                     y_pred=outputs['gap_rec'],
                                     gap_mask=y['gap_mask'])
 
-            loss = rmse + rmse_dt_gap + rmse_gap
+            loss = rmse + rmse_gap + rmse_dt_gap*0.01
 
             r2_value = custom_r2(y_true=y['magnitudes'], 
                                  y_pred=outputs['reconstruction'], 
@@ -122,7 +122,7 @@ class CustomModel(Model):
                                 y_pred=outputs['gap_rec'],
                                 gap_mask=y['gap_mask'])
 
-        loss = rmse + rmse_dt_gap + rmse_gap
+        loss = rmse + rmse_dt_gap*0.01 + rmse_gap
 
         r2_value = custom_r2(y_true=y['magnitudes'], 
                              y_pred=outputs['reconstruction'], 
