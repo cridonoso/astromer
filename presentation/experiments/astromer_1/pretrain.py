@@ -3,16 +3,15 @@ import argparse
 import sys
 import os
 
-from src.models.astromer_1 import get_ASTROMER, train_step, test_step
-
-from src.training.callbacks import SaveCheckpoint, TestModel
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
+from tensorflow.keras.optimizers import Adam
 
-from src.training.utils import train
-from datetime import datetime
-
-from src.data.zero import pretraining_pipeline
+from src.losses.astromer_1 import MaskedMeanSquaredError
+from src.metrics.astromer_1 import MaskedRSquare
+from src.models.astromer_1 import get_ASTROMER
 from src.data import get_loader
+
+from datetime import datetime
 
 
 def run(opt):
@@ -53,14 +52,8 @@ def run(opt):
                               shuffle=False,
                               repeat=1,
                               aversion='base')
-    cbks = [SaveCheckpoint(frequency=None, project_path=EXPDIR), 
-            TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
-            EarlyStopping(monitor='val_loss', patience=opt.patience),
-            TestModel(test_batches=test_loader.take(1) if opt.debug else test_loader, 
-                      project_path=os.path.join(EXPDIR, 'tensorboard'),
-                      test_step_fn=test_step,
-                      params=opt.__dict__)
-            ]
+    cbks = [TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
+            EarlyStopping(monitor='val_loss', patience=opt.patience)]
     # ======= MODEL ========================================
     model = get_ASTROMER(num_layers=opt.num_layers,
                         num_heads=opt.num_heads,
@@ -80,19 +73,14 @@ def run(opt):
         print('[INFO] Restoring previous training')
         model.load_weights(os.path.join(opt.checkpoint, 'weights', 'weights'))
         
-    model = train(model,
-              train_loader, 
-              valid_loader, 
-              num_epochs=opt.num_epochs, 
-              lr=opt.lr, 
-              project_path=EXPDIR,
-              debug=opt.debug,
-              patience=opt.patience,
-              train_step_fn=train_step,
-              test_step_fn=test_step,
-              argparse_dict=opt.__dict__,
-              callbacks=cbks,
-              scheduler=opt.scheduler)
+    model.compile(optimizer=Adam(1e-3), 
+                  loss=[MaskedMeanSquaredError()],
+                  metrics=[MaskedRSquare()])
+
+    model.fit(train_loader, 
+              epochs=2 if opt.debug else opt.num_epochs, 
+              validation_data=valid_loader,
+              callbacks=cbks)
 
 
 if __name__ == '__main__':

@@ -74,139 +74,171 @@ def get_ASTROMER(num_layers=2,
 
     outputs = {'gap': x_gap, 'reconstruction':x_rec, 'gap_rec': x_gap_rec}
 
-    return Model(inputs=placeholder, outputs=outputs, name="ASTROMER_NSP")
+    return CustomModel(inputs=placeholder, outputs=outputs, name="ASTROMER_NSP")
 
-@tf.function
-def train_step(model, x, y, optimizer, **kwargs):
-    with tf.GradientTape() as tape:
-        outputs = model(x, training=True)
+
+class CustomModel(keras.Model):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def train_step(self, data):
+        x, y = data
+        with tf.GradientTape() as tape:
+            y_pred = self(x, training=True)  # Forward pass
+            loss = self.compute_loss(y=y, y_pred=y_pred)
+
+        trainable_vars = self.trainable_variables
+        gradients = tape.gradient(loss, trainable_vars)
+        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+
+        for metric in self.metrics:
+            if metric.name == "loss":
+                metric.update_state(loss)
+            else:
+                metric.update_state(y, y_pred)
+
+        # Return a dict mapping metric names to current value
+        return {m.name: m.result() for m in self.metrics}
+
+    def test_step(self, data):
+        x, y = data
+        y_pred = self(x, training=False)
+        self.compute_loss(y=y, y_pred=y_pred)
+        for metric in self.metrics:
+            if metric.name != "loss":
+                metric.update_state(y, y_pred)
+        return {m.name: m.result() for m in self.metrics}
+
+
+# @tf.function
+# def train_step(model, x, y, optimizer, **kwargs):
+#     with tf.GradientTape() as tape:
+#         outputs = model(x, training=True)
         
-        rmse = custom_rmse(y_true=y['magnitudes'],
-                           y_pred=outputs['reconstruction'],
-                           mask=y['probed_mask'])
+#         rmse = custom_rmse(y_true=y['magnitudes'],
+#                            y_pred=outputs['reconstruction'],
+#                            mask=y['probed_mask'])
 
-        rmse_dt_gap = rmse_for_delta_gap(y_true=y['gap_dt'], 
-                                      y_pred=outputs['gap'])
+#         rmse_dt_gap = rmse_for_delta_gap(y_true=y['gap_dt'], 
+#                                       y_pred=outputs['gap'])
         
-        rmse_gap = rmse_for_gap(y_true=y['magnitudes'],
-                                y_pred=outputs['gap_rec'],
-                                gap_mask=y['gap_mask'])
+#         rmse_gap = rmse_for_gap(y_true=y['magnitudes'],
+#                                 y_pred=outputs['gap_rec'],
+#                                 gap_mask=y['gap_mask'])
 
-        loss = rmse + rmse_dt_gap + rmse_gap
+#         loss = rmse + rmse_dt_gap + rmse_gap
 
-        r2_value = custom_r2(y_true=y['magnitudes'], 
-                             y_pred=outputs['reconstruction'], 
-                             mask=y['probed_mask'])
+#         r2_value = custom_r2(y_true=y['magnitudes'], 
+#                              y_pred=outputs['reconstruction'], 
+#                              mask=y['probed_mask'])
     
-    grads = tape.gradient(loss, model.trainable_weights)
-    optimizer.apply_gradients(zip(grads, model.trainable_weights))
+#     grads = tape.gradient(loss, model.trainable_weights)
+#     optimizer.apply_gradients(zip(grads, model.trainable_weights))
     
-    return {'loss':loss,
-            'rmse': rmse,
-            'r_square':r2_value,
-            'rmse_gap': rmse_gap}
+#     return {'loss':loss,
+#             'rmse': rmse,
+#             'r_square':r2_value,
+#             'rmse_gap': rmse_gap}
 
-@tf.function
-def test_step(model, x, y, return_pred=False, **kwargs):
-    outputs = model(x, training=False)
+# @tf.function
+# def test_step(model, x, y, return_pred=False, **kwargs):
+#     outputs = model(x, training=False)
     
-    rmse = custom_rmse(y_true=y['magnitudes'],
-                       y_pred=outputs['reconstruction'],
-                       mask=y['probed_mask'])
+#     rmse = custom_rmse(y_true=y['magnitudes'],
+#                        y_pred=outputs['reconstruction'],
+#                        mask=y['probed_mask'])
 
-    rmse_dt_gap = rmse_for_delta_gap(y_true=y['gap_dt'], 
-                                  y_pred=outputs['gap'])
+#     rmse_dt_gap = rmse_for_delta_gap(y_true=y['gap_dt'], 
+#                                   y_pred=outputs['gap'])
 
-    rmse_gap = rmse_for_gap(y_true=y['magnitudes'],
-                            y_pred=outputs['gap_rec'],
-                            gap_mask=y['gap_mask'])
+#     rmse_gap = rmse_for_gap(y_true=y['magnitudes'],
+#                             y_pred=outputs['gap_rec'],
+#                             gap_mask=y['gap_mask'])
 
-    loss = rmse + rmse_dt_gap + rmse_gap
+#     loss = rmse + rmse_dt_gap + rmse_gap
 
-    r2_value = custom_r2(y_true=y['magnitudes'], 
-                         y_pred=outputs['reconstruction'], 
-                         mask=y['probed_mask'])
-    if return_pred:
-        return outputs
+#     r2_value = custom_r2(y_true=y['magnitudes'], 
+#                          y_pred=outputs['reconstruction'], 
+#                          mask=y['probed_mask'])
+#     if return_pred:
+#         return outputs
 
-    return {'loss':loss,
-            'rmse': rmse,
-            'r_square':r2_value,
-            'rmse_gap': rmse_gap}
+#     return {'loss':loss,
+#             'rmse': rmse,
+#             'r_square':r2_value,
+#             'rmse_gap': rmse_gap}
 
-def predict(model, test_loader):
-    n_batches = sum([1 for _, _ in test_loader])
-    print('[INFO] Processing {} batches'.format(n_batches))
+# def predict(model, test_loader):
+#     n_batches = sum([1 for _, _ in test_loader])
+#     print('[INFO] Processing {} batches'.format(n_batches))
     
-    y_pred = []
-    y_true = []
-    masks  = []
-    times  = []
-    cls_pred = []
-    cls_true = []
+#     y_pred = []
+#     y_true = []
+#     masks  = []
+#     times  = []
+#     cls_pred = []
+#     cls_true = []
 
-    tbar = tqdm(test_loader, total=n_batches)
-    index = 0
-    for x, y in tbar:
-        outputs = test_step(model, x, y, return_pred=True, rmse_factor=0.5)
-        y_pred.append(outputs['reconstruction'])
-        y_true.append(y['magnitudes'])
+#     tbar = tqdm(test_loader, total=n_batches)
+#     index = 0
+#     for x, y in tbar:
+#         outputs = test_step(model, x, y, return_pred=True, rmse_factor=0.5)
+#         y_pred.append(outputs['reconstruction'])
+#         y_true.append(y['magnitudes'])
         
-        masks.append(y['probed_mask'])
-        times.append(x['times'])
-        cls_pred.append(outputs['nsp_label'])
-        cls_true.append(y['nsp_label'])
+#         masks.append(y['probed_mask'])
+#         times.append(x['times'])
+#         cls_pred.append(outputs['nsp_label'])
+#         cls_true.append(y['nsp_label'])
      
-    y_pred = tf.concat(y_pred, axis=0)
-    y_true = tf.concat(y_true, axis=0)
-    times  = tf.concat(times, axis=0)
-    masks  = tf.concat(masks, axis=0)
-    cls_pred = tf.concat(cls_pred, axis=0)
-    cls_true = tf.concat(cls_true, axis=0)
-    y_pred = tf.concat([times, y_pred], axis=2)
-    y_true = tf.concat([times, y_true], axis=2)
-    return y_pred, y_true, masks, cls_pred, cls_true
+#     y_pred = tf.concat(y_pred, axis=0)
+#     y_true = tf.concat(y_true, axis=0)
+#     times  = tf.concat(times, axis=0)
+#     masks  = tf.concat(masks, axis=0)
+#     cls_pred = tf.concat(cls_pred, axis=0)
+#     cls_true = tf.concat(cls_true, axis=0)
+#     y_pred = tf.concat([times, y_pred], axis=2)
+#     y_true = tf.concat([times, y_true], axis=2)
+#     return y_pred, y_true, masks, cls_pred, cls_true
 
-def restore_model(model_folder):
-    with open(os.path.join(model_folder, 'config.toml'), 'r') as f:
-        model_config = toml.load(f)
+# def restore_model(model_folder):
+#     with open(os.path.join(model_folder, 'config.toml'), 'r') as f:
+#         model_config = toml.load(f)
+#     astromer = get_ASTROMER(num_layers=model_config['num_layers'],
+#                             num_heads=model_config['num_heads'],
+#                             head_dim=model_config['head_dim'],
+#                             mixer_size=model_config['mixer'],
+#                             dropout=model_config['dropout'],
+#                             pe_base=model_config['pe_base'],
+#                             pe_dim=model_config['pe_dim'],
+#                             pe_c=model_config['pe_exp'],
+#                             window_size=model_config['window_size'],
+#                             encoder_mode=model_config['encoder_mode'],
+#                             average_layers=model_config['avg_layers'])
 
+#     print('[INFO] LOADING PRETRAINED WEIGHTS')
+#     astromer.load_weights(os.path.join(model_folder, 'weights', 'weights'))
 
-    astromer = get_ASTROMER(num_layers=model_config['num_layers'],
-                            num_heads=model_config['num_heads'],
-                            head_dim=model_config['head_dim'],
-                            mixer_size=model_config['mixer'],
-                            dropout=model_config['dropout'],
-                            pe_base=model_config['pe_base'],
-                            pe_dim=model_config['pe_dim'],
-                            pe_c=model_config['pe_exp'],
-                            window_size=model_config['window_size'],
-                            encoder_mode=model_config['encoder_mode'],
-                            average_layers=model_config['avg_layers'])
-
-    print('[INFO] LOADING PRETRAINED WEIGHTS')
-    astromer.load_weights(os.path.join(model_folder, 'weights', 'weights'))
-
-    return astromer, model_config
+#     return astromer, model_config
 
 
-def get_embeddings(astromer, dataset, model_config):
-    encoder = astromer.get_layer('encoder')
-    embeddings = []
-    for x, y in dataset:
-        Z = encoder(x)
-        embeddings.append(Z.numpy())
+# def get_embeddings(astromer, dataset, model_config):
+#     encoder = astromer.get_layer('encoder')
+#     embeddings = []
+#     for x, y in dataset:
+#         Z = encoder(x)
+#         embeddings.append(Z.numpy())
         
-    max_seq_len = model_config['window_size']
-    embedding_dim = model_config['mixer']
+#     max_seq_len = model_config['window_size']
+#     embedding_dim = model_config['mixer']
 
-    embeddings = np.concatenate(embeddings, axis=0)
-    return embeddings
+#     embeddings = np.concatenate(embeddings, axis=0)
+#     return embeddings
 
-def save_embeddings(embeddings, output_path, file_name):
-    os.makedirs(output_path, exist_ok=True)
-    path = os.path.join(output_path, '{}.joblib'.format(file_name))   
-    with open(path, "wb") as f:
-        joblib.dump(embeddings, f)
-    print(f"[INFO] Successfully stored embeddings at path {path}")
+# def save_embeddings(embeddings, output_path, file_name):
+#     os.makedirs(output_path, exist_ok=True)
+#     path = os.path.join(output_path, '{}.joblib'.format(file_name))   
+#     with open(path, "wb") as f:
+#         joblib.dump(embeddings, f)
+#     print(f"[INFO] Successfully stored embeddings at path {path}")
 
