@@ -105,6 +105,7 @@ class CustomModel(Model):
         return {'loss':loss,
                 'rmse': rmse,
                 'r_square':r2_value,
+                'rmse_dt_gap':rmse_dt_gap,
                 'rmse_gap': rmse_gap}
 
     def test_step(self, data):
@@ -129,4 +130,5 @@ class CustomModel(Model):
         return {'loss':loss,
                 'rmse': rmse,
                 'r_square':r2_value,
+                'rmse_dt_gap':rmse_dt_gap,
                 'rmse_gap': rmse_gap}
