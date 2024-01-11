@@ -5,10 +5,11 @@ import toml
 import sys
 import os
 
-from src.models.astromer_2 import get_ASTROMER, build_input, train_step, test_step
-from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
-from src.training.callbacks import SaveCheckpoint, TestModel
-from src.training.utils import train
+from src.models.astromer_2 import get_ASTROMER
+
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
+from tensorflow.keras.optimizers import Adam
+
 from src.data import get_loader
 from datetime import datetime
 
@@ -34,7 +35,7 @@ def run(opt):
                             encoder_mode=model_config['encoder_mode'],
                             average_layers=model_config['avg_layers'])
 
-    astromer.load_weights(os.path.join(opt.pt_folder, 'weights', 'weights'))
+    astromer.load_weights(os.path.join(opt.pt_folder, 'weights'))
     print('[INFO] Weights loaded')
     # ====================================================================================
     # =============== FINETUNING MODEL  ==================================================
@@ -86,19 +87,13 @@ def run(opt):
                       params=model_config)
             ]
 
-    model = train(astromer,
-                  train_loader, 
-                  valid_loader, 
-                  num_epochs=opt.num_epochs, 
-                  lr=model_config['lr'], 
-                  project_path=FTWEIGTHS,
-                  debug=opt.debug,
-                  patience=opt.patience,
-                  train_step_fn=train_step,
-                  test_step_fn=test_step,
-                  argparse_dict=opt.__dict__,
-                  callbacks=cbks,
-                  rmse_factor=model_config['rmse_factor'])
+    astromer.compile(optimizer=Adam(1e-3))
+
+    astromer.fit(train_loader, 
+              epochs=2 if opt.debug else opt.num_epochs, 
+              validation_data=valid_loader,
+              callbacks=cbks)
+
 
     with open(os.path.join(FTWEIGTHS, 'config.toml'), 'w') as f:
         toml.dump(model_config, f)

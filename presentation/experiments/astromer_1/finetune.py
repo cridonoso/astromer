@@ -5,7 +5,8 @@ import toml
 import sys
 import os
 
-from tensorflow.keras.callbacks import TensorBoard, EarlyStopping
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
+from tensorflow.keras.optimizers import Adam
 
 from src.models.astromer_1 import get_ASTROMER
 from src.data.loaders import get_loader
@@ -42,7 +43,7 @@ def run(opt):
                             average_layers=model_config['avg_layers'],
                             mask_format=model_config['mask_format'])
 
-    astromer.load_weights(os.path.join(opt.pt_folder, 'weights', 'weights'))
+    astromer.load_weights(os.path.join(opt.pt_folder, 'weights'))
     print('[INFO] Weights loaded')
     # ====================================================================================
     # =============== FINETUNING MODEL  ==================================================
@@ -78,43 +79,21 @@ def run(opt):
                               repeat=1,
                               aversion='base')
 
-    test_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'test'),
-                              batch_size=5 if opt.debug else opt.bs,
-                              window_size=model_config['window_size'],
-                              probed_frac=model_config['probed'],
-                              random_frac=model_config['rs'],
-                              sampling=False,
-                              shuffle=False,
-                              repeat=1,
-                              aversion='base')
-
 
     cbks = [TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
-            EarlyStopping(monitor='val_loss', patience=opt.patience)]
+            EarlyStopping(monitor='val_loss', patience=opt.patience),
+            ModelCheckpoint(filepath=os.path.join(EXPDIR, 'weights'),
+                            save_weights_only=True,
+                            save_best_only=True,
+                            save_freq='epoch',
+                            verbose=1)]
 
-    astromer, \
-    (best_train_metrics,
-    best_val_metrics,
-    test_metrics)  = train(astromer,
-                           train_loader, 
-                           valid_loader, 
-                           num_epochs=opt.num_epochs, 
-                           lr=model_config['lr'], 
-                           test_loader=test_loader,
-                           project_path=FTWEIGTHS,
-                           debug=opt.debug,
-                           patience=opt.patience,
-                           train_step_fn=train_step,
-                           test_step_fn=test_step,
-                           argparse_dict=opt.__dict__,
-                           callbacks=cbks)
+    astromer.compile(optimizer=Adam(1e-3))
 
-    metrics = merge_metrics(train=best_train_metrics, 
-                            val=best_val_metrics, 
-                            test=test_metrics)
-
-    with open(os.path.join(FTWEIGTHS, 'metrics.toml'), 'w') as fp:
-        toml.dump(metrics, fp)
+    astromer.fit(train_loader, 
+              epochs=2 if opt.debug else opt.num_epochs, 
+              validation_data=valid_loader,
+              callbacks=cbks)
 
     with open(os.path.join(FTWEIGTHS, 'config.toml'), 'w') as f:
         toml.dump(model_config, f)
