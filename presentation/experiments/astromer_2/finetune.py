@@ -5,7 +5,9 @@ import toml
 import sys
 import os
 
-from src.models.astromer_2 import get_ASTROMER
+from src.models.astromer_skip import get_ASTROMER as ASTROMER_SKIP
+from src.models.astromer_gap import get_ASTROMER as ASTROMER_GAP
+from src.models.astromer_nsp import get_ASTROMER as ASTROMER_NSP
 
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
 from tensorflow.keras.optimizers import Adam
@@ -23,7 +25,9 @@ def run(opt):
     with open(os.path.join(opt.pt_folder, 'config.toml'), 'r') as f:
         model_config = toml.load(f)
         
-    astromer = get_ASTROMER(num_layers=model_config['num_layers'],
+    # ======= MODEL ========================================
+    if model_config['encoder_mode'] == 'nsp':
+        astromer = ASTROMER_NSP(num_layers=model_config['num_layers'],
                             num_heads=model_config['num_heads'],
                             head_dim=model_config['head_dim'],
                             mixer_size=model_config['mixer'],
@@ -31,11 +35,31 @@ def run(opt):
                             pe_base=model_config['pe_base'],
                             pe_dim=model_config['pe_dim'],
                             pe_c=model_config['pe_exp'],
-                            window_size=model_config['window_size'],
-                            encoder_mode=model_config['encoder_mode'],
-                            average_layers=model_config['avg_layers'])
+                            window_size=model_config['window_size'])
 
-    astromer.load_weights(os.path.join(opt.pt_folder, 'weights'))
+    if model_config['encoder_mode'] == 'gap':
+        astromer = ASTROMER_GAP(num_layers=model_config['num_layers'],
+                            num_heads=model_config['num_heads'],
+                            head_dim=model_config['head_dim'],
+                            mixer_size=model_config['mixer'],
+                            dropout=model_config['dropout'],
+                            pe_base=model_config['pe_base'],
+                            pe_dim=model_config['pe_dim'],
+                            pe_c=model_config['pe_exp'],
+                            window_size=model_config['window_size'])
+
+    if model_config['encoder_mode'] == 'skip':
+        astromer = ASTROMER_SKIP(num_layers=model_config['num_layers'],
+                            num_heads=model_config['num_heads'],
+                            head_dim=model_config['head_dim'],
+                            mixer_size=model_config['mixer'],
+                            dropout=model_config['dropout'],
+                            pe_base=model_config['pe_base'],
+                            pe_dim=model_config['pe_dim'],
+                            pe_c=model_config['pe_exp'],
+                            window_size=model_config['window_size'])
+
+    astromer.load_weights(os.path.join(opt.pt_folder, 'weights')).expect_partial()
     print('[INFO] Weights loaded')
     # ====================================================================================
     # =============== FINETUNING MODEL  ==================================================
@@ -46,6 +70,7 @@ def run(opt):
                                '{}_{}'.format(opt.subdataset, opt.spc))
     FTWEIGTHS = opt.target_dir
 
+    # ========== DATA ========================================
     train_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'train'),
                               batch_size=5 if opt.debug else opt.bs,
                               window_size=model_config['window_size'],
@@ -55,7 +80,7 @@ def run(opt):
                               sampling=False,
                               shuffle=True,
                               repeat=1,
-                              aversion='2')
+                              aversion=model_config['encoder_mode'])
 
     valid_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'val'),
                               batch_size=5 if opt.debug else opt.bs,
@@ -66,26 +91,15 @@ def run(opt):
                               sampling=False,
                               shuffle=False,
                               repeat=1,
-                              aversion='2')
-
-    test_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'test'),
-                              batch_size=5 if opt.debug else opt.bs,
-                              window_size=model_config['window_size'],
-                              probed_frac=model_config['probed'],
-                              random_frac=model_config['rs'],
-                              nsp_prob=model_config['nsp_prob'],
-                              sampling=False,
-                              shuffle=False,
-                              repeat=1,
-                              aversion='2')
+                              aversion=model_config['encoder_mode'])
 
     cbks = [TensorBoard(log_dir=os.path.join(FTWEIGTHS, 'tensorboard')),
             EarlyStopping(monitor='val_loss', patience=opt.patience),
-            TestModel(test_batches=test_loader.take(1) if opt.debug else test_loader, 
-                      project_path=os.path.join(FTWEIGTHS, 'tensorboard'),
-                      test_step_fn=test_step,
-                      params=model_config)
-            ]
+            ModelCheckpoint(filepath=os.path.join(FTWEIGTHS, 'weights'),
+                save_weights_only=True,
+                save_best_only=True,
+                save_freq='epoch',
+                verbose=1)]
 
     astromer.compile(optimizer=Adam(1e-3))
 
