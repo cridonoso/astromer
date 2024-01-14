@@ -67,7 +67,6 @@ def run(opt):
                         pe_dim=opt.pe_dim,
                         pe_c=opt.pe_exp,
                         window_size=opt.window_size,
-                        encoder_mode=opt.encoder_mode,
                         mask_format=opt.mask_format)
 
     # ============================================================

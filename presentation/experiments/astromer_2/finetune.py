@@ -104,9 +104,9 @@ def run(opt):
     astromer.compile(optimizer=Adam(1e-3))
 
     astromer.fit(train_loader, 
-              epochs=2 if opt.debug else opt.num_epochs, 
-              validation_data=valid_loader,
-              callbacks=cbks)
+                  epochs=2 if opt.debug else opt.num_epochs, 
+                  validation_data=valid_loader,
+                  callbacks=cbks)
 
 
     with open(os.path.join(FTWEIGTHS, 'config.toml'), 'w') as f:
