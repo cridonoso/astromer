@@ -72,7 +72,7 @@ def run(opt):
     # ============================================================
     if opt.checkpoint != '-1':
         print('[INFO] Restoring previous training')
-        model.load_weights(os.path.join(opt.checkpoint, 'weights', 'weights'))
+        model.load_weights(os.path.join(opt.checkpoint, 'weights'))
     
     model.compile(optimizer=Adam(1e-3))
 

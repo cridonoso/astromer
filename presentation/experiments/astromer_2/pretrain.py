@@ -83,7 +83,7 @@ def run(opt):
 
     if opt.checkpoint != '-1':
         print('[INFO] Restoring previous training')
-        model.load_weights(os.path.join(opt.checkpoint, 'weights', 'weights'))
+        model.load_weights(os.path.join(opt.checkpoint, 'weights'))
         
     # ============================================================
     cbks = [TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
