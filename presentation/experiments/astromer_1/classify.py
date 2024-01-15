@@ -6,9 +6,8 @@ import sys
 import os
 
 from presentation.experiments.utils import train_classifier
-from src.models.astromer_1 import get_ASTROMER, build_input, train_step, test_step
-from src.training.utils import train
-from src.data.zero import pretraining_pipeline
+from src.models.astromer_1 import get_ASTROMER, build_input
+from src.data.loaders import get_loader
 from datetime import datetime
 
 
@@ -36,7 +35,7 @@ def run(opt):
     # ====================================================================================
     # =============== LOADING PRETRAINED MODEL ===========================================
     # ====================================================================================
-    with open(os.path.join(FTWEIGTHS, 'config.toml'), 'r') as f:
+    with open(os.path.join(opt.pt_folder, 'config.toml'), 'r') as f:
         model_config = toml.load(f)
 
     astromer = get_ASTROMER(num_layers=model_config['num_layers'],
@@ -47,10 +46,7 @@ def run(opt):
                             pe_base=model_config['pe_base'],
                             pe_dim=model_config['pe_dim'],
                             pe_c=model_config['pe_exp'],
-                            window_size=model_config['window_size'],
-                            encoder_mode=model_config['encoder_mode'],
-                            average_layers=model_config['avg_layers'],
-                            mask_format=model_config['mask_format'])
+                            window_size=model_config['window_size'])
 
     astromer.load_weights(os.path.join(FTWEIGTHS, 'weights', 'weights'))
     print('[INFO] Weights loaded')
@@ -72,68 +68,38 @@ def run(opt):
                               opt.subdataset+'_'+str(opt.spc))
     num_cls = pd.read_csv(os.path.join(DOWNSTREAM_DATA, 'objects.csv')).shape[0]
 
-    train_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'train'),
-                                        batch_size= 5 if opt.debug else 512, 
-                                        window_size=model_config['window_size'],
-                                        shuffle=True,
-                                        sampling=False,
-                                        repeat=1,
-                                        msk_frac=0.,
-                                        rnd_frac=0.,
-                                        same_frac=0.,
-                                        num_cls=num_cls,
-                                        key_format='1')
-    valid_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'val'),
-                                        batch_size=5 if opt.debug else 512,
-                                        window_size=model_config['window_size'],
-                                        shuffle=False,
-                                        sampling=False,
-                                        msk_frac=0.,
-                                        rnd_frac=0.,
-                                        same_frac=0.,
-                                        num_cls=num_cls,
-                                        key_format='1')
-    test_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'test'),
-                                        batch_size=5 if opt.debug else 512,
-                                        window_size=model_config['window_size'],
-                                        shuffle=False,
-                                        sampling=False,
-                                        msk_frac=0.,
-                                        rnd_frac=0.,
-                                        same_frac=0.,
-                                        num_cls=num_cls,
-                                        key_format='1')
-    # train_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
-    #                          batch_size= 5 if opt.debug else 512, 
-    #                          probed=1.,
-    #                          random_same=0.,  
-    #                          window_size=model_config['window_size'], 
-    #                          off_nsp=True,
-    #                          nsp_prob=0., 
-    #                          repeat=1, 
-    #                          sampling=False,
-    #                          shuffle=True,
-    #                          num_cls=num_cls)
-    # valid_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'val'), 
-    #                          batch_size= 5 if opt.debug else 512, 
-    #                          probed=1.,
-    #                          random_same=0.,  
-    #                          window_size=model_config['window_size'], 
-    #                          off_nsp=True,
-    #                          nsp_prob=0., 
-    #                          repeat=1, 
-    #                          sampling=False,
-    #                          num_cls=num_cls)
-    # test_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'test'), 
-    #                          batch_size= 5 if opt.debug else 512, 
-    #                          probed=1.,
-    #                          random_same=0.,  
-    #                          window_size=model_config['window_size'], 
-    #                          off_nsp=True, 
-    #                          nsp_prob=0., 
-    #                          repeat=1, 
-    #                          sampling=False,
-    #                          num_cls=num_cls)
+    train_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'train'),
+                              batch_size=5 if opt.debug else opt.bs,
+                              window_size=model_config['window_size'],
+                              probed_frac=1.,
+                              random_frac=0.,
+                              sampling=False,
+                              shuffle=True,
+                              repeat=1,
+                              aversion=model_config['encoder_mode'],
+                              num_cls=num_cls)
+
+    valid_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'val'),
+                              batch_size=5 if opt.debug else opt.bs,
+                              window_size=model_config['window_size'],
+                              probed_frac=1.,
+                              random_frac=0.,
+                              sampling=False,
+                              shuffle=False,
+                              repeat=1,
+                              aversion=model_config['encoder_mode'],
+                              num_cls=num_cls)
+
+    test_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'test'),
+                              batch_size=5 if opt.debug else opt.bs,
+                              window_size=model_config['window_size'],
+                              probed_frac=1.,
+                              random_frac=0.,
+                              sampling=False,
+                              shuffle=False,
+                              repeat=1,
+                              aversion=model_config['encoder_mode'],
+                              num_cls=num_cls)
 
     if opt.debug:
         train_loader = train_loader.take(1)

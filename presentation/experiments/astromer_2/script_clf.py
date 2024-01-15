@@ -11,7 +11,7 @@ batch_size = 2500
 records_folder = './data/records/'
 ds_names = ['alcock', 'atlas']
 spc_list = [20, 100]
-clf_names = ['att_linear', 'cls_linear', 'all_linear']
+clf_names = ['att_mlp', 'cls_linear', 'cls_mlp']
 
 try:
     exp_name   = sys.argv[3] 
@@ -33,6 +33,7 @@ for dataset in ds_names:
                                         '{}_{}'.format(dataset, spc))  
 
                 FTWEIGTHS = os.path.join(pt_folder, 
+                                         '..',
                                          'finetuning',                                    
                                          dataset,
                                          'fold_'+str(fold_n), 

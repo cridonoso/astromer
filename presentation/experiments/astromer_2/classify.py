@@ -6,8 +6,14 @@ import sys
 import os
 
 from presentation.experiments.utils import train_classifier
-from src.models.astromer_2 import get_ASTROMER, build_input, train_step, test_step
-from src.training.utils import train
+
+from src.models.astromer_skip import get_ASTROMER as ASTROMER_SKIP, build_input as build_input_skip
+from src.models.astromer_gap import get_ASTROMER as ASTROMER_GAP, build_input
+from src.models.astromer_nsp import get_ASTROMER as ASTROMER_NSP, build_input
+
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
+from tensorflow.keras.optimizers import Adam
+
 from src.data import get_loader
 from datetime import datetime
 
@@ -28,8 +34,10 @@ def run(opt):
     # ====================================================================================
     with open(os.path.join(opt.pt_folder, 'config.toml'), 'r') as f:
         model_config = toml.load(f)
-
-    astromer = get_ASTROMER(num_layers=model_config['num_layers'],
+        
+    # ======= MODEL ========================================
+    if model_config['encoder_mode'] == 'nsp':
+        astromer = ASTROMER_NSP(num_layers=model_config['num_layers'],
                             num_heads=model_config['num_heads'],
                             head_dim=model_config['head_dim'],
                             mixer_size=model_config['mixer'],
@@ -37,61 +45,80 @@ def run(opt):
                             pe_base=model_config['pe_base'],
                             pe_dim=model_config['pe_dim'],
                             pe_c=model_config['pe_exp'],
-                            window_size=model_config['window_size'],
-                            encoder_mode=model_config['encoder_mode'],
-                            average_layers=model_config['avg_layers'])
+                            window_size=model_config['window_size'])
+        inp_placeholder = build_input(model_config['window_size'])
 
-    astromer.load_weights(os.path.join(opt.ft_folder, 'weights', 'weights'))
+    if model_config['encoder_mode'] == 'gap':
+        astromer = ASTROMER_GAP(num_layers=model_config['num_layers'],
+                            num_heads=model_config['num_heads'],
+                            head_dim=model_config['head_dim'],
+                            mixer_size=model_config['mixer'],
+                            dropout=model_config['dropout'],
+                            pe_base=model_config['pe_base'],
+                            pe_dim=model_config['pe_dim'],
+                            pe_c=model_config['pe_exp'],
+                            window_size=model_config['window_size'])
+        inp_placeholder = build_input(model_config['window_size'])
+
+    if model_config['encoder_mode'] == 'skip':
+        astromer = ASTROMER_SKIP(num_layers=model_config['num_layers'],
+                            num_heads=model_config['num_heads'],
+                            head_dim=model_config['head_dim'],
+                            mixer_size=model_config['mixer'],
+                            dropout=model_config['dropout'],
+                            pe_base=model_config['pe_base'],
+                            pe_dim=model_config['pe_dim'],
+                            pe_c=model_config['pe_exp'],
+                            window_size=model_config['window_size'])
+        inp_placeholder = build_input_skip(model_config['window_size'])
+
+    astromer.load_weights(os.path.join(opt.ft_folder, 'weights')).expect_partial()
     print('[INFO] Weights loaded')
 
     # ====================================================================================
     # =============== DOWNSTREAM TASK  ===================================================
     # ====================================================================================
     num_cls = pd.read_csv(os.path.join(opt.data, 'objects.csv')).shape[0]
-
+    # ========== DATA ========================================
     train_loader = get_loader(os.path.join(opt.data, 'train'),
-                              batch_size= 5 if opt.debug else opt.bs, 
+                              batch_size=5 if opt.debug else opt.bs,
                               window_size=model_config['window_size'],
-                              probed_frac=0.,
+                              probed_frac=1.,
                               random_frac=0.,
-                              nsp_prob=0.,
                               sampling=False,
                               shuffle=True,
                               repeat=1,
-                              num_cls=num_cls,
-                              aversion='2')
+                              aversion=model_config['encoder_mode'],
+                              num_cls=num_cls)
 
     valid_loader = get_loader(os.path.join(opt.data, 'val'),
                               batch_size=5 if opt.debug else opt.bs,
                               window_size=model_config['window_size'],
-                              probed_frac=0.,
+                              probed_frac=1.,
                               random_frac=0.,
-                              nsp_prob=0.,
                               sampling=False,
                               shuffle=False,
                               repeat=1,
-                              num_cls=num_cls,
-                              aversion='2')
+                              aversion=model_config['encoder_mode'],
+                              num_cls=num_cls)
 
     test_loader = get_loader(os.path.join(opt.data, 'test'),
                               batch_size=5 if opt.debug else opt.bs,
                               window_size=model_config['window_size'],
-                              probed_frac=0.,
+                              probed_frac=1.,
                               random_frac=0.,
-                              nsp_prob=0.,
                               sampling=False,
                               shuffle=False,
                               repeat=1,
-                              num_cls=num_cls,
-                              aversion='2')
+                              aversion=model_config['encoder_mode'],
+                              num_cls=num_cls)
 
     if opt.debug:
         train_loader = train_loader.take(1)
         valid_loader = valid_loader.take(1)
         test_loader  = test_loader.take(1)
 
-
-    inp_placeholder = build_input(model_config['window_size'])
+    
     encoder = astromer.get_layer('encoder')
     encoder.trainable = opt.train_astromer
     embedding = encoder(inp_placeholder)
