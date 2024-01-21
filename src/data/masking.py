@@ -239,7 +239,7 @@ def add_random(input_dict, random_frac, njobs):
 
 #     input_dict['att_mask'] = tf.cast(att_mask, tf.float32)
 
-    return input_dict
+#     return input_dict
 
 def startidx_size_pair(mask_sequence):
 	windows = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
