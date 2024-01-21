@@ -6,9 +6,9 @@ import sys
 import os
 
 from presentation.experiments.utils import train_classifier
-from src.models.astromer_1 import get_ASTROMER, build_input, train_step, test_step
-from src.training.utils import train
+from src.models.astromer_0 import get_ASTROMER, train_step, test_step, build_input
 from src.data.zero import pretraining_pipeline
+from src.training.utils import train
 from datetime import datetime
 
 
@@ -28,7 +28,7 @@ def run(opt):
     # ====================================================================================
     FTWEIGTHS = os.path.join(opt.pt_folder,
                              '..',
-                             opt.ft_name, #'finetuning',                                     
+                             'finetuning',                                     
                              opt.subdataset,
                              'fold_'+str(opt.fold), 
                              '{}_{}'.format(opt.subdataset, opt.spc))   
@@ -40,17 +40,13 @@ def run(opt):
         model_config = toml.load(f)
 
     astromer = get_ASTROMER(num_layers=model_config['num_layers'],
-                            num_heads=model_config['num_heads'],
-                            head_dim=model_config['head_dim'],
-                            mixer_size=model_config['mixer'],
-                            dropout=model_config['dropout'],
-                            pe_base=model_config['pe_base'],
-                            pe_dim=model_config['pe_dim'],
-                            pe_c=model_config['pe_exp'],
-                            window_size=model_config['window_size'],
-                            encoder_mode=model_config['encoder_mode'],
-                            average_layers=model_config['avg_layers'],
-                            mask_format=model_config['mask_format'])
+                         d_model=model_config['head_dim']*model_config['num_heads'],
+                         num_heads=model_config['num_heads'],
+                         dff=model_config['mixer'],
+                         base=model_config['pe_base'],
+                         rate=model_config['dropout'],
+                         use_leak=False,
+                         maxlen=model_config['window_size'])
 
     astromer.load_weights(os.path.join(FTWEIGTHS, 'weights', 'weights'))
     print('[INFO] Weights loaded')
@@ -66,7 +62,7 @@ def run(opt):
 
     CLFWEIGHTS = os.path.join( opt.pt_folder,
                               '..',
-                              'classification_{}'.format(opt.ft_name), 
+                              'classification', 
                               opt.subdataset, 
                               'fold_'+str(opt.fold), 
                               opt.subdataset+'_'+str(opt.spc))
@@ -81,8 +77,7 @@ def run(opt):
                                         msk_frac=0.,
                                         rnd_frac=0.,
                                         same_frac=0.,
-                                        num_cls=num_cls,
-                                        key_format='1')
+                                        num_cls=num_cls)
     valid_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'val'),
                                         batch_size=5 if opt.debug else 512,
                                         window_size=model_config['window_size'],
@@ -91,8 +86,7 @@ def run(opt):
                                         msk_frac=0.,
                                         rnd_frac=0.,
                                         same_frac=0.,
-                                        num_cls=num_cls,
-                                        key_format='1')
+                                        num_cls=num_cls)
     test_loader = pretraining_pipeline(os.path.join(DOWNSTREAM_DATA, 'test'),
                                         batch_size=5 if opt.debug else 512,
                                         window_size=model_config['window_size'],
@@ -101,39 +95,7 @@ def run(opt):
                                         msk_frac=0.,
                                         rnd_frac=0.,
                                         same_frac=0.,
-                                        num_cls=num_cls,
-                                        key_format='1')
-    # train_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'train'), 
-    #                          batch_size= 5 if opt.debug else 512, 
-    #                          probed=1.,
-    #                          random_same=0.,  
-    #                          window_size=model_config['window_size'], 
-    #                          off_nsp=True,
-    #                          nsp_prob=0., 
-    #                          repeat=1, 
-    #                          sampling=False,
-    #                          shuffle=True,
-    #                          num_cls=num_cls)
-    # valid_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'val'), 
-    #                          batch_size= 5 if opt.debug else 512, 
-    #                          probed=1.,
-    #                          random_same=0.,  
-    #                          window_size=model_config['window_size'], 
-    #                          off_nsp=True,
-    #                          nsp_prob=0., 
-    #                          repeat=1, 
-    #                          sampling=False,
-    #                          num_cls=num_cls)
-    # test_loader = load_data(dataset=os.path.join(DOWNSTREAM_DATA, 'test'), 
-    #                          batch_size= 5 if opt.debug else 512, 
-    #                          probed=1.,
-    #                          random_same=0.,  
-    #                          window_size=model_config['window_size'], 
-    #                          off_nsp=True, 
-    #                          nsp_prob=0., 
-    #                          repeat=1, 
-    #                          sampling=False,
-    #                          num_cls=num_cls)
+                                        num_cls=num_cls)
 
     if opt.debug:
         train_loader = train_loader.take(1)
@@ -145,9 +107,9 @@ def run(opt):
     encoder = astromer.get_layer('encoder')
     encoder.trainable = opt.train_astromer
     embedding = encoder(inp_placeholder)
-    embedding = embedding*(1.-inp_placeholder['att_mask'])
+    embedding = embedding*(1.-inp_placeholder['mask_in'])
     embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
-                                      tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
+                                      tf.reduce_sum(1.-inp_placeholder['mask_in'], axis=1))
 
     summary_clf = train_classifier(embedding,
                                    inp_placeholder=inp_placeholder,
@@ -166,7 +128,6 @@ if __name__ == '__main__':
 	parser.add_argument('--subdataset', default='alcock', type=str, help='Data folder where tf.record files are located')
 	parser.add_argument('--pt-folder', default='./results/pretraining*', type=str, help='pretrained model folder')
 	parser.add_argument('--fold', default=0, type=int, help='Fold to use')
-	parser.add_argument('--ft-name', default='finetuning', type=str, help='Finetuning folder')
 	parser.add_argument('--spc', default=20, type=int, help='Samples per class')
 	parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
 

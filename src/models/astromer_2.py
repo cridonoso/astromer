@@ -8,14 +8,12 @@ import os
 from tensorflow.keras.layers import Input
 from tensorflow.keras import Model
 from tqdm import tqdm
-from src.layers  import Encoder, ConcatEncoder, TransformLayer, RegLayer
+from src.layers  import Encoder, ConcatEncoder, TransformLayer, RegLayer, NSPEncoder
 from src.losses  import custom_rmse, custom_bce
 from src.metrics import custom_r2, custom_acc
 
 
 def build_input(window_size):
-	window_size = window_size + 1
-	
 	magnitudes  = Input(shape=(window_size, 1),
 				  batch_size=None,
 				  name='magnitudes')
@@ -47,7 +45,8 @@ def get_ASTROMER(num_layers=2,
 				 window_size=100,
 				 batch_size=None,
 				 encoder_mode='normal',
-				 average_layers=False):
+				 average_layers=False,
+				 mask_format='first'): # first / zero
 	
 	placeholder = build_input(window_size)
 
@@ -62,7 +61,23 @@ def get_ASTROMER(num_layers=2,
 						  pe_dim=pe_dim,
 						  pe_c=pe_c,
 						  average_layers=average_layers,
+						  mask_format=mask_format,
 						  name='encoder')
+
+	if encoder_mode == 'nsp':
+		print('[INFO] NSP Encoder')
+		encoder = NSPEncoder(window_size=window_size,
+							 num_layers=num_layers,
+							 num_heads=num_heads,
+							 head_dim=head_dim,
+							 mixer_size=mixer_size,
+							 dropout=dropout,
+							 pe_base=pe_base,
+							 pe_dim=pe_dim,
+							 pe_c=pe_c,
+							 average_layers=average_layers,
+							 mask_format=mask_format,
+							 name='encoder')
 
 	if encoder_mode == 'concat':
 		encoder = ConcatEncoder(window_size=window_size,
@@ -75,6 +90,7 @@ def get_ASTROMER(num_layers=2,
 								pe_dim=pe_dim,
 								pe_c=pe_c,
 								average_layers=average_layers,
+								mask_format=mask_format,
 								name='encoder')
 
 	reg_layer = TransformLayer(name='regressor')

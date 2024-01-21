@@ -37,7 +37,8 @@ def get_ASTROMER(num_layers=2,
 				 batch_size=None,
 				 encoder_mode='normal',
 				 astrospec_skip=False,
-				 average_layers=False):
+				 average_layers=False,
+				 mask_format='first'):
 
 	placeholder = build_input(window_size)
 
@@ -52,6 +53,7 @@ def get_ASTROMER(num_layers=2,
 					  pe_c=pe_c,
 					  average_layers=average_layers,
 					  astrospec_skip=astrospec_skip,
+					  mask_format=mask_format,
 					  name='encoder')
 
 	x = encoder(placeholder)
@@ -103,24 +105,27 @@ def predict(model, test_loader):
 	y_true = tf.concat([times.concat(), y_true.concat()], axis=2)
 	return y_pred, y_true, masks.concat()
 
-def restore_model(model_folder):
-	with open(os.path.join(model_folder, 'config.toml'), 'r') as f:
-		model_config = toml.load(f)
+def restore_model(model_folder, mask_format=None):
+    with open(os.path.join(model_folder, 'config.toml'), 'r') as f:
+        model_config = toml.load(f)
+    
+    if 'mask_format' in model_config:
+        mask_format = model_config['mask_format']
 
+    astromer = get_ASTROMER(num_layers=model_config['num_layers'],
+                            num_heads=model_config['num_heads'],
+                            head_dim=model_config['head_dim'],
+                            mixer_size=model_config['mixer'],
+                            dropout=model_config['dropout'],
+                            pe_base=model_config['pe_base'],
+                            pe_dim=model_config['pe_dim'],
+                            pe_c=model_config['pe_exp'],
+                            window_size=model_config['window_size'],
+                            encoder_mode=model_config['encoder_mode'],
+                            average_layers=model_config['avg_layers'],
+                            mask_format=mask_format)
+    print(mask_format)
+    print('[INFO] LOADING PRETRAINED WEIGHTS')
+    astromer.load_weights(os.path.join(model_folder, 'weights', 'weights'))
 
-	astromer = get_ASTROMER(num_layers=model_config['num_layers'],
-							num_heads=model_config['num_heads'],
-							head_dim=model_config['head_dim'],
-							mixer_size=model_config['mixer'],
-							dropout=model_config['dropout'],
-							pe_base=model_config['pe_base'],
-							pe_dim=model_config['pe_dim'],
-							pe_c=model_config['pe_exp'],
-							window_size=model_config['window_size'],
-							encoder_mode=model_config['encoder_mode'],
-							average_layers=model_config['avg_layers'])
-
-	print('[INFO] LOADING PRETRAINED WEIGHTS')
-	astromer.load_weights(os.path.join(model_folder, 'weights', 'weights'))
-
-	return astromer, model_config
+    return astromer, model_config

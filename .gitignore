@@ -1,12 +1,8 @@
 *ted_hrlr_translate_pt_en_converter*
 *__pycache__
-data
-.ipynb_checkpoints/
-runs
 .Trash-0/
+.ipynb_checkpoints/
 weights
-presentation/backup/
-big_atlas.zip
 user
 literature
 results
@@ -19,3 +15,9 @@ presentation/experiments/astromer_2/results_2/
 .DS_Store
 /spectral_15000
 /test_run
+
+presentation/experiments/astromer_0/results
+presentation/experiments/astromer_1/results
+presentation/experiments/astromer_2/results
+
+/data/records
