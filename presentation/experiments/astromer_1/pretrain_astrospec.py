@@ -30,7 +30,7 @@ def run(opt):
 							 random_fraction=opt.random_frac,
 							 same_fraction=opt.same_frac,
 							 off_nsp=True,  
-							 repeat=4, 
+							 repeat=1, 
 							 sampling=True)
 	valid_loader = load_data_astrospec(dataset=os.path.join(opt.data, 'val'), 
 							 batch_size=5 if opt.debug else opt.bs, 
