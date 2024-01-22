@@ -62,7 +62,7 @@ def run(opt):
 
     CLFWEIGHTS = os.path.join( opt.pt_folder,
                               '..',
-                              'classification', 
+                              'classification_new', 
                               opt.subdataset, 
                               'fold_'+str(opt.fold), 
                               opt.subdataset+'_'+str(opt.spc))
@@ -107,10 +107,8 @@ def run(opt):
     encoder = astromer.get_layer('encoder')
     encoder.trainable = opt.train_astromer
     embedding = encoder(inp_placeholder)
-    embedding = embedding*(1.-inp_placeholder['mask_in'])
-    embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
-                                      tf.reduce_sum(1.-inp_placeholder['mask_in'], axis=1))
 
+    mask = 1.- inp_placeholder['mask_in']
     summary_clf = train_classifier(embedding,
                                    inp_placeholder=inp_placeholder,
                                    train_loader=train_loader,
@@ -119,7 +117,8 @@ def run(opt):
                                    num_cls=num_cls, 
                                    project_path=CLFWEIGHTS,
                                    clf_name=opt.clf_name,
-                                   debug=opt.debug)
+                                   debug=opt.debug,
+                                   mask=mask)
 
 
 if __name__ == '__main__':

@@ -24,23 +24,30 @@ def get_mlp_att(inputs, mask, num_cls):
     y_pred = tf.math.divide_no_nan(y_pred, tf.reduce_sum(mask, 1))
     return y_pred
 
-def get_linear(inputs, mask, num_cls):
+def get_linear(inputs, mask, num_cls, invert_mask):
     y_pred = TimeDistributed(Dense(num_cls, name='output_layer'))(inputs)
     y_pred = tf.reduce_sum(y_pred*mask,1)
     y_pred = tf.math.divide_no_nan(y_pred, mask)
     return y_pred
 
-def train_classifier(embedding, inp_placeholder, train_loader, valid_loader, test_loader, num_cls, project_path='', clf_name='emb_dense', debug=False):
+def train_classifier(embedding, inp_placeholder, train_loader, valid_loader, 
+    test_loader, num_cls, project_path='', clf_name='emb_dense', debug=False, mask=None):
     os.makedirs(os.path.join(project_path, clf_name), exist_ok=True)
     os.makedirs(os.path.join(project_path, clf_name), exist_ok=True)
 
     if 'mlp' in clf_name:
         print('[INFO] Training MLP')
-        y_pred = get_mlp_att(embedding, inp_placeholder['att_mask'], num_cls)
-        
+        if mask is not None:
+            y_pred = get_mlp_att(embedding, mask, num_cls)
+        else:
+            y_pred = get_mlp_att(embedding, inp_placeholder['att_mask'], num_cls)
+
     if 'linear' in clf_name:
         print('[INFO] Training Linear')
-        y_pred = get_linear(embedding, inp_placeholder['att_mask'], num_cls)
+        if mask is not None:
+            y_pred = get_mlp_att(embedding, mask, num_cls)
+        else:
+            y_pred = get_linear(embedding, inp_placeholder['att_mask'], num_cls)
 
     classifier = Model(inputs=inp_placeholder, outputs=y_pred, name=clf_name)
     classifier.compile(optimizer=Adam(1e-3),

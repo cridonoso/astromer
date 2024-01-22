@@ -74,7 +74,7 @@ def run(opt):
         print('[INFO] Restoring previous training')
         model.load_weights(os.path.join(opt.checkpoint, 'weights'))
     
-    model.compile(optimizer=Adam(1e-3))
+    model.compile(optimizer=Adam(opt.lr))
 
     model.fit(train_loader, 
               epochs=2 if opt.debug else opt.num_epochs, 
