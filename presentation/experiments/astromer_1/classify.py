@@ -111,9 +111,6 @@ def run(opt):
     encoder = astromer.get_layer('encoder')
     encoder.trainable = opt.train_astromer
     embedding = encoder(inp_placeholder)
-    embedding = embedding*(1.-inp_placeholder['att_mask'])
-    embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
-                                      tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
 
     summary_clf = train_classifier(embedding,
                                    inp_placeholder=inp_placeholder,
