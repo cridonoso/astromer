@@ -122,9 +122,9 @@ def run(opt):
     encoder = astromer.get_layer('encoder')
     encoder.trainable = opt.train_astromer
     embedding = encoder(inp_placeholder)
-
+    
     if 'att' in opt.clf_name and model_config['encoder_mode'] == 'skip':
-        print('[INFO] Using CLS tokens')
+        print('[INFO] Using SKIP')
         embedding = embedding*(1.-inp_placeholder['att_mask'])
         embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
                                   tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
@@ -134,7 +134,6 @@ def run(opt):
         embedding = tf.slice(embedding, [0, 0, 0], [-1, 1,-1], name='slice_cls')
         embedding = tf.squeeze(embedding, axis=1)
 
-    print(opt.clf_name)
     if 'att' in opt.clf_name and model_config['encoder_mode'] != 'skip':
         print('[INFO] Using OBS tokens')
         embedding = tf.slice(embedding, [0, 1, 0], [-1, 1,-1], name='slice_att')

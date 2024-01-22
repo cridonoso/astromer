@@ -48,7 +48,7 @@ def run(opt):
                             pe_c=model_config['pe_exp'],
                             window_size=model_config['window_size'])
 
-    astromer.load_weights(os.path.join(FTWEIGTHS, 'weights', 'weights'))
+    astromer.load_weights(os.path.join(FTWEIGTHS, 'weights')).expect_partial()
     print('[INFO] Weights loaded')
 
     # ====================================================================================
@@ -77,7 +77,6 @@ def run(opt):
                               shuffle=True,
                               repeat=1,
                               aversion=model_config['encoder_mode'],
-                              num_cls=num_cls)
 
     valid_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'val'),
                               batch_size=5 if opt.debug else opt.bs,
