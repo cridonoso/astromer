@@ -5,7 +5,8 @@ import os
 from src.data.record import deserialize
 from src.data.preprocessing import to_windows, min_max_scaler, standardize_dataset,get_moving_median,to_windows_astrospec,standardize_dataset_astrospec,standardize
 from src.data.masking import get_probed, add_random,get_probed_astrospec
-from src.data.nsp import randomize, randomize_v2
+from src.data.nsp import apply_nsp
+from src.data.gap import set_gap, invert_mask
 
 def load_records(records_dir):
     """
