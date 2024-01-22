@@ -25,7 +25,7 @@ for dataset in ds_names:
         for spc in spc_list:
             for fold_n in range(3):
                 start = time.time()
-                project_path = '{} --debug  --gpu {} --data {} --pt-folder {}  --ft-folder {} --clf-folder {} --clf-name {}'
+                project_path = '{} --gpu {} --data {} --pt-folder {}  --ft-folder {} --clf-folder {} --clf-name {}'
 
                 DATAPATH = os.path.join(records_folder,                                  
                                         dataset,
