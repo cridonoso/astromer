@@ -125,31 +125,15 @@ def run(opt):
     
     if 'att' in opt.clf_name and model_config['encoder_mode'] == 'skip':
         print('[INFO] Using SKIP')
-        embedding = embedding*(1.-inp_placeholder['att_mask'])
-        embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
-                                  tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
 
     if 'cls' in opt.clf_name and model_config['encoder_mode'] != 'skip':
         print('[INFO] Using CLS tokens')
         embedding = tf.slice(embedding, [0, 0, 0], [-1, 1,-1], name='slice_cls')
-        embedding = tf.squeeze(embedding, axis=1)
 
     if 'att' in opt.clf_name and model_config['encoder_mode'] != 'skip':
         print('[INFO] Using OBS tokens')
         embedding = tf.slice(embedding, [0, 1, 0], [-1, 1,-1], name='slice_att')
-        embedding = embedding*(1.-inp_placeholder['att_mask'])
-        embedding = tf.math.divide_no_nan(tf.reduce_sum(embedding, axis=1), 
-                                          tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
-
-    if 'all' in opt.clf_name and model_config['encoder_mode'] != 'skip':
-        print('[INFO] Using ALL tokens')
-        cls_token  = tf.slice(embedding, [0, 0, 0], [-1, 1,-1], name='slice_cls')
-        cls_token = tf.squeeze(cls_token, axis=1)
-        att_tokens = tf.slice(embedding, [0, 1, 0], [-1, 1,-1], name='slice_att')
-        att_tokens = att_tokens*(1.-inp_placeholder['att_mask'])
-        att_tokens = tf.math.divide_no_nan(tf.reduce_sum(att_tokens, axis=1), 
-                                          tf.reduce_sum(1.-inp_placeholder['att_mask'], axis=1))
-        embedding = tf.concat([att_tokens, cls_token], axis=-1)
+        print(embedding.shape)
 
     summary_clf = train_classifier(embedding,
                                    inp_placeholder=inp_placeholder,

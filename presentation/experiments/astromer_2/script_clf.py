@@ -11,7 +11,7 @@ batch_size = 512
 records_folder = './data/records/'
 ds_names = ['alcock', 'atlas']
 spc_list = [20, 100]
-clf_names = ['att_mlp', 'cls_linear', 'cls_mlp']
+clf_names = ['att_mlp', 'cls_mlp']
 
 try:
     exp_name   = sys.argv[3] 
@@ -25,7 +25,7 @@ for dataset in ds_names:
         for spc in spc_list:
             for fold_n in range(3):
                 start = time.time()
-                project_path = '{} --gpu {} --data {} --pt-folder {}  --ft-folder {} --clf-folder {} --clf-name {}'
+                project_path = '{} --debug  --gpu {} --data {} --pt-folder {}  --ft-folder {} --clf-folder {} --clf-name {}'
 
                 DATAPATH = os.path.join(records_folder,                                  
                                         dataset,
