@@ -20,15 +20,14 @@ def get_mlp_att(inputs, mask, num_cls):
     x = TimeDistributed(Dense(256, activation='relu'))(x)
     x = LayerNormalization(name='layer_norm')(x)
     y_pred = TimeDistributed(Dense(num_cls, name='output_layer'))(x)
-    y_pred = tf.reduce_sum(y_pred*(1.-mask),1)
+    y_pred = tf.reduce_sum(y_pred*mask,1)
     y_pred = tf.math.divide_no_nan(y_pred, tf.reduce_sum(mask, 1))
-    print(y_pred)
     return y_pred
 
 def get_linear(inputs, mask, num_cls):
     y_pred = TimeDistributed(Dense(num_cls, name='output_layer'))(inputs)
-    y_pred = tf.reduce_sum(y_pred*(1.-mask),1)
-    y_pred = tf.math.divide_no_nan(y_pred, tf.reduce_sum(mask, 1))
+    y_pred = tf.reduce_sum(y_pred*mask,1)
+    y_pred = tf.math.divide_no_nan(y_pred, mask)
     return y_pred
 
 def train_classifier(embedding, inp_placeholder, train_loader, valid_loader, test_loader, num_cls, project_path='', clf_name='emb_dense', debug=False):
