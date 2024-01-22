@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 import toml
 import os
 
@@ -7,23 +8,25 @@ from src.metrics            import custom_r2
 from tensorflow.keras.layers import Input, Layer, Dense
 from tensorflow.keras        import Model
 import tensorflow as tf
+from pathlib import Path
+import joblib
 
 from src.layers import Encoder, RegLayer
 
 def build_input(length):
-	serie  = Input(shape=(length, 1),
-				  batch_size=None,
-				  name='input')
-	times  = Input(shape=(length, 1),
-				  batch_size=None,
-				  name='times')
-	mask   = Input(shape=(length, 1),
-				  batch_size=None,
-				  name='mask')
+    serie  = Input(shape=(length, 1),
+                  batch_size=None,
+                  name='input')
+    times  = Input(shape=(length, 1),
+                  batch_size=None,
+                  name='times')
+    mask   = Input(shape=(length, 1),
+                  batch_size=None,
+                  name='mask')
 
-	return {'magnitudes':serie,
-			'att_mask':mask,
-			'times':times}
+    return {'magnitudes':serie,
+            'att_mask':mask,
+            'times':times}
 
 def get_ASTROMER(num_layers=2,
 				 num_heads=2,
@@ -59,73 +62,38 @@ def get_ASTROMER(num_layers=2,
 	x = encoder(placeholder)
 	x = RegLayer(name='regression')(x)
 
-	return Model(inputs=placeholder, outputs=x, name="ASTROMER-1")
+	return CustomModel(inputs=placeholder, outputs=x, name="ASTROMER-1")
 
+class CustomModel(Model):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-@tf.function
-def train_step(model, x, y, optimizer):
-	with tf.GradientTape() as tape:
-		x_pred = model(x, training=True)
-		rmse = custom_rmse(y_true=y['magnitudes'],
-						  y_pred=x_pred,
-						  mask=y['probed_mask'])
-		r2_value = custom_r2(y['magnitudes'], x_pred, y['probed_mask'])
+    def train_step(self, data):
+        x, y = data
+        with tf.GradientTape() as tape:
+            y_pred = self(x, training=True)  # Forward pass
+            rmse = custom_rmse(y_true=y['magnitudes'],
+                               y_pred=y_pred,
+                               mask=y['probed_mask'])
 
-	grads = tape.gradient(rmse, model.trainable_weights)
-	optimizer.apply_gradients(zip(grads, model.trainable_weights))
-	return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
+            r2_value = custom_r2(y_true=y['magnitudes'], 
+                                 y_pred=y_pred, 
+                                 mask=y['probed_mask'])
 
+        trainable_vars = self.trainable_variables
+        gradients = tape.gradient(rmse, trainable_vars)
+        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
 
-@tf.function
-def test_step(model, x, y, return_pred=False):
-	x_pred = model(x, training=False)
-	rmse = custom_rmse(y_true=y['magnitudes'],
-					  y_pred=x_pred,
-					  mask=y['probed_mask'])
-	r2_value = custom_r2(y['magnitudes'], x_pred, y['probed_mask'])
-	if return_pred:
-		return x_pred
-	return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
+        return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
 
-def predict(model, test_loader):
-	n_batches = sum([1 for _, _ in test_loader])
-	print('[INFO] Processing {} batches'.format(n_batches))
-	y_pred = tf.TensorArray(dtype=tf.float32, size=n_batches)
-	y_true = tf.TensorArray(dtype=tf.float32, size=n_batches)
-	masks  = tf.TensorArray(dtype=tf.float32, size=n_batches)
-	times  = tf.TensorArray(dtype=tf.float32, size=n_batches)
-	for index, (x, y) in enumerate(test_loader):
-		outputs = test_step(model, x, y, return_pred=True)
-		y_pred = y_pred.write(index, outputs)
-		y_true = y_true.write(index, y['magnitudes'])
-		masks  = masks.write(index, y['probed_mask'])
-		times = times.write(index, x['times'])
+    def test_step(self, data):
+        x, y = data
+        y_pred = self(x, training=False)
+        rmse = custom_rmse(y_true=y['magnitudes'],
+                           y_pred=y_pred,
+                           mask=y['probed_mask'])
 
-	y_pred = tf.concat([times.concat(), y_pred.concat()], axis=2)
-	y_true = tf.concat([times.concat(), y_true.concat()], axis=2)
-	return y_pred, y_true, masks.concat()
-
-def restore_model(model_folder, mask_format=None):
-    with open(os.path.join(model_folder, 'config.toml'), 'r') as f:
-        model_config = toml.load(f)
-    
-    if 'mask_format' in model_config:
-        mask_format = model_config['mask_format']
-
-    astromer = get_ASTROMER(num_layers=model_config['num_layers'],
-                            num_heads=model_config['num_heads'],
-                            head_dim=model_config['head_dim'],
-                            mixer_size=model_config['mixer'],
-                            dropout=model_config['dropout'],
-                            pe_base=model_config['pe_base'],
-                            pe_dim=model_config['pe_dim'],
-                            pe_c=model_config['pe_exp'],
-                            window_size=model_config['window_size'],
-                            encoder_mode=model_config['encoder_mode'],
-                            average_layers=model_config['avg_layers'],
-                            mask_format=mask_format)
-    print(mask_format)
-    print('[INFO] LOADING PRETRAINED WEIGHTS')
-    astromer.load_weights(os.path.join(model_folder, 'weights', 'weights'))
-
-    return astromer, model_config
+        r2_value = custom_r2(y_true=y['magnitudes'], 
+                             y_pred=y_pred, 
+                             mask=y['probed_mask'])
+        return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}

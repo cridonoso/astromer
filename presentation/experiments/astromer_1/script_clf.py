@@ -7,7 +7,7 @@ import os, sys
 
 gpu        = sys.argv[1]
 pt_folder  = sys.argv[2] #until pretraining
-batch_size = 2500    
+batch_size = 512    
 records_folder = './data/records/'
 ds_names = ['alcock', 'atlas']
 spc_list = [20, 100]

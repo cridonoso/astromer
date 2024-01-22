@@ -3,12 +3,13 @@ import argparse
 import sys
 import os
 
-from src.models.astromer_1 import get_ASTROMER, train_step, test_step
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
+from tensorflow.keras.optimizers import Adam
 
-from src.training.utils import train
+from src.models.astromer_1 import get_ASTROMER
+from src.data import get_loader
+
 from datetime import datetime
-
-from src.data.zero import pretraining_pipeline
 
 
 def run(opt):
@@ -20,37 +21,42 @@ def run(opt):
     os.makedirs(EXPDIR, exist_ok=True)
 
     # ========== DATA ========================================
-    train_loader = pretraining_pipeline(os.path.join(opt.data, 'train'),
-                                        batch_size= 5 if opt.debug else opt.bs, 
-                                        window_size=opt.window_size,
-                                        shuffle=True,
-                                        sampling=True,
-                                        repeat=4,
-                                        msk_frac=opt.probed,
-                                        rnd_frac=opt.rs,
-                                        same_frac=opt.rs,
-                                        key_format='1')
+    train_loader = get_loader(os.path.join(opt.data, 'train'),
+                              batch_size=5 if opt.debug else opt.bs,
+                              window_size=opt.window_size,
+                              probed_frac=opt.probed,
+                              random_frac=opt.rs,
+                              sampling=True,
+                              shuffle=True,
+                              repeat=4,
+                              aversion='base')
 
-    valid_loader = pretraining_pipeline(os.path.join(opt.data, 'val'),
-                                        batch_size=5 if opt.debug else opt.bs,
-                                        window_size=opt.window_size,
-                                        shuffle=False,
-                                        sampling=True,
-                                        msk_frac=opt.probed,
-                                        rnd_frac=opt.rs,
-                                        same_frac=opt.rs,
-                                        key_format='1')
+    valid_loader = get_loader(os.path.join(opt.data, 'val'),
+                              batch_size=5 if opt.debug else opt.bs,
+                              window_size=opt.window_size,
+                              probed_frac=opt.probed,
+                              random_frac=opt.rs,
+                              sampling=False,
+                              shuffle=False,
+                              repeat=1,
+                              aversion='base')
 
-    test_loader = pretraining_pipeline(os.path.join(opt.data, 'test'),
-                                        batch_size=5 if opt.debug else opt.bs,
-                                        window_size=opt.window_size,
-                                        shuffle=False,
-                                        sampling=True,
-                                        msk_frac=opt.probed,
-                                        rnd_frac=opt.rs,
-                                        same_frac=opt.rs,
-                                        key_format='1')
-
+    test_loader = get_loader(os.path.join(opt.data, 'test'),
+                              batch_size=5 if opt.debug else opt.bs,
+                              window_size=opt.window_size,
+                              probed_frac=opt.probed,
+                              random_frac=opt.rs,
+                              sampling=False,
+                              shuffle=False,
+                              repeat=1,
+                              aversion='base')
+    cbks = [TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
+            EarlyStopping(monitor='val_loss', patience=opt.patience),
+            ModelCheckpoint(filepath=os.path.join(EXPDIR, 'weights'),
+                            save_weights_only=True,
+                            save_best_only=True,
+                            save_freq='epoch',
+                            verbose=1)]
     # ======= MODEL ========================================
     model = get_ASTROMER(num_layers=opt.num_layers,
                         num_heads=opt.num_heads,
@@ -61,28 +67,19 @@ def run(opt):
                         pe_dim=opt.pe_dim,
                         pe_c=opt.pe_exp,
                         window_size=opt.window_size,
-                        encoder_mode=opt.encoder_mode,
-                        average_layers=opt.avg_layers,
                         mask_format=opt.mask_format)
 
     # ============================================================
     if opt.checkpoint != '-1':
         print('[INFO] Restoring previous training')
-        model.load_weights(os.path.join(opt.checkpoint, 'weights', 'weights'))
-        
-    model = train(model,
-              train_loader, 
-              valid_loader, 
-              num_epochs=opt.num_epochs, 
-              lr=opt.lr, 
-              test_loader=test_loader,
-              project_path=EXPDIR,
-              debug=opt.debug,
-              patience=opt.patience,
-              train_step_fn=train_step,
-              test_step_fn=test_step,
-              argparse_dict=opt.__dict__,
-              scheduler=opt.scheduler)
+        model.load_weights(os.path.join(opt.checkpoint, 'weights'))
+    
+    model.compile(optimizer=Adam(1e-3))
+
+    model.fit(train_loader, 
+              epochs=2 if opt.debug else opt.num_epochs, 
+              validation_data=valid_loader,
+              callbacks=cbks)
 
 
 if __name__ == '__main__':

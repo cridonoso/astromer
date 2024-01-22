@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-# @tf.function
+@tf.function
 def custom_r2(y_true, y_pred, mask):
     SS_res = tf.math.square(y_true - y_pred)
     SS_res =  tf.reduce_sum(SS_res* mask)

@@ -34,7 +34,6 @@ class Encoder(Model):
 		self.pe_base     	= pe_base
 		self.pe_c        	= pe_c
 		self.pe_dim         = pe_dim
-		self.average_layers = average_layers
 		self.mask_format    = mask_format
 		self.inp_transform  = tf.keras.layers.Dense(self.pe_dim, name='inp_transform')
 		self.astrospec_skip = astrospec_skip
@@ -63,15 +62,6 @@ class Encoder(Model):
 		x = x_transformed + x_pe   
 		return x , window_size
 
-	def output_format(self, outputs, window_size):
-		if self.average_layers:
-			x = tf.reduce_mean(outputs, 0)
-		else:
-			x = outputs[-1]
-
-		x = tf.reshape(x, [-1, window_size, self.num_heads*self.head_dim])
-		return x
-
 	def call(self, inputs, training=False):
 		# adding embedding and position encoding.
 		x, window_size = self.input_format(inputs)  
@@ -80,16 +70,20 @@ class Encoder(Model):
 			x =  self.enc_layers[i](x, training=training, mask=inputs['att_mask'])
 		return  x # (batch_size, input_seq_len, d_model)
 
-class ConcatEncoder(Encoder):
-	def input_format(self, inputs):
-		x_pe = self.positional_encoder(inputs['times'])
-		if 'seg_emb' in inputs.keys():
-			window_size = self.window_size + 1
-			x = tf.concat([x_pe, inputs['magnitudes'], inputs['seg_emb']], 2)
-		else:
-			window_size = self.window_size
-			x = tf.concat([x_pe, inputs['magnitudes']], 2)
-		return x, window_size
+class SkipEncoder(Encoder):
+	def call(self, inputs, training=False):
+		# adding embedding and position encoding.
+		x, window_size = self.input_format(inputs)  
+		x = self.dropout_layer(x, training=training)
+
+		att_outputs = tf.TensorArray(dtype=tf.float32, 
+									 size=self.num_layers, 
+									 name='skip_att')
+		for i in range(self.num_layers):
+			x =  self.enc_layers[i](x, training=training, mask=inputs['att_mask'])
+			att_outputs = att_outputs.write(i, x)
+		out = tf.reduce_mean(att_outputs.stack(), axis=0)
+		return out  # (batch_size, input_seq_len, d_model)
 
 class NSPEncoder(Encoder):
 	def __init__(self, **kwargs):
@@ -99,7 +93,8 @@ class NSPEncoder(Encoder):
 		self.concat_cls    = Concatenate(axis=1, name='concat_cls')
 
 	def input_format(self, inputs):
-		x = tf.concat([inputs['magnitudes'], inputs['seg_emb']], axis=2, name='concat_mag_segemb')
+		x = tf.concat([inputs['magnitudes'], inputs['seg_emb']], axis=2, 
+						name='concat_mag_segemb')
 		
 		x_transformed = self.inp_transform(x)   
 		x_pe = self.positional_encoder(inputs['times'])
