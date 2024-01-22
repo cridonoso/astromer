@@ -62,7 +62,7 @@ def run(opt):
 
     CLFWEIGHTS = os.path.join( opt.pt_folder,
                               '..',
-                              'classification_{}'.format(opt.ft_name), 
+                              opt.target_name, 
                               opt.subdataset, 
                               'fold_'+str(opt.fold), 
                               opt.subdataset+'_'+str(opt.spc))
@@ -129,6 +129,8 @@ if __name__ == '__main__':
     parser.add_argument('--subdataset', default='alcock', type=str, help='Data folder where tf.record files are located')
     parser.add_argument('--pt-folder', default='./results/pretraining*', type=str, help='pretrained model folder')
     parser.add_argument('--fold', default=0, type=int, help='Fold to use')
+    parser.add_argument('--target-name', default='classification', type=str, help='target folder')
+
     parser.add_argument('--ft-name', default='finetuning', type=str, help='Finetuning folder')
     parser.add_argument('--spc', default=20, type=int, help='Samples per class')
     parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')

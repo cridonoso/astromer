@@ -14,6 +14,18 @@ from tensorflow.keras import Model
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 
+def get_mlp_avg(inputs, mask, num_cls):
+    inputs = tf.reduce_sum(inputs*mask,1)
+    inputs = tf.math.divide_no_nan(inputs, tf.reduce_sum(mask, 1))
+    x = Dense(1024, activation='relu')(inputs)
+    x = Dense(512, activation='relu')(x)
+    x = Dense(256, activation='relu')(x)
+    x = LayerNormalization(name='layer_norm')(x)
+    y_pred = Dense(num_cls, name='output_layer')(x)
+    y_pred = tf.reshape(y_pred, [-1, num_cls])
+    return y_pred
+
+
 def get_mlp_att(inputs, mask, num_cls):
     x = TimeDistributed(Dense(1024, activation='relu'))(inputs)
     x = TimeDistributed(Dense(512, activation='relu'))(x)
@@ -35,7 +47,14 @@ def train_classifier(embedding, inp_placeholder, train_loader, valid_loader,
     os.makedirs(os.path.join(project_path, clf_name), exist_ok=True)
     os.makedirs(os.path.join(project_path, clf_name), exist_ok=True)
 
-    if 'mlp' in clf_name:
+    if clf_name == 'avg_mlp':
+        print('[INFO] Training AVG MLP')
+        if mask is not None:
+            y_pred = get_mlp_att(embedding, mask, num_cls)
+        else:
+            y_pred = get_mlp_att(embedding, inp_placeholder['att_mask'], num_cls)
+
+    if clf_name == 'att_mlp':
         print('[INFO] Training MLP')
         if mask is not None:
             y_pred = get_mlp_att(embedding, mask, num_cls)

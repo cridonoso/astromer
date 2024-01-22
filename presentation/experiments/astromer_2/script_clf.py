@@ -7,11 +7,12 @@ import os, sys
 
 gpu        = sys.argv[1]
 pt_folder  = sys.argv[2] #until finetuning
+
 batch_size = 512    
 records_folder = './data/records/'
 ds_names = ['alcock', 'atlas']
 spc_list = [20, 100]
-clf_names = ['att_mlp', 'cls_mlp']
+clf_names = ['avg_mlp']
 
 try:
     exp_name   = sys.argv[3] 
@@ -40,7 +41,8 @@ for dataset in ds_names:
                                          '{}_{}'.format(dataset, spc))   
 
                 CLFWEIGHTS = os.path.join(pt_folder,
-                                          'classification',                                     
+                                          '..',
+                                          exp_name,                                     
                                           dataset,
                                           'fold_'+str(fold_n), 
                                           '{}_{}'.format(dataset, spc))
