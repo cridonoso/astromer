@@ -240,7 +240,7 @@ def add_random(input_dict, random_frac, njobs):
 #     input_dict['att_mask'] = tf.cast(att_mask, tf.float32)
 
 #     return input_dict
-
+@tf.function
 def startidx_size_pair(mask_sequence):
 	windows = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
 	start = 0
@@ -257,6 +257,7 @@ def startidx_size_pair(mask_sequence):
 			window_size = 0
 	return windows.stack()
 
+@tf.function
 def update_mask(mask,selected_rows):
     for k in tf.range(tf.shape(selected_rows)[0]):
         indices_selected=tf.range(selected_rows[k][0],selected_rows[k][0]+selected_rows[k][1])
