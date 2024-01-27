@@ -152,6 +152,32 @@ def format_inp_astromer(batch,
 
     return inputs, outputs
 
+def format_input_no_nsp(input_dict, num_cls=None, test_mode=False):
+    times = tf.slice(input_dict['input'], [0, 0, 0], [-1, -1, 1])
+    magnitudes = tf.slice(input_dict['input'], [0, 0, 1], [-1, -1, 1])
+    att_mask = tf.expand_dims(input_dict['att_mask'], axis=-1)
+
+    inputs = {
+        'magnitudes': magnitudes,
+        'times': times,
+        'att_mask': att_mask,
+    }
+    if test_mode:
+        print('[INFO] TESTING MODE')
+        inputs['original'] = input_dict['original']
+        inputs['mask'] = input_dict['mask']
+
+    if num_cls is not None:
+        outputs = tf.one_hot(input_dict['label'], num_cls)
+
+    else:
+        outputs = {
+            'magnitudes': tf.slice(input_dict['original'], [0, 0, 1], [-1, -1, 1]),
+            'probed_mask': tf.expand_dims(input_dict['probed_mask'], -1),
+        }
+
+    return inputs, outputs
+
 def format_inp_gap(batch, 
                    window_size,
                    return_ids=False, 
@@ -335,6 +361,7 @@ def load_data_astrospec(dataset,
     
     # MOVING MEDIAN CALCULATION
     dataset = dataset.map(lambda x: get_moving_median(x,moving_window_size))
+    
 
     # CREATE WINDOWS
     dataset, sizes = to_windows_astrospec(dataset,
@@ -346,7 +373,7 @@ def load_data_astrospec(dataset,
     dataset = dataset.map(lambda x: standardize_dataset_astrospec(x, on='moving_median_sequence'))
     dataset = dataset.map(lambda x: standardize_dataset_astrospec(x, on='original'))
     
-    # MASKING
+    # # MASKING
     dataset = dataset.map(lambda x: get_probed_astrospec(x, exclusive_fraction,non_exclusive_fraction,iqr_threshold,random_fraction,same_fraction,njobs=njobs))
    
     # PADDING
