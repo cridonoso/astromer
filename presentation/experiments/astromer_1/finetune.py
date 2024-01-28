@@ -50,12 +50,7 @@ def run(opt):
                                opt.subdataset,
                                'fold_'+str(opt.fold), 
                                '{}_{}'.format(opt.subdataset, opt.spc))
-    FTWEIGTHS = os.path.join(opt.pt_folder,
-                             '..',
-                             opt.exp_name,                                     
-                             opt.subdataset,
-                             'fold_'+str(opt.fold), 
-                             '{}_{}'.format(opt.subdataset, opt.spc))   
+    FTWEIGTHS = opt.target_dir 
 
     train_loader = get_loader(os.path.join(DOWNSTREAM_DATA, 'train'),
                               batch_size=5 if opt.debug else opt.bs,
@@ -86,7 +81,17 @@ def run(opt):
                             save_freq='epoch',
                             verbose=1)]
 
-    astromer.compile(optimizer=Adam(1e-3))
+    if model_config['scheduler']:
+        print('[INFO] Using Custom Scheduler')
+        lr = CustomSchedule(d_model=int(opt.head_dim*opt.num_heads))
+    else:
+        lr = model_config['lr']
+        
+    astromer.compile(optimizer=Adam(lr, 
+                     beta_1=0.9,
+                     beta_2=0.98,
+                     epsilon=1e-9,
+                     name='astromer_optimizer'))
 
     astromer.fit(train_loader, 
               epochs=2 if opt.debug else opt.num_epochs, 
@@ -101,7 +106,9 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--gpu', default='-1', type=str, help='GPU to be used. -1 means no GPU will be used')
 	parser.add_argument('--subdataset', default='alcock', type=str, help='Data folder where tf.record files are located')
-	parser.add_argument('--pt-folder', default='./results/pretraining*', type=str, help='pretrained model folder')
+    parser.add_argument('--pt-folder', default='./results/pretraining*', type=str, help='pretrained model folder')
+    parser.add_argument('--target-dir', default='./results/finetuning/alcock/fold_0/alcock_20', type=str, help='target directory')
+
 	parser.add_argument('--fold', default=0, type=int, help='Fold to use')
 	parser.add_argument('--spc', default=20, type=int, help='Samples per class')
 	parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
