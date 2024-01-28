@@ -21,8 +21,8 @@ spc_list = [20, 100, 500]
  
 root = 'python -m presentation.experiments.astromer_1.finetune'
 
-for mode_ft in ['', ' --allvisible']:
-    if mode_ft == '--allvisible':
+for mode_ft in [' --allvisible', '']:
+    if mode_ft == ' --allvisible':
         exp_name = exp_name+'_AV'
 
     for dataset in ds_names:
