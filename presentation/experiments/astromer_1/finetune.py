@@ -39,11 +39,9 @@ def run(opt):
                             pe_dim=model_config['pe_dim'],
                             pe_c=model_config['pe_exp'],
                             window_size=model_config['window_size'],
-                            encoder_mode=model_config['encoder_mode'],
-                            average_layers=model_config['avg_layers'],
                             mask_format=model_config['mask_format'])
 
-    astromer.load_weights(os.path.join(opt.pt_folder, 'weights'))
+    astromer.load_weights(os.path.join(opt.pt_folder, 'weights')).expect_partial()
     print('[INFO] Weights loaded')
     # ====================================================================================
     # =============== FINETUNING MODEL  ==================================================
@@ -80,9 +78,9 @@ def run(opt):
                               aversion='base')
 
 
-    cbks = [TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
+    cbks = [TensorBoard(log_dir=os.path.join(FTWEIGTHS, 'tensorboard')),
             EarlyStopping(monitor='val_loss', patience=opt.patience),
-            ModelCheckpoint(filepath=os.path.join(EXPDIR, 'weights'),
+            ModelCheckpoint(filepath=os.path.join(FTWEIGTHS, 'weights'),
                             save_weights_only=True,
                             save_best_only=True,
                             save_freq='epoch',

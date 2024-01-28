@@ -11,7 +11,7 @@ batch_size = 512
 records_folder = './data/records/'
 ds_names = ['alcock', 'atlas']
 spc_list = [20, 100]
-clf_names = ['avg_mlp']
+clf_names = ['avg_mlp', 'att_mlp']
 
 try:
     exp_name   = sys.argv[3] 

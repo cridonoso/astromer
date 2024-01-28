@@ -1,5 +1,6 @@
 import tensorflow as tf
 import argparse
+import toml
 import sys
 import os
 
@@ -8,6 +9,7 @@ from tensorflow.keras.optimizers import Adam
 
 from src.models.astromer_1 import get_ASTROMER
 from src.data import get_loader
+from src.training.scheduler import CustomSchedule
 
 from datetime import datetime
 
@@ -74,8 +76,22 @@ def run(opt):
         print('[INFO] Restoring previous training')
         model.load_weights(os.path.join(opt.checkpoint, 'weights'))
     
-    model.compile(optimizer=Adam(opt.lr))
+    if opt.scheduler:
+        print('[INFO] Using Custom Scheduler')
+        lr = CustomSchedule(d_model=int(opt.head_dim*opt.num_heads))
+    else:
+        lr = opt.lr
+        
+    model.compile(optimizer=Adam(lr, 
+                             beta_1=0.9,
+                             beta_2=0.98,
+                             epsilon=1e-9,
+                             name='astromer_optimizer'))
 
+    with open(os.path.join(EXPDIR, 'config.toml'), 'w') as f:
+        toml.dump(opt.__dict__, f)
+    
+    
     model.fit(train_loader, 
               epochs=2 if opt.debug else opt.num_epochs, 
               validation_data=valid_loader,
