@@ -9,7 +9,7 @@ gpu        = sys.argv[1]
 pt_folder  = sys.argv[2] #until pretraining
 # all_visible = sys.argv[3].lower() == 'true'
 try:
-    exp_name   = sys.argv[4] 
+    exp_name   = sys.argv[3] 
 except:
     exp_name = 'finetuning'
     
