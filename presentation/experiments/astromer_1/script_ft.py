@@ -24,6 +24,8 @@ root = 'python -m presentation.experiments.astromer_1.finetune'
 for mode_ft in [' --allvisible', '']:
     if mode_ft == ' --allvisible':
         exp_name = exp_name+'_AV'
+    else:
+        exp_name = 'finetuning'
 
     for dataset in ds_names:
         print(dataset)

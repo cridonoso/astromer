@@ -20,39 +20,45 @@ except:
     exp_name = 'classification'
     
 root = 'python -m presentation.experiments.astromer_2.classify'
-for dataset in ds_names:
 
-    for clf_name in clf_names:
-        for spc in spc_list:
-            for fold_n in range(3):
-                start = time.time()
-                project_path = '{} --gpu {} --data {} --pt-folder {}  --ft-folder {} --clf-folder {} --clf-name {}'
+for ft_folder in ['finetuning_AV', 'finetuning']:
+    if '_AV' in ft_folder:
+        exp_name = '{}_AV'.format(exp_name)
+    else:
+        exp_name = 'classification'
+        
+    for dataset in ds_names:
+        for clf_name in clf_names:
+            for spc in spc_list:
+                for fold_n in range(3):
+                    start = time.time()
+                    project_path = '{} --gpu {} --data {} --pt-folder {}  --ft-folder {} --clf-folder {} --clf-name {}'
 
-                DATAPATH = os.path.join(records_folder,                                  
-                                        dataset,
-                                        'fold_'+str(fold_n), 
-                                        '{}_{}'.format(dataset, spc))  
+                    DATAPATH = os.path.join(records_folder,                                  
+                                            dataset,
+                                            'fold_'+str(fold_n), 
+                                            '{}_{}'.format(dataset, spc))  
 
-                FTWEIGTHS = os.path.join(pt_folder, 
-                                         '..',
-                                         'finetuning',                                    
-                                         dataset,
-                                         'fold_'+str(fold_n), 
-                                         '{}_{}'.format(dataset, spc))   
+                    FTWEIGTHS = os.path.join(pt_folder, 
+                                             '..',
+                                             ft_folder,                                    
+                                             dataset,
+                                             'fold_'+str(fold_n), 
+                                             '{}_{}'.format(dataset, spc))   
 
-                CLFWEIGHTS = os.path.join(pt_folder,
-                                          '..',
-                                          exp_name,                                     
-                                          dataset,
-                                          'fold_'+str(fold_n), 
-                                          '{}_{}'.format(dataset, spc))
+                    CLFWEIGHTS = os.path.join(pt_folder,
+                                              '..',
+                                              exp_name,                                     
+                                              dataset,
+                                              'fold_'+str(fold_n), 
+                                              '{}_{}'.format(dataset, spc))
 
-                command1 = project_path.format(root, gpu, DATAPATH, pt_folder, FTWEIGTHS, CLFWEIGHTS, clf_name)
+                    command1 = project_path.format(root, gpu, DATAPATH, pt_folder, FTWEIGTHS, CLFWEIGHTS, clf_name)
 
-                try:
-                    subprocess.call(command1, shell=True)
-                except Exception as e:
-                    print(e)
+                    try:
+                        subprocess.call(command1, shell=True)
+                    except Exception as e:
+                        print(e)
 
-                end = time. time()
-                print('{} takes {:.2f} sec'.format(dataset, (end - start)))
+                    end = time. time()
+                    print('{} takes {:.2f} sec'.format(dataset, (end - start)))

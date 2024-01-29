@@ -24,6 +24,8 @@ root = 'python -m presentation.experiments.astromer_2.finetune'
 for mode_ft in [' --allvisible', '']:
     if mode_ft == ' --allvisible':
         exp_name = exp_name+'_AV'
+    else:
+        exp_name = 'finetuning'
 
     for dataset in ds_names:
         print(dataset)
@@ -38,7 +40,8 @@ for mode_ft in [' --allvisible', '']:
                                          'fold_'+str(fold_n), 
                                          '{}_{}'.format(dataset, spc))   
                 command1 = project_path.format(root, gpu, dataset, pt_folder, fold_n, spc, exp_name, FTWEIGTHS)
-                command1+=mode_ft
+                if mode_ft == ' --allvisible':
+                    command1+=mode_ft
                     
                 try:
                     subprocess.call(command1, shell=True)
@@ -46,4 +49,4 @@ for mode_ft in [' --allvisible', '']:
                     print(e)
 
                 end = time. time()
-                print('{} takes {:.2f} sec'.format(dataset, (end - start)))
+                print('{}-{} takes {:.2f} sec'.format(mode_ft, dataset, (end - start)))

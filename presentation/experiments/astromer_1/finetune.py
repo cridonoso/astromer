@@ -8,6 +8,7 @@ import os
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
 from tensorflow.keras.optimizers import Adam
 
+from src.training.scheduler import CustomSchedule
 from src.models.astromer_1 import get_ASTROMER
 from src.data.loaders import get_loader
 
@@ -83,7 +84,7 @@ def run(opt):
 
     if model_config['scheduler']:
         print('[INFO] Using Custom Scheduler')
-        lr = CustomSchedule(d_model=int(opt.head_dim*opt.num_heads))
+        lr = CustomSchedule(d_model=int(model_config['head_dim']*model_config['num_heads']))
     else:
         lr = model_config['lr']
         
