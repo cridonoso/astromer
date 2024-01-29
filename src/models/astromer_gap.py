@@ -132,3 +132,24 @@ class CustomModel(Model):
                 'r_square':r2_value,
                 'rmse_dt_gap':rmse_dt_gap,
                 'rmse_gap': rmse_gap}
+    
+    def predict_step(self, data):
+        x, y = data
+        y_pred = self(x, training=False)
+        
+        return {'reconstruction': y_pred['reconstruction'], 
+                'magnitudes': y['magnitudes'],
+                'times': x['times'],
+                'probed_mask': y['probed_mask']}
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

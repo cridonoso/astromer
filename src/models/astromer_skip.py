@@ -98,3 +98,23 @@ class CustomModel(Model):
                              mask=y['probed_mask'])
         return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
 
+    def predict_step(self, data):
+        x, y = data
+        y_pred = self(x, training=False)
+        
+        return {'reconstruction': y_pred, 
+                'magnitudes': y['magnitudes'],
+                'times': x['times'],
+                'probed_mask': y['probed_mask']}
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

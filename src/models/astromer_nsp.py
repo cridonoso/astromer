@@ -130,3 +130,21 @@ class CustomModel(Model):
                 'bce':bce,
                 'acc':nsp_acc}
 
+    def predict_step(self, data):
+        x, y = data
+        y_pred = self(x, training=False)
+        
+        return {'reconstruction': y_pred['reconstruction'], 
+                'magnitudes': y['magnitudes'],
+                'times': x['times'],
+                'probed_mask': y['probed_mask']}
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

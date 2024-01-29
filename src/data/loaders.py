@@ -127,19 +127,6 @@ def format_inp_astromer(batch,
         outputs['seg_emb']     = tf.where(inputs['seg_emb'] == -1., 1., 0.)
         outputs['nsp_label']   = batch['nsp_label']
     
-    if aversion == 'gap':
-        inputs['magnitudes'] = batch['input_modified']
-        inputs['times']      = tf.slice(batch['input'], [0,0], [-1,1])
-        inputs['att_mask']   = batch['att_mask'] * batch['gap_mask']
-        inputs['seg_emb']    = batch['seg_emb']
-
-        outputs['magnitudes']  = tf.slice(batch['input'], [0,1], [-1,1])
-        outputs['error']       = tf.slice(batch['input'], [0,2], [-1,1])
-        outputs['probed_mask'] = batch['probed_mask']
-        outputs['gap_mask']    = batch['gap_mask']
-        outputs['gap_dt']      = batch['dt']
-        outputs['gap_0']       = batch['t0']
-        outputs['gap_1']       = batch['t1']
 
     if num_cls is not None:
         outputs = tf.one_hot(batch['label'], num_cls)
@@ -167,7 +154,7 @@ def format_inp_gap(batch,
     Returns:
         type: A tuple (x, y) tuple where x are the inputs and y the labels
     """
-
+    print('USING EXCLUSIVE FUNCTION')
 
     inputs, outputs = {}, {}
 
