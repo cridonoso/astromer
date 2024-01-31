@@ -7,11 +7,11 @@ import os, sys
 
 gpu        = sys.argv[1]
 pt_folder  = sys.argv[2] #until pretraining
-batch_size = 2500    
+batch_size = 512    
 records_folder = './data/records/'
 ds_names = ['alcock', 'atlas']
 spc_list = [20, 100]
-clf_names = ['att_mlp']
+clf_names = ['avg_mlp', 'att_mlp']
  
 root = 'python -m presentation.experiments.astromer_0.classify'
 for dataset in ds_names:

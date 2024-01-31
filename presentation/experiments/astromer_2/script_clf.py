@@ -21,7 +21,7 @@ except:
     
 root = 'python -m presentation.experiments.astromer_2.classify'
 
-for ft_folder in ['finetuning_AV', 'finetuning']:
+for ft_folder in ['finetuning', 'finetuning_AV']:
     if '_AV' in ft_folder:
         exp_name = '{}_AV'.format(exp_name)
     else:

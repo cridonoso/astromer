@@ -132,7 +132,7 @@ def run(opt):
 
     if 'att' in opt.clf_name and model_config['encoder_mode'] != 'skip':
         print('[INFO] Using OBS tokens')
-        embedding = tf.slice(embedding, [0, 1, 0], [-1, 1,-1], name='slice_att')
+        embedding = tf.slice(embedding, [0, 1, 0], [-1, -1,-1], name='slice_att')
         print(embedding.shape)
 
     summary_clf = train_classifier(embedding,
