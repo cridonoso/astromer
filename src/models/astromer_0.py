@@ -51,11 +51,11 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         super(MultiHeadAttention, self).__init__()
         self.num_heads = num_heads
         self.d_model = d_model
+        self.m_alpha = m_alpha
 
         assert d_model % self.num_heads == 0
 
         self.depth = d_model // self.num_heads # final dimension
-        self.m_alpha = m_alpha
         print('[INFO] Using masked-att with alpha = {:.2f}'.format(m_alpha))
         self.wq = tf.keras.layers.Dense(d_model, name='WQ')
         self.wk = tf.keras.layers.Dense(d_model, name='WK')
@@ -150,14 +150,14 @@ class EncoderLayer(tf.keras.layers.Layer):
 
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, num_layers, d_model, num_heads, dff,
-                 base=10000, rate=0.1, use_leak=False, **kwargs):
+                 base=10000, rate=0.1, use_leak=False, m_alpha=1., **kwargs):
         super(Encoder, self).__init__(**kwargs)
 
         self.d_model = d_model
         self.num_layers = num_layers
         self.base = base
         self.inp_transform = tf.keras.layers.Dense(d_model)
-        self.enc_layers = [EncoderLayer(d_model, num_heads, dff, rate, use_leak)
+        self.enc_layers = [EncoderLayer(d_model, num_heads, dff, rate, use_leak, m_alpha)
                             for _ in range(num_layers)]
         self.dropout = tf.keras.layers.Dropout(rate)
 
