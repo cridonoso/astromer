@@ -50,7 +50,8 @@ def run(opt):
 						 base=opt.pe_base,
 						 rate=opt.dropout,
 						 use_leak=False,
-						 maxlen=opt.window_size)
+						 maxlen=opt.window_size,
+						 m_alpha=opt.m_alpha)
 
     # ============================================================
     if opt.checkpoint != '-1':
@@ -136,6 +137,8 @@ if __name__ == '__main__':
 	parser.add_argument('--rs', default=0.2, type=float,
 						help='Probed fraction to be randomized or unmasked')
 
+	parser.add_argument('--m-alpha', default=1., type=float,
+						help='Alpha used within mask self-attention')
 
 	opt = parser.parse_args()        
 	run(opt)

@@ -11,7 +11,7 @@ from tensorflow.keras.layers import Input, Layer, Dense
 import tensorflow as tf
 
 
-def scaled_dot_product_attention(q, k, v, mask):
+def scaled_dot_product_attention(q, k, v, mask, m_alpha):
     """Calculate the attention weights.
     q, k, v must have matching leading dimensions.
     k, v must have matching penultimate dimension, i.e.: seq_len_k = seq_len_v.
@@ -38,7 +38,7 @@ def scaled_dot_product_attention(q, k, v, mask):
     mask_rshp += tf.transpose(mask_rshp, [0,2,1])
     mask_rshp = tf.minimum(1., mask_rshp)
     mask_rshp = tf.expand_dims(mask_rshp, 1)
-    scaled_attention_logits += mask_rshp
+    scaled_attention_logits += mask_rshp*m_alpha
 
     # softmax is normalized on the last axis (seq_len_k) so that the scores add up to 1.
     attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
@@ -47,7 +47,7 @@ def scaled_dot_product_attention(q, k, v, mask):
     return output, attention_weights
 
 class MultiHeadAttention(tf.keras.layers.Layer):
-    def __init__(self, d_model, num_heads):
+    def __init__(self, d_model, num_heads, m_alpha):
         super(MultiHeadAttention, self).__init__()
         self.num_heads = num_heads
         self.d_model = d_model
@@ -55,7 +55,8 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         assert d_model % self.num_heads == 0
 
         self.depth = d_model // self.num_heads # final dimension
-
+        self.m_alpha = m_alpha
+        print('[INFO] Using masked-att with alpha = {:.2f}'.format(m_alpha))
         self.wq = tf.keras.layers.Dense(d_model, name='WQ')
         self.wk = tf.keras.layers.Dense(d_model, name='WK')
         self.wv = tf.keras.layers.Dense(d_model, name='WV')
@@ -82,7 +83,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         # scaled_attention.shape == (batch_size, num_heads, seq_len_q, depth)
         # attention_weights.shape == (batch_size, num_heads, seq_len_q, seq_len_k)
-        scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask)
+        scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask, self.m_alpha)
 
         scaled_attention = tf.transpose(scaled_attention, perm=[0, 2, 1, 3])  # (batch_size, seq_len_q, num_heads, depth)
 
@@ -111,10 +112,10 @@ def point_wise_feed_forward_network(d_model, dff):
     ])
 
 class EncoderLayer(tf.keras.layers.Layer):
-    def __init__(self, d_model, num_heads, dff, rate=0.1, use_leak=False, **kwargs):
+    def __init__(self, d_model, num_heads, dff, rate=0.1, use_leak=False, m_alpha=1., **kwargs):
         super(EncoderLayer, self).__init__(**kwargs)
 
-        self.mha = MultiHeadAttention(d_model, num_heads)
+        self.mha = MultiHeadAttention(d_model, num_heads, m_alpha)
         self.ffn = point_wise_feed_forward_network(d_model, dff)
 
         self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
@@ -197,7 +198,8 @@ def get_ASTROMER(num_layers=2,
                  rate=0.1,
                  use_leak=False,
                  maxlen=100,
-                 batch_size=None):
+                 batch_size=None,
+                 m_alpha=1):
 
     placeholder = build_input(maxlen)
 
@@ -208,7 +210,8 @@ def get_ASTROMER(num_layers=2,
                       base=base,
                       rate=rate,
                       use_leak=False,
-                      name='encoder')
+                      name='encoder',
+                      m_alpha=m_alpha)
 
     x = encoder(placeholder)
 
