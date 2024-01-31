@@ -214,67 +214,105 @@ def get_ASTROMER(num_layers=2,
 
     x = RegLayer(name='regression')(x)
 
-    return Model(inputs=placeholder, outputs=x, name="ASTROMER")
+    return CustomModel(inputs=placeholder, outputs=x, name="ASTROMER")
 
 
-@tf.function
-def train_step(model, x, y, optimizer, **kwargs):
-    with tf.GradientTape() as tape:
-        x_pred = model(x, training=True)
+# @tf.function
+# def train_step(model, x, y, optimizer, **kwargs):
+#     with tf.GradientTape() as tape:
+#         x_pred = model(x, training=True)
+#         rmse = custom_rmse(y_true=y['target'],
+#                           y_pred=x_pred,
+#                           mask=y['mask_out'])
+#         r2_value = custom_r2(y['target'], x_pred, y['mask_out'])
+
+#     grads = tape.gradient(rmse, model.trainable_weights)
+#     optimizer.apply_gradients(zip(grads, model.trainable_weights))
+#     return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
+
+
+# @tf.function
+# def test_step(model, x, y, return_pred=False, **kwargs):
+#     x_pred = model(x, training=False)
+#     rmse = custom_rmse(y_true=y['target'],
+#                       y_pred=x_pred,
+#                       mask=y['mask_out'])
+#     r2_value = custom_r2(y['target'], x_pred, y['mask_out'])
+#     if return_pred:
+#         return x_pred
+#     return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
+
+# def predict(model, test_loader):
+#     n_batches = sum([1 for _, _ in test_loader])
+#     print('[INFO] Processing {} batches'.format(n_batches))
+#     y_pred = tf.TensorArray(dtype=tf.float32, size=n_batches)
+#     y_true = tf.TensorArray(dtype=tf.float32, size=n_batches)
+#     masks  = tf.TensorArray(dtype=tf.float32, size=n_batches)
+#     times  = tf.TensorArray(dtype=tf.float32, size=n_batches)
+#     for index, (x, y) in enumerate(test_loader):
+#         outputs = test_step(model, x, y, return_pred=True)
+#         y_pred = y_pred.write(index, outputs)
+#         y_true = y_true.write(index, y['target'])
+#         masks  = masks.write(index, y['mask_out'])
+#         times = times.write(index, x['times'])
+
+#     y_pred = tf.concat([times.concat(), y_pred.concat()], axis=2)
+#     y_true = tf.concat([times.concat(), y_true.concat()], axis=2)
+#     return y_pred, y_true, masks.concat()
+
+# def restore_model(model_folder):
+#     with open(os.path.join(model_folder, 'config.toml'), 'r') as f:
+#         model_config = toml.load(f)
+
+
+#     astromer = get_ASTROMER(num_layers=model_config['num_layers'],
+#                             d_model=model_config['head_dim']*model_config['num_heads'],
+#                             num_heads=model_config['num_heads'],
+#                             dff=model_config['mixer'],
+#                             base=model_config['pe_base'],
+#                             rate=model_config['dropout'],
+#                             use_leak=False,
+#                             maxlen=model_config['window_size'])
+
+#     print('[INFO] LOADING PRETRAINED WEIGHTS')
+#     astromer.load_weights(os.path.join(model_folder, 'weights', 'weights'))
+
+#     return astromer, model_config
+
+
+### KERAS MODEL 
+class CustomModel(Model):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def train_step(self, data):
+        x, y = data
+
+        with tf.GradientTape() as tape:
+            x_pred = self(x, training=True)
+            rmse = custom_rmse(y_true=y['target'],
+                              y_pred=x_pred,
+                              mask=y['mask_out'])
+            r2_value = custom_r2(y['target'], x_pred, y['mask_out'])
+
+        grads = tape.gradient(rmse, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
+
+    def test_step(self, data):
+        x, y = data
+        x_pred = self(x, training=False)
         rmse = custom_rmse(y_true=y['target'],
                           y_pred=x_pred,
                           mask=y['mask_out'])
         r2_value = custom_r2(y['target'], x_pred, y['mask_out'])
-
-    grads = tape.gradient(rmse, model.trainable_weights)
-    optimizer.apply_gradients(zip(grads, model.trainable_weights))
-    return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
-
-
-@tf.function
-def test_step(model, x, y, return_pred=False, **kwargs):
-    x_pred = model(x, training=False)
-    rmse = custom_rmse(y_true=y['target'],
-                      y_pred=x_pred,
-                      mask=y['mask_out'])
-    r2_value = custom_r2(y['target'], x_pred, y['mask_out'])
-    if return_pred:
-        return x_pred
-    return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
-
-def predict(model, test_loader):
-    n_batches = sum([1 for _, _ in test_loader])
-    print('[INFO] Processing {} batches'.format(n_batches))
-    y_pred = tf.TensorArray(dtype=tf.float32, size=n_batches)
-    y_true = tf.TensorArray(dtype=tf.float32, size=n_batches)
-    masks  = tf.TensorArray(dtype=tf.float32, size=n_batches)
-    times  = tf.TensorArray(dtype=tf.float32, size=n_batches)
-    for index, (x, y) in enumerate(test_loader):
-        outputs = test_step(model, x, y, return_pred=True)
-        y_pred = y_pred.write(index, outputs)
-        y_true = y_true.write(index, y['target'])
-        masks  = masks.write(index, y['mask_out'])
-        times = times.write(index, x['times'])
-
-    y_pred = tf.concat([times.concat(), y_pred.concat()], axis=2)
-    y_true = tf.concat([times.concat(), y_true.concat()], axis=2)
-    return y_pred, y_true, masks.concat()
-
-def restore_model(model_folder):
-    with open(os.path.join(model_folder, 'config.toml'), 'r') as f:
-        model_config = toml.load(f)
-
-
-    astromer = get_ASTROMER(num_layers=model_config['num_layers'],
-                            d_model=model_config['head_dim']*model_config['num_heads'],
-                            num_heads=model_config['num_heads'],
-                            dff=model_config['mixer'],
-                            base=model_config['pe_base'],
-                            rate=model_config['dropout'],
-                            use_leak=False,
-                            maxlen=model_config['window_size'])
-
-    print('[INFO] LOADING PRETRAINED WEIGHTS')
-    astromer.load_weights(os.path.join(model_folder, 'weights', 'weights'))
-
-    return astromer, model_config
+        return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
+    
+    def predict_step(self, data):
+        x, y = data
+        x_pred = self(x, training=False)
+        
+        return {'reconstruction': x_pred, 
+                'magnitudes': y['target'],
+                'times': x['times'],
+                'probed_mask': y['mask_out']}
