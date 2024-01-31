@@ -17,7 +17,7 @@ from src.data.zero import pretraining_pipeline
 def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
 
-    ROOT = './presentation/experiments/astromer_0/'
+    ROOT = './presentation/results/'
     trial = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     EXPDIR = os.path.join(ROOT, 'results', opt.exp_name, trial, 'pretraining')
     os.makedirs(EXPDIR, exist_ok=True)
