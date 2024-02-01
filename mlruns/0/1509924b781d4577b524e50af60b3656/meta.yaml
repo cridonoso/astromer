@@ -1,0 +1,15 @@
+artifact_uri: file:///home/cridonoso/Documents/astromer-science/unstable/mlruns/0/1509924b781d4577b524e50af60b3656/artifacts
+end_time: 1706807913294
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 1509924b781d4577b524e50af60b3656
+run_name: skillful-goat-904
+run_uuid: 1509924b781d4577b524e50af60b3656
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1706807912587
+status: 4
+tags: []
+user_id: cridonoso

@@ -2,10 +2,11 @@ name: downstream_task
 
 docker_env:
   image: astromer
-
+  volumes: [".:/home"]
+  
 entry_points:
-  parameters:
-    data: {type: str, default: './data/records/alcock'}
-    fold: {type: float, default: 0}
-    samples_per_class: {type: float, default: 20}
-  command: "python main.py {data} {fold} {samples_per_class}"
+  main:
+    parameters:
+      data: {type: str, default: './data/records/alcock/fold_0/alcock_20/'}
+      pt_model: {type: str, default: './presentation/results/bugstromer'}
+    command: "python -m presentation.pipelines.pipeline_1.main {pt_model} {data}"

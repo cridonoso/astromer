@@ -1,0 +1,15 @@
+artifact_uri: file:///home/cridonoso/Documents/astromer-science/unstable/mlruns/0/3f6e355f86d84bd2ad10fcfe71abbc3c/artifacts
+end_time: 1706807739455
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 3f6e355f86d84bd2ad10fcfe71abbc3c
+run_name: angry-moose-467
+run_uuid: 3f6e355f86d84bd2ad10fcfe71abbc3c
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1706807738847
+status: 4
+tags: []
+user_id: cridonoso
