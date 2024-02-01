@@ -1,14 +1,6 @@
-tensorboard_plugin_profile
-googledrivedownloader
 scikit-learn
-notebook==6.5.4
-graphviz
-seaborn
-tomli_w
 joblib
 pandas
 mlflow
-pydot
 tqdm
-tomli
 toml

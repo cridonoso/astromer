@@ -5,15 +5,22 @@ import os
 from src.models.astromer_0 import get_ASTROMER
 
 
-def build_model(arch='base', **params):
+def build_model(params):
+	if params['encoder_mode'] == 'normal':
+		model = get_ASTROMER(num_layers=params['num_layers'],
+							 d_model=params['head_dim']*params['num_heads'],
+							 num_heads=params['num_heads'],
+							 dff=params['mixer'],
+							 base=params['pe_base'],
+							 rate=params['dropout'],
+							 use_leak=False,
+							 maxlen=params['window_size'],
+							 m_alpha=params['m_alpha'])
 
-	if arch == 'base':
-		model = get_ASTROMER(**params)
-
-	if arch == 'skip':
+	if params['encoder_mode'] == 'skip':
 		pass
 
-	if arch == 'nsp':
+	if params['encoder_mode'] == 'nsp':
 		pass
 
 	return model
@@ -24,4 +31,9 @@ def load_pt_model(pt_path):
 	with open(config_file, 'r') as file:
 		pt_config = toml.load(file)
 
-	print(pt_config)
+	model = build_model(pt_config)
+
+	weights_path = os.path.join(pt_path, 'weights')
+	model.load_weights(weights_path).expect_partial()
+
+	return model, pt_config
