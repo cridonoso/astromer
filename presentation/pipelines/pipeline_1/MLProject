@@ -1,0 +1,11 @@
+name: downstream_task
+
+docker_env:
+  image: astromer
+
+entry_points:
+  parameters:
+    data: {type: str, default: './data/records/alcock'}
+    fold: {type: float, default: 0}
+    samples_per_class: {type: float, default: 20}
+  command: "python main.py {data} {fold} {samples_per_class}"

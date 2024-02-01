@@ -7,8 +7,8 @@ seaborn
 tomli_w
 joblib
 pandas
+mlflow
 pydot
 tqdm
-wandb
 tomli
 toml
