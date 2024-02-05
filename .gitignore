@@ -4,7 +4,8 @@
 .ipynb_checkpoints/
 weights
 user
-
+mlruns/
+outputs
 presentation/experiments/astromer_0/results
 presentation/experiments/astromer_1/results
 presentation/experiments/astromer_2/results
