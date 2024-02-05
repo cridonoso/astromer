@@ -92,31 +92,31 @@ def format_inp_astromer(batch,
     inputs, outputs = {}, {}
 
     if aversion == 'skip':
-        inputs['magnitudes'] = batch['input_modified']
+        inputs['input'] = batch['input_modified']
         times = tf.slice(batch['input'], [0,0,0], [-1,-1,1])
         inp_size = tf.shape(batch['input'])
         t0 = tf.slice(batch['input'], [0,0,0], [-1,inp_size[1]-1,1])
         t1 = tf.slice(batch['input'], [0,1,0], [-1,-1,1])
         dt = t1 - t0
-        inputs['times']      = tf.concat([tf.zeros([inp_size[0], 1, 1]), dt], axis=1)
-        inputs['att_mask']   = batch['att_mask']
+        inputs['times']     = tf.concat([tf.zeros([inp_size[0], 1, 1]), dt], axis=1)
+        inputs['mask_in']   = batch['mask_in']
 
-        outputs['magnitudes']  = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
+        outputs['target']  = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
         outputs['error']       = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
-        outputs['probed_mask'] = batch['probed_mask']
+        outputs['mask_out'] = batch['mask_out']
     
     if aversion == 'nsp':
-        inputs['magnitudes'] = batch['nsp_magnitudes']
-        inputs['times']      = batch['nsp_times']
-        inputs['att_mask']   = batch['att_mask']
-        inputs['seg_emb']    = tf.expand_dims(batch['seg_emb'], axis=-1)
+        inputs['input']   = batch['nsp_magnitudes']
+        inputs['times']   = batch['nsp_times']
+        inputs['mask_in'] = batch['mask_in']
+        inputs['seg_emb'] = tf.expand_dims(batch['seg_emb'], axis=-1)
         
-        outputs['magnitudes']  = batch['target_magnitudes']
-        outputs['error']       = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
-        outputs['original']    = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
-        outputs['probed_mask'] = batch['probed_mask']
-        outputs['seg_emb']     = tf.where(inputs['seg_emb'] == -1., 1., 0.)
-        outputs['nsp_label']   = batch['nsp_label']
+        outputs['target'] = batch['target_magnitudes']
+        outputs['error']  = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
+        outputs['original']  = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
+        outputs['mask_out']  = batch['mask_out']
+        outputs['seg_emb']   = tf.where(inputs['seg_emb'] == -1., 1., 0.)
+        outputs['nsp_label'] = batch['nsp_label']
     
 
     if num_cls is not None:
@@ -192,7 +192,6 @@ def get_loader(dataset,
                            rnd_frac=random_frac,
                            same_frac=random_frac,
                            window_size=window_size)
-    
     dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
     
     if aversion == 'nsp':

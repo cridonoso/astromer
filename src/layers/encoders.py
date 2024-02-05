@@ -52,10 +52,10 @@ class Encoder(Model):
 	def input_format(self, inputs):
 		if 'seg_emb' in inputs.keys():
 			window_size = self.window_size + 1 # if seg_emb exists then NSP is being applied
-			x = tf.concat([inputs['magnitudes'], inputs['seg_emb']], axis=2, name='concat_mag_segemb')
+			x = tf.concat([inputs['input'], inputs['seg_emb']], axis=2, name='concat_mag_segemb')
 		else:
 			window_size = self.window_size
-			x = inputs['magnitudes']
+			x = inputs['input']
 
 		x_transformed = self.inp_transform(x)   
 		x_pe = self.positional_encoder(inputs['times'])
@@ -67,7 +67,7 @@ class Encoder(Model):
 		x, window_size = self.input_format(inputs)  
 		x = self.dropout_layer(x, training=training)
 		for i in range(self.num_layers):
-			x =  self.enc_layers[i](x, training=training, mask=inputs['att_mask'])
+			x =  self.enc_layers[i](x, training=training, mask=inputs['mask_in'])
 		return  x # (batch_size, input_seq_len, d_model)
 
 class SkipEncoder(Encoder):
@@ -80,7 +80,7 @@ class SkipEncoder(Encoder):
 									 size=self.num_layers, 
 									 name='skip_att')
 		for i in range(self.num_layers):
-			x =  self.enc_layers[i](x, training=training, mask=inputs['att_mask'])
+			x =  self.enc_layers[i](x, training=training, mask=inputs['mask_in'])
 			att_outputs = att_outputs.write(i, x)
 		out = tf.reduce_mean(att_outputs.stack(), axis=0)
 		return out  # (batch_size, input_seq_len, d_model)
@@ -93,7 +93,7 @@ class NSPEncoder(Encoder):
 		self.concat_cls    = Concatenate(axis=1, name='concat_cls')
 
 	def input_format(self, inputs):
-		x = tf.concat([inputs['magnitudes'], inputs['seg_emb']], axis=2, 
+		x = tf.concat([inputs['input'], inputs['seg_emb']], axis=2, 
 						name='concat_mag_segemb')
 		
 		x_transformed = self.inp_transform(x)   
@@ -105,6 +105,6 @@ class NSPEncoder(Encoder):
 
 		window_size = self.window_size + 1
 		msk_cls_tkn = tf.zeros([tf.shape(x)[0], 1, 1])
-		inputs['att_mask'] = self.concat_cls([msk_cls_tkn, inputs['att_mask']])
+		inputs['mask_in'] = self.concat_cls([msk_cls_tkn, inputs['mask_in']])
 
 		return x, window_size

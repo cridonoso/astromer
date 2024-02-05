@@ -164,8 +164,8 @@ def mask_dataset(dataset,
               'mask'  :[None, ],
               'label' :(),
               'input_modified': [None, None],
-              'att_mask': [None, None],
-              'probed_mask': [None, None],
-              'mean_values':[None, None]}
+              'mask_in': [None, None],
+              'mask_out': [None, None],
+              'mean_values':[3]}
 
     return dataset, shapes

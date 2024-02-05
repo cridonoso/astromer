@@ -5,8 +5,8 @@ import sys
 import os
 
 from src.models.astromer_0 import get_ASTROMER as get_Base
-from src.models.astromer_nsp import get_ASTROMER as get_Skip
-from src.models.astromer_skip import get_ASTROMER as get_NSP
+from src.models.astromer_nsp import get_ASTROMER as get_NSP
+from src.models.astromer_skip import get_ASTROMER as get_Skip
 
 from datetime import datetime
 
@@ -38,7 +38,7 @@ def get_loaders(opt):
                                             msk_frac=opt.probed,
                                             rnd_frac=opt.rs,
                                             same_frac=opt.rs)
-    if opt.arch == 'skip' or opt.arch 'skip':
+    if opt.arch == 'skip' or opt.arch == 'nsp':
         train_loader = get_loader(os.path.join(opt.data, 'train'),
                                   batch_size=5 if opt.debug else opt.bs,
                                   window_size=opt.window_size,
@@ -80,24 +80,24 @@ def get_model(opt):
 
     if opt.arch == 'skip':
         model = get_Skip(num_layers=opt.num_layers,
-                            num_heads=opt.num_heads,
-                            head_dim=opt.head_dim,
-                            mixer_size=opt.mixer,
-                            dropout=opt.dropout,
-                            pe_base=opt.pe_base,
-                            pe_dim=opt.pe_dim,
-                            pe_c=opt.pe_exp,
-                            window_size=opt.window_size)
+                         num_heads=opt.num_heads,
+                         head_dim=opt.head_dim,
+                         mixer_size=opt.mixer,
+                         dropout=opt.dropout,
+                         pe_base=opt.pe_base,
+                         pe_dim=opt.pe_dim,
+                         pe_c=opt.pe_exp,
+                         window_size=opt.window_size)
     if opt.arch == 'nsp':
         model = get_NSP(num_layers=opt.num_layers,
-                    num_heads=opt.num_heads,
-                    head_dim=opt.head_dim,
-                    mixer_size=opt.mixer,
-                    dropout=opt.dropout,
-                    pe_base=opt.pe_base,
-                    pe_dim=opt.pe_dim,
-                    pe_c=opt.pe_exp,
-                    window_size=opt.window_size)
+                        num_heads=opt.num_heads,
+                        head_dim=opt.head_dim,
+                        mixer_size=opt.mixer,
+                        dropout=opt.dropout,
+                        pe_base=opt.pe_base,
+                        pe_dim=opt.pe_dim,
+                        pe_c=opt.pe_exp,
+                        window_size=opt.window_size)
 
     return model
 
@@ -114,7 +114,7 @@ def run(opt):
 
     # ======= MODEL ========================================
     model = get_model(opt)
-    
+
     # ============================================================
     if opt.checkpoint != '-1':
         print('[INFO] Restoring previous training')
@@ -182,7 +182,10 @@ if __name__ == '__main__':
                         help='Units to be used on the hidden layer of a feed-forward network that combines head outputs within an attention layer')
     parser.add_argument('--dropout', default=0., type=float,
                         help='Dropout to use on the output of each attention layer (before mixer layer)')
+    parser.add_argument('--m-alpha', default=1., type=float,
+                        help='Alpha used within mask self-attention')
 
+    # =========================================================
     parser.add_argument('--lr', default=1e-5, type=float,
                         help='learning rate')
     parser.add_argument('--bs', default=2500, type=int,
@@ -193,14 +196,15 @@ if __name__ == '__main__':
                         help='Number of epochs')
     parser.add_argument('--window-size', default=200, type=int,
                         help='windows size of the PSFs')\
-
+    # ==========================================================
     parser.add_argument('--probed', default=0.5, type=float,
                         help='Probed percentage')
     parser.add_argument('--rs', default=0.2, type=float,
                         help='Probed fraction to be randomized or unmasked')
+    # ONLY NSP =================================================
+    parser.add_argument('--nsp-prob', default=0.5, type=float,
+                        help='Probability of randomize second segment in NSP pretraining task')
 
-    parser.add_argument('--m-alpha', default=1., type=float,
-                        help='Alpha used within mask self-attention')
 
     opt = parser.parse_args()        
     run(opt)

@@ -19,7 +19,7 @@ from src.metrics import custom_r2, custom_acc
 def build_input(window_size, batch_size=None):
     magnitudes  = Input(shape=(window_size, 1),
                   batch_size=batch_size,
-                  name='magnitudes')
+                  name='input')
     times       = Input(shape=(window_size, 1),
                   batch_size=batch_size,
                   name='times')
@@ -30,9 +30,9 @@ def build_input(window_size, batch_size=None):
                   batch_size=batch_size,
                   name='seg_emb')
 
-    pholder = {'magnitudes':magnitudes,
+    pholder = {'input':magnitudes,
                'times':times,
-               'att_mask':att_mask,
+               'mask_in':att_mask,
                'seg_emb':seg_emb}
 
     return pholder
@@ -79,9 +79,9 @@ class CustomModel(Model):
         with tf.GradientTape() as tape:
             outputs = self(x, training=True)  # Forward pass
 
-            rmse = rmse_for_nsp(y_true=y['magnitudes'],
+            rmse = rmse_for_nsp(y_true=y['target'],
                                y_pred=outputs['reconstruction'],
-                               mask=y['probed_mask'],
+                               mask=y['mask_out'],
                                nsp_label=y['nsp_label'],
                                segment_emb=y['seg_emb'])
 
@@ -89,9 +89,9 @@ class CustomModel(Model):
             
             loss = rmse + bce
 
-            r2_value = custom_r2(y_true=y['magnitudes'], 
+            r2_value = custom_r2(y_true=y['target'], 
                                  y_pred=outputs['reconstruction'], 
-                                 mask=y['probed_mask'])
+                                 mask=y['mask_out'])
 
             nsp_acc  = custom_acc(y['nsp_label'], outputs['nsp_label'])
 
@@ -108,9 +108,9 @@ class CustomModel(Model):
     def test_step(self, data):
         x, y = data
         outputs = self(x, training=False)
-        rmse = rmse_for_nsp(y_true=y['magnitudes'],
+        rmse = rmse_for_nsp(y_true=y['target'],
                            y_pred=outputs['reconstruction'],
-                           mask=y['probed_mask'],
+                           mask=y['mask_out'],
                            nsp_label=y['nsp_label'],
                            segment_emb=y['seg_emb'])
 
@@ -118,9 +118,9 @@ class CustomModel(Model):
         
         loss = rmse + bce
 
-        r2_value = custom_r2(y_true=y['magnitudes'], 
+        r2_value = custom_r2(y_true=y['target'], 
                              y_pred=outputs['reconstruction'], 
-                             mask=y['probed_mask'])
+                             mask=y['mask_out'])
 
         nsp_acc  = custom_acc(y['nsp_label'], outputs['nsp_label'])
 
@@ -133,11 +133,10 @@ class CustomModel(Model):
     def predict_step(self, data):
         x, y = data
         y_pred = self(x, training=False)
-        
         return {'reconstruction': y_pred['reconstruction'], 
-                'magnitudes': y['magnitudes'],
+                'magnitudes': y['target'],
                 'times': x['times'],
-                'probed_mask': y['probed_mask']}
+                'probed_mask': y['mask_out']}
     
     
     

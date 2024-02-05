@@ -8,7 +8,6 @@ true="true"
 if [[ $gpu == $true ]]; then
  echo GPU found
  docker run --name astromer_container -it \
-   -d \
    --rm \
    --privileged=true \
    --mount "type=bind,src=$(pwd),dst=/home/" \
@@ -21,7 +20,6 @@ if [[ $gpu == $true ]]; then
 else
  echo CPU Only
  docker run --name astromer_container -it \
-   -d \
    --rm \
    --privileged=true \
    --mount "type=bind,src=$(pwd),dst=/home/" \

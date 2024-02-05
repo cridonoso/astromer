@@ -2,7 +2,7 @@ import tensorflow as tf
 import os
 
 from src.data.masking import get_masked, set_random, mask_sample
-from src.data.preprocessing import sample_lc, to_windows
+from src.data.preprocessing import sample_lc, to_windows, standardize
 from src.data.loaders import load_records
 from src.data.record import deserialize
 
@@ -225,26 +225,9 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
             'error': tf.slice(batch['input'], [0,0,2], [-1,-1,1]),
             'mask_out': batch['mask_out'],
         }
-
-    if 'nsp_label' in batch.keys() and num_cls is None:
-        outputs['nsp_label'] = batch['nsp_label']
-        outputs['target'] = tf.slice(outputs['target'], [0,1,0], [-1,-1,-1])
-        outputs['mask_out'] = tf.slice(outputs['mask_out'], [0,1,0], [-1,-1,-1])
-
-
-    if nsp_test:
-        inputs['original_input'] = batch['original_input']
         
     if return_lengths:
         inputs['length'] = batch['length']
-
-    if key_format == '1':
-        inputs['magnitudes'] = inputs.pop('input')
-        inputs['att_mask']   = inputs.pop('mask_in')
-        del inputs['mask_out']
-        if num_cls is None:
-            outputs['magnitudes'] = outputs.pop('target')
-            outputs['probed_mask'] = outputs.pop('mask_out')
             
     if return_ids:
         return outputs, batch['lcid']

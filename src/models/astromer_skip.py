@@ -20,17 +20,17 @@ from src.metrics import custom_r2
 def build_input(window_size, batch_size=None):
     magnitudes  = Input(shape=(window_size, 1),
                   batch_size=batch_size,
-                  name='magnitudes')
+                  name='input')
     times       = Input(shape=(window_size, 1),
                   batch_size=batch_size,
                   name='times')
     att_mask    = Input(shape=(window_size, 1),
                   batch_size=batch_size,
-                  name='att_mask') 
+                  name='mask_in') 
 
-    pholder = {'magnitudes':magnitudes,
+    pholder = {'input':magnitudes,
                'times':times,
-               'att_mask':att_mask}
+               'mask_in':att_mask}
 
     return pholder
 
@@ -72,13 +72,13 @@ class CustomModel(Model):
         x, y = data
         with tf.GradientTape() as tape:
             y_pred = self(x, training=True)  # Forward pass
-            rmse = custom_rmse(y_true=y['magnitudes'],
+            rmse = custom_rmse(y_true=y['target'],
                                y_pred=y_pred,
-                               mask=y['probed_mask'])
+                               mask=y['mask_out'])
 
-            r2_value = custom_r2(y_true=y['magnitudes'], 
+            r2_value = custom_r2(y_true=y['target'], 
                                  y_pred=y_pred, 
-                                 mask=y['probed_mask'])
+                                 mask=y['mask_out'])
 
         trainable_vars = self.trainable_variables
         gradients = tape.gradient(rmse, trainable_vars)
@@ -89,13 +89,13 @@ class CustomModel(Model):
     def test_step(self, data):
         x, y = data
         y_pred = self(x, training=False)
-        rmse = custom_rmse(y_true=y['magnitudes'],
+        rmse = custom_rmse(y_true=y['target'],
                            y_pred=y_pred,
-                           mask=y['probed_mask'])
+                           mask=y['mask_out'])
 
-        r2_value = custom_r2(y_true=y['magnitudes'], 
+        r2_value = custom_r2(y_true=y['target'], 
                              y_pred=y_pred, 
-                             mask=y['probed_mask'])
+                             mask=y['mask_out'])
         return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
 
     def predict_step(self, data):
@@ -103,9 +103,9 @@ class CustomModel(Model):
         y_pred = self(x, training=False)
         
         return {'reconstruction': y_pred, 
-                'magnitudes': y['magnitudes'],
+                'magnitudes': y['target'],
                 'times': x['times'],
-                'probed_mask': y['probed_mask']}
+                'probed_mask': y['mask_out']}
     
     
     

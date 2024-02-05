@@ -13,6 +13,7 @@ def standardize(batch, on='input', axis=0):
     """
     mean_value = tf.reduce_mean(batch['input'], axis, name='mean_value')
     batch['input'] = batch['input'] - tf.expand_dims(mean_value, axis)
+    batch['mean_values'] = mean_value
     return batch
 
 def min_max_scaler(batch, on='input', axis=0):
