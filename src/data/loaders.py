@@ -25,7 +25,7 @@ def load_records(records_dir):
         for x in os.listdir(os.path.join(records_dir, folder)):
             rec_paths.append(os.path.join(records_dir, folder, x))
 
-    dataset = tf.data.TFRecordDataset(rec_paths)    
+    dataset = tf.data.TFRecordDataset(rec_paths)
     dataset = dataset.map(deserialize)
     return dataset
 
@@ -91,15 +91,6 @@ def format_inp_astromer(batch,
 
     inputs, outputs = {}, {}
 
-    if aversion == 'normal' or aversion == 'base':
-        inputs['magnitudes'] = batch['input_modified']
-        inputs['times']      = tf.slice(batch['input'], [0,0,0], [-1,-1,1])
-        inputs['att_mask']   = batch['att_mask']
-
-        outputs['magnitudes']  = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
-        outputs['error']       = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
-        outputs['probed_mask'] = batch['probed_mask']
-
     if aversion == 'skip':
         inputs['magnitudes'] = batch['input_modified']
         times = tf.slice(batch['input'], [0,0,0], [-1,-1,1])
@@ -139,64 +130,6 @@ def format_inp_astromer(batch,
 
     return inputs, outputs
 
-def format_inp_gap(batch, 
-                   window_size,
-                   return_ids=False, 
-                   return_lengths=False, 
-                   num_cls=None, 
-                   nsp_test=False):
-    """
-    Buildng ASTROMER input
-
-    Args:
-        batch (type): a batch of windows and their properties
-
-    Returns:
-        type: A tuple (x, y) tuple where x are the inputs and y the labels
-    """
-    print('USING EXCLUSIVE FUNCTION')
-
-    inputs, outputs = {}, {}
-
-    inputs['magnitudes'] = batch['input_modified']
-    inputs['times']      = tf.slice(batch['input'], [0,0], [-1,1])
-    inputs['att_mask']   = batch['att_mask'] * batch['gap_mask']
-    inputs['seg_emb']    = batch['seg_emb']
-
-    outputs['magnitudes']  = tf.slice(batch['input'], [0,1], [-1,1])
-    outputs['error']       = tf.slice(batch['input'], [0,2], [-1,1])
-    outputs['probed_mask'] = batch['probed_mask'] * batch['gap_mask']
-    outputs['gap_dt']      = batch['dt']
-    outputs['gap_0']       = batch['t0']
-    outputs['gap_1']       = batch['t1']
-    outputs['pad_mask']    = tf.expand_dims(batch['mask'], axis=-1)
-    outputs['gap_mask']    = (1.-batch['gap_mask']) * outputs['pad_mask'] 
-
-    time_steps = tf.shape(inputs['magnitudes'])[0]    
-    if time_steps < window_size:
-        pad_mask = tf.zeros([window_size - time_steps, 1], name='pad_mask')
-        inputs['magnitudes'] = tf.concat([inputs['magnitudes'], pad_mask], axis=0)
-        inputs['times']      = tf.concat([inputs['times'], pad_mask], axis=0)
-        inputs['att_mask']   = tf.concat([inputs['att_mask'], pad_mask], axis=0)
-        inputs['seg_emb']    = tf.concat([inputs['seg_emb'], pad_mask], axis=0)
-
-        outputs['magnitudes']  = tf.concat([outputs['magnitudes'], pad_mask], axis=0)
-        outputs['error']       = tf.concat([outputs['error'], pad_mask], axis=0)
-        outputs['probed_mask'] = tf.concat([outputs['probed_mask'], pad_mask], axis=0)
-        outputs['gap_mask']    = tf.concat([outputs['gap_mask'], pad_mask], axis=0)
-        outputs['pad_mask']    = tf.concat([outputs['pad_mask'], pad_mask], axis=0)
-
-    if num_cls is not None:
-        outputs = tf.one_hot(batch['label'], num_cls)
-    
-    if return_ids:     
-        outputs = tf.one_hot(batch['label'], num_cls), batch['lcid']
-        
-    if return_lengths:
-        outputs = tf.one_hot(batch['label'], num_cls), batch['lenght']
-
-    return inputs, outputs
-
 def filter_fn(input_dict):
     if tf.less(tf.shape(input_dict['input'])[0], 5):
         return False
@@ -218,7 +151,7 @@ def get_loader(dataset,
                cache=False,
                return_ids=False,
                return_lengths=False,
-               aversion='gap'):
+               aversion='skip'):
 
 
     assert isinstance(dataset, (list, str)), '[ERROR] Invalid format'
@@ -260,31 +193,20 @@ def get_loader(dataset,
                            same_frac=random_frac,
                            window_size=window_size)
     
-    if aversion == 'gap':
-        dataset = set_gap(dataset, max_gap=max_gap)
-        dataset = dataset.map(lambda x: format_inp_gap(x,
-                                                    window_size=window_size,
-                                                    return_ids=return_ids,
-                                                    return_lengths=return_lengths,
-                                                    num_cls=num_cls),
-                      num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        dataset = dataset.batch(batch_size)        
-        dataset = dataset.map(invert_mask)
-    else:
-        dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
+    dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
     
     if aversion == 'nsp':
         print('[INFO] NSP format activated')
         dataset = apply_nsp(dataset, nsp_prob)
 
     # FORMAT INPUT DICTONARY
-    if aversion != 'gap':
-        dataset = dataset.map(lambda x: format_inp_astromer(x,
-                                                    return_ids=return_ids,
-                                                    return_lengths=return_lengths,
-                                                    num_cls=num_cls,
-                                                    aversion=aversion),
-                      num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    dataset = dataset.map(lambda x: format_inp_astromer(x,
+                                                return_ids=return_ids,
+                                                return_lengths=return_lengths,
+                                                num_cls=num_cls,
+                                                aversion=aversion),
+                  num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     if cache:
         dataset = dataset.cache()

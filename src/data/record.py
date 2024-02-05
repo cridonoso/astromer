@@ -210,7 +210,6 @@ def deserialize(sample):
     context_features = {'label': tf.io.FixedLenFeature([],dtype=tf.int64),
                         'length': tf.io.FixedLenFeature([],dtype=tf.int64),
                         'id': tf.io.FixedLenFeature([], dtype=tf.string)}
-
     sequence_features = dict()
     for i in range(3):
         sequence_features['dim_{}'.format(i)] = tf.io.VarLenFeature(dtype=tf.float32)
@@ -221,6 +220,10 @@ def deserialize(sample):
                             sequence_features=sequence_features
                             )
 
+    input_dict = dict()
+    input_dict['lcid']   = tf.cast(context['id'], tf.string)
+    input_dict['length'] = tf.cast(context['length'], tf.int32)
+    input_dict['label']  = tf.cast(context['label'], tf.int32)
 
     casted_inp_parameters = []
     for i in range(3):
@@ -230,10 +233,7 @@ def deserialize(sample):
         casted_inp_parameters.append(seq_dim)
 
 
-    input_dict = dict()
-    input_dict['lcid']   = tf.cast(context['id'], dtype=tf.string)
-    input_dict['length'] = tf.cast(context['length'], dtype=tf.int32)
-    input_dict['label']  = tf.cast(context['label'], dtype=tf.int32)
-    input_dict['input'] = tf.stack(casted_inp_parameters, axis=2)[0]
-
+    sequence = tf.stack(casted_inp_parameters, axis=2)[0]
+    input_dict['input'] = sequence
     return input_dict
+

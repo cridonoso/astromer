@@ -2,7 +2,7 @@ import tensorflow as tf
 
 from src.data.record import deserialize
 
-def standardize(batch, on='input', axis=0, return_mean=False):
+def standardize(batch, on='input', axis=0):
     """
     Standardize input tensor given a dataset batch
     Args:
@@ -12,9 +12,7 @@ def standardize(batch, on='input', axis=0, return_mean=False):
         type: tf.Dataset
     """
     mean_value = tf.reduce_mean(batch['input'], axis, name='mean_value')
-    mean_value = tf.expand_dims(mean_value, axis)
-    batch['input'] = batch['input'] - mean_value
-    batch['mean_values'] = mean_value
+    batch['input'] = batch['input'] - tf.expand_dims(mean_value, axis)
     return batch
 
 def min_max_scaler(batch, on='input', axis=0):
