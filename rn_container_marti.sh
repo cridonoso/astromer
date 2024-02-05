@@ -11,8 +11,8 @@ docker run  -it \
   --privileged=true \
   --mount "type=bind,src=$(pwd),dst=/home/" \
   --workdir /home/ \
-  -p 8822:8822 \
-  -p 1022:1022\
+  -p 8852:8852 \
+  -p 1052:1052\
   --gpus all \
   -e HOST="$(whoami)" \
   astromer bash
