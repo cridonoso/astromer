@@ -177,7 +177,8 @@ def pretraining_pipeline(dataset,
               'label' :(),
               'input_modified': [None, None],
               'mask_in': [None, None],
-              'mask_out': [None, None]}
+              'mask_out': [None, None],
+              'mean_values':[3]}
     
     dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
 
