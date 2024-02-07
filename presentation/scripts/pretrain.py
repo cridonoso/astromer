@@ -76,7 +76,8 @@ def get_model(opt):
                          rate=opt.dropout,
                          use_leak=False,
                          maxlen=opt.window_size,
-                         m_alpha=opt.m_alpha)
+                         m_alpha=opt.m_alpha,
+                         mask_format=opt.mask_format)
 
     if opt.arch == 'skip':
         model = get_Skip(num_layers=opt.num_layers,
@@ -184,6 +185,8 @@ if __name__ == '__main__':
                         help='Dropout to use on the output of each attention layer (before mixer layer)')
     parser.add_argument('--m-alpha', default=1., type=float,
                         help='Alpha used within mask self-attention')
+    parser.add_argument('--mask-format', default='QK', type=str,
+                        help='mask on Query and Key tokens (QK) or Query tokens only (Q)')
 
     # =========================================================
     parser.add_argument('--lr', default=1e-5, type=float,

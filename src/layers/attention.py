@@ -1,7 +1,6 @@
 import tensorflow as tf
 
-
-def scaled_dot_product_attention(q, k, v, mask, alpha=1.):
+def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK'):
     """Calculate the attention weights.
     q, k, v must have matching leading dimensions.
     k, v must have matching penultimate dimension, i.e.: seq_len_k = seq_len_v.
@@ -23,12 +22,23 @@ def scaled_dot_product_attention(q, k, v, mask, alpha=1.):
     dk = tf.cast(tf.shape(k)[-1], tf.float32)
     scaled_attention_logits = matmul_qk / tf.math.sqrt(dk)
 
-    steps = tf.shape(scaled_attention_logits)[2]
-    mask_rshp = tf.tile(mask, [1,1,steps])
-    mask_rshp += tf.transpose(mask_rshp, [0,2,1])
-    mask_rshp = tf.minimum(1., mask_rshp)
-    mask_rshp = tf.expand_dims(mask_rshp, 1)
-    scaled_attention_logits += mask_rshp*alpha
+    if mask_format == 'Q':
+        print('[INFO] Masking Query tokens only')
+        steps = tf.shape(scaled_attention_logits)[2]
+        mask_rshp = tf.tile(mask, [1,1,steps])
+        mask_rshp = tf.transpose(mask_rshp, [0,2,1])
+        mask_rshp = tf.minimum(1., mask_rshp)
+        mask_rshp = tf.expand_dims(mask_rshp, 1)
+        scaled_attention_logits += (mask_rshp*m_alpha)
+    
+    if mask_format == 'QK':
+        print('[INFO] Masking Query and Key tokens')
+        steps = tf.shape(scaled_attention_logits)[2]
+        mask_rshp = tf.tile(mask, [1,1,steps])
+        mask_rshp += tf.transpose(mask_rshp, [0,2,1])
+        mask_rshp = tf.minimum(1., mask_rshp)
+        mask_rshp = tf.expand_dims(mask_rshp, 1)
+        scaled_attention_logits += mask_rshp*m_alpha
 
     # softmax is normalized on the last axis (seq_len_k) so that the scores add up to 1.
     attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
