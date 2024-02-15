@@ -6,7 +6,7 @@ from src.models.astromer_0 import get_ASTROMER
 
 
 def build_model(params):
-	if params['encoder_mode'] == 'normal':
+	if params['arch'] == 'normal' or params['arch'] == 'base':
 		model = get_ASTROMER(num_layers=params['num_layers'],
 							 d_model=params['head_dim']*params['num_heads'],
 							 num_heads=params['num_heads'],
@@ -17,10 +17,10 @@ def build_model(params):
 							 maxlen=params['window_size'],
 							 m_alpha=params['m_alpha'])
 
-	if params['encoder_mode'] == 'skip':
+	if params['arch'] == 'skip':
 		pass
 
-	if params['encoder_mode'] == 'nsp':
+	if params['arch'] == 'nsp':
 		pass
 
 	return model

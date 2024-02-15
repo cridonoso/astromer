@@ -1,8 +1,9 @@
 
 expertiment_ids: ['atlas', 'alcock']
 data: './data/records'
-do_ft: [false, false]
+do_ft: [true, true]
 do_clf: [true, true]
+gpu: '0'
 
 mlflow_tags:
   model: 'bugstromer_1'
@@ -16,7 +17,7 @@ experiment:
 
 
 training:
-  scheduler : false
+  scheduler : true
   lr : 0.001
   bs : 512
   patience : 20

@@ -156,9 +156,10 @@ def ft_train_evaluate(trial, exp_id, spc_id, config):
         mlflow.set_tags(tags=config['mlflow_tags'])
 
         # load pretrain astromer cf
-        with open(os.path.join(config['mlflow_tags']['save_path'],'pretraining','config.toml'), 'r') as file:
+        with open(os.path.join(config['mlflow_tags']['save_path'], 'pretraining','config.toml'), 'r') as file:
             params = toml.load(file)
-
+            print(params)
+            
         astromer = build_model(params)
 
 
@@ -271,7 +272,8 @@ def classify(exp_id, config):
 def pipeline(cfg: DictConfig) -> None:
     config = cfg
     OmegaConf.set_struct(config, False)
-    
+    print(config['gpu'])
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(config['gpu'])
 
     for exp_id, ft in zip(config['expertiment_ids'], config['do_ft']):
         if ft:
@@ -283,7 +285,7 @@ def pipeline(cfg: DictConfig) -> None:
 
 
 if __name__ == "__main__":
-
+    
     pipeline()
 
     
