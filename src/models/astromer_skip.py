@@ -44,21 +44,24 @@ def get_ASTROMER(num_layers=2,
                  pe_c=1,
                  window_size=100,
                  batch_size=None,
-                 mask_format='first'): # first / zero
+                 m_alpha=-0.5,
+                 mask_format='Q'): # first / zero
     
     placeholder = build_input(window_size)
 
     print('[INFO] NSP Encoder')
     x = SkipEncoder(window_size=window_size,
-                      num_layers=num_layers,
-                      num_heads=num_heads,
-                      head_dim=head_dim,
-                      mixer_size=mixer_size,
-                      dropout=dropout,
-                      pe_base=pe_base,
-                      pe_dim=pe_dim,
-                      pe_c=pe_c,
-                      name='encoder')(placeholder)
+                    num_layers=num_layers,
+                    num_heads=num_heads,
+                    head_dim=head_dim,
+                    mixer_size=mixer_size,
+                    dropout=dropout,
+                    pe_base=pe_base,
+                    pe_dim=pe_dim,
+                    pe_c=pe_c,
+                    m_alpha=m_alpha,
+                    mask_format=mask_format,
+                    name='encoder')(placeholder)
 
     outputs = RegLayer(name='regresor')(x)
 

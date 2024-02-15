@@ -19,15 +19,15 @@ def point_wise_feed_forward_network(d_model, dff):
     ])
 
 class AttentionBlock(tf.keras.layers.Layer):
-	def __init__(self, head_dim, num_heads, mixer_size, dropout=0.1, mask_format='first', **kwargs):
+	def __init__(self, head_dim, num_heads, mixer_size, dropout=0.1, m_alpha=-0.5, mask_format='Q', **kwargs):
 		super(AttentionBlock, self).__init__(**kwargs)
 		self.head_dim = head_dim
 		self.num_heads = num_heads
 		self.mixer_size = mixer_size
 		self.dropout = dropout
 		self.mask_format = mask_format
-		self.mha = HeadAttentionMulti(self.head_dim, self.num_heads, mask_format=mask_format)
-		# self.ffn = MergingLayer(self.mixer_size, self.num_heads, self.head_dim, name='att_block_merging_layer')
+		self.m_alpha = m_alpha
+		self.mha = HeadAttentionMulti(self.head_dim, self.num_heads, m_alpha=self.m_alpha, mask_format=mask_format)
 		self.ffn = point_wise_feed_forward_network(self.num_heads*self.head_dim, self.mixer_size)
 		self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 		self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)

@@ -88,7 +88,9 @@ def get_model(opt):
                          pe_base=opt.pe_base,
                          pe_dim=opt.pe_dim,
                          pe_c=opt.pe_exp,
-                         window_size=opt.window_size)
+                         window_size=opt.window_size,
+                         m_alpha=opt.m_alpha,
+                         mask_format=opt.mask_format)
     if opt.arch == 'nsp':
         model = get_NSP(num_layers=opt.num_layers,
                         num_heads=opt.num_heads,
@@ -98,7 +100,9 @@ def get_model(opt):
                         pe_base=opt.pe_base,
                         pe_dim=opt.pe_dim,
                         pe_c=opt.pe_exp,
-                        window_size=opt.window_size)
+                        window_size=opt.window_size,
+                        m_alpha=opt.m_alpha,
+                        mask_format=opt.mask_format)
 
     return model
 

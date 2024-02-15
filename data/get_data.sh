@@ -22,7 +22,7 @@ then
     NAME=${1%-*}
     mkdir -p records/
     DIR=./records/
-    OUTFILE=./records/$NAME.zip
+    OUTFILE=./records/$NAME
     echo $OUTFILE
 else
     mkdir -p raw_data/$1

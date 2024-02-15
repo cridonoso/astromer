@@ -47,7 +47,7 @@ def get_ASTROMER(num_layers=2,
                  pe_c=1,
                  window_size=100,
                  batch_size=None,
-                 encoder_mode='normal',
+                 m_alpha=-0.5,
                  mask_format='first'): # first / zero
     
     placeholder = build_input(window_size)

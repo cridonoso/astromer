@@ -15,7 +15,6 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK'):
     Returns:
     output, attention_weights
     """
-
     matmul_qk = tf.matmul(q, k, transpose_b=True)  # (..., seq_len_q, seq_len_k)
 
     # scale matmul_qk
@@ -47,13 +46,14 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK'):
     return output, attention_weights
 
 class HeadAttentionMulti(tf.keras.layers.Layer):
-	def __init__(self, head_dim, num_heads, mask_format):
+	def __init__(self, head_dim, num_heads, m_alpha, mask_format):
 		super(HeadAttentionMulti, self).__init__()
-		self.num_heads = num_heads
-		self.head_dim = head_dim
+		self.num_heads   = num_heads
+		self.head_dim    = head_dim
 		self.mask_format = mask_format
-		self.d_model = self.num_heads * self.head_dim
-		self.depth = self.d_model // self.num_heads # final dimension
+		self.m_alpha     = m_alpha
+		self.d_model     = self.num_heads * self.head_dim
+		self.depth       = self.d_model // self.num_heads # final dimension
 		
 		self.wq = tf.keras.layers.Dense(self.d_model, name='WQ')
 		self.wk = tf.keras.layers.Dense(self.d_model, name='WK')
@@ -80,7 +80,10 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 
 		# scaled_attention.shape == (batch_size, num_heads, seq_len_q, depth)
 		# attention_weights.shape == (batch_size, num_heads, seq_len_q, seq_len_k)
-		scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask=mask)
+		scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, 
+																		mask=mask,
+																		m_alpha=self.m_alpha,
+																		mask_format=self.mask_format)
 
 		scaled_attention = tf.transpose(scaled_attention, perm=[0, 2, 1, 3])  # (batch_size, seq_len_q, num_heads, depth)
 

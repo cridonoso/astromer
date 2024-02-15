@@ -18,7 +18,8 @@ class Encoder(Model):
 				 pe_base=1000, 
 				 pe_dim=128,
 				 pe_c=1., 
-				 mask_format='first',
+				 m_alpha=-0.5,
+				 mask_format='Q',
 				 **kwargs):
 		super(Encoder, self).__init__(**kwargs)
 		# super().__init__(**kwargs)
@@ -33,6 +34,7 @@ class Encoder(Model):
 		self.pe_c        	= pe_c
 		self.pe_dim         = pe_dim
 		self.mask_format    = mask_format
+		self.m_alpha        = m_alpha
 		self.inp_transform  = tf.keras.layers.Dense(self.pe_dim, name='inp_transform')
 
 		self.positional_encoder = PositionalEncoder(self.pe_dim, 
@@ -44,7 +46,9 @@ class Encoder(Model):
 										  self.num_heads, 
 										  self.mixer_size, 
 										  dropout=self.dropout, 
-										  mask_format=self.mask_format, name=f'att_layer_{i}')
+										  mask_format=self.mask_format, 
+										  m_alpha=self.m_alpha,
+										  name=f'att_layer_{i}')
 							for i in range(self.num_layers)]
 		
 		self.dropout_layer = tf.keras.layers.Dropout(self.dropout)
