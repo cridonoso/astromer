@@ -213,7 +213,7 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
     inputs = {
         'input': batch['input_modified'],
         'times': tf.slice(batch['input'], [0,0,0], [-1,-1,1]),
-        'mask_in': tf.expand_dims(batch['mask_in'], -1),
+        'mask_in': batch['mask_in'],
         'mask_out':tf.expand_dims(batch['mask_out'], -1)
         
     }

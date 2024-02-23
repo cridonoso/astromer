@@ -88,8 +88,8 @@ def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
     orig_magn = seq_magn
 
     # [MASK] values
-    if msk_frac == 0.:
-        mask_out = tf.ones(time_steps)
+    if msk_frac == 1.:
+        mask_out = tf.ones(time_steps) * input_dict['mask']
     else:
         mask_out = get_masked(seq_magn, msk_frac)
 
@@ -106,7 +106,7 @@ def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
                                    tf.random.shuffle(seq_magn),
                                    rnd_frac,
                                    name='set_random')
-    if msk_frac == 0.:
+    if msk_frac == 1.:
         mask_in  =  1.- mask_out
 
     mask_out = tf.reshape(mask_out, [time_steps, 1])
@@ -128,9 +128,8 @@ def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
         input_dict['input'] = tf.concat([input_dict['input'], reshaped_mask], 0)
 
     input_dict['input_modified'] = seq_magn
-    input_dict['mask_in']  = mask_in
+    input_dict['mask_in']  = mask_in 
     input_dict['mask_out'] = mask_out
-
     return input_dict
 
 def mask_dataset(dataset,

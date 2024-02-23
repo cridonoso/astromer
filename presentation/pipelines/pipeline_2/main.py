@@ -14,6 +14,8 @@ from src.training.scheduler import CustomSchedule
 from presentation.experiments.utils import * 
 import tensorflow as tf
 from src.models.astromer_0 import  build_input
+from src.models.astromer_nsp import  build_input as build_input_nsp
+from src.models.astromer_skip import  build_input as build_input_skip
 import logging
 import numpy as np
 
@@ -69,13 +71,32 @@ def clf_train_evaluate(trial, exp_id, spc_id, config):
                             verbose=1),
                              mlflow.tensorflow.MLflowCallback( run=run)]
         
-        inp_placeholder = build_input(config['training']['maxlen'])
-        encoder = astromer.get_layer('encoder')
-        encoder.trainable = config['clf']['astromer_unfrozen']
-        embedding = encoder(inp_placeholder)
-        mask = 1.- inp_placeholder['mask_in']
         
-        clf = Model(inputs=inp_placeholder, outputs= get_mlp_avg(embedding, mask, num_cls), name='mlp_att')
+        if params['arch'] == 'base' or params['arch'] == 'normal':
+            inp_placeholder = build_input(config['training']['maxlen'])
+            encoder = astromer.get_layer('encoder')
+            encoder.trainable = config['clf']['astromer_unfrozen']
+            embedding = encoder(inp_placeholder)
+        
+        if params['arch'] == 'skip':
+            inp_placeholder = build_input_skip(config['training']['maxlen'])
+            encoder = astromer.get_layer('encoder')
+            encoder.trainable = config['clf']['astromer_unfrozen']
+            embedding = encoder(inp_placeholder)
+            
+        if params['arch'] == 'nsp':
+            inp_placeholder = build_input_nsp(config['training']['maxlen'])      
+            encoder = astromer.get_layer('encoder')
+            encoder.trainable = config['clf']['astromer_unfrozen']
+            embedding = encoder(inp_placeholder)
+            embedding = tf.slice(embedding, [0, 1, 0], [-1, -1,-1], name='slice_obs')
+            embedding = tf.reshape(embedding, [-1, params['window_size'], params['head_dim']*params['num_heads']])
+            
+            
+        mask = 1.- inp_placeholder['mask_in']
+        clf = Model(inputs=inp_placeholder, 
+                    outputs= get_mlp_avg(embedding, mask, num_cls), 
+                    name='mlp_att')
         clf.compile(optimizer=Adam(lr, 
                              beta_1=0.9,
                              beta_2=0.98,
@@ -193,8 +214,15 @@ def ft_train_evaluate(trial, exp_id, spc_id, config):
               epochs=config['training']['num_epochs'], 
               validation_data=tf_data['validation'],
               callbacks=cbks)
-        rmse, r2, loss = astromer.evaluate(tf_data['test_loader'])
-
+        try:
+            rmse, r2, loss = astromer.evaluate(tf_data['test_loader']) #
+        except:
+            print('[INFO] EVAL NSP FORMAT')
+            acc, bce, loss, r2, rmse = astromer.evaluate(tf_data['test_loader'])
+            print('l: {:.2f} - rmse: {:.2f} - r_square: {:.2f} - bce: {:.2f} acc: {:.2f}'.format(loss, rmse, r2, bce, acc))
+            mlflow.log_metric("test_acc", acc)
+            mlflow.log_metric("test_bce", bce)
+            
         # save config as parametros
         mlflow.log_params(params) 
         # save config as config.toml
@@ -240,7 +268,7 @@ def finetune(exp_id, config):
 def classify(exp_id, config):
 
     #get/create experiment
-    experiment_id = get_or_create_experiment('clf_{}'.format(exp_id))
+    experiment_id = get_or_create_experiment('clf_{}_2'.format(exp_id))
     mlflow.set_experiment(experiment_id=experiment_id)
     print(f"Experiment ID: {experiment_id}")
 
@@ -272,9 +300,7 @@ def classify(exp_id, config):
 def pipeline(cfg: DictConfig) -> None:
     config = cfg
     OmegaConf.set_struct(config, False)
-    print(config['gpu'])
     os.environ["CUDA_VISIBLE_DEVICES"] = str(config['gpu'])
-
     for exp_id, ft in zip(config['expertiment_ids'], config['do_ft']):
         if ft:
             finetune(exp_id, config)

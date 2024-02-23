@@ -15,14 +15,15 @@ from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 
 def get_mlp_avg(inputs, mask, num_cls):
-    inputs = tf.reduce_sum(inputs*mask,1)
-    inputs = tf.math.divide_no_nan(inputs, tf.reduce_sum(mask, 1))
-    x = Dense(1024, activation='relu')(inputs)
+    x = tf.multiply(inputs, mask) 
+    x = tf.reduce_sum(x, 1)
+    x = tf.math.divide_no_nan(x, tf.reduce_sum(mask, 1))
+
+    x = Dense(1024, activation='relu')(x)
     x = Dense(512, activation='relu')(x)
     x = Dense(256, activation='relu')(x)
     x = LayerNormalization(name='layer_norm')(x)
     y_pred = Dense(num_cls, name='output_layer')(x)
-    y_pred = tf.reshape(y_pred, [-1, num_cls])
     return y_pred
 
 

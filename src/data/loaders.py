@@ -193,13 +193,12 @@ def get_loader(dataset,
                            same_frac=random_frac,
                            window_size=window_size)
     dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
-    
+
     if aversion == 'nsp':
         print('[INFO] NSP format activated')
         dataset = apply_nsp(dataset, nsp_prob)
-
+    
     # FORMAT INPUT DICTONARY
-
     dataset = dataset.map(lambda x: format_inp_astromer(x,
                                                 return_ids=return_ids,
                                                 return_lengths=return_lengths,

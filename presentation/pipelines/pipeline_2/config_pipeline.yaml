@@ -1,7 +1,7 @@
 
 expertiment_ids: ['atlas', 'alcock']
 data: './data/records'
-do_ft: [true, true]
+do_ft: [false, false]
 do_clf: [true, true]
 gpu: '0'
 
