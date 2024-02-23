@@ -8,10 +8,7 @@ import os
 import psutil
 import tracemalloc
 import os, sys
-import sys
-sys.path.append('/home/Samsung2TB/')
-sys.path.append('/home/Samsung2TB/astromer/')
-from astromer.src.data.record import DataPipeline
+from src.data.record import DataPipeline
 import os.path
 import tensorflow as tf 
 
@@ -19,9 +16,9 @@ import tensorflow as tf
 #config.gpu_options.allow_growth = True
 #sess = tf.compat.v1.Session(config=config)
 
-METAPATH = '../../data/raw_data/alcock/new_metadata.parquet'
-LCDIR = '../..//data/raw_data/alcock/parquets/'
-metadata = pd.read_parquet(METAPATH)
+METAPATH = './data/raw_data/alcock/metadata.csv'
+LCDIR = './data/raw_data/alcock/LCs/'
+metadata = pd.read_csv(METAPATH)
 metadata['Class'] = pd.Categorical(metadata['Class'])
 metadata['Label'] = metadata['Class'].cat.codes
 metadata['Path'] = metadata['Path'].apply(lambda x: os.path.join(LCDIR, x))
@@ -38,7 +35,7 @@ pipeline = DataPipeline(metadata=metadata,
 st = time.time()
 tracemalloc.start()
 
-var = pipeline.run(LCDIR, METAPATH , n_jobs=int(sys.argv[1]))
+var = pipeline.run(n_jobs=int(sys.argv[1]))
 
 current, peak = tracemalloc.get_traced_memory()
 current = current/(1024*1024)
@@ -49,6 +46,6 @@ elapsed_time = et - st
 tracemalloc.stop()
 print('Execution time:', elapsed_time, 'seconds')
 df.loc[len(df)] = [round(elapsed_time, 4)  , round(peak, 4) ]
-#print(len(var))
+print(len(var))
 del var
 df.to_csv('time_memory.csv')

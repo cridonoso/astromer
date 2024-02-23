@@ -1,191 +1,164 @@
 import tensorflow as tf
+import tensorflow as tfp
 
-@tf.function
-def get_mean_and_std(tensor, N):
-    """
-    Return the mean and standard deviation of a padded batch.
-    Args:
-        tensor : tensor of size (n_samples x length x 1)
-        N: tensor of dimension (n_samples x 1) with the real lengths of light curves.
-           Notice, when there is no padding N == length
-    Returns:
-        tuple: A tuple of tensors of dimension (n_samples x 1)
-               containing the mean and standard deviation of each sample in the batch.
-    """
-    mean_ = tf.math.divide_no_nan(tf.reduce_sum(tensor, 1), N)
-    diff = tf.pow(tf.squeeze(tensor) - mean_, 2)
-    diff = tf.reduce_sum(diff, 1)
-    std_ = tf.math.sqrt(
-                tf.math.divide_no_nan(
-                        tf.expand_dims(diff, 1), N)
-                )
-    return mean_, std_
+def get_segment_length(mask, divide_factor=2):
+    window_size = tf.shape(mask)[1]
+    n_steps = tf.reduce_sum(mask, 1)
+    half_maximum = tf.math.divide(window_size, divide_factor)
 
-@tf.function
-def add_segment_to_tensor(tensor_0, tensor_1, pivot, rnd_seq_size, cls_tkn=-99., sep_tkn=-98.):
-    """
-        Add a random segment in a tensor sequence. (user for NSP task)
-        Cut a window of length <rnd_seq_size> from tensor_1, then
-        paste it in tensor_0 starting from the pivot position
+    length = tf.minimum(tf.cast(n_steps, tf.float32), 
+                        tf.cast(half_maximum, tf.float32))
+    return tf.cast(length, tf.int32)
 
-    Args:
-        tensor_0: target sequence (or matrix)
-        tensor_1: random sequence used to get the random window (or matrix)
-        pivot: position to put the random window
-        rnd_seq_size: size of the random window
-        cls_tkn: [CLS] token to predict if the segment is random or not
-        sep_tkn: [SEP] token to distinguish between segments
+def creat_mask_given_lenghts(lengths_1, max_len):
+    valid_ind = tf.ragged.range(0, tf.cast(lengths_1, tf.int32))
+    mask = tf.one_hot(valid_ind, max_len)
+    mask = tf.reduce_sum(mask, 1)
+    return tf.cast(mask, tf.bool)
 
-    Returns:
-        type: a randomized tensor of size len(tensor_0) + 3, where 3
-              comes from adding [CLS] and 2x[SEP]
+def concat_segments(segment_0, segment_1, mask_0, mask_1, padding_mask=None):
+    sub_0 = tf.ragged.boolean_mask(segment_0, mask_0)
 
-    """
-    if tf.rank(tensor_0) < 2:
-        tensor_0 = tf.expand_dims(tensor_0, 1)
-        tensor_1 = tf.expand_dims(tensor_1, 1)
+    if padding_mask is not None:
+        time_1 = tf.slice(segment_1, [0,0,0], [-1, -1, 1])
+        rest   = tf.slice(segment_1, [0,0,1], [-1, -1, -1])
 
-    inp_length = tf.shape(tensor_0)[0]
-    inp_dim    = tf.shape(tensor_0)[-1]
+        valid_values = tf.ragged.boolean_mask(time_1, tf.cast(padding_mask, tf.bool))
+        min_val = tf.reduce_min(valid_values, axis=1) 
+        min_val = tf.expand_dims(min_val, axis=1)
+        max_val = tf.reduce_max(valid_values, axis=1) 
+        max_val = tf.expand_dims(max_val, axis=1)
+        time_1 = tf.math.divide_no_nan(time_1 - min_val, max_val-min_val)
+        
+        last_time_0 = tf.reduce_max(sub_0, axis=1)
+        last_time_0 = tf.slice(last_time_0, [0, 0], [-1, 1])
+        last_time_0 = tf.reshape(last_time_0, [tf.shape(last_time_0)[0], 1, 1])
+        time_0_a = tf.slice(segment_0, [0, 0, 0], [-1, tf.shape(segment_0)[1]-1, 1])
+        time_0_b = tf.slice(segment_0, [0, 1, 0], [-1, -1, 1])
+        delta_t0 = time_0_b - time_0_a
+        delta_t0 = tf.ragged.boolean_mask(delta_t0, tf.slice(mask_0, [0, 1], [-1, -1]))
+        delta_t0 = tf.reduce_mean(delta_t0, 1)
+        delta_t0 = tf.reshape(delta_t0, [tf.shape(delta_t0)[0], 1, 1])
+        time_1 = time_1 + delta_t0 + last_time_0
+        segment_1 = tf.concat([time_1, rest], 2)
 
-    rand_msk = tf.range(pivot, pivot+rnd_seq_size)
-    rand_msk = tf.one_hot(rand_msk, inp_length)
-    rand_msk = tf.reduce_sum(rand_msk, 0)
-    rand_msk = tf.expand_dims(rand_msk, 1)
-    rand_msk = tf.tile(rand_msk, [1, inp_dim])
+    sub_1 = tf.ragged.boolean_mask(segment_1, mask_1)   
+     
+    return tf.concat([sub_0, sub_1], axis=1).to_tensor()
 
-    if tf.shape(tensor_1)[0] < inp_length:
-        k = tf.math.ceil(tf.divide(inp_length,
-                                   tf.shape(tensor_1)[0]))
-        tensor_1 = tf.tile(tensor_1, [k, 1])
+def combine_sequences(seq_0, seq_1, mask_0, norm_time=False):
+    if tf.rank(seq_0) == 3:
+        mask_0 = tf.expand_dims(mask_0, axis=-1)
 
-    tensor_1 = tf.slice(tensor_1, [0, 0], [inp_length, -1])
-    tensor_1 = tensor_1 * rand_msk
-    tensor_0 = tensor_0 * (1.-rand_msk)
-    tensor_2 = tensor_0 + tensor_1
+    mask_1 = tf.logical_not(mask_0)
 
-    a = tf.range(0, pivot)
-    b = tf.range(pivot+1, pivot+rnd_seq_size+1)
-    c = tf.range(pivot+rnd_seq_size+2, inp_length+2)
+    mask_0 = tf.cast(mask_0, tf.float32)
+    mask_1 = tf.cast(mask_1, tf.float32)
 
-    indices = tf.concat([a,b,c], axis=0)
-    indices = tf.expand_dims(indices, 1)
+    # Make zero all obs to be replace. Keep original observations
+    original_masked = seq_0 * mask_0
+    
+    # Make zero all original observations. Keep randomized ones.
+    replace_masked = seq_1 * mask_1
+    if norm_time:
+        N_r = tf.cast(tf.reduce_sum(mask_0, 1), tf.int32)
 
-    base     = tf.zeros([inp_length+2, inp_dim]) + sep_tkn
-    tensor_3 = tf.tensor_scatter_nd_update(base,
-                                           indices,
-                                           tensor_2)
+        first_mask = tf.one_hot(N_r, tf.shape(mask_0)[1])
+        first_mask = tf.transpose(first_mask, [0, 2, 1])
+        first_t = tf.boolean_mask(replace_masked, first_mask)
+        replace_masked = replace_masked-tf.reshape(first_t, [-1, 1, 1])
+        replace_masked = replace_masked + tf.expand_dims(tf.reduce_max(original_masked, 1), axis=1)
+        replace_masked = replace_masked*mask_1
 
-    tensor_3 = tf.concat([tf.tile([[cls_tkn]], [1,inp_dim]), tensor_3], 0)
+    # Sum both masked_original and masked_raplace to create the final input
+    randomized_input = original_masked + replace_masked
 
-    return tensor_3
+    return randomized_input
 
-# @tf.function
-def randomize_segment(batch, random_sample, frac=.5, prob=.5, sep_token=-98, cls_token=-99, moving_window=False):
-    nsp_label = tf.random.categorical(tf.math.log([[prob, 1-prob]]), 1)
-    nsp_label = tf.squeeze(nsp_label)
+def randomize(input_dict, nsp_prob):
+    ''' Mantain times from random light curve by shifting its times'''
+    inp_size = tf.shape(input_dict['input_modified'])
 
-    # IF nsp is 1 then don't change the sequence but add the tokens anyways
-    if tf.cast(nsp_label, tf.bool):
-        random_sample = batch
+    indices = tf.range(0, inp_size[0], dtype=tf.int32)
+    shuffle_indices = tf.random.shuffle(indices)
 
-    inp_length = tf.shape(batch['input'])[0]
-    size = tf.cast(inp_length, tf.float32)*frac
-    rnd_seq_size = tf.cast(size, tf.int32)
+    # Probabilities to randomize
+    probs = tf.random.uniform(shape=(inp_size[0],), minval=0, maxval=1)
+    binary_vector = tf.where(probs > nsp_prob, 1, 0)
+    # On binary_vector = 0, replace the index by a random one
+    shuffle_indices = (shuffle_indices*(1-binary_vector)) + (indices*binary_vector)
 
-    # Where the random segment start
-    if moving_window:
-        pivot = tf.random.uniform(shape=(),
-                                  minval=0,
-                                  maxval=inp_length-rnd_seq_size,
-                                  dtype=tf.int32)
-    else:
-        pivot = inp_length-rnd_seq_size
+    # Original vector
+    target_original       = tf.slice(input_dict['input'], [0,0,1], [-1,-1,1])
+    magnitudes_original   = input_dict['input_modified']
+    times_original        = tf.slice(input_dict['input'] , [0, 0, 0], [-1, -1, 1])  
+    att_mask_original     = input_dict['mask_in']
+    prob_mask_original    = input_dict['mask_out']
+    padding_mask_original = input_dict['mask']
+    
+    # Candidates for replacing
+    target_replace       = tf.gather(target_original, shuffle_indices) 
+    magnitudes_replace   = tf.gather(magnitudes_original, shuffle_indices) 
+    times_replace        = tf.gather(times_original, shuffle_indices)    
+    att_mask_replace     = tf.gather(att_mask_original, shuffle_indices)
+    prob_mask_replace    = tf.gather(prob_mask_original, shuffle_indices)
+    padding_mask_replace = tf.gather(padding_mask_original, shuffle_indices)
+    
+    # Number of observations to be placed as the first original 50% 
+    length_0 = get_segment_length(padding_mask_original, divide_factor=2) 
 
-    # Put a random segment in the input_modified sequence (masked input)
-    batch['input_modified'] = add_segment_to_tensor(batch['input_modified'],
-                                                    random_sample['input_modified'],
-                                                    pivot,
-                                                    rnd_seq_size)
+    # Create original fraction mask
+    mask_original_obs = creat_mask_given_lenghts(length_0, max_len=inp_size[1])
 
-    # Add tokens to the original times
-    original_times  = tf.slice(batch['input'], [0,0],[-1, 1])
-    original_times  = add_segment_to_tensor(original_times,
-                                            original_times,
-                                            pivot,
-                                            rnd_seq_size)
+    # Combine sequences
+    target_randomized   = combine_sequences(seq_0=target_original,
+                                                seq_1=target_replace, 
+                                                mask_0=mask_original_obs)
+    magnitudes_randomized   = combine_sequences(seq_0=magnitudes_original,
+                                                seq_1=magnitudes_replace, 
+                                                mask_0=mask_original_obs)
+    att_mask_randomized     = combine_sequences(seq_0=att_mask_original,
+                                                seq_1=att_mask_replace, 
+                                                mask_0=mask_original_obs)
+    prob_mask_randomized    = combine_sequences(seq_0=prob_mask_original,
+                                                seq_1=prob_mask_replace, 
+                                                mask_0=mask_original_obs)
+    padding_mask_randomized = combine_sequences(seq_0=padding_mask_original,
+                                                seq_1=padding_mask_replace, 
+                                                mask_0=mask_original_obs)
+    
+    # Segment embedding 
+    segment_emb = (tf.cast(mask_original_obs, tf.float32)+1.) * padding_mask_randomized
 
-    batch['original_input'] = add_segment_to_tensor(batch['input'],
-                                                    batch['input'],
-                                                    pivot,
-                                                    rnd_seq_size)
+    t_mean = tf.slice(input_dict['mean_values'], [0, 0], [-1, 1])
+    t_mean = tf.expand_dims(t_mean, axis=-1)
+    t_0 = times_original+ t_mean
+    t_1 = times_replace + tf.gather(t_mean, shuffle_indices)
 
-    # Put a random segment in the original input
-    batch['input'] = add_segment_to_tensor(batch['input'],
-                                           random_sample['input'],
-                                           pivot,
-                                           rnd_seq_size)
-    # keep the original times
-    batch['input'] = tf.concat([original_times,
-                                tf.slice(batch['input'], [0,1], [-1,-1])],
-                                1)
+    times_randomized = combine_sequences(seq_0=t_0,
+                                         seq_1=t_1, 
+                                         mask_0=mask_original_obs,
+                                         norm_time=True)
+    mean_val = tf.reduce_mean(times_randomized, 1)
+    mean_val = tf.expand_dims(mean_val, 1)
+    
+    times_randomized = times_randomized - mean_val
 
-    # Add 0s to mask_in to be included in the self-attention op
-    batch['mask']  = add_segment_to_tensor(batch['mask'],
-                                           random_sample['mask'],
-                                           pivot,
-                                           rnd_seq_size,
-                                           cls_tkn=0.,
-                                           sep_tkn=0.)
+    input_dict['nsp_label'] = tf.cast(tf.expand_dims(binary_vector, -1), tf.float32)
+    input_dict['target_magnitudes'] = target_randomized
+    input_dict['nsp_magnitudes'] = magnitudes_randomized
+    input_dict['nsp_times'] = times_randomized * tf.expand_dims(padding_mask_randomized, axis=-1)
+    input_dict['nsp_pad_mask'] = padding_mask_randomized
 
-    # Add 0s to mask_in to be included in the self-attention op
-    batch['mask_in']  = add_segment_to_tensor(batch['mask_in'],
-                                              random_sample['mask_in'],
-                                              pivot,
-                                              rnd_seq_size,
-                                              cls_tkn=0.,
-                                              sep_tkn=0.)
+    input_dict['mask_out'] = prob_mask_randomized
+    input_dict['mask_in'] = att_mask_randomized * (1.-tf.expand_dims(padding_mask_randomized, axis=-1))
+    input_dict['seg_emb'] = tf.where(segment_emb == 2., -1., segment_emb)
 
-    # Add 0s to mask_out to exclude tokens from the loss function
-    batch['mask_out'] = add_segment_to_tensor(batch['mask_out'],
-                                              random_sample['mask_out'],
-                                              pivot,
-                                              rnd_seq_size,
-                                              cls_tkn=0.,
-                                              sep_tkn=0.)
-    batch['nsp_label'] = nsp_label
+    return input_dict
 
-    return batch
+def apply_nsp(dataset, nsp_prob=0.5):
 
+    dataset = dataset.map(lambda x: randomize(x, nsp_prob),
+                              num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-def nsp_dataset(dataset, prob=.5, frac=.5, buffer_shuffle=5000, moving_window=False):
-    """
-    Add random next sentence with probability 1-prob
-
-    Args:
-        dataset: tf.dataset with light curves sequences (use after masking)
-        prob: probability of adding random segment
-        frac: fraction of the sequence to change. The random window size depends on this.
-        buffer_shuffle: buffer for shuffling the same dataset and get random segments
-        moving_window: if the window can be added in a random part within the light curve
-
-    Returns:
-        dataset: tf.dataset that includes <nsp_label>. After use this function,
-                 all sequences will be modified to incorporate [CLS] and [SEP] tokens
-                 i.e., input, input_modified, mask, mask_in, mask_out....
-
-    """
-
-    shuffle_dataset = dataset.shuffle(buffer_shuffle)
-
-    # UNCOMMENT FOR TESTING
-    # for x, y in zip(dataset, shuffle_dataset):
-    #     randomize_segment(x, random_sample=y, frac=frac)
-
-    dataset = tf.data.Dataset.zip((dataset, shuffle_dataset))
-    dataset = dataset.map(lambda x, y: randomize_segment(x,
-                                                         random_sample=y,
-                                                         frac=frac,
-                                                         prob=prob,
-                                                         moving_window=moving_window))
     return dataset

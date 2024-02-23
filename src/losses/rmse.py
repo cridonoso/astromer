@@ -1,20 +1,49 @@
 import tensorflow as tf
 
-
-def custom_rmse(y_true, y_pred, sample_weight=None, mask=None):
+@tf.function
+def custom_rmse(y_true, y_pred, mask=None):
+    inp_shp = tf.shape(y_true)
+    
+    residuals = tf.square(y_true - y_pred)
+    residuals = tf.multiply(residuals, mask)
+    residuals  = tf.reduce_sum(residuals, 1)
+    mse_mean = tf.math.divide_no_nan(residuals, tf.reduce_sum(mask, 1))
+    mse_mean = tf.reduce_mean(mse_mean)
+    return tf.math.sqrt(mse_mean)
+    
+@tf.function
+def rmse_for_nsp(y_true, y_pred, mask=None, nsp_label=None, segment_emb=None):
     inp_shp = tf.shape(y_true)
     residuals = tf.square(y_true - y_pred)
 
-    if sample_weight is not None:
-        residuals = tf.multiply(residuals, sample_weight)
+    segment_emb = segment_emb*(1.-tf.expand_dims(nsp_label, 1))
 
-    if mask is not None:
-        residuals = tf.multiply(residuals, mask)
+    loss_first_50 = (residuals*mask) * segment_emb
+    loss_all = (residuals * mask) * tf.expand_dims(nsp_label, 1)
+    loss_total = loss_first_50 + loss_all
 
-    residuals  = tf.reduce_sum(residuals, 1)
-
-    mse_mean = tf.math.divide_no_nan(residuals,
-                         tf.reduce_sum(mask, 1))
-
+    N = tf.where(loss_total == 0., 0., 1.)
+    N = tf.reduce_sum(N, axis=1)
+    
+    mse_mean = tf.math.divide_no_nan(tf.reduce_sum(loss_total, 1), N)
     mse_mean = tf.reduce_mean(mse_mean)
-    return tf.math.sqrt(mse_mean)
+    return mse_mean
+
+@tf.function
+def rmse_for_delta_gap(y_true, y_pred):
+    residuals = tf.square(y_true - y_pred)
+    mse_mean = tf.reduce_mean(residuals)
+    mse_mean = tf.math.sqrt(mse_mean)
+    return mse_mean
+
+@tf.function
+def rmse_for_gap(y_true, y_pred, gap_mask):
+    residuals = tf.square(y_true - y_pred)
+    residuals = residuals * gap_mask
+
+    mse_mean = tf.math.divide_no_nan(
+            tf.reduce_sum(residuals, axis=1),
+            tf.reduce_sum(gap_mask, axis=1),
+        ) 
+    mse_mean = tf.reduce_mean(residuals)
+    return mse_mean

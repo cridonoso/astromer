@@ -1,10 +1,6 @@
 import tensorflow as tf
 
-@tf.function
-def reshape_mask(mask):
-    ''' Reshape Mask to match attention dimensionality '''
-    with tf.name_scope("reshape_mask") as scope:
-        return mask[:, tf.newaxis, tf.newaxis, :, 0]
+
 
 @tf.function
 def get_masked(tensor, frac=0.15):
@@ -56,7 +52,9 @@ def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
         rand_mask = tf.minimum(rand_mask, tf.ones_like(rand_mask))
         rand_mask = tf.expand_dims(rand_mask, 1)
         rand_mask = tf.tile(rand_mask, [1, tf.shape(serie_2)[-1]])
-
+        
+        # print(rand_mask)
+        
         len_s1 = tf.minimum(tf.shape(serie_2)[0],
                             tf.shape(rand_mask)[0])
 
@@ -67,12 +65,13 @@ def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
         keep_mask = tf.math.floor(tf.math.cos(rand_mask))
 
         serie_1 = tf.multiply(serie_1, keep_mask, name='seriemul')
-
         keep_mask = tf.slice(keep_mask, [0,0], [-1,1])
+        # print(keep_mask)
         mask_1  = tf.multiply(mask_1, tf.squeeze(keep_mask), name='maskmul2')
         serie_1 = tf.add(serie_1, rand_vals)
 
         return serie_1, mask_1
+
 
 def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
     '''
@@ -85,26 +84,30 @@ def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
     seq_errs = tf.slice(x, [0, 2], [-1, 1])
 
     # Save the true values
+    time_steps = tf.shape(seq_magn)[0]
     orig_magn = seq_magn
 
     # [MASK] values
-    mask_out = get_masked(seq_magn, msk_frac)
+    if msk_frac == 0.:
+        mask_out = tf.ones(time_steps)
+    else:
+        mask_out = get_masked(seq_magn, msk_frac)
 
-    # [MASK] -> Same values
+    # [MASK] -> Identity
     seq_magn, mask_in = set_random(seq_magn,
                                    mask_out,
                                    seq_magn,
                                    same_frac,
                                    name='set_same')
 
-    # [MASK] -> Random value
+    # [MASK] -> Random
     seq_magn, mask_in = set_random(seq_magn,
                                    mask_in,
                                    tf.random.shuffle(seq_magn),
                                    rnd_frac,
                                    name='set_random')
-
-    time_steps = tf.shape(seq_magn)[0]
+    if msk_frac == 0.:
+        mask_in  =  1.- mask_out
 
     mask_out = tf.reshape(mask_out, [time_steps, 1])
     mask_in = tf.reshape(mask_in, [time_steps, 1])
@@ -154,5 +157,15 @@ def mask_dataset(dataset,
                                                 same_frac=same_frac,
                                                 max_obs=window_size),
                               num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    
+    shapes = {'input' :[None, 3],
+              'lcid'  :(),
+              'length':(),
+              'mask'  :[None, ],
+              'label' :(),
+              'input_modified': [None, None],
+              'mask_in': [None, None],
+              'mask_out': [None, None],
+              'mean_values':[3]}
 
-    return dataset
+    return dataset, shapes

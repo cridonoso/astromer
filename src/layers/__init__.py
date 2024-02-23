@@ -1,4 +1,3 @@
-from src.layers.attention import HeadAttentionMulti
-from src.layers.encoder import Encoder, EncoderLayer, EncoderSKIP
-from src.layers.output import RegLayer
-from src.layers.positional import positional_encoding
+from src.layers.output import TransformLayer, RegLayer, TransformLayer_GAP
+from src.layers.encoders import Encoder, SkipEncoder, NSPEncoder
+

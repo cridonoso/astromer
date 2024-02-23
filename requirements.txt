@@ -1,13 +1,6 @@
-tensorboard_plugin_profile
-googledrivedownloader
 scikit-learn
-notebook
-graphviz
-seaborn
 joblib
 pandas
-optuna
-pydot
+mlflow
 tqdm
-tomli
-tomli_w
+toml

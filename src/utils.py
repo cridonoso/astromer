@@ -1,5 +1,6 @@
 import tensorflow as tf
 import seaborn as sns
+# import mlflow as mf
 import pandas as pd
 import numpy as np
 import json
@@ -23,7 +24,7 @@ def plot_cm(cm, ax, title='CM', fontsize=15, cbar=False, yticklabels=True, class
         if value < 0.01:
             labels[row][col] = '< 1%'
         else:
-            labels[row][col] = '{:2.1f}%'.format(value*100)
+            labels[row][col] = '{:2.1f}\\%'.format(value*100)
 
     ax = sns.heatmap(cm, annot = labels, fmt = '',
                      annot_kws={"size": fontsize},
@@ -39,7 +40,7 @@ def plot_cm(cm, ax, title='CM', fontsize=15, cbar=False, yticklabels=True, class
     try:
         if yticklabels and class_names is not None:
             ax.set_yticklabels(class_names, rotation=0, fontsize=fontsize+1)
-            ax.set_xticklabels(class_names, rotation=90, fontsize=fontsize+1)
+            ax.set_xticklabels(class_names, rotation=0, fontsize=fontsize+1)
     except:
         pass
     ax.set_title(title, fontsize=fontsize+5)
@@ -84,22 +85,32 @@ def my_summary_iterator(path):
     for r in tf_record.tf_record_iterator(path):
         yield event_pb2.Event.FromString(r)
 
-def get_metrics(path_logs, metric_name='epoch_loss', full_logs=True, show_keys=False):
-    train_logs = [x for x in os.listdir(path_logs) if x.endswith('.v2')][-1]
+def get_metrics(path_logs, metric_name='epoch_loss', full_logs=True, show_keys=False, nlog=-1):
+    train_logs = [x for x in os.listdir(path_logs) if x.endswith('.v2')][nlog]
     path_train = os.path.join(path_logs, train_logs)
 
     if full_logs:
-        ea = event_accumulator.EventAccumulator(path_train, size_guidance={'tensors': 0})
+        ea = event_accumulator.EventAccumulator(path_train, 
+                                                size_guidance={'tensors': 0})
     else:
         ea = event_accumulator.EventAccumulator(path_train)
-
+      
     ea.Reload()
 
     if show_keys:
         print(ea.Tags())
 
-    metrics = pd.DataFrame([(w,s,tf.make_ndarray(t))for w,s,t in ea.Tensors(metric_name)],
-                columns=['wall_time', 'step', 'value'])
+    try:
+        metrics = pd.DataFrame([(w,s,tf.make_ndarray(t))for w,s,t in ea.Tensors(metric_name)],
+                    columns=['wall_time', 'step', 'value'])
+    except:
+        frames = []
+        for file in os.listdir(path_logs):
+            if not file.endswith('.csv'): continue
+            if metric_name in file:
+                metrics = pd.read_csv(os.path.join(path_logs, file))
+                metrics.columns = ['wall_time', 'step', 'value']
+        
     return metrics
 
 def dict_to_json(varsdic, conf_file):
@@ -107,3 +118,51 @@ def dict_to_json(varsdic, conf_file):
     varsdic['exp_date'] = now.strftime("%d/%m/%Y %H:%M:%S")
     with open(conf_file, 'w') as json_file:
         json.dump(varsdic, json_file, indent=4)
+        
+        
+
+# def mf_check_run_exists(experiment_name:str, run_name:str)->bool:
+#     try:
+#         experiment_meta = dict(mf.get_experiment_by_name(experiment_name))
+#         experiment_id = experiment_meta["experiment_id"]
+#         run = mf.MlflowClient().search_runs(experiment_ids=[str(experiment_id)],
+#                                             filter_string=f"tags.`mlflow.runName` = '{run_name}'")
+#         if run:
+#             return True
+#         else:
+#             return False
+#     except:
+#         return False
+    
+# def mf_create_or_get_experiment_id(experiment_name:str):
+#     # Check if the experiment exists
+#     experiment = mf.get_experiment_by_name(experiment_name)
+
+#     if experiment:
+#         # If the experiment exists, return its ID
+#         return experiment.experiment_id
+#     else:
+#         # If the experiment doesn't exist, create a new one and return its ID
+#         return mf.create_experiment(experiment_name)
+    
+    
+# def mf_set_tracking_uri(tracking_uri:str):
+#     mf.set_tracking_uri(tracking_uri)
+    
+# def mf_set_experiment(experiment_id=None,experiment_name=None):
+#     if experiment_id:
+#         mf.set_experiment(experiment_id=experiment_id)
+#     elif not experiment_id and experiment_name:
+#         mf.set_experiment(experiment_name=experiment_name)
+#     else:
+#         ValueError("""Neither experiment name of experiment id is passed, please pass either of them to set the 
+#                    current experiemnt""")
+        
+
+        
+
+        
+    
+    
+    
+    

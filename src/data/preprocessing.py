@@ -13,6 +13,24 @@ def standardize(batch, on='input', axis=0):
     """
     mean_value = tf.reduce_mean(batch['input'], axis, name='mean_value')
     batch['input'] = batch['input'] - tf.expand_dims(mean_value, axis)
+    batch['mean_values'] = mean_value
+    return batch
+
+def min_max_scaler(batch, on='input', axis=0):
+    """
+    Normalize input tensor given a dataset batch
+    Args:
+        dataset: batched dataset
+
+    Returns:
+        type: tf.Dataset
+    """
+    min_value = tf.reduce_min(batch['input'], axis, name='min_value')
+    max_value = tf.reduce_max(batch['input'], axis, name='max_value')
+    min_value = tf.expand_dims(min_value, axis)
+    max_value = tf.expand_dims(max_value, axis)
+    batch['input'] = tf.math.divide_no_nan(batch['input'] - min_value,
+                                           max_value-min_value)
     return batch
 
 def sample_lc(sample, max_obs, binary=True):
@@ -54,7 +72,7 @@ def get_windows(sample, max_obs, binary=True):
         input_dict = sample
 
     sequence = input_dict['input']
-    rest = input_dict['length']%max_obs
+    rest = input_dict['length']%(max_obs)
 
     pivots = tf.tile([max_obs], [tf.cast(input_dict['length']/max_obs, tf.int32)])
     pivots = tf.concat([[0], pivots], 0)
@@ -67,14 +85,14 @@ def get_windows(sample, max_obs, binary=True):
                        infer_shape=False,
                        fn_output_signature=(tf.float32))
 
-    y        = tf.tile([input_dict['label']], [len(splits)])
-    ids      = tf.tile([input_dict['lcid']], [len(splits)])
-    orig_len = tf.tile([input_dict['length']], [len(splits)])
+    input_dict['label']  = tf.tile([input_dict['label']], [len(splits)])
+    input_dict['lcid']   = tf.tile([input_dict['lcid']], [len(splits)])
+    input_dict['length'] = tf.tile([input_dict['length']], [len(splits)])
+    input_dict['input']  = splits
 
-    return splits, y, ids, orig_len
+    return input_dict
 
 def to_windows(dataset,
-               batch_size=None,
                window_size=200,
                sampling=True):
     """
@@ -92,6 +110,7 @@ def to_windows(dataset,
     """
 
     if sampling:
+        print('[INFO] Sampling random windows')
         dataset = dataset.map(lambda x: sample_lc(x,
                                                   max_obs=window_size,
                                                   binary=False),
@@ -102,13 +121,8 @@ def to_windows(dataset,
                                                     binary=False),
                               num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-        dataset = dataset.flat_map(lambda w,x,y,z: tf.data.Dataset.from_tensor_slices((w,x,y,z)))
+        dataset = dataset.flat_map(lambda x: tf.data.Dataset.from_tensor_slices(x))
 
-        dataset = dataset.map(lambda w,x,y,z: {'input':w,
-                                               'label':x,
-                                               'lcid':y,
-                                               'length':z},
-                              num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     dataset = dataset.map(lambda x: {'input' :x['input'],
                                      'lcid'  :x['lcid'],
@@ -116,8 +130,5 @@ def to_windows(dataset,
                                      'mask'  :tf.ones(tf.shape(x['input'])[0]),
                                      'label' : x['label']},
                           num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
-    if batch_size is not None:
-        dataset = dataset.padded_batch(batch_size)
 
     return dataset

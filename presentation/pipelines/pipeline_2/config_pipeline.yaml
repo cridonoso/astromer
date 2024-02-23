@@ -1,0 +1,35 @@
+
+expertiment_ids: ['atlas', 'alcock']
+data: './data/records'
+do_ft: [true, true]
+do_clf: [true, true]
+gpu: '0'
+
+mlflow_tags:
+  model: 'bugstromer_1'
+  save_path: './presentation/results/bugstromer_1/2024-02-01_13-54-17'
+
+
+experiment:
+  folds : ['fold_0', 'fold_1', 'fold_2']
+  spc : ['20', '100', '500']
+  
+
+
+training:
+  scheduler : true
+  lr : 0.001
+  bs : 512
+  patience : 20
+  num_epochs : 1000
+  probed : 0.2
+  rs : 0.1
+  maxlen : 200
+  
+clf:
+  arch: 'mlp_att'
+  astromer: frozen
+  astromer_unfrozen: false
+
+  
+

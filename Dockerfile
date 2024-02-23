@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.8.0-gpu
+FROM tensorflow/tensorflow:2.11.0-gpu
 # ==== USER CREATION ===
 ARG USER_ID
 ARG GROUP_ID
@@ -7,7 +7,7 @@ RUN adduser --disabled-password --gecos '' --uid $USER_ID --gid $GROUP_ID user
 # ==== UPDATE SISTEM ====
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
-RUN apt-get update
+RUN apt-get update --fix-missing
 RUN apt install -y graphviz
 RUN apt install nano htop wget sudo
 RUN echo "user:user" | chpasswd && adduser user sudo
@@ -18,6 +18,7 @@ RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install dvipng texlive-latex-ext
 ADD ./requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt --no-cache-dir
 RUN apt-get install -y libmysqlclient-dev
+RUN apt-get update
 # ==== BUILDING WORKING DIR ====
 USER user
 WORKDIR /home/

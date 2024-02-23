@@ -1,0 +1,13 @@
+name: downstream_task
+
+docker_env:
+  image: astromer
+  volumes: ["/home/cridonoso/Documents/astromer-science/astromer:/home"]
+  
+entry_points:
+  main:
+    parameters:
+      data: {type: str, default: './data/records/alcock/fold_0/alcock_20/'}
+      pt_model: {type: str, 
+      default: './presentation/results/bugstromer_1/2024-02-01_13-54-17/pretraining'}
+    command: "python -m presentation.pipelines.pipeline_1.main {pt_model} {data}"

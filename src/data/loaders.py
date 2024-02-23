@@ -1,10 +1,13 @@
 import tensorflow as tf
+import multiprocessing
 import os
 
 from src.data.record import deserialize
-from src.data.preprocessing import to_windows, standardize
-from src.data.masking import mask_dataset, mask_sample
-from src.data.nsp import nsp_dataset
+from src.data.preprocessing import to_windows, standardize, min_max_scaler
+from src.data.masking import mask_dataset
+from src.data.nsp import apply_nsp
+from src.data.gap import set_gap, invert_mask
+
 
 def load_records(records_dir):
     """
@@ -70,118 +73,12 @@ def load_numpy(samples,
                                                         'length':()})
     return dataset
 
-def pretraining_pipeline(dataset,
-                         batch_size=None,
-                         window_size=200,
-                         msk_frac=.5,
-                         rnd_frac=.2,
-                         same_frac=.2,
-                         sampling=True,
-                         shuffle=False,
-                         repeat=1,
-                         num_cls=None,
-                         normalize=True,
-                         cache=False,
-                         return_ids=False,
-                         return_lengths=False,
-                         nsp_prob=1.,
-                         nsp_frac=0.,
-                         moving_window=False,
-                         nsp_test=False):
-    """
-    Pretraining pipeline.
-    Create an ad-hoc ASTROMER dataset
-
-    Args:
-        dataset: tf.Dataset (use load_records or load_numpy first)
-        batch_size (integer): Number of windows per batch
-        window_size: Maximum window size. window_size<=max.length from lightcurves
-        sampling: Windows extraction strategy.
-                  If True, windows are randomnly sampled from the light curves
-                  If False, lightcurves are divided in sequential windows
-                  without overlaping.
-        msk_frac: observations fraction per light curve that will be masked
-        rnd_frac: fraction from masked values to be replaced by random values
-        same_frac: fraction from masked values to be replace by same values
-        return_ids: Not necessary when training.
-        return_lengths: Not necessary when training.
-        moving_window: Random sengement prediction
-
-    Returns:
-        type: tf.Dataset
-    """
-    assert isinstance(dataset, (list, str)), '[ERROR] Invalid format'
-    assert batch_size is not None, '[ERROR] Undefined batch size'
-
-    if isinstance(dataset, list):
-        dataset = load_numpy(dataset)
-
-    if isinstance(dataset, str):
-        dataset = load_records(dataset)
-
-    if shuffle:
-        SHUFFLE_BUFFER = 10000
-        dataset = dataset.shuffle(SHUFFLE_BUFFER)
-
-    # REPEAT LIGHT CURVES
-    if repeat is not None:
-        print('[INFO] Repeating dataset x{} times'.format(repeat))
-        dataset = dataset.repeat(repeat)
-
-    # CREATE WINDOWS
-    dataset = to_windows(dataset,
-                         window_size=window_size,
-                         sampling=sampling)
-
-    if normalize:
-        dataset = dataset.map(standardize)
-
-    dataset = mask_dataset(dataset,
-                           msk_frac=msk_frac,
-                           rnd_frac=rnd_frac,
-                           same_frac=same_frac,
-                           window_size=window_size)
-
-    shapes = {'input' :[None, 3],
-              'lcid'  :(),
-              'length':(),
-              'mask'  :[None, ],
-              'label' :(),
-              'input_modified': [None, None],
-              'mask_in': [None, None],
-              'mask_out': [None, None]}
-
-    if nsp_frac>0. and nsp_prob<=1.:
-        print('[INFO] Using NSP')
-        print('[INFO] Mov. win: ',moving_window)
-        dataset = nsp_dataset(dataset,
-                              prob=nsp_prob,
-                              frac=nsp_frac,
-                              moving_window=moving_window,
-                              buffer_shuffle=5000)
-        shapes['nsp_label'] = ()
-        shapes['mask'] = (None, None)
-        shapes['original_input'] = (None, 3)
-
-    dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
-
-    # FORMAT INPUT DICTONARY
-    dataset = dataset.map(lambda x: format_inp_astromer(x,
-                                                        return_ids=return_ids,
-                                                        return_lengths=return_lengths,
-                                                        num_cls=num_cls,
-                                                        nsp_test=nsp_test),
-                          num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
-    if cache:
-        dataset = dataset.cache()
-
-    #PREFETCH BATCHES
-    dataset = dataset.prefetch(2)
-
-    return dataset
-
-def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=None, nsp_test=False):
+def format_inp_astromer(batch, 
+                        return_ids=False, 
+                        return_lengths=False, 
+                        num_cls=None, 
+                        nsp_test=False,
+                        aversion='base'):
     """
     Buildng ASTROMER input
 
@@ -192,30 +89,128 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
         type: A tuple (x, y) tuple where x are the inputs and y the labels
     """
 
-    inputs = {
-        'input': batch['input_modified'],
-        'times': tf.slice(batch['input'], [0,0,0], [-1,-1,1]),
-        'mask_in': batch['mask_in']
-    }       
+    inputs, outputs = {}, {}
+
+    if aversion == 'skip':
+        inputs['input'] = batch['input_modified']
+        times = tf.slice(batch['input'], [0,0,0], [-1,-1,1])
+        inp_size = tf.shape(batch['input'])
+        t0 = tf.slice(batch['input'], [0,0,0], [-1,inp_size[1]-1,1])
+        t1 = tf.slice(batch['input'], [0,1,0], [-1,-1,1])
+        dt = t1 - t0
+        inputs['times']     = tf.concat([tf.zeros([inp_size[0], 1, 1]), dt], axis=1)
+        inputs['mask_in']   = batch['mask_in']
+
+        outputs['target']  = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
+        outputs['error']       = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
+        outputs['mask_out'] = batch['mask_out']
+    
+    if aversion == 'nsp':
+        inputs['input']   = batch['nsp_magnitudes']
+        inputs['times']   = batch['nsp_times']
+        inputs['mask_in'] = batch['mask_in']
+        inputs['seg_emb'] = tf.expand_dims(batch['seg_emb'], axis=-1)
         
+        outputs['target'] = batch['target_magnitudes']
+        outputs['error']  = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
+        outputs['original']  = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
+        outputs['mask_out']  = batch['mask_out']
+        outputs['seg_emb']   = tf.where(inputs['seg_emb'] == -1., 1., 0.)
+        outputs['nsp_label'] = batch['nsp_label']
+    
+
     if num_cls is not None:
         outputs = tf.one_hot(batch['label'], num_cls)
-    else:
-        outputs = {
-            'target': tf.slice(batch['input'], [0,0,1], [-1,-1,1]),
-            'mask_out': batch['mask_out'],
-        }
-
-    if 'nsp_label' in batch.keys() and num_cls is None:
-        outputs['nsp_label'] = batch['nsp_label']
-        outputs['target'] = tf.slice(outputs['target'], [0,1,0], [-1,-1,-1])
-        outputs['mask_out'] = tf.slice(outputs['mask_out'], [0,1,0], [-1,-1,-1])
-
-    if nsp_test:
-        inputs['original_input'] = batch['original_input']
-    if return_ids:
-        inputs['ids'] = batch['lcid']
+    
+    if return_ids:     
+        outputs = tf.one_hot(batch['label'], num_cls), batch['lcid']
+        
     if return_lengths:
-        inputs['length'] = batch['length']
+        outputs = tf.one_hot(batch['label'], num_cls), batch['lenght']
 
     return inputs, outputs
+
+def filter_fn(input_dict):
+    if tf.less(tf.shape(input_dict['input'])[0], 5):
+        return False
+    else:
+        return True
+    
+def get_loader(dataset,
+               batch_size=None,
+               window_size=200,
+               probed_frac=.2,
+               random_frac=.1,
+               nsp_prob=0.5,
+               sampling=True,
+               shuffle=False,
+               repeat=1,
+               num_cls=None,
+               max_gap=0.2,
+               normalize='zero-mean', # 'minmax'
+               cache=False,
+               return_ids=False,
+               return_lengths=False,
+               aversion='skip'):
+
+
+    assert isinstance(dataset, (list, str)), '[ERROR] Invalid format'
+    assert batch_size is not None, '[ERROR] Undefined batch size'
+
+    if isinstance(dataset, list):
+        dataset = load_numpy(dataset)
+
+    if isinstance(dataset, str):
+        dataset = load_records(dataset)
+    
+    if shuffle:
+        SHUFFLE_BUFFER = 10000
+        dataset = dataset.shuffle(SHUFFLE_BUFFER)
+
+    # REPEAT LIGHT CURVES
+    if repeat is not None:
+        print('[INFO] Repeating dataset x{} times'.format(repeat))
+        dataset = dataset.repeat(repeat)
+    
+    dataset = dataset.filter(filter_fn)
+
+    # CREATE WINDOWS
+    dataset = to_windows(dataset,
+                         window_size=window_size,
+                         sampling=sampling)
+
+    if normalize == 'zero-mean':
+        dataset = dataset.map(standardize)
+
+    if normalize == 'minmax':
+        dataset = dataset.map(min_max_scaler)
+        
+    
+    print('[INFO] Loading PT task: Masking')
+    dataset, shapes = mask_dataset(dataset,
+                           msk_frac=probed_frac,
+                           rnd_frac=random_frac,
+                           same_frac=random_frac,
+                           window_size=window_size)
+    dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
+    
+    if aversion == 'nsp':
+        print('[INFO] NSP format activated')
+        dataset = apply_nsp(dataset, nsp_prob)
+
+    # FORMAT INPUT DICTONARY
+
+    dataset = dataset.map(lambda x: format_inp_astromer(x,
+                                                return_ids=return_ids,
+                                                return_lengths=return_lengths,
+                                                num_cls=num_cls,
+                                                aversion=aversion),
+                  num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    if cache:
+        dataset = dataset.cache()
+
+    # #PREFETCH BATCHES
+    dataset = dataset.prefetch(2)
+
+    return dataset
