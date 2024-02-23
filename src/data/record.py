@@ -1,239 +1,478 @@
-import zipfile
-from io import BytesIO
 import multiprocessing as mp
 import tensorflow as tf
 import pandas as pd
+import polars as pl
 import numpy as np
 import logging
+import shutil
+import random
+import glob
+import toml
 import os
 
-from joblib import wrap_non_picklable_objects
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from joblib import Parallel, delayed
+from typing import List, Dict, Any
+from io import BytesIO
 from tqdm import tqdm
-from time import time
+
+# Set up logging configuration
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 
 def _bytes_feature(value):
     """Returns a bytes_list from a string / byte."""
     if isinstance(value, type(tf.constant(0))):
         value = value.numpy() # BytesList won't unpack a string from an EagerTensor.
-    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
 
 def _float_feature(list_of_floats):  # float32
     return tf.train.Feature(float_list=tf.train.FloatList(value=list_of_floats))
 
 def _int64_feature(value):
-    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
 
-def get_example(lcid, label, lightcurve):
+def parse_dtype(value, data_type):
+    if type(value) in [int, float] and data_type == 'integer':
+        return _int64_feature([int(value)])
+    if type(value) in [int, float] and data_type == 'float':
+        return _float_feature([value])
+    if type(value) == str and data_type == 'string':
+        return _bytes_feature([str(value).encode()])
+
+    if type(value) == list:
+        if type(value[0]) == int and data_type == 'integer':
+            return _int64_feature(value)
+        if type(value[0]) == float and data_type == 'float':
+            return _float_feature(value)
+        if type(value[0]) == str and data_type == 'string':
+            return _bytes_feature(value)
+
+    raise ValueError('[ERROR] {} with type {} could not be parsed. Please use <str>, <int>, or <float>'.format(value, type(value)))
+
+def substract_frames(frame1, frame2, on):
+    frame1 = frame1[~frame1[on].isin(frame2[on])]
+    return frame1
+
+def write_config(context_features: List[str], sequential_features: List[str], config_path: str) -> None:
     """
-    Create a record example from numpy values.
-    Serialization
+    Writes the configuration to a toml file.
+
     Args:
-        lcid (string): object id
-        label (int): class code
-        lightcurve (numpy array): time, magnitudes and observational error
-
-    Returns:
-        tensorflow record
+        context_features (list): List of context features.
+        sequential_features (list): List of sequential features.
+        config_path (str): Path to the output config.toml file.
     """
-
-    f = dict()
-
-    dict_features={
-    'id': _bytes_feature(str(lcid).encode()),
-    'label': _int64_feature(label),
-    'length': _int64_feature(lightcurve.shape[0]),
+    config = {
+        "context_features": context_features,
+        "sequential_features": sequential_features
     }
-    element_context = tf.train.Features(feature = dict_features)
 
-    dict_sequence = {}
-    for col in range(lightcurve.shape[1]):
-        seqfeat = _float_feature(lightcurve[:, col])
-        seqfeat = tf.train.FeatureList(feature = [seqfeat])
-        dict_sequence['dim_{}'.format(col)] = seqfeat
+    # Make directory if it does not exist
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
 
-    element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
-    ex = tf.train.SequenceExample(context = element_context,
-                                  feature_lists= element_lists)
-    return ex
-
-@wrap_non_picklable_objects
-def process_lc2(row, source, unique_classes, zip_flag, file_ins=None, **kwargs):
-    path  = row['Path'].split('/')[-1]
-    label = list(unique_classes).index(row['Class'])
-    lc_path = os.path.join(source, path)
-    
-    if zip_flag == True:
-        file_inf = file_ins.getinfo(lc_path)
-        file_read = file_ins.read(file_inf)
-
-        observations = pd.read_csv(BytesIO(file_read), **kwargs)
-
-    else:
-        observations = pd.read_csv(lc_path, **kwargs)
-        
-    observations.columns = ['mjd', 'mag', 'errmag']
-    observations = observations.dropna()
-    observations.sort_values('mjd')
-    observations = observations.drop_duplicates(keep='last')
-    
-    observations = observations[(observations['mag']>=observations['mag'].quantile(.1)) &
-                                (observations['mag']<=observations['mag'].quantile(.99)) &
-                                (observations['errmag']>=0.) & (observations['errmag']<=1)]
-
-    numpy_lc = observations.values
-
-    return row['ID'], label, numpy_lc
-
-def process_lc3(lc_index, label, numpy_lc, writer):
     try:
-        ex = get_example(lc_index, label, numpy_lc)
-        writer.write(ex.SerializeToString())
-    except:
-        print('[INFO] {} could not be processed'.format(lc_index))
+        with open(config_path, 'w') as config_file:
+            toml.dump(config, config_file)
+        logging.info(f'Successfully wrote config to {config_path}')
+    except Exception as e:
+        logging.error(f'Error while writing the config file: {str(e)}')
+        raise e
 
-def divide_training_subset(frame, train, val, test_meta):
+class DataPipeline:
     """
-    Divide the dataset into train, validation and test subsets.
-    Notice that:
-        test = 1 - (train + val)
-
     Args:
-        frame (Dataframe): Dataframe following the astro-standard format
-        dest (string): Record destination.
-        train (float): train fraction
-        val (float): validation fraction
-    Returns:
-        tuple x3 : (name of subset, subframe with metadata)
+        metadata
+        config_path
     """
 
-    frame = frame.sample(frac=1)
-    n_samples = frame.shape[0]
+    def __init__(self,
+                 metadata=None,
+                 config_path= "./config.toml"):
 
-    n_train = int(n_samples*train)
-    n_val = int(n_samples*val)
+        
 
-    if test_meta is not None:
-        sub_test = test_meta
-        sub_train = frame.iloc[:n_train]
-        sub_val   = frame.iloc[n_train:]
-    else:
-        sub_train = frame.iloc[:n_train]
-        sub_val   = frame.iloc[n_train:n_train+n_val]
-        sub_test  = frame.iloc[n_train+n_val:]
+        #get context and sequential features from config file 
+        if not os.path.isfile(config_path):
+            logging.error("The specified config path does not exist")
+            raise FileNotFoundError("The specified config path does not exist")
 
-    return ('train', sub_train), ('val', sub_val), ('test', sub_test)
+        # Read the config file
+        with open(config_path, 'r') as f:
+            config = toml.load(f)
 
-def write_records(frame, dest, max_lcs_per_record, source, unique, zip_flag=False, n_jobs=None, max_obs=200, **kwargs):
-    # Get frames with fixed number of lightcurves
-    collection = [frame.iloc[i:i+max_lcs_per_record] \
-                  for i in range(0, frame.shape[0], max_lcs_per_record)]
+        # Saving class variables
+        self.metadata                  = metadata
+        self.config_path               = config_path
+        self.config                    = config
+        self.context_features          = config['context_features']['value']
+        self.context_features_dtype    = config['context_features']['dtypes']
+        self.sequential_features       = config['sequential_features']['value']
+        self.sequential_features_dtype = config['sequential_features']['dtypes']
+        self.output_folder             = config['general']['target']['value']
+        self.id_column                 = config['general']['id_column']['value']
+
+        assert self.metadata[self.id_column].dtype == int, \
+        'ID column should be an integer Serie but {} was given'.format(self.metadata[self.id_column].dtype)
+        
+        if metadata is not None:
+            print('[INFO] {} samples loaded'.format(metadata.shape[0]))
+
+        self.metadata['subset_0'] = ['full']*self.metadata.shape[0]
+
+        os.makedirs(self.output_folder, exist_ok=True)
+
+    @staticmethod
+    def aux_serialize(sel : pl.DataFrame, 
+                      path : str, 
+                      context_features: list, 
+                      context_features_dtype: list,
+                      sequential_features: list,
+                      sequential_features_dtype: list) -> None:
+        if not isinstance(sel, pl.DataFrame):
+            logging.error("Invalid data type provided to aux_serialize")
+            raise ValueError("Invalid data type provided to aux_serialize")
+
+        with tf.io.TFRecordWriter(path) as writer:
+            for row  in sel.iter_rows(named=True):
+                ex = DataPipeline.get_example(row, context_features, context_features_dtype, 
+                                              sequential_features, sequential_features_dtype)
+                writer.write(ex.SerializeToString())
+         
+        
+    @staticmethod
+    def get_example(row: dict, 
+                    context_features: list, 
+                    context_features_dtype: list,
+                    sequential_features: list,
+                    sequential_features_dtype: list) -> tf.train.SequenceExample:
+        """
+        Converts a given row into a TensorFlow SequenceExample.
+
+        Args:
+            row (pd.Series): Row of data to be converted.
+
+        Returns:
+            tf.train.SequenceExample: The converted row as a SequenceExample.
+        """
+        dict_features = {}
+        # Parse each context feature based on its dtype and add to the features dictionary
+        for name, data_type in zip(context_features, context_features_dtype):
+            dict_features[name] = parse_dtype(row[name], data_type=data_type)
+
+        # Create a context for the SequenceExample using the features dictionary
+        element_context = tf.train.Features(feature=dict_features)
+
+        dict_sequence = {}
+        # Create a sequence of features for each dimension of the lightcurve
+        for col, data_type in zip(sequential_features, sequential_features_dtype):
+            seqfeat = parse_dtype(row[col][:], data_type=data_type)
+            seqfeat = tf.train.FeatureList(feature=[seqfeat])
+            dict_sequence[col] = seqfeat
+
+        # Add the sequence to the SequenceExample
+        element_lists = tf.train.FeatureLists(feature_list=dict_sequence)
+
+        # Create the SequenceExample
+        ex = tf.train.SequenceExample(context=element_context, feature_lists=element_lists)
+        # logging.info("Successfully converted to SequenceExample.")
+        return ex
     
-    if zip_flag == True:
-        with zipfile.ZipFile(source.split('/')[0]+'.zip', 'r') as zp:
+    def inspect_records(self, dir_path:str = './records/output/', num_records: int = 1):
+        """
+        Function to inspect the first 'num_records' from a random TFRecord file in the given directory.
 
-            for counter, subframe in enumerate(collection):
-                var = [process_lc2(row, source, unique, zip_flag, file_ins = zp, **kwargs) for k, row in subframe.iterrows()]
+        Args:
+            dir_path (str): Directory path where TFRecord files are located.
+            num_records (int): Number of records to inspect.
 
-                with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
-                    for counter2, data_lc in enumerate(var):
-                        process_lc3(*data_lc, writer)    
+        Returns:
+            NoReturn
+        """
+        # Use glob to get all the .record files in the directory
+        file_paths = glob.glob(dir_path + '*.record')
+
+        # Select a random file path
+        file_path = random.choice(file_paths)
+
+        try:
+            raw_dataset = tf.data.TFRecordDataset(file_path)
+            for raw_record in raw_dataset.take(num_records):
+                example = tf.train.Example()
+                example.ParseFromString(raw_record.numpy())
+
+            logging.info(f'Successfully inspected {num_records} records from {file_path}.')
+        except Exception as e:
+            logging.error(f'Error while inspecting records. Error message: {str(e)}')
+            raise e
+
+
     
+    def train_val_test(self,
+                       val_frac=0.2,
+                       test_frac=0.2,
+                       test_meta=None,
+                       val_meta=None,
+                       shuffle=True,
+                       id_column_name=None,
+                       k_fold=1):
+
+        if k_fold > 1 and test_meta is not None:
+            assert len(test_meta) == k_fold, 'test_meta should be a list containing {}-fold subsets'.format(k_fold)
+
+        if id_column_name is None:
+            id_column_name = self.metadata.columns[0]
+        print('[INFO] Using {} col as sample identifier'.format(id_column_name))
+
+        if (type(test_meta) is not list) and (k_fold > 1) and (type(test_meta) != type(None)):
+            raise ValueError(f'k_fold={k_fold} does not match with number of test frames. Please provide a list of testing frames for each fold')
+        if (type(val_meta) is not list) and (k_fold > 1) and (type(val_meta) != type(None)):
+            raise ValueError(f'k_fold={k_fold} does not match with number of validation frames.Please, provide a list of validation frames for each fold')
+
+        if test_meta is None: test_meta = []
+        if val_meta is None: val_meta = []
+
+        for k in range(k_fold):
+            if shuffle:
+                print('[INFO] Shuffling')
+                self.metadata = self.metadata.sample(frac=1)
+
+            self.metadata = substract_frames(self.metadata, test_meta[k], on=id_column_name)
+
+            try:
+                val_meta[k]
+            except:
+                val_meta.append(self.metadata.sample(frac=val_frac))
+
+            self.metadata = substract_frames(self.metadata, val_meta[k], on=id_column_name)
+
+            self.metadata['subset_{}'.format(k)] = ['train']*self.metadata.shape[0]
+            val_meta[k]['subset_{}'.format(k)]      = ['validation']*val_meta[k].shape[0]
+            test_meta[k]['subset_{}'.format(k)]     = ['test']*test_meta[k].shape[0]
+
+            self.metadata = pd.concat([self.metadata, val_meta[k], test_meta[k]])
+
+
+    def prepare_data(self, container : np.ndarray, elements_per_shard : int, subset : str, fold_n : int):
+        """Prepare the data to be saved as records"""
+        if container is None or not hasattr(container, '__iter__'):
+            raise ValueError("Invalid container provided to prepare_data")
+        
+        # Number of objects in the split
+        N = self.metadata.shape[0]
+        # Compute the number of shards
+
+        n_shards = -np.floor_divide(N, -elements_per_shard)
+        # Number of characters of the padded number of shards
+        name_length = len(str(n_shards))
+
+        # Create one file per shard
+        shard_paths = []
+        root = os.path.join(self.output_folder, f'fold_{fold_n}', subset)
+        os.makedirs(root, exist_ok=True)
+        shutil.copyfile(self.config_path, os.path.join(root, 'config.toml'))
+        for shard in range(n_shards):
+            # Get the shard number padded with 0s
+            shard_name = str(shard+1).rjust(name_length, '0')
+            # Get the shard store name
+            shard_path= os.path.join(root, '{}.record'.format(shard_name))
+            # Save it into a list
+            shard_paths.append(shard_path)
+
+        shards_data = []
+        for j in range(len(shard_paths)):
+            sel = container[j*elements_per_shard:(j+1)*elements_per_shard]
+            shards_data.append(sel)        
+        return shards_data, shard_paths
+    
+    def lightcurve_step(self, inputs):
+        """
+        Preprocessing applied to each light curve separately
+        """
+        # First feature is time
+        inputs = inputs.sort(self.sequential_features[0]) 
+        return inputs
+
+    def observations_step(self):
+        """
+        Preprocessing applied to all observations. Filter only
+        """
+        fn = pl.col("err") < 1.  # Clean the data on the big lazy dataframe
+        return fn
+
+    def read_all_parquets(self, observations_path : str , metadata_path : str) -> pd.DataFrame:
+        """
+        Read the files from given paths and filters it based on err_threshold and ID from metadata
+        Args:
+            observations_path (str): Directory path of parquet files
+            metadata_path (str): File path of metadata
+        Returns:
+            new_df (pl.DataFrame): Processed dataframe
+        """
+        # logging.info("Reading parquet files")
+
+        if not os.path.exists(observations_path):
+            logging.error("The specified parquets path does not exist")
+            raise FileNotFoundError("The specified parquets path does not exist")
+
+        if not os.path.isfile(metadata_path):
+            logging.error("The specified metadata path does not exist")
+            raise FileNotFoundError("The specified metadata path does not exist")
+
+
+        # Read the parquet filez lazily
+        paths = os.path.join(observations_path, '*.parquet')
+        scan = pl.scan_parquet(paths)
+
+        # Using partial information, extract only the necessary objects
+        ID_series = pl.Series(self.metadata[self.id_column].values)
+        f1 = pl.col(self.id_column).is_in(ID_series)
+        scan.filter(f1)
+        
+        lightcurves_fn  = lambda light_curve: self.lightcurve_step(light_curve)
+
+        # Filter, drop nulls, and sort every object
+        processed_obs = scan.filter(self.observations_step()).drop_nulls().groupby(self.id_column).apply(lightcurves_fn, schema=None)
+
+        # Select only the relevant columns
+        processed_obs = processed_obs.select([self.id_column] + self.sequential_features)
+
+        # Mix metadata and the data
+        processed_obs = processed_obs.groupby(self.id_column).all()
+
+        # First run takes more time!
+        metadata_lazy = pl.scan_parquet(metadata_path, cache=True) # First run is slower
+           
+        # Perform the join to get the data
+        processed_obs = processed_obs.join(other=metadata_lazy, 
+                                            on=self.id_column).collect(streaming=True) #streaming might be useless.                    
+        
+        return processed_obs
+    
+
+
+    def resample_folds(self, n_folds=1):
+        print('[INFO] Creating {} random folds'.format(n_folds))
+        print('Not implemented yet hehehe...')
+
+    def run(self, observations_path :str , metadata_path : str, n_jobs : int =1, elements_per_shard : int = 5000) -> None: 
+        """
+        Executes the DataPipeline operations which includes reading parquet files, processing samples and writing records.
+        
+        Args:
+            observations_path (str): Directory path of parquet files containing light curves observations
+            metadata_path (str): Path for metadata file
+            n_jobs (int): The maximum number of concurrently running jobs. Default is 1
+            elements_per_shard (int): Maximum number of elements per shard. Default is 5000
+        """
+        if not os.path.exists(observations_path):
+            logging.error("The specified parquets path does not exist")
+            raise FileNotFoundError("The specified parquets path does not exist")
+        
+        if not os.path.isfile(metadata_path):
+            logging.error("The specified metadata path does not exist")
+            raise FileNotFoundError("The specified metadata path does not exist")
+        
+        # Start the operations
+        logging.info("Starting DataPipeline operations")
+
+        # threads = Parallel(n_jobs=n_jobs, backend='threading')
+        fold_groups = [x for x in self.metadata.columns if 'subset' in x]
+        pbar = tqdm(fold_groups, colour='#00ff00') # progress bar
+        
+        new_df = self.read_all_parquets(observations_path, metadata_path)
+        self.new_df = new_df
+
+        for fold_n, fold_col in enumerate(pbar):
+            pbar.set_description(f"Processing fold {fold_n}/{len(fold_groups)}")
+            for subset in self.metadata[fold_col].unique():               
+                # ============ Processing Samples ===========
+                partial = self.metadata[self.metadata[fold_col] == subset]
+                
+                # Transform into a appropiate representation
+                index = partial[self.id_column]
+                b = np.isin(new_df[self.id_column].to_numpy(), index)
+                container = new_df.filter(b)
+                
+                # ============ Writing Records ===========                
+                shards_data, shard_paths = self.prepare_data(container, elements_per_shard, subset, fold_n)
+                
+                # for shard, shard_path in zip(shards_data,shard_paths):
+                #     DataPipeline.aux_serialize(shard, shard_path, 
+                #                     self.context_features, self.context_features_dtype, 
+                #                     self.sequential_features, self.sequential_features_dtype)
+
+                with ThreadPoolExecutor(n_jobs) as exe:
+                    # submit tasks to generate files
+                    _ = [exe.submit(DataPipeline.aux_serialize, shard, shard_path, 
+                                    self.context_features, self.context_features_dtype, 
+                                    self.sequential_features, self.sequential_features_dtype) \
+                             for shard, shard_path in zip(shards_data,shard_paths)]
+    
+
+        logging.info('Finished execution of DataPipeline operations')
+
+
+
+
+def get_tf_dtype(data_type, is_sequence=False):
+    if not is_sequence:
+        if data_type == 'integer': return tf.io.FixedLenFeature([], dtype=tf.int64)
+        if data_type == 'float': return tf.io.FixedLenFeature([], dtype=tf.float32)
+        if data_type == 'string': return tf.io.FixedLenFeature([], dtype=tf.string)
     else:
+        if data_type == 'integer': return tf.io.VarLenFeature(dtype=tf.int64)
+        if data_type == 'float': return tf.io.VarLenFeature(dtype=tf.float32)
+        if data_type == 'string': return tf.io.VarLenFeature(dtype=tf.string32)
 
-        for counter, subframe in enumerate(collection):
-            #-------#
-            var = Parallel(n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique, zip_flag, file_ins = None, **kwargs) \
-                                         for k, row in subframe.iterrows())
-            #------#
-            
-            #var = Parallel(backend = 'threading', n_jobs=n_jobs)(delayed(process_lc2)(row, source, unique, zp, **kwargs) \
-             #                      for k, row in subframe.iterrows())
-            
-
-            with tf.io.TFRecordWriter(dest+'/chunk_{}.record'.format(counter)) as writer:
-                for counter2, data_lc in enumerate(var):
-                    process_lc3(*data_lc, writer)
-
-def create_dataset(meta_df,
-                   source,
-                   target='records/new_ztf_g',
-                   n_jobs=None,
-                   subsets_frac=(0.5, 0.25),
-                   test_subset=None,
-                   max_lcs_per_record=100,
-                   **kwargs): # kwargs contains additional arguments for the read_csv() function
-
-    os.makedirs(target, exist_ok=True)
-    zip_flag = False
-    if source.split('.')[-1] == 'zip':
-        zip_flag = True
-        source = source.split('.')[0]+'/'    
-
-    bands = meta_df['Band'].unique()
-    if len(bands) > 1:
-        b = input('Filters {} were found. Type one to continue'.format(' and'.join(bands)))
-        meta_df = meta_df[meta_df['Band'] == b]
-
-    unique, counts = np.unique(meta_df['Class'], return_counts=True)
-    info_df = pd.DataFrame()
-    info_df['label'] = unique
-    info_df['size'] = counts
-    info_df.to_csv(os.path.join(target, 'objects.csv'), index=False)
-
-    # Separate by class
-    cls_groups = meta_df.groupby('Class')
-
-    for cls_name, cls_meta in tqdm(cls_groups, total=len(cls_groups)):
-        subsets = divide_training_subset(cls_meta,
-                                         train=subsets_frac[0],
-                                         val=subsets_frac[1],
-                                         test_meta = test_subset)
-
-        for subset_name, frame in subsets:
-            dest = os.path.join(target, subset_name, cls_name)
-            if not os.path.exists(dest):
-                os.makedirs(dest, exist_ok=True)
-            write_records(frame, dest, max_lcs_per_record, source, unique, zip_flag, n_jobs, **kwargs)
-
-def deserialize(sample):
+def deserialize(sample, records_path=None):
     """
-    Read a serialized sample and convert it to tensor
-    Context and sequence features should match with the name used when writing.
+    Reads a serialized sample and converts it to tensor.
+    Context and sequence features should match the name used when writing.
     Args:
         sample (binary): serialized sample
 
     Returns:
         type: decoded sample
     """
-    context_features = {'label': tf.io.FixedLenFeature([],dtype=tf.int64),
-                        'length': tf.io.FixedLenFeature([],dtype=tf.int64),
-                        'id': tf.io.FixedLenFeature([], dtype=tf.string)}
-    sequence_features = dict()
-    for i in range(3):
-        sequence_features['dim_{}'.format(i)] = tf.io.VarLenFeature(dtype=tf.float32)
+    try:
+        with open(os.path.join(records_path, 'config.toml'), 'r') as f:
+            config = toml.load(f)
+    except FileNotFoundError as e:
+        logging.error(f'Configuration file not found at {records_path}. Please provide a valid path.')
+        raise e
+    except Exception as e:
+        logging.error(f'An error occurred while loading the configuration file: {str(e)}')
+        raise e
 
+    # Define context features as strings
+    context_features = {}
+    for feat, data_type in zip(config['context_features']['value'], config['context_features']['dtypes']):
+        context_features[feat]= get_tf_dtype(data_type)
+
+    sequence_features = {}
+    # Define sequence features as floating point numbers
+    for feat, data_type in zip(config['sequential_features']['value'], config['sequential_features']['dtypes']):
+        sequence_features[feat]= get_tf_dtype(data_type, is_sequence=True)
+
+    # Parse the serialized sample into context and sequence features
     context, sequence = tf.io.parse_single_sequence_example(
                             serialized=sample,
                             context_features=context_features,
                             sequence_features=sequence_features
                             )
+    
+    # Cast context features to strings
+    input_dict = {k: context[k] for k in config['context_features']['value']}
 
-    input_dict = dict()
-    input_dict['lcid']   = tf.cast(context['id'], tf.string)
-    input_dict['length'] = tf.cast(context['length'], tf.int32)
-    input_dict['label']  = tf.cast(context['label'], tf.int32)
-
+    # Cast and store sequence features
     casted_inp_parameters = []
-    for i in range(3):
-        seq_dim = sequence['dim_{}'.format(i)]
+    for k in config['sequential_features']['value']:
+        seq_dim = sequence[k]
         seq_dim = tf.sparse.to_dense(seq_dim)
         seq_dim = tf.cast(seq_dim, tf.float32)
         casted_inp_parameters.append(seq_dim)
 
-
-    sequence = tf.stack(casted_inp_parameters, axis=2)[0]
-    input_dict['input'] = sequence
+    # Add sequence to the input dictionary
+    input_dict['input'] = tf.stack(casted_inp_parameters, axis=2)
     return input_dict
-
