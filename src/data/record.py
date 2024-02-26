@@ -237,16 +237,19 @@ class DataPipeline:
                 print('[INFO] Shuffling')
                 self.metadata = self.metadata.sample(frac=1)
 
+            try:
+                test_meta[k]
+            except:
+                test_meta.append(self.metadata.sample(frac=test_frac))
             self.metadata = substract_frames(self.metadata, test_meta[k], on=id_column_name)
 
             try:
                 val_meta[k]
             except:
                 val_meta.append(self.metadata.sample(frac=val_frac))
-
             self.metadata = substract_frames(self.metadata, val_meta[k], on=id_column_name)
 
-            self.metadata['subset_{}'.format(k)] = ['train']*self.metadata.shape[0]
+            self.metadata['subset_{}'.format(k)]    = ['train']*self.metadata.shape[0]
             val_meta[k]['subset_{}'.format(k)]      = ['validation']*val_meta[k].shape[0]
             test_meta[k]['subset_{}'.format(k)]     = ['test']*test_meta[k].shape[0]
 
@@ -268,7 +271,8 @@ class DataPipeline:
 
         # Create one file per shard
         shard_paths = []
-        root = os.path.join(self.output_folder, f'fold_{fold_n}', subset)
+        print(self.output_folder, 'fold_'+str(fold_n), subset)
+        root = os.path.join(self.output_folder, 'fold_'+str(fold_n), subset)
         os.makedirs(root, exist_ok=True)
         shutil.copyfile(self.config_path, os.path.join(root, 'config.toml'))
         for shard in range(n_shards):

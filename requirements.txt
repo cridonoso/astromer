@@ -1,5 +1,7 @@
+notebook==6.5.6
 scikit-learn
 joblib
+polars
 pandas
 mlflow
 tqdm

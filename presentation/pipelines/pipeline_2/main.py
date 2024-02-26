@@ -1,30 +1,31 @@
+import mlflow.tensorflow
+import tensorflow as tf
+import pandas as pd
+import numpy as np
+import logging
+import mlflow
+import optuna
+import toml
 import sys
 import os
-import toml
-import optuna
-import mlflow
-import mlflow.tensorflow
-from functools import partial
-import pandas as pd
-from presentation.pipelines.hp_tuning.utils import *
-from presentation.pipelines.steps import build_tf_data_loader, build_model
+
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
 from tensorflow.keras.optimizers import Adam
-from src.training.scheduler import CustomSchedule
-from presentation.experiments.utils import * 
-import tensorflow as tf
-from src.models.astromer_0 import  build_input
+from functools import partial
+
+from presentation.pipelines.steps.model_design import build_model, get_mlp_avg
+from presentation.pipelines.steps.load_data import build_tf_data_loader
+from presentation.pipelines.utils import get_or_create_experiment
+
 from src.models.astromer_nsp import  build_input as build_input_nsp
 from src.models.astromer_skip import  build_input as build_input_skip
-import logging
-import numpy as np
+from src.training.scheduler import CustomSchedule
+from src.models.astromer_0 import  build_input
 
 optuna.logging.set_verbosity(optuna.logging.ERROR)
 logging.getLogger('tensorflow').setLevel(logging.ERROR)
 import hydra
 from omegaconf import DictConfig, OmegaConf
-
-#mlflow.tensorflow.autolog( )
 
 os.environ['HYDRA_FULL_ERROR'] = '1'
 
@@ -64,12 +65,12 @@ def clf_train_evaluate(trial, exp_id, spc_id, config):
                                        clf_mode=True)
         
         cbks = [EarlyStopping(monitor='val_loss', patience=config['training']['patience']),
-            ModelCheckpoint(filepath=os.path.join(EXPDIR, 'weights'),
-                            save_weights_only=True,
-                            save_best_only=True,
-                            save_freq='epoch',
-                            verbose=1),
-                             mlflow.tensorflow.MLflowCallback( run=run)]
+                ModelCheckpoint(filepath=os.path.join(EXPDIR, 'weights'),
+                                save_weights_only=True,
+                                save_best_only=True,
+                                save_freq='epoch',
+                                verbose=1),
+                                mlflow.tensorflow.MLflowCallback( run=run)]
         
         
         if params['arch'] == 'base' or params['arch'] == 'normal':

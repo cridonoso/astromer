@@ -11,12 +11,15 @@ records/
 presentation/experiments/astromer_0/backup/
 wandb
 *.record
-data/records_parquet
+
 mlruns/
 outputs
 presentation/experiments/astromer_0/results
 presentation/experiments/astromer_1/results
 presentation/experiments/astromer_2/results
+
 data/embeddings/
 /data/records
 /data/raw_data
+/data/raw_data_parquet
+data/records_parquet
