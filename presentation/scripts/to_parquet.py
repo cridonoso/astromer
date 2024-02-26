@@ -19,7 +19,7 @@ def run(opt):
     metadata['sset'] = ['train']*metadata.shape[0]
 
     if os.path.exists(os.path.join(opt.data, 'test_metadata.csv')):
-        test_metadata = os.path.join(opt.data, 'test_metadata.csv')
+        test_metadata = pd.read_csv(os.path.join(opt.data, 'test_metadata.csv'))
         test_metadata['sset'] = ['test']*test_metadata.shape[0]
         metadata = pd.concat([metadata, test_metadata])
 
