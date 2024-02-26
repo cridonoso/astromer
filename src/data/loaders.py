@@ -2,7 +2,7 @@ import tensorflow as tf
 import multiprocessing
 import os
 
-from src.data.record import deserialize
+from src.data.old_record import deserialize
 from src.data.preprocessing import to_windows, standardize, min_max_scaler
 from src.data.masking import mask_dataset
 from src.data.nsp import apply_nsp
