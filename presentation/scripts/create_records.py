@@ -23,10 +23,8 @@ class CustomCleanPipeline(DataPipeline):
         inputs = inputs.sort(self.sequential_features[0], descending=True) 
         p99 = inputs.quantile(0.99, 'nearest')
         p01 = inputs.quantile(0.01, 'nearest')
-
         inputs = inputs.filter(pl.col('mag') < p99['mag'])
         inputs = inputs.filter(pl.col('mag') > p01['mag'])
-        print(inputs)
         return inputs
 
     def observations_step(self):
@@ -50,7 +48,11 @@ def run(opt):
     metadata['Class'] = pd.Categorical(metadata['Class'])
     metadata['Label'] = metadata['Class'].cat.codes
     metadata['Path']  = metadata['Path'].apply(lambda x: os.path.join(OBSPATH, x)) 
-
+    
+    if opt.debug:
+        metadata = metadata.sample(20)
+        print('[INFO] Debugging: ', metadata.shape)
+        
     custom_pipeline = CustomCleanPipeline(metadata=metadata,
                                           config_path=opt.config)
 
@@ -67,7 +69,7 @@ def run(opt):
 
     var = custom_pipeline.run(observations_path=OBSPATH, 
                                metadata_path=METAPATH,
-                               n_jobs=8,
+                               n_jobs=16,
                                elements_per_shard=opt.elements_per_shard)
 
 if __name__ == '__main__':
@@ -88,7 +90,7 @@ if __name__ == '__main__':
     parser.add_argument('--test-frac', default=0.2, type=float,
                     help='Validation fraction')
 
-    parser.add_argument('--elements-per-shard', default=5000, type=int,
+    parser.add_argument('--elements-per-shard', default=20000, type=int,
                     help='Number of light curves per shard')
 
 

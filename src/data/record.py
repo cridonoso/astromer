@@ -304,12 +304,11 @@ class DataPipeline:
         fn = pl.col("err") < 1.  # Clean the data on the big lazy dataframe
         return fn
 
-    def read_all_parquets(self, observations_path : str , metadata_path : str) -> pd.DataFrame:
+    def read_all_parquets(self, observations_path : str) -> pd.DataFrame:
         """
         Read the files from given paths and filters it based on err_threshold and ID from metadata
         Args:
             observations_path (str): Directory path of parquet files
-            metadata_path (str): File path of metadata
         Returns:
             new_df (pl.DataFrame): Processed dataframe
         """
@@ -318,10 +317,6 @@ class DataPipeline:
         if not os.path.exists(observations_path):
             logging.error("The specified parquets path does not exist")
             raise FileNotFoundError("The specified parquets path does not exist")
-
-        if not os.path.isfile(metadata_path):
-            logging.error("The specified metadata path does not exist")
-            raise FileNotFoundError("The specified metadata path does not exist")
 
 
         # Read the parquet filez lazily
@@ -345,11 +340,11 @@ class DataPipeline:
         processed_obs = processed_obs.groupby(self.id_column).all()
 
         # First run takes more time!
-        metadata_lazy = pl.scan_parquet(metadata_path, cache=True) # First run is slower
-           
+        # metadata_lazy = pl.scan_parquet(metadata_path, cache=True) # First run is slower
+        metadata_lazy = pl.from_pandas(self.metadata).lazy()   
         # Perform the join to get the data
         processed_obs = processed_obs.join(other=metadata_lazy, 
-                                            on=self.id_column).collect(streaming=True) #streaming might be useless.                    
+                                            on=self.id_column).collect(streaming=False) #streaming might be useless.                    
         
         return processed_obs
     
@@ -384,7 +379,9 @@ class DataPipeline:
         fold_groups = [x for x in self.metadata.columns if 'subset' in x]
         pbar = tqdm(fold_groups, colour='#00ff00') # progress bar
         
-        new_df = self.read_all_parquets(observations_path, metadata_path)
+        print('[INFO] Reading parquet')
+        new_df = self.read_all_parquets(observations_path)
+        print('[INFO] Light curves loaded')
         self.new_df = new_df
 
         for fold_n, fold_col in enumerate(pbar):
@@ -442,6 +439,7 @@ def deserialize(sample, records_path=None):
     try:
         with open(os.path.join(records_path, 'config.toml'), 'r') as f:
             config = toml.load(f)
+            print(config)
     except FileNotFoundError as e:
         logging.error(f'Configuration file not found at {records_path}. Please provide a valid path.')
         raise e

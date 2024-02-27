@@ -11,8 +11,6 @@ if [[ $gpu == $true ]]; then
    --rm \
    --privileged=true \
    --mount "type=bind,src=$(pwd),dst=/home/" \
-   -v "/home/cridonoso/Shared/datasets/light_curves/records:/home/data/records" \
-   -v "/home/cridonoso/Shared/datasets/light_curves/raw_data:/home/data/raw_data" \
    --workdir /home/ \
    -p 8886:8886 \
    -p 6006:6006 \
@@ -25,8 +23,6 @@ else
    --rm \
    --privileged=true \
    --mount "type=bind,src=$(pwd),dst=/home/" \
-   -v "/home/cridonoso/Shared/datasets/light_curves/records:/home/data/records" \
-   -v "/home/cridonoso/Shared/datasets/light_curves/raw_data:/home/data/raw_data" \
    --workdir /home/ \
    -p 8886:8886 \
    -p 6006:6006 \

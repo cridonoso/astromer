@@ -4,5 +4,6 @@ joblib
 polars
 pandas
 mlflow
+gdown
 tqdm
 toml
