@@ -19,48 +19,27 @@ from src.data import get_loader
 
 
 def get_loaders(opt):
-    if opt.arch == 'base':
-        train_loader = pretraining_pipeline(os.path.join(opt.data, 'train'),
-                                            batch_size= 5 if opt.debug else opt.bs, 
-                                            window_size=opt.window_size,
-                                            shuffle=True,
-                                            sampling=True,
-                                            repeat=4,
-                                            msk_frac=opt.probed,
-                                            rnd_frac=opt.rs,
-                                            same_frac=opt.rs)
+    train_loader = get_loader(os.path.join(opt.data, 'train'),
+                              batch_size=5 if opt.debug else opt.bs,
+                              window_size=opt.window_size,
+                              probed_frac=opt.probed,
+                              random_frac=opt.rs,
+                              nsp_prob=opt.nsp_prob,
+                              sampling=True,
+                              shuffle=True,
+                              repeat=4,
+                              aversion=opt.arch)
 
-        valid_loader = pretraining_pipeline(os.path.join(opt.data, 'val'),
-                                            batch_size=5 if opt.debug else opt.bs,
-                                            window_size=opt.window_size,
-                                            shuffle=False,
-                                            sampling=True,
-                                            msk_frac=opt.probed,
-                                            rnd_frac=opt.rs,
-                                            same_frac=opt.rs)
-
-    if opt.arch == 'skip' or opt.arch == 'nsp':
-        train_loader = get_loader(os.path.join(opt.data, 'train'),
-                                  batch_size=5 if opt.debug else opt.bs,
-                                  window_size=opt.window_size,
-                                  probed_frac=opt.probed,
-                                  random_frac=opt.rs,
-                                  nsp_prob=opt.nsp_prob,
-                                  sampling=True,
-                                  shuffle=True,
-                                  repeat=4,
-                                  aversion=opt.arch)
-
-        valid_loader = get_loader(os.path.join(opt.data, 'val'),
-                                  batch_size=5 if opt.debug else opt.bs,
-                                  window_size=opt.window_size,
-                                  probed_frac=opt.probed,
-                                  random_frac=opt.rs,
-                                  nsp_prob=opt.nsp_prob,
-                                  sampling=True,
-                                  shuffle=False,
-                                  repeat=1,
-                                  aversion=opt.arch)
+    valid_loader = get_loader(os.path.join(opt.data, 'val'),
+                              batch_size=5 if opt.debug else opt.bs,
+                              window_size=opt.window_size,
+                              probed_frac=opt.probed,
+                              random_frac=opt.rs,
+                              nsp_prob=opt.nsp_prob,
+                              sampling=True,
+                              shuffle=False,
+                              repeat=1,
+                              aversion=opt.arch)
 
     return {
         'train': train_loader, 'validation': valid_loader
