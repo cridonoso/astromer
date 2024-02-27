@@ -49,6 +49,7 @@ def run(opt):
     metadata['Label'] = metadata['Class'].cat.codes
     metadata['Path']  = metadata['Path'].apply(lambda x: os.path.join(OBSPATH, x)) 
     
+
     if opt.debug:
         metadata = metadata.sample(20)
         print('[INFO] Debugging: ', metadata.shape)
@@ -68,9 +69,9 @@ def run(opt):
                                    k_fold=opt.folds)
 
     var = custom_pipeline.run(observations_path=OBSPATH, 
-                               metadata_path=METAPATH,
-                               n_jobs=16,
-                               elements_per_shard=opt.elements_per_shard)
+                              metadata_path=METAPATH,
+                              n_jobs=16,
+                              elements_per_shard=opt.elements_per_shard)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -83,7 +84,7 @@ if __name__ == '__main__':
                     help='target folder to save records files')
 
 
-    parser.add_argument('--folds', default=3, type=int,
+    parser.add_argument('--folds', default=1, type=int,
                     help='number of folds')
     parser.add_argument('--val-frac', default=0.2, type=float,
                     help='Validation fraction')

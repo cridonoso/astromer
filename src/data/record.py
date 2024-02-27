@@ -7,6 +7,7 @@ import logging
 import shutil
 import random
 import glob
+import math
 import toml
 import os
 
@@ -262,31 +263,35 @@ class DataPipeline:
             raise ValueError("Invalid container provided to prepare_data")
         
         # Number of objects in the split
-        N = self.metadata.shape[0]
+        N = len(container)
         # Compute the number of shards
+        n_shards = math.ceil(N/elements_per_shard)
 
-        n_shards = -np.floor_divide(N, -elements_per_shard)
         # Number of characters of the padded number of shards
         name_length = len(str(n_shards))
 
-        # Create one file per shard
-        shard_paths = []
-        print(self.output_folder, 'fold_'+str(fold_n), subset)
+        # Create fold's directory
         root = os.path.join(self.output_folder, 'fold_'+str(fold_n), subset)
         os.makedirs(root, exist_ok=True)
+
+        # Keep config file in the records folder to desirialize later
         shutil.copyfile(self.config_path, os.path.join(root, 'config.toml'))
+
+        # Create one file per shard
+        shard_paths = []
+        shards_data = []
         for shard in range(n_shards):
+            print('shard: ', shard)
             # Get the shard number padded with 0s
             shard_name = str(shard+1).rjust(name_length, '0')
             # Get the shard store name
             shard_path= os.path.join(root, '{}.record'.format(shard_name))
+            # Get shard observations
+            sel = container[shard*elements_per_shard:(shard+1)*elements_per_shard]
             # Save it into a list
             shard_paths.append(shard_path)
+            shards_data.append(sel) 
 
-        shards_data = []
-        for j in range(len(shard_paths)):
-            sel = container[j*elements_per_shard:(j+1)*elements_per_shard]
-            shards_data.append(sel)        
         return shards_data, shard_paths
     
     def lightcurve_step(self, inputs):
@@ -301,7 +306,7 @@ class DataPipeline:
         """
         Preprocessing applied to all observations. Filter only
         """
-        fn = pl.col("err") < 1.  # Clean the data on the big lazy dataframe
+        fn = pl.col("errmag") < 1.  # Clean the data on the big lazy dataframe
         return fn
 
     def read_all_parquets(self, observations_path : str) -> pd.DataFrame:
@@ -377,16 +382,17 @@ class DataPipeline:
 
         # threads = Parallel(n_jobs=n_jobs, backend='threading')
         fold_groups = [x for x in self.metadata.columns if 'subset' in x]
-        pbar = tqdm(fold_groups, colour='#00ff00') # progress bar
+        
         
         print('[INFO] Reading parquet')
         new_df = self.read_all_parquets(observations_path)
         print('[INFO] Light curves loaded')
         self.new_df = new_df
 
-        for fold_n, fold_col in enumerate(pbar):
-            pbar.set_description(f"Processing fold {fold_n}/{len(fold_groups)}")
-            for subset in self.metadata[fold_col].unique():               
+        for fold_n, fold_col in enumerate(fold_groups):
+            pbar = tqdm(self.metadata[fold_col].unique(), colour='#00ff00') # progress bar
+            for subset in pbar:               
+                pbar.set_description(f"Processing fold {fold_n+1}/{len(fold_groups)} - {subset}")
                 # ============ Processing Samples ===========
                 partial = self.metadata[self.metadata[fold_col] == subset]
                 
@@ -398,17 +404,17 @@ class DataPipeline:
                 # ============ Writing Records ===========                
                 shards_data, shard_paths = self.prepare_data(container, elements_per_shard, subset, fold_n)
                 
-                # for shard, shard_path in zip(shards_data,shard_paths):
-                #     DataPipeline.aux_serialize(shard, shard_path, 
-                #                     self.context_features, self.context_features_dtype, 
-                #                     self.sequential_features, self.sequential_features_dtype)
-
-                with ThreadPoolExecutor(n_jobs) as exe:
-                    # submit tasks to generate files
-                    _ = [exe.submit(DataPipeline.aux_serialize, shard, shard_path, 
+                for shard, shard_path in zip(shards_data,shard_paths):
+                    DataPipeline.aux_serialize(shard, shard_path, 
                                     self.context_features, self.context_features_dtype, 
-                                    self.sequential_features, self.sequential_features_dtype) \
-                             for shard, shard_path in zip(shards_data,shard_paths)]
+                                    self.sequential_features, self.sequential_features_dtype)
+
+                # with ThreadPoolExecutor(n_jobs) as exe:
+                #     # submit tasks to generate files
+                #     _ = [exe.submit(DataPipeline.aux_serialize, shard, shard_path, 
+                #                     self.context_features, self.context_features_dtype, 
+                #                     self.sequential_features, self.sequential_features_dtype) \
+                #              for shard, shard_path in zip(shards_data, shard_paths)]
     
 
         logging.info('Finished execution of DataPipeline operations')

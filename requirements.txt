@@ -7,3 +7,4 @@ mlflow
 gdown
 tqdm
 toml
+run_cris.sh
