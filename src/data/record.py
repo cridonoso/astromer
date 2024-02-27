@@ -48,8 +48,8 @@ def parse_dtype(value, data_type):
             return _float_feature(value)
         if type(value[0]) == str and data_type == 'string':
             return _bytes_feature(value)
-
-    raise ValueError('[ERROR] {} with type {} could not be parsed. Please use <str>, <int>, or <float>'.format(value, type(value)))
+    
+    raise ValueError('[ERROR] {} with type {}/{} could not be parsed. Please use <str>, <int>, or <float>'.format(value, type(value), data_type))
 
 def substract_frames(frame1, frame2, on):
     frame1 = frame1[~frame1[on].isin(frame2[on])]
@@ -281,7 +281,6 @@ class DataPipeline:
         shard_paths = []
         shards_data = []
         for shard in range(n_shards):
-            print('shard: ', shard)
             # Get the shard number padded with 0s
             shard_name = str(shard+1).rjust(name_length, '0')
             # Get the shard store name
@@ -445,13 +444,9 @@ def deserialize(sample, records_path=None):
     try:
         with open(os.path.join(records_path, 'config.toml'), 'r') as f:
             config = toml.load(f)
-            print(config)
-    except FileNotFoundError as e:
-        logging.error(f'Configuration file not found at {records_path}. Please provide a valid path.')
-        raise e
-    except Exception as e:
-        logging.error(f'An error occurred while loading the configuration file: {str(e)}')
-        raise e
+    except:
+        with open('./data/config.toml', 'r') as f:
+            config = toml.load(f)
 
     # Define context features as strings
     context_features = {}
@@ -482,5 +477,14 @@ def deserialize(sample, records_path=None):
         casted_inp_parameters.append(seq_dim)
 
     # Add sequence to the input dictionary
-    input_dict['input'] = tf.stack(casted_inp_parameters, axis=2)
+    input_dict['input'] = tf.stack(casted_inp_parameters, axis=2)[0]
+    
+    try:
+        input_dict['length'] = tf.shape(input_dict['input'])[0]
+        # Compatibility with keys in the following code
+        input_dict['lcid'] = input_dict.pop('ID')
+        input_dict['label'] = input_dict.pop('Label')
+    except Exception as e:
+        input_dict['lcid'] = input_dict.pop('id')
+            
     return input_dict

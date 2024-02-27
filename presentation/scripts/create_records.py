@@ -12,8 +12,9 @@ import os
 
 from src.data.record import DataPipeline
 
-
+import time
 import polars as pl
+
 class CustomCleanPipeline(DataPipeline):
     def lightcurve_step(self, inputs):
         """
@@ -38,12 +39,14 @@ class CustomCleanPipeline(DataPipeline):
 
 def run(opt):
     
+    start = time.time()
+
     opt.data = os.path.normpath(opt.data)
 
 
     METAPATH = os.path.join(opt.data, 'metadata.parquet')
     OBSPATH  = os.path.join(opt.data, 'light_curves')
-
+    
     metadata = pd.read_parquet(METAPATH)
     metadata['Class'] = pd.Categorical(metadata['Class'])
     metadata['Label'] = metadata['Class'].cat.codes
@@ -72,6 +75,9 @@ def run(opt):
                               metadata_path=METAPATH,
                               n_jobs=16,
                               elements_per_shard=opt.elements_per_shard)
+
+    end = time.time()
+    print('\n [INFO] ELAPSED: ', end - start)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

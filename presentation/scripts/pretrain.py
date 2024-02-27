@@ -38,7 +38,6 @@ def get_loaders(opt):
                                             msk_frac=opt.probed,
                                             rnd_frac=opt.rs,
                                             same_frac=opt.rs)
-
     if opt.arch == 'skip' or opt.arch == 'nsp':
         train_loader = get_loader(os.path.join(opt.data, 'train'),
                                   batch_size=5 if opt.debug else opt.bs,

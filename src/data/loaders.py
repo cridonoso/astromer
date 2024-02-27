@@ -1,13 +1,13 @@
 import tensorflow as tf
 import multiprocessing
+import glob
 import os
 
-from src.data.old_record import deserialize
 from src.data.preprocessing import to_windows, standardize, min_max_scaler
-from src.data.masking import mask_dataset
-from src.data.nsp import apply_nsp
 from src.data.gap import set_gap, invert_mask
-
+from src.data.masking import mask_dataset
+from src.data.record import deserialize
+from src.data.nsp import apply_nsp
 
 def load_records(records_dir):
     """
@@ -18,16 +18,13 @@ def load_records(records_dir):
     Returns:
         type: tf.Dataset instance
     """
-    rec_paths = []
-    for folder in os.listdir(records_dir):
-        if folder.endswith('.csv'):
-            continue
-        for x in os.listdir(os.path.join(records_dir, folder)):
-            rec_paths.append(os.path.join(records_dir, folder, x))
-
-    dataset = tf.data.TFRecordDataset(rec_paths)
-    dataset = dataset.map(deserialize)
-    return dataset
+    record_files = glob.glob(os.path.join(records_dir, '*.record'))
+    if len(record_files) == 0:
+        record_files = glob.glob(os.path.join(records_dir, '*', '*.record'))
+        
+    raw_dataset = tf.data.TFRecordDataset(record_files)
+    raw_dataset = raw_dataset.map(lambda x: deserialize(x, records_dir))
+    return raw_dataset
 
 def create_generator(list_of_arrays, labels=None, ids=None):
     """
@@ -90,7 +87,16 @@ def format_inp_astromer(batch,
     """
 
     inputs, outputs = {}, {}
-
+    if aversion == 'base' or aversion == 'normal':
+        inputs['input']    =  batch['input_modified']
+        inputs['times']    =  tf.slice(batch['input'], [0,0,0], [-1,-1,1])
+        inputs['mask_in']  =  batch['mask_in']
+        inputs['mask_out'] = tf.expand_dims(batch['mask_out'], -1)
+        
+        outputs['target']   =  tf.slice(batch['input'], [0,0,1], [-1,-1,1])
+        outputs['error']    =  tf.slice(batch['input'], [0,0,2], [-1,-1,1])
+        outputs['mask_out'] =  batch['mask_out']
+            
     if aversion == 'skip':
         inputs['input'] = batch['input_modified']
         times = tf.slice(batch['input'], [0,0,0], [-1,-1,1])
@@ -161,7 +167,7 @@ def get_loader(dataset,
         dataset = load_numpy(dataset)
 
     if isinstance(dataset, str):
-        dataset = load_records(dataset)
+        dataset = load_records(records_dir=dataset)
     
     if shuffle:
         SHUFFLE_BUFFER = 10000
