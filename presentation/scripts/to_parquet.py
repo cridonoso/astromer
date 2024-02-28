@@ -40,7 +40,7 @@ def run(opt):
     os.makedirs(light_curves_dir, exist_ok=True)
 
 
-    metadata = metadata.assign(newID=metadata.index.values)
+    metadata = metadata.assign(newID=range(len(metadata)))
     metadata['path'] = (opt.data + '/LCs/'+ metadata.Path).to_list()
 
     threads = Parallel(n_jobs=opt.n_jobs, backend='loky')

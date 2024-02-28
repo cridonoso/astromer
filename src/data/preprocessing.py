@@ -2,6 +2,20 @@ import tensorflow as tf
 
 from src.data.record import deserialize
 
+def nothing(batch, on='input', axis=0):
+    """
+    Standardize input tensor given a dataset batch
+    Args:
+        dataset: batched dataset
+
+    Returns:
+        type: tf.Dataset
+    """
+    mean_value = tf.reduce_mean(batch['input'], axis, name='mean_value')
+    batch['mean_values'] = mean_value
+    return batch
+
+
 def standardize(batch, on='input', axis=0):
     """
     Standardize input tensor given a dataset batch

@@ -30,7 +30,7 @@ def get_loaders(opt):
                               repeat=4,
                               aversion=opt.arch)
 
-    valid_loader = get_loader(os.path.join(opt.data, 'val'),
+    valid_loader = get_loader(os.path.join(opt.data, 'validation'),
                               batch_size=5 if opt.debug else opt.bs,
                               window_size=opt.window_size,
                               probed_frac=opt.probed,
@@ -184,7 +184,7 @@ if __name__ == '__main__':
     parser.add_argument('--window-size', default=200, type=int,
                         help='windows size of the PSFs')\
     # ==========================================================
-    parser.add_argument('--probed', default=0.5, type=float,
+    parser.add_argument('--probed', default=0.2, type=float,
                         help='Probed percentage')
     parser.add_argument('--rs', default=0.2, type=float,
                         help='Probed fraction to be randomized or unmasked')

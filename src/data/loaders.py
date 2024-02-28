@@ -3,7 +3,7 @@ import multiprocessing
 import glob
 import os
 
-from src.data.preprocessing import to_windows, standardize, min_max_scaler
+from src.data.preprocessing import to_windows, standardize, min_max_scaler, nothing
 from src.data.gap import set_gap, invert_mask
 from src.data.masking import mask_dataset
 from src.data.record import deserialize
@@ -96,6 +96,7 @@ def format_inp_astromer(batch,
         outputs['target']   =  tf.slice(batch['input'], [0,0,1], [-1,-1,1])
         outputs['error']    =  tf.slice(batch['input'], [0,0,2], [-1,-1,1])
         outputs['mask_out'] =  batch['mask_out']
+        outputs['lcid'] = batch['lcid']
             
     if aversion == 'skip':
         inputs['input'] = batch['input_modified']
@@ -184,7 +185,9 @@ def get_loader(dataset,
     dataset = to_windows(dataset,
                          window_size=window_size,
                          sampling=sampling)
-
+    
+    if normalize is None:
+        dataset = dataset.map(nothing)
     if normalize == 'zero-mean':
         dataset = dataset.map(standardize)
 
