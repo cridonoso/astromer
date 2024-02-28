@@ -87,7 +87,7 @@ def format_inp_astromer(batch,
     """
 
     inputs, outputs = {}, {}
-    if aversion == 'base' or aversion == 'normal':
+    if aversion == 'base' or aversion == 'normal' or aversion=='redux':
         inputs['input']    =  batch['input_modified']
         inputs['times']    =  tf.slice(batch['input'], [0,0,0], [-1,-1,1])
         inputs['mask_in']  =  batch['mask_in']
