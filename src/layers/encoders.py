@@ -3,7 +3,7 @@ import tensorflow as tf
 from src.layers.attblock import AttentionBlock
 from src.layers.positional import PositionalEncoder
 from src.layers.nsp import ClassToken
-from tensorflow.keras.layers import Layer, Concatenate
+from tensorflow.keras.layers import Layer, Concatenate, GlobalAveragePooling1D
 from tensorflow.keras import Model
 
 class Encoder(Model):
@@ -66,12 +66,17 @@ class Encoder(Model):
 		x = x_transformed + x_pe   
 		return x , window_size
 
+	def output_transform(self, inputs):
+		return inputs
+
 	def call(self, inputs, training=False):
 		# adding embedding and position encoding.
 		x, window_size = self.input_format(inputs)  
 		x = self.dropout_layer(x, training=training)
 		for i in range(self.num_layers):
 			x =  self.enc_layers[i](x, training=training, mask=inputs['mask_in'])
+
+		x = self.output_transform(x)
 		return  x # (batch_size, input_seq_len, d_model)
 
 class SkipEncoder(Encoder):
@@ -112,3 +117,14 @@ class NSPEncoder(Encoder):
 		inputs['mask_in'] = self.concat_cls([msk_cls_tkn, inputs['mask_in']])
 
 		return x, window_size
+
+
+class ReducerEncoder(Encoder):
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
+
+		self.global_average = GlobalAveragePooling1D()
+
+	def output_transform(self, inputs):
+		x = self.global_average(inputs)
+		return x

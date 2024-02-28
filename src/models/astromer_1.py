@@ -11,22 +11,22 @@ import tensorflow as tf
 from pathlib import Path
 import joblib
 
-from src.layers import Encoder, RegLayer
+from src.layers import ReducerEncoder, UpRegLayer, RegLayer
 
-def build_input(length):
-    serie  = Input(shape=(length, 1),
-                  batch_size=None,
-                  name='input')
-    times  = Input(shape=(length, 1),
-                  batch_size=None,
+def build_input(window_size, batch_size=None):
+    magnitudes  = Input(shape=(window_size, 1),
+                  batch_size=batch_size,
+                  name='magnitudes')
+    times       = Input(shape=(window_size, 1),
+                  batch_size=batch_size,
                   name='times')
-    mask   = Input(shape=(length, 1),
-                  batch_size=None,
-                  name='mask')
+    att_mask    = Input(shape=(window_size, 1),
+                  batch_size=batch_size,
+                  name='att_mask') 
 
-    return {'magnitudes':serie,
-            'att_mask':mask,
-            'times':times}
+    return {'input':magnitudes,
+            'times':times,
+            'mask_in':att_mask}
 
 def get_ASTROMER(num_layers=2,
                  num_heads=2,
@@ -38,24 +38,27 @@ def get_ASTROMER(num_layers=2,
                  pe_c=1,
                  window_size=100,
                  batch_size=None,
-                 mask_format='first'):
+                 m_alpha=-0.5,
+                 mask_format='Q'):
 
     placeholder = build_input(window_size)
 
-    encoder = Encoder(window_size=window_size,
-                      num_layers=num_layers,
-                      num_heads=num_heads,
-                      head_dim=head_dim,
-                      mixer_size=mixer_size,
-                      dropout=dropout,
-                      pe_base=pe_base,
-                      pe_dim=pe_dim,
-                      pe_c=pe_c,
-                      mask_format=mask_format,
-                      name='encoder')
+    encoder = ReducerEncoder(window_size=window_size,
+                             num_layers=num_layers,
+                             num_heads=num_heads,
+                             head_dim=head_dim,
+                             mixer_size=mixer_size,
+                             dropout=dropout,
+                             pe_base=pe_base,
+                             pe_dim=pe_dim,
+                             pe_c=pe_c,
+                             m_alpha=m_alpha,
+                             mask_format=mask_format,
+                             name='encoder')
 
     x = encoder(placeholder)
-    x = RegLayer(name='regression')(x)
+
+    x = UpRegLayer(name='regression')((x, placeholder['times']))
 
     return CustomModel(inputs=placeholder, outputs=x, name="ASTROMER-1")
 
@@ -84,13 +87,13 @@ class CustomModel(Model):
     def test_step(self, data):
         x, y = data
         y_pred = self(x, training=False)
-        rmse = custom_rmse(y_true=y['magnitudes'],
+        rmse = custom_rmse(y_true=y['target'],
                            y_pred=y_pred,
-                           mask=y['probed_mask'])
+                           mask=y['mask_out'])
 
-        r2_value = custom_r2(y_true=y['magnitudes'], 
+        r2_value = custom_r2(y_true=y['target'], 
                              y_pred=y_pred, 
-                             mask=y['probed_mask'])
+                             mask=y['mask_out'])
         return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
     
     def predict_step(self, data):
@@ -98,6 +101,6 @@ class CustomModel(Model):
         y_pred = self(x, training=False)
         
         return {'reconstruction': y_pred, 
-                'magnitudes': y['magnitudes'],
+                'magnitudes': y['target'],
                 'times': x['times'],
-                'probed_mask': y['probed_mask']}
+                'probed_mask': y['mask_out']}

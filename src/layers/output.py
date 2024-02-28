@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from tensorflow.keras.layers import Input, Layer, Dense
+from tensorflow.keras.layers import Input, Layer, Dense, TimeDistributed
 
 
 class TransformLayer_GAP(Layer):
@@ -56,5 +56,20 @@ class RegLayer(Layer):
 
 	def call(self, inputs, training):
 		x = self.bn_0(inputs, training=training)
+		x = self.reg_layer(x)
+		return x
+
+class UpRegLayer(Layer):
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
+		self.reg_layer = TimeDistributed(Dense(1, name='reconstruction'))
+		self.bn_0 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+
+	def call(self, inputs, training):
+		x = tf.expand_dims(inputs[0], axis=1)
+		t = inputs[1]
+		x = tf.tile(x, [1, tf.shape(t)[1], 1])
+		x = tf.concat([t, x], axis=-1)
+		x = self.bn_0(x, training=training)
 		x = self.reg_layer(x)
 		return x
