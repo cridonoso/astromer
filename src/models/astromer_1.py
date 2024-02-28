@@ -70,13 +70,13 @@ class CustomModel(Model):
         x, y = data
         with tf.GradientTape() as tape:
             y_pred = self(x, training=True)  # Forward pass
-            rmse = custom_rmse(y_true=y['magnitudes'],
+            rmse = custom_rmse(y_true=y['target'],
                                y_pred=y_pred,
-                               mask=y['probed_mask'])
+                               mask=y['mask_out'])
 
-            r2_value = custom_r2(y_true=y['magnitudes'], 
+            r2_value = custom_r2(y_true=y['target'], 
                                  y_pred=y_pred, 
-                                 mask=y['probed_mask'])
+                                 mask=y['mask_out'])
 
         trainable_vars = self.trainable_variables
         gradients = tape.gradient(rmse, trainable_vars)
