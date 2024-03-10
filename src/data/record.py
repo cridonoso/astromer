@@ -486,5 +486,11 @@ def deserialize(sample, records_path=None):
         input_dict['label'] = input_dict.pop('Label')
     except Exception as e:
         input_dict['lcid'] = input_dict.pop('id')
-            
+        
+    try:    
+        del input_dict['Class']
+        del input_dict['Band']
+    except:
+        pass
+        
     return input_dict

@@ -160,6 +160,7 @@ def pretraining_pipeline(dataset,
 
     if normalize == 'zero-mean':
         dataset = dataset.map(standardize)
+
     if normalize == 'minmax':
         dataset = dataset.map(min_max_scaler)
     
@@ -222,6 +223,7 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
         outputs = tf.one_hot(batch['label'], num_cls)
     else:
         outputs = {
+            'lcid': batch['lcid'],
             'target': tf.slice(batch['input'], [0,0,1], [-1,-1,1]),
             'error': tf.slice(batch['input'], [0,0,2], [-1,-1,1]),
             'mask_out': batch['mask_out'],
