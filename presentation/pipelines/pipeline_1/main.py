@@ -295,7 +295,11 @@ def pipeline(cfg: DictConfig) -> None:
 
 
 if __name__ == "__main__":
+    '''
     
+    python -m presentation.pipelines.pipeline_1.main  visible_gpu.model=[0, 1]
+
+    '''
     pipeline()
 
     
