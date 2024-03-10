@@ -87,9 +87,30 @@ def format_inp_astromer(batch,
     """
 
     inputs, outputs = {}, {}
-    if aversion == 'base' or aversion == 'normal' or aversion=='redux':
+    if aversion=='redux':
+        inputs['input']    =  batch['input_modified']
+        t_mean = tf.slice(batch['mean_values'], [0, 0], [-1, 1])
+        t_mean = tf.expand_dims(t_mean, axis=1)
+        times = tf.slice(batch['input'], [0,0,0], [-1,-1,1]) + t_mean
+        t_min = tf.reduce_min(times, axis=1)
+        t_min = tf.expand_dims(t_min, axis=1)
+        t_max = tf.reduce_max(times, axis=1)
+        t_max = tf.expand_dims(t_max, axis=1)
+        inputs['times']    =  tf.math.divide_no_nan(times - t_min, t_max-t_min) + 0.1
+        
+        inputs['mask_in']  =  batch['mask_in']
+        inputs['mask_out'] = tf.expand_dims(batch['mask_out'], -1)
+        
+        outputs['target']   =  tf.slice(batch['input'], [0,0,1], [-1,-1,1])
+        outputs['error']    =  tf.slice(batch['input'], [0,0,2], [-1,-1,1])
+        outputs['mask_out'] =  batch['mask_out']
+        outputs['lcid']     = batch['lcid']
+
+
+    if aversion == 'base' or aversion == 'normal':
         inputs['input']    =  batch['input_modified']
         inputs['times']    =  tf.slice(batch['input'], [0,0,0], [-1,-1,1])
+
         inputs['mask_in']  =  batch['mask_in']
         inputs['mask_out'] = tf.expand_dims(batch['mask_out'], -1)
         
