@@ -20,11 +20,13 @@ from src.data import get_loader
 
 
 def get_loaders(opt):
+    print(opt.same)
     train_loader = get_loader(os.path.join(opt.data, 'train'),
                               batch_size=5 if opt.debug else opt.bs,
                               window_size=opt.window_size,
                               probed_frac=opt.probed,
                               random_frac=opt.rs,
+                              same_frac=opt.same,
                               nsp_prob=opt.nsp_prob,
                               sampling=True,
                               shuffle=True,
@@ -36,6 +38,7 @@ def get_loaders(opt):
                               window_size=opt.window_size,
                               probed_frac=opt.probed,
                               random_frac=opt.rs,
+                              same_frac=opt.same,
                               nsp_prob=opt.nsp_prob,
                               sampling=True,
                               shuffle=False,
@@ -202,6 +205,8 @@ if __name__ == '__main__':
                         help='Probed percentage')
     parser.add_argument('--rs', default=0.2, type=float,
                         help='Probed fraction to be randomized or unmasked')
+    parser.add_argument('--same', default=None, type=float,
+                        help='Fraction to make visible during masked-self attention while evaluating during loss')
     # ONLY NSP =================================================
     parser.add_argument('--nsp-prob', default=0.5, type=float,
                         help='Probability of randomize second segment in NSP pretraining task')
