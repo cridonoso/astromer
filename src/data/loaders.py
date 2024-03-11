@@ -185,7 +185,10 @@ def get_loader(dataset,
 
     assert isinstance(dataset, (list, str)), '[ERROR] Invalid format'
     assert batch_size is not None, '[ERROR] Undefined batch size'
-
+    if same_frac is None:
+        same_frac = random_frac
+        
+    print('[INFO] Probed: {:.2f} Random: {:.2f} Same: {:.2f}'.format(probed_frac, random_frac, same_frac))
     if isinstance(dataset, list):
         dataset = load_numpy(dataset)
 
@@ -221,7 +224,7 @@ def get_loader(dataset,
     dataset, shapes = mask_dataset(dataset,
                            msk_frac=probed_frac,
                            rnd_frac=random_frac,
-                           same_frac=random_frac if same_frac is None else same_frac,
+                           same_frac=same_frac,
                            window_size=window_size)
     dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
 
