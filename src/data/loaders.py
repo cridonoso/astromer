@@ -169,6 +169,7 @@ def get_loader(dataset,
                window_size=200,
                probed_frac=.2,
                random_frac=.1,
+               same_frac=None,
                nsp_prob=0.5,
                sampling=True,
                shuffle=False,
@@ -220,7 +221,7 @@ def get_loader(dataset,
     dataset, shapes = mask_dataset(dataset,
                            msk_frac=probed_frac,
                            rnd_frac=random_frac,
-                           same_frac=random_frac,
+                           same_frac=random_frac if same_frac is None else same_frac,
                            window_size=window_size)
     dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
 
