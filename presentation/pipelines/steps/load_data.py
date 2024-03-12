@@ -22,8 +22,11 @@ def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False):
             same = params['same']
         except:
             same  = None
-        nsp_prob = params['nsp_prob']
-        
+        try:
+            nsp_prob = params['nsp_prob']
+        except:
+            nsp_prob = 0.
+            
     train_loader = get_loader(os.path.join(data_path, 'train'),
                               batch_size=batch_size,
                               window_size=params['window_size'],

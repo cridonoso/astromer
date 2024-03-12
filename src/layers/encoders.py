@@ -69,14 +69,21 @@ class Encoder(Model):
     def output_transform(self, inputs):
         return inputs
 
-    def call(self, inputs, training=False):
+    def call(self, inputs, training=False, return_weights=False):
         # adding embedding and position encoding.
         x, window_size = self.input_format(inputs)  
         x = self.dropout_layer(x, training=training)
         for i in range(self.num_layers):
-            x =  self.enc_layers[i](x, training=training, mask=inputs['mask_in'])
-
+            if return_weights:
+                x, w, qkvalues =  self.enc_layers[i](x, training=training, 
+                                                     mask=inputs['mask_in'], 
+                                                     return_weights=True)
+            else:
+                x =  self.enc_layers[i](x, training=training, mask=inputs['mask_in'])
         x = self.output_transform(x)
+        
+        if return_weights:
+            return x, w, qkvalues
         return  x # (batch_size, input_seq_len, d_model)
 
 class SkipEncoder(Encoder):

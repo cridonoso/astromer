@@ -273,7 +273,7 @@ def classify(index, config, n_jobs=1):
         n_datasets = len(config['data']['paths'])
         study.optimize(partial_ft, n_trials=n_datasets, n_jobs=n_jobs)
 
-    return exp_id
+    return child_exp_id
 
 @hydra.main(version_base=None, config_path=".", config_name="config_pipeline")
 def pipeline(cfg: DictConfig) -> None:

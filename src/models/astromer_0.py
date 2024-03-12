@@ -32,7 +32,7 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK'):
     # scale matmul_qk
     dk = tf.cast(tf.shape(k)[-1], tf.float32)
     scaled_attention_logits = matmul_qk / tf.math.sqrt(dk)
-
+    qkvalues = scaled_attention_logits
     if mask_format == 'Q':
         print('[INFO] Masking Query tokens only')
         steps = tf.shape(scaled_attention_logits)[2]
@@ -50,12 +50,12 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK'):
         mask_rshp = tf.minimum(1., mask_rshp)
         mask_rshp = tf.expand_dims(mask_rshp, 1)
         scaled_attention_logits += mask_rshp*m_alpha
-
+    
     # softmax is normalized on the last axis (seq_len_k) so that the scores add up to 1.
     attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
     output = tf.matmul(attention_weights, v, name='Z')  # (..., seq_len_q, depth_v)
 
-    return output, attention_weights
+    return output, attention_weights, qkvalues
 
 class MultiHeadAttention(tf.keras.layers.Layer):
     def __init__(self, d_model, num_heads, m_alpha, mask_format):
@@ -95,7 +95,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         # scaled_attention.shape == (batch_size, num_heads, seq_len_q, depth)
         # attention_weights.shape == (batch_size, num_heads, seq_len_q, seq_len_k)
-        scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask, self.m_alpha, self.mask_format)
+        scaled_attention, attention_weights, qkvalues = scaled_dot_product_attention(q, k, v, mask, self.m_alpha, self.mask_format)
 
         scaled_attention = tf.transpose(scaled_attention, perm=[0, 2, 1, 3])  # (batch_size, seq_len_q, num_heads, depth)
 
@@ -104,7 +104,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         output = self.dense(concat_attention)  # (batch_size, seq_len_q, d_model)
 
-        return output, attention_weights
+        return output, attention_weights, qkvalues
 
 class RegLayer(Layer):
     def __init__(self, **kwargs):
@@ -141,8 +141,8 @@ class EncoderLayer(tf.keras.layers.Layer):
         self.dropout1 = tf.keras.layers.Dropout(rate)
         self.dropout2 = tf.keras.layers.Dropout(rate)
 
-    def call(self, x, training, mask):
-        attn_output, _ = self.mha(x, mask)  # (batch_size, input_seq_len, d_model)
+    def call(self, x, training, mask, return_weights=False):
+        attn_output, w, qkvalues = self.mha(x, mask)  # (batch_size, input_seq_len, d_model)
         attn_output = self.dropout1(attn_output, training=training)
 
         if self.use_leak:
@@ -157,12 +157,14 @@ class EncoderLayer(tf.keras.layers.Layer):
             out2 = self.layernorm2(self.reshape_leak_2(out1) + ffn_output) # (batch_size, input_seq_len, d_model)
         else:
             out2 = self.layernorm2(ffn_output)
-
+        
+        if return_weights:
+            return out2, w, qkvalues
         return out2
 
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, num_layers, d_model, num_heads, dff,
-                 base=10000, rate=0.1, use_leak=False, m_alpha=1., mask_format='QK', **kwargs):
+                 base=10000, rate=0.1, use_leak=False, m_alpha=1., mask_format='QK', return_weights=False,**kwargs):
         super(Encoder, self).__init__(**kwargs)
 
         self.d_model = d_model
@@ -173,7 +175,7 @@ class Encoder(tf.keras.layers.Layer):
                             for _ in range(num_layers)]
         self.dropout = tf.keras.layers.Dropout(rate)
 
-    def call(self, data, training=False):
+    def call(self, data, training=False, return_weights=False):
         # adding embedding and position encoding.
         x_pe = positional_encoding(data['times'], self.d_model, mjd=True)
 
@@ -183,8 +185,14 @@ class Encoder(tf.keras.layers.Layer):
         x = self.dropout(transformed_input, training=training)
 
         for i in range(self.num_layers):
-            x = self.enc_layers[i](x, training, data['mask_in'])
-
+            if return_weights:
+                x, w, qkvalues = self.enc_layers[i](x, training, data['mask_in'], return_weights=True)
+            else:
+                x = self.enc_layers[i](x, training, data['mask_in'], return_weights=False)
+        
+        if return_weights:
+            return x, w, qkvalues
+        
         return x  # (batch_size, input_seq_len, d_model)
     
 def build_input(length):
@@ -212,7 +220,8 @@ def get_ASTROMER(num_layers=2,
                  maxlen=100,
                  batch_size=None,
                  m_alpha=1,
-                 mask_format='QK'):
+                 mask_format='QK',
+                 return_weights=False):
 
     placeholder = build_input(maxlen)
 
@@ -225,12 +234,21 @@ def get_ASTROMER(num_layers=2,
                       use_leak=False,
                       name='encoder',
                       m_alpha=m_alpha,
-                      mask_format=mask_format)
-
-    x = encoder(placeholder)
-
+                      mask_format=mask_format,
+                      return_weights=return_weights)
+    
+    if return_weights:
+        x, w, qkvalues = encoder(placeholder, return_weights=True)
+    else:
+        x = encoder(placeholder, return_weights=False)
+        
     x = RegLayer(name='regression')(x)
-
+    
+    if return_weights:
+        return CustomModel(inputs=placeholder, 
+                           outputs={'output': x, 'w': w, 'qk_values':qkvalues}, 
+                           name="ASTROMER")
+    
     return CustomModel(inputs=placeholder, outputs=x, name="ASTROMER")
 
 

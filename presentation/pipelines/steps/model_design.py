@@ -17,8 +17,10 @@ from tensorflow.keras import Model
 from tensorflow.keras.layers import TimeDistributed, LayerNormalization, Dense, Dropout
 
 
-def build_model(params):
+def build_model(params, return_weights=False):
     if params['arch'] == 'normal' or params['arch'] == 'base':
+        if params['mask_format'] == 'first':
+            params['mask_format'] = 'QK'
         model = get_Base(num_layers=params['num_layers'],
                          d_model=params['head_dim']*params['num_heads'],
                          num_heads=params['num_heads'],
@@ -28,7 +30,8 @@ def build_model(params):
                          use_leak=False,
                          maxlen=params['window_size'],
                          m_alpha=params['m_alpha'],
-                         mask_format=params['mask_format'])
+                         mask_format=params['mask_format'],
+                         return_weights=return_weights)
 
     if params['arch'] == 'redux':
         model = get_Base(num_layers=params['num_layers'],

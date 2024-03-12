@@ -20,7 +20,7 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK'):
     # scale matmul_qk
     dk = tf.cast(tf.shape(k)[-1], tf.float32)
     scaled_attention_logits = matmul_qk / tf.math.sqrt(dk)
-
+    qk_values = scaled_attention_logits
     if mask_format == 'Q':
         print('[INFO] Masking Query tokens only')
         steps = tf.shape(scaled_attention_logits)[2]
@@ -43,7 +43,7 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK'):
     attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
     output = tf.matmul(attention_weights, v, name='Z')  # (..., seq_len_q, depth_v)
 
-    return output, attention_weights
+    return output, attention_weights, qk_values
 
 class HeadAttentionMulti(tf.keras.layers.Layer):
 	def __init__(self, head_dim, num_heads, m_alpha, mask_format):
@@ -80,7 +80,7 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 
 		# scaled_attention.shape == (batch_size, num_heads, seq_len_q, depth)
 		# attention_weights.shape == (batch_size, num_heads, seq_len_q, seq_len_k)
-		scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, 
+		scaled_attention, attention_weights, qk_values = scaled_dot_product_attention(q, k, v, 
 																		mask=mask,
 																		m_alpha=self.m_alpha,
 																		mask_format=self.mask_format)
@@ -92,7 +92,7 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 
 		output = self.dense(concat_attention)  # (batch_size, seq_len_q, d_model)
 		
-		return output, attention_weights
+		return output, attention_weights, qk_values
 
 	def get_config(self):
 		config = super().get_config()
