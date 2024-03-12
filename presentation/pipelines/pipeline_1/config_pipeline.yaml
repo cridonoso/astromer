@@ -1,13 +1,12 @@
 
-exp_id: 'sunday_morning' 
+exp_id: 'randomeke' 
 do_ft: [False, False]
 do_clf: [True, True]
-visible_gpu: ['0', '1']
+visible_gpu: ['2', '3']
 
 pretrain:
-  tag: ['clean_inf', 'clean_1']
-  weights: ['./presentation/results/2024-02-29_16-08-43',
-            './presentation/results/2024-03-08_16-43-12']
+  tag: ['rancho']
+  weights: ['./presentation/results/randomeke/2024-03-11_19-48-50/']
 
 data:
   paths : ['./data/records/alcock/fold_0/alcock_20', 
@@ -59,7 +58,7 @@ finetuning:
   patience : 30
   num_epochs : 10000
   probed : 0.2
-  debug : True
+  debug : False
   
 classification:
   lr : 0.001
@@ -68,6 +67,6 @@ classification:
   num_epochs : 10000
   clf_arch: 'avg_mlp'
   astromer_trainable: False
-  debug : True
+  debug : False
   
 

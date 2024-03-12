@@ -13,10 +13,15 @@ def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False):
         probed = 1.
         random = 0.
         nsp_prob = 0. 
+        same = 0.
     else:
         num_cls = None
         probed = params['probed']
         random = params['rs']
+        try:
+            same = params['same']
+        except:
+            same  = None
         nsp_prob = params['nsp_prob']
         
     train_loader = get_loader(os.path.join(data_path, 'train'),
@@ -24,6 +29,7 @@ def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False):
                               window_size=params['window_size'],
                               probed_frac=probed,
                               random_frac=random,
+                              same_frac=same,
                               nsp_prob=nsp_prob,
                               sampling=False,
                               shuffle=True,
@@ -36,6 +42,7 @@ def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False):
                               window_size=params['window_size'],
                               probed_frac=probed,
                               random_frac=random,
+                              same_frac=same,
                               nsp_prob=nsp_prob,
                               sampling=False,
                               shuffle=False,
@@ -48,6 +55,7 @@ def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False):
                               window_size=params['window_size'],
                               probed_frac=probed,
                               random_frac=random,
+                              same_frac=same,
                               nsp_prob=nsp_prob,
                               sampling=False,
                               shuffle=False,
