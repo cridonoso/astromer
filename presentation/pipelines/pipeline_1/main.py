@@ -183,7 +183,10 @@ def classification_step(trial, run_index, config):
         tags = {**tags, **params}
         mlflow.set_tags(tags=tags) # I think this is not necessary 
         mlflow.log_params(params) 
-
+        mlflow.log_params({
+               'clf_name': config['classification']['clf_arch'],
+               'astromer_trainable': config['classification']['astromer_trainable']
+        })
         # Build Astromer model
         astromer = build_model(params)
         astromer.load_weights(os.path.join(ft_weights, 'weights')).expect_partial()
