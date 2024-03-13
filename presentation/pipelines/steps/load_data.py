@@ -5,7 +5,7 @@ import os
 from src.data.zero import pretraining_pipeline
 from src.data import get_loader
 
-def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False):
+def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False, sampling=False):
 
     if clf_mode:
         print('Classification Mode')
@@ -34,7 +34,7 @@ def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False):
                               random_frac=random,
                               same_frac=same,
                               nsp_prob=nsp_prob,
-                              sampling=False,
+                              sampling=sampling,
                               shuffle=True,
                               repeat=1,
                               aversion=params['arch'],
@@ -47,7 +47,7 @@ def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False):
                               random_frac=random,
                               same_frac=same,
                               nsp_prob=nsp_prob,
-                              sampling=False,
+                              sampling=sampling,
                               shuffle=False,
                               repeat=1,
                               aversion=params['arch'],
@@ -60,7 +60,7 @@ def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False):
                               random_frac=random,
                               same_frac=same,
                               nsp_prob=nsp_prob,
-                              sampling=False,
+                              sampling=sampling,
                               shuffle=False,
                               repeat=1,
                               aversion=params['arch'],

@@ -1,12 +1,14 @@
 
-exp_id: 'randomeke' 
-do_ft: [False, False]
+exp_id: 'comparison' 
+do_ft: [True, True]
 do_clf: [True, True]
 visible_gpu: ['2', '3']
 
 pretrain:
-  tag: ['rancho']
-  weights: ['./presentation/results/randomeke/2024-03-11_19-48-50/']
+  tag: ['first', 'second', 'third']
+  weights: ['./presentation/results/comparison/2024-03-12_21-26-21',
+            './presentation/results/comparison/2024-03-12_21-29-51',
+            './presentation/results/comparison/2024-03-12_21-32-41']
 
 data:
   paths : ['./data/records/alcock/fold_0/alcock_20', 
