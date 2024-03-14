@@ -30,7 +30,7 @@ def get_loaders(opt):
                               nsp_prob=opt.nsp_prob,
                               sampling=True,
                               shuffle=True,
-                              repeat=4,
+                              repeat=1,
                               aversion=opt.arch)
 
     valid_loader = get_loader(os.path.join(opt.data, 'validation'),
@@ -61,7 +61,7 @@ def get_model(opt):
                          dropout=opt.dropout,
                          pe_base=opt.pe_base,
                          pe_dim=opt.pe_dim,
-                         pe_c=opt.exp,
+                         pe_c=opt.pe_exp,
                          window_size=opt.window_size,
                          m_alpha=opt.m_alpha,
                          mask_format=opt.mask_format)
