@@ -95,7 +95,8 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         # scaled_attention.shape == (batch_size, num_heads, seq_len_q, depth)
         # attention_weights.shape == (batch_size, num_heads, seq_len_q, seq_len_k)
-        scaled_attention, attention_weights, qkvalues = scaled_dot_product_attention(q, k, v, mask, self.m_alpha, self.mask_format)
+        scaled_attention, attention_weights, qkvalues = scaled_dot_product_attention(q, k, v, 
+                                            mask=mask, m_alpha=self.m_alpha, mask_format=self.mask_format)
 
         scaled_attention = tf.transpose(scaled_attention, perm=[0, 2, 1, 3])  # (batch_size, seq_len_q, num_heads, depth)
 
@@ -186,9 +187,9 @@ class Encoder(tf.keras.layers.Layer):
 
         for i in range(self.num_layers):
             if return_weights:
-                x, w, qkvalues = self.enc_layers[i](x, training, data['mask_in'], return_weights=True)
+                x, w, qkvalues = self.enc_layers[i](x, training=training, mask=data['mask_in'], return_weights=True)
             else:
-                x = self.enc_layers[i](x, training, data['mask_in'], return_weights=False)
+                x = self.enc_layers[i](x, training=training, mask=data['mask_in'], return_weights=False)
         
         if return_weights:
             return x, w, qkvalues
@@ -265,7 +266,7 @@ class CustomModel(Model):
             rmse = custom_rmse(y_true=y['target'],
                               y_pred=x_pred,
                               mask=y['mask_out'])
-            r2_value = custom_r2(y['target'], x_pred, y['mask_out'])
+            r2_value = custom_r2(y['target'], x_pred, mask=y['mask_out'])
 
         grads = tape.gradient(rmse, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
@@ -277,7 +278,7 @@ class CustomModel(Model):
         rmse = custom_rmse(y_true=y['target'],
                           y_pred=x_pred,
                           mask=y['mask_out'])
-        r2_value = custom_r2(y['target'], x_pred, y['mask_out'])
+        r2_value = custom_r2(y['target'], x_pred, mask=y['mask_out'])
         return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
     
     def predict_step(self, data):
