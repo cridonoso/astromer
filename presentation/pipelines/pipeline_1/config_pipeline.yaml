@@ -1,7 +1,7 @@
 
 exp_id: 'comparison' 
-do_ft: [True, True]
-do_clf: [True, True]
+do_ft: [False, False, False]
+do_clf: [True, True, True]
 visible_gpu: ['2', '3']
 
 pretrain:
