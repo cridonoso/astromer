@@ -4,8 +4,8 @@ import toml
 import sys
 import os
 
-from src.models.astromer_0 import get_ASTROMER as get_Base
-from src.models.astromer_1 import get_ASTROMER as get_Redux
+
+from src.models.astromer_1 import get_ASTROMER as get_Base
 from src.models.astromer_nsp import get_ASTROMER as get_NSP
 from src.models.astromer_skip import get_ASTROMER as get_Skip
 
@@ -52,27 +52,17 @@ def get_loaders(opt):
 
 def get_model(opt):
     if opt.arch == 'redux':
-        model = get_Redux(num_layers=opt.num_layers,
-                          num_heads=opt.num_heads,
-                          head_dim=opt.head_dim,
-                          mixer_size=opt.mixer,
-                          dropout=opt.dropout,
-                          pe_base=opt.pe_base,
-                          pe_dim=opt.pe_dim,
-                          pe_c=opt.pe_exp,
-                          window_size=opt.window_size,
-                          m_alpha=opt.m_alpha,
-                          mask_format=opt.mask_format)
-
+        pass
     if opt.arch == 'base':
         model = get_Base(num_layers=opt.num_layers,
-                         d_model=opt.head_dim*opt.num_heads,
                          num_heads=opt.num_heads,
-                         dff=opt.mixer,
-                         base=opt.pe_base,
-                         rate=opt.dropout,
-                         use_leak=False,
-                         maxlen=opt.window_size,
+                         head_dim=opt.head_dim,
+                         mixer_size=opt.mixer,
+                         dropout=opt.dropout,
+                         pe_base=opt.pe_base,
+                         pe_dim=opt.pe_dim,
+                         pe_c=opt.exp,
+                         window_size=opt.window_size,
                          m_alpha=opt.m_alpha,
                          mask_format=opt.mask_format)
 

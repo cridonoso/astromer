@@ -11,7 +11,7 @@ import tensorflow as tf
 from pathlib import Path
 import joblib
 
-from src.layers import ReducerEncoder, UpRegLayer, RegLayer
+from src.layers import Encoder, RegLayer
 
 def build_input(window_size, batch_size=None):
     magnitudes  = Input(shape=(window_size, 1),
@@ -43,22 +43,22 @@ def get_ASTROMER(num_layers=2,
 
     placeholder = build_input(window_size)
 
-    encoder = ReducerEncoder(window_size=window_size,
-                             num_layers=num_layers,
-                             num_heads=num_heads,
-                             head_dim=head_dim,
-                             mixer_size=mixer_size,
-                             dropout=dropout,
-                             pe_base=pe_base,
-                             pe_dim=pe_dim,
-                             pe_c=pe_c,
-                             m_alpha=m_alpha,
-                             mask_format=mask_format,
-                             name='encoder')
+    encoder = Encoder(window_size=window_size,
+                      num_layers=num_layers,
+                      num_heads=num_heads,
+                      head_dim=head_dim,
+                      mixer_size=mixer_size,
+                      dropout=dropout,
+                      pe_base=pe_base,
+                      pe_dim=pe_dim,
+                      pe_c=pe_c,
+                      m_alpha=m_alpha,
+                      mask_format=mask_format,
+                      name='encoder')
 
     x = encoder(placeholder)
 
-    x = UpRegLayer(name='regression')((x, placeholder['times']))
+    x = RegLayer(name='regression')(x)
 
     return CustomModel(inputs=placeholder, outputs=x, name="ASTROMER-1")
 
