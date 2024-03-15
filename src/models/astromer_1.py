@@ -56,7 +56,7 @@ def get_ASTROMER(num_layers=2,
                       mask_format=mask_format,
                       name='encoder')
 
-    placeholder['magnitudes'] = tf.multiply(placeholder['magnitudes'], 1.-placeholder['mask_in']) 
+    placeholder['input'] = tf.multiply(placeholder['input'], 1.-placeholder['mask_in']) 
     placeholder['times'] = tf.multiply(placeholder['times'], 1.-placeholder['mask_in']) 
 
     x = encoder(placeholder)
