@@ -114,7 +114,7 @@ def run(opt):
         
     if opt.scheduler:
         print('[INFO] Using Custom Scheduler')
-        lr = CustomSchedule(d_model=int(opt.head_dim*opt.num_heads))
+        lr = CustomSchedule(d_model=int(opt.head_dim))
     else:
         lr = opt.lr
 
