@@ -110,7 +110,7 @@ def format_inp_astromer(batch,
         inputs['input'] =  batch['input_modified']
 
         # inputs['back_times'] =  times
-        inputs['times'] =  shifted_times
+        inputs['times'] =  times
         inputs['mask_in'] =  batch['mask_in']
 
         errors = tf.slice(input_original, [0, 0, 2], [-1,-1, 1])
