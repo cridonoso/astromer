@@ -37,7 +37,7 @@ def create_loss_weigths(errors):
     W_min = tf.expand_dims(W_min, 1)
     W_max = tf.reduce_max(W, axis=1)
     W_max = tf.expand_dims(W_max, 1)
-    W = (W - W_min)/(W_max - W_min) + 1e-3
+    W = tf.math.divide_no_nan(W - W_min, W_max - W_min) + 1e-3
     return W
 
 
