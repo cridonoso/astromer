@@ -11,7 +11,7 @@ import tensorflow as tf
 from pathlib import Path
 import joblib
 
-from src.layers import Encoder, RegLayer
+from src.layers import MaskTokenEncoder, RegLayer
 
 def build_input(window_size, batch_size=None):
     magnitudes  = Input(shape=(window_size, 1),
@@ -39,25 +39,24 @@ def get_ASTROMER(num_layers=2,
                  window_size=100,
                  batch_size=None,
                  m_alpha=-0.5,
-                 mask_format='Q'):
+                 mask_format='Q',
+                 use_leak=False):
 
     placeholder = build_input(window_size)
 
-    encoder = Encoder(window_size=window_size,
-                      num_layers=num_layers,
-                      num_heads=num_heads,
-                      head_dim=head_dim,
-                      mixer_size=mixer_size,
-                      dropout=dropout,
-                      pe_base=pe_base,
-                      pe_dim=pe_dim,
-                      pe_c=pe_c,
-                      m_alpha=m_alpha,
-                      mask_format=mask_format,
-                      name='encoder')
-
-    placeholder['input'] = tf.multiply(placeholder['input'], 1.-placeholder['mask_in']) 
-    placeholder['times'] = tf.multiply(placeholder['times'], 1.-placeholder['mask_in']) 
+    encoder = MaskTokenEncoder(window_size=window_size,
+                               num_layers=num_layers,
+                               num_heads=num_heads,
+                               head_dim=head_dim,
+                               mixer_size=mixer_size,
+                               dropout=dropout,
+                               pe_base=pe_base,
+                               pe_dim=pe_dim,
+                               pe_c=pe_c,
+                               m_alpha=m_alpha,
+                               mask_format=mask_format,
+                               use_leak=use_leak,
+                               name='encoder')
 
     x = encoder(placeholder)
 
@@ -75,7 +74,8 @@ class CustomModel(Model):
             y_pred = self(x, training=True)  # Forward pass
             rmse = custom_rmse(y_true=y['target'],
                                y_pred=y_pred,
-                               mask=y['mask_out'])
+                               mask=y['mask_out'],
+                               weights=y['w_error'])
 
             r2_value = custom_r2(y_true=y['target'], 
                                  y_pred=y_pred, 
@@ -92,7 +92,8 @@ class CustomModel(Model):
         y_pred = self(x, training=False)
         rmse = custom_rmse(y_true=y['target'],
                            y_pred=y_pred,
-                           mask=y['mask_out'])
+                           mask=y['mask_out'],
+                           weights=y['w_error'])
 
         r2_value = custom_r2(y_true=y['target'], 
                              y_pred=y_pred, 

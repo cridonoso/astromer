@@ -2,15 +2,6 @@ import tensorflow as tf
 
 from src.layers.attention import HeadAttentionMulti
 
-class MergingLayer(tf.keras.layers.Layer):
-	def __init__(self, units, num_heads, head_dim, **kwargs):
-		super(MergingLayer, self).__init__(**kwargs)
-		d_model = num_heads*head_dim
-		self.layer_0 = tf.keras.layers.Dense(units, activation='tanh')
-		self.layer_1 = tf.keras.layers.Dense(d_model)
-	def call(self, inputs):
-		x = self.layer_0(inputs)
-		return self.layer_1(x)
 
 def point_wise_feed_forward_network(d_model, dff):
     return tf.keras.Sequential([
@@ -19,7 +10,9 @@ def point_wise_feed_forward_network(d_model, dff):
     ])
 
 class AttentionBlock(tf.keras.layers.Layer):
-	def __init__(self, head_dim, num_heads, mixer_size, dropout=0.1, m_alpha=-0.5, mask_format='Q', **kwargs):
+	def __init__(self, head_dim, num_heads, mixer_size, 
+				 dropout=0.1, m_alpha=-0.5, mask_format='Q', 
+				 use_leak=False, **kwargs):
 		super(AttentionBlock, self).__init__(**kwargs)
 		self.head_dim = head_dim
 		self.num_heads = num_heads
@@ -27,22 +20,42 @@ class AttentionBlock(tf.keras.layers.Layer):
 		self.dropout = dropout
 		self.mask_format = mask_format
 		self.m_alpha = m_alpha
+		self.use_leak = use_leak
+
 		self.mha = HeadAttentionMulti(self.head_dim, self.num_heads, m_alpha=self.m_alpha, mask_format=mask_format)
-		self.ffn = point_wise_feed_forward_network(self.num_heads*self.head_dim, self.mixer_size)
+		self.ffn = point_wise_feed_forward_network(self.num_heads*self.head_dim, 
+												   self.mixer_size)
+		
 		self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 		self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
+		
+		if use_leak:
+			self.reshape_leak_1 = tf.keras.layers.Dense(self.head_dim*self.num_heads)
+			self.reshape_leak_2 = tf.keras.layers.Dense(self.head_dim*self.num_heads)
+
 		self.dropout1 = tf.keras.layers.Dropout(self.dropout)
 		self.dropout2 = tf.keras.layers.Dropout(self.dropout)
 
 	def call(self, x, training, mask=None, return_weights=False):
 		attn_output, att_weights, qk_values = self.mha(x, training=training, mask=mask)  # (batch_size, input_seq_len, d_model)
 		attn_output = self.dropout1(attn_output, training=training)
+
+		if self.use_leak:
+			attn_output = self.reshape_leak_1(x) + attn_output
+
 		attn_output = self.layernorm1(attn_output, training=training)
+		
 		ffn_output  = self.ffn(attn_output)  # (batch_size, input_seq_len, d_model)
 		ffn_output  = self.dropout2(ffn_output, training=training)
+		
+		if self.use_leak:
+			ffn_output = self.reshape_leak_2(attn_output) + ffn_output
+
 		ffn_output  = self.layernorm2(ffn_output, training=training)
+
 		if return_weights:
 			return ffn_output, att_weights, qk_values
+
 		return ffn_output
 
 	def get_config(self):
@@ -50,9 +63,11 @@ class AttentionBlock(tf.keras.layers.Layer):
 		config.update({
 			"head_dim": self.head_dim,
 			"num_heads": self.num_heads,
-			"dff": self.dff,
-			"dropout": self.rate,
+			"mixer_size": self.mixer_size,
+			"dropout": self.dropout,
 			"mask_format": self.mask_format,
+			"m_alpha": self.m_alpha,
+			"use_leak": self.use_leak,
 			"mha": serialize_keras_object(self.mha),
 			"ffn": serialize_keras_object(self.ffn),
 		})

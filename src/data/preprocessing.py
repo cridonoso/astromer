@@ -15,6 +15,31 @@ def nothing(batch, on='input', axis=0):
     batch['mean_values'] = mean_value
     return batch
 
+def shift_times(times, max_days=31):
+    '''
+    Shift randomly MJD times up to 31 days
+    '''
+    inp_size = tf.shape(times)
+    shifts = tf.random.uniform(shape=[inp_size[0], 1, 1], minval=0, maxval=max_days)
+    times = tf.add(times, shifts)
+    return times
+
+def unstandardize(batch):
+    '''
+    Go back to original input values
+    '''
+    mean_values = tf.expand_dims(batch['mean_values'], 1)
+    return batch['input'] + mean_values
+
+def create_loss_weigths(errors):
+    W = tf.math.divide_no_nan(1., errors)
+    W_min = tf.reduce_min(W, axis=1)
+    W_min = tf.expand_dims(W_min, 1)
+    W_max = tf.reduce_max(W, axis=1)
+    W_max = tf.expand_dims(W_max, 1)
+    W = (W - W_min)/(W_max - W_min) + 1e-3
+    return W
+
 
 def standardize(batch, on='input', axis=0):
     """

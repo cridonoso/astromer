@@ -20,6 +20,7 @@ class Encoder(Model):
                  pe_c=1., 
                  m_alpha=-0.5,
                  mask_format='Q',
+                 use_leak=False,
                  **kwargs):
         super().__init__(**kwargs)
         # super().__init__(**kwargs)
@@ -35,6 +36,7 @@ class Encoder(Model):
         self.pe_dim         = pe_dim
         self.mask_format    = mask_format
         self.m_alpha        = m_alpha
+        self.use_leak       = use_leak
         self.inp_transform  = tf.keras.layers.Dense(self.pe_dim, name='inp_transform')
 
         self.positional_encoder = PositionalEncoder(self.pe_dim, 
@@ -48,10 +50,11 @@ class Encoder(Model):
                                           dropout=self.dropout, 
                                           mask_format=self.mask_format, 
                                           m_alpha=self.m_alpha,
+                                          use_leak=self.use_leak,
                                           name=f'att_layer_{i}')
                             for i in range(self.num_layers)]
         
-        self.dropout_layer = tf.keras.layers.Dropout(self.dropout)
+        self.dropout_layer = tf.keras.layers.Dropout(dropout)
 
     def input_format(self, inputs):
         if 'seg_emb' in inputs.keys():
@@ -158,3 +161,48 @@ class ReducerEncoder(Encoder):
         x = tf.squeeze(x, axis=1)
         x = self.out_dense(x)
         return x
+
+class MaskTokenEncoder(Encoder):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        msk_token = tf.Variable(initial_value=tf.zeros([1, self.pe_dim]), 
+                                trainable=True,
+                                name='mask_token')
+
+        self.msk_token = tf.tile(msk_token, [self.window_size, 1])
+
+    def input_format(self, inputs):
+        if 'seg_emb' in inputs.keys():
+            window_size = self.window_size + 1 # if seg_emb exists then NSP is being applied
+            x = tf.concat([inputs['input'], inputs['seg_emb']], axis=2, name='concat_mag_segemb')
+        else:
+            window_size = self.window_size
+            x = inputs['input']
+
+        x_transformed = self.inp_transform(x)   
+        x_pe = self.positional_encoder(inputs['times'])
+        x = x_transformed + x_pe  
+
+        x = tf.multiply(x, 1. - inputs['mask_in'])
+        msk_tkn = tf.multiply(self.msk_token, inputs['mask_in'])
+        x = tf.add(x, msk_tkn)
+        return x , window_size
+
+    def call(self, inputs, training=False, return_weights=False):
+        # adding embedding and position encoding.
+        x, window_size = self.input_format(inputs)  
+        x = self.dropout_layer(x, training=training)
+        for i in range(self.num_layers):
+            if return_weights:
+                x, w, qkvalues =  self.enc_layers[i](x, training=training, 
+                                                     mask=inputs['mask_in'], 
+                                                     return_weights=True)
+            else:
+                x =  self.enc_layers[i](x, training=training, mask=inputs['mask_in'])
+
+        x = self.output_transform(x)
+        
+        if return_weights:
+            return x, w, qkvalues
+        return  x # (batch_size, input_seq_len, d_model)

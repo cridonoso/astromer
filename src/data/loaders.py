@@ -3,7 +3,7 @@ import multiprocessing
 import glob
 import os
 
-from src.data.preprocessing import to_windows, standardize, min_max_scaler, nothing
+from src.data.preprocessing import to_windows, standardize, min_max_scaler, nothing, unstandardize, shift_times, create_loss_weigths 
 from src.data.gap import set_gap, invert_mask
 from src.data.masking import mask_dataset
 from src.data.record import deserialize
@@ -89,13 +89,7 @@ def format_inp_astromer(batch,
     inputs, outputs = {}, {}
     if aversion=='redux':
         inputs['input']    =  batch['input_modified']
-        t_mean = tf.slice(batch['mean_values'], [0, 0], [-1, 1])
-        t_mean = tf.expand_dims(t_mean, axis=1)
-        times = tf.slice(batch['input'], [0,0,0], [-1,-1,1]) + t_mean
-        t_min = tf.reduce_min(times, axis=1)
-        t_min = tf.expand_dims(t_min, axis=1)
-        t_max = tf.reduce_max(times, axis=1)
-        t_max = tf.expand_dims(t_max, axis=1)
+        times              = tf.slice(batch['input_modified'], [0, 0, 0], [-1, -1, 1])
         inputs['times']    =  tf.math.divide_no_nan(times - t_min, t_max-t_min) + 0.1
         
         inputs['mask_in']  =  batch['mask_in']
@@ -108,16 +102,22 @@ def format_inp_astromer(batch,
 
 
     if aversion == 'base' or aversion == 'normal':
-        inputs['input']    =  batch['input_modified']
-        inputs['times']    =  tf.slice(batch['input'], [0,0,0], [-1,-1,1])
+        input_original  = unstandardize(batch)
+        times           = tf.slice(input_original, [0, 0, 0], [-1, -1, 1])
+        shifted_times   = shift_times(times, max_days=31)
+        back_times      = tf.slice(batch['input_modified'], [0, 0, 0], [-1, -1, 1])
 
-        inputs['mask_in']  =  batch['mask_in']
-        inputs['mask_out'] = tf.expand_dims(batch['mask_out'], -1)
-        
+        inputs['input'] =  batch['input_modified']
+
+        # inputs['back_times'] =  times
+        inputs['times'] =  shifted_times
+        inputs['mask_in'] =  batch['mask_in']
+
+        errors = tf.slice(input_original, [0, 0, 2], [-1,-1, 1])
         outputs['target']   =  tf.slice(batch['input'], [0,0,1], [-1,-1,1])
-        outputs['error']    =  tf.slice(batch['input'], [0,0,2], [-1,-1,1])
+        outputs['w_error']    =  create_loss_weigths(errors)
         outputs['mask_out'] =  batch['mask_out']
-        outputs['lcid'] = batch['lcid']
+        outputs['lcid']     = batch['lcid']
             
     if aversion == 'skip':
         inputs['input'] = batch['input_modified']
@@ -126,11 +126,11 @@ def format_inp_astromer(batch,
         t0 = tf.slice(batch['input'], [0,0,0], [-1,inp_size[1]-1,1])
         t1 = tf.slice(batch['input'], [0,1,0], [-1,-1,1])
         dt = t1 - t0
-        inputs['times']     = tf.concat([tf.zeros([inp_size[0], 1, 1]), dt], axis=1)
-        inputs['mask_in']   = batch['mask_in']
+        inputs['times']   = tf.concat([tf.zeros([inp_size[0], 1, 1]), dt], axis=1)
+        inputs['mask_in'] = batch['mask_in']
 
-        outputs['target']  = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
-        outputs['error']       = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
+        outputs['target'] = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
+        outputs['error']  = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
         outputs['mask_out'] = batch['mask_out']
     
     if aversion == 'nsp':
@@ -175,7 +175,6 @@ def get_loader(dataset,
                shuffle=False,
                repeat=1,
                num_cls=None,
-               max_gap=0.2,
                normalize='zero-mean', # 'minmax'
                cache=False,
                return_ids=False,

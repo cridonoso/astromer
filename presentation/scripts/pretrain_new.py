@@ -64,7 +64,8 @@ def get_model(opt):
                          pe_c=opt.pe_exp,
                          window_size=opt.window_size,
                          m_alpha=opt.m_alpha,
-                         mask_format=opt.mask_format)
+                         mask_format=opt.mask_format,
+                         use_leak=opt.use_leak)
 
     if opt.arch == 'skip':
         model = get_Skip(num_layers=opt.num_layers,
@@ -178,6 +179,7 @@ if __name__ == '__main__':
                         help='Alpha used within mask self-attention')
     parser.add_argument('--mask-format', default='QK', type=str,
                         help='mask on Query and Key tokens (QK) or Query tokens only (Q)')
+    parser.add_argument('--use-leak', action='store_true', help='Use Custom Scheduler during training')
 
     # =========================================================
     parser.add_argument('--lr', default=1e-5, type=float,
@@ -189,7 +191,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_epochs', default=10000, type=int,
                         help='Number of epochs')
     parser.add_argument('--window-size', default=200, type=int,
-                        help='windows size of the PSFs')\
+                        help='windows size of the PSFs')
     # ==========================================================
     parser.add_argument('--probed', default=0.2, type=float,
                         help='Probed percentage')
