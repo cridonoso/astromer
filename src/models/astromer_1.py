@@ -11,7 +11,9 @@ import tensorflow as tf
 from pathlib import Path
 import joblib
 
-from src.layers import MaskTokenEncoder, RegLayer
+from src.layers import Encoder, RegLayer
+from src.layers.input import AddMSKToken
+
 
 def build_input(window_size, batch_size=None):
     magnitudes  = Input(shape=(window_size, 1),
@@ -44,19 +46,21 @@ def get_ASTROMER(num_layers=2,
 
     placeholder = build_input(window_size)
 
-    encoder = MaskTokenEncoder(window_size=window_size,
-                               num_layers=num_layers,
-                               num_heads=num_heads,
-                               head_dim=head_dim,
-                               mixer_size=mixer_size,
-                               dropout=dropout,
-                               pe_base=pe_base,
-                               pe_dim=pe_dim,
-                               pe_c=pe_c,
-                               m_alpha=m_alpha,
-                               mask_format=mask_format,
-                               use_leak=use_leak,
-                               name='encoder')
+    placeholder = AddMSKToken(trainable=True)(placeholder)
+
+    encoder = Encoder(window_size=window_size,
+                      num_layers=num_layers,
+                      num_heads=num_heads,
+                      head_dim=head_dim,
+                      mixer_size=mixer_size,
+                      dropout=dropout,
+                      pe_base=pe_base,
+                      pe_dim=pe_dim,
+                      pe_c=pe_c,
+                      m_alpha=m_alpha,
+                      mask_format=mask_format,
+                      use_leak=use_leak,
+                      name='encoder')
 
     x = encoder(placeholder)
 
