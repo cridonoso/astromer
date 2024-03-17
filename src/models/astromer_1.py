@@ -46,7 +46,7 @@ def get_ASTROMER(num_layers=2,
 
     placeholder = build_input(window_size)
 
-    placeholder = AddMSKToken(trainable=True)(placeholder)
+    placeholder = AddMSKToken(trainable=True, on=['input', 'times'])(placeholder)
 
     encoder = Encoder(window_size=window_size,
                       num_layers=num_layers,
