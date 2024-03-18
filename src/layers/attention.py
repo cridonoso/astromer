@@ -34,7 +34,7 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK'):
         print('[INFO] Masking Query and Key tokens')
         steps = tf.shape(scaled_attention_logits)[2]
         mask_rshp = tf.tile(mask, [1,1,steps])
-        mask_rshp += tf.transpose(mask_rshp, [0,2,1])
+        mask_rshp += tf.transpose(mask_rshp, [0,1,2])
         mask_rshp = tf.minimum(1., mask_rshp)
         mask_rshp = tf.expand_dims(mask_rshp, 1)
         scaled_attention_logits += mask_rshp*m_alpha
