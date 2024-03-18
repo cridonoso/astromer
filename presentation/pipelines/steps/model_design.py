@@ -2,8 +2,8 @@ import tensorflow as tf
 import toml 
 import os
 
-from src.models.astromer_0 import get_ASTROMER as get_Base
-from src.models.astromer_1 import get_ASTROMER as get_Redux
+from src.models.astromer_0 import get_ASTROMER as get_Bugstromer
+from src.models.astromer_1 import get_ASTROMER as get_Base
 from src.models.astromer_nsp import get_ASTROMER as get_NSP
 from src.models.astromer_skip import get_ASTROMER as get_Skip
 
@@ -18,10 +18,10 @@ from tensorflow.keras.layers import TimeDistributed, LayerNormalization, Dense, 
 
 
 def build_model(params, return_weights=False):
-    if params['arch'] == 'normal' or params['arch'] == 'base':
+    if params['arch'] == 'normal':
         if params['mask_format'] == 'first':
             params['mask_format'] = 'QK'
-        model = get_Base(num_layers=params['num_layers'],
+        model = get_Bugstromer(num_layers=params['num_layers'],
                          d_model=params['head_dim']*params['num_heads'],
                          num_heads=params['num_heads'],
                          dff=params['mixer'],
@@ -33,7 +33,7 @@ def build_model(params, return_weights=False):
                          mask_format=params['mask_format'],
                          return_weights=return_weights)
 
-    if params['arch'] == 'redux':
+    if params['arch'] == 'base':
         model = get_Base(num_layers=params['num_layers'],
                           num_heads=params['num_heads'],
                           head_dim=params['head_dim'],
@@ -44,7 +44,8 @@ def build_model(params, return_weights=False):
                           pe_c=params['pe_exp'],
                           window_size=params['window_size'],
                           m_alpha=params['m_alpha'],
-                          mask_format=params['mask_format'])
+                          mask_format=params['mask_format'],
+                          use_leak=params['use_leak'])
 
     if params['arch'] == 'skip':
         model = get_Skip(num_layers=params['num_layers'],
