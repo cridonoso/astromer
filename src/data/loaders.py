@@ -87,21 +87,21 @@ def format_inp_astromer(batch,
     """
 
     inputs, outputs = {}, {}
-    if aversion=='redux':
+    if aversion=='zero':
+        print('[INFO] Zero')
         inputs['input']    =  batch['input_modified']
-        times              = tf.slice(batch['input_modified'], [0, 0, 0], [-1, -1, 1])
-        inputs['times']    =  tf.math.divide_no_nan(times - t_min, t_max-t_min) + 0.1
+        inputs['times']    =  tf.slice(batch['input'], [0, 0, 0], [-1, -1, 1])
         
-        inputs['mask_in']  =  batch['mask_in']
-        inputs['mask_out'] = tf.expand_dims(batch['mask_out'], -1)
+        inputs['mask_in']  = batch['mask_in']
+        inputs['mask_out'] = batch['mask_out']
         
-        outputs['target']   =  tf.slice(batch['input'], [0,0,1], [-1,-1,1])
-        outputs['error']    =  tf.slice(batch['input'], [0,0,2], [-1,-1,1])
-        outputs['mask_out'] =  batch['mask_out']
+        outputs['target']   = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
+        outputs['error']    = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
+        outputs['mask_out'] = batch['mask_out']
         outputs['lcid']     = batch['lcid']
+        outputs['w_error']  = tf.ones_like(inputs['times'], dtype=tf.float32)
 
-
-    if aversion == 'base' or aversion == 'normal':
+    if aversion == 'base':
         input_original  = unstandardize(batch)
         times           = tf.slice(input_original, [0, 0, 0], [-1, -1, 1])
         shifted_times   = shift_times(times, max_days=31)

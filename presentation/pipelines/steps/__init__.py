@@ -1,2 +1,2 @@
 from .load_data import build_loader
-from .model_design import load_pt_model, build_model
+from .model_design import load_pt_model

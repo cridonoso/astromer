@@ -5,6 +5,7 @@ import sys
 import os
 
 
+from src.models.astromer_0 import get_ASTROMER as get_Bugstromer
 from src.models.astromer_1 import get_ASTROMER as get_Base
 from src.models.astromer_nsp import get_ASTROMER as get_NSP
 from src.models.astromer_skip import get_ASTROMER as get_Skip
@@ -20,7 +21,6 @@ from src.data import get_loader
 
 
 def get_loaders(opt):
-    print(opt.same)
     train_loader = get_loader(os.path.join(opt.data, 'train'),
                               batch_size=5 if opt.debug else opt.bs,
                               window_size=opt.window_size,
@@ -51,8 +51,19 @@ def get_loaders(opt):
 
 
 def get_model(opt):
-    if opt.arch == 'redux':
-        pass
+    if opt.arch == 'bugstromer':
+        model = get_Bugstromer(num_layers=opt.num_layers,
+                               d_model=opt.num_heads*opt.head_dim,
+                               num_heads=opt.num_heads,
+                               dff=opt.mixer,
+                               base=opt.pe_base,
+                               rate=opt.dropout,
+                               use_leak=False,
+                               maxlen=opt.window_size,
+                               m_alpha=opt.m_alpha,
+                               mask_format=opt.mask_format,
+                               return_weights=False)
+        
     if opt.arch == 'base':
         model = get_Base(num_layers=opt.num_layers,
                          num_heads=opt.num_heads,

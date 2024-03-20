@@ -1,14 +1,12 @@
 
-exp_id: 'comparison' 
-do_ft: [False, False, False]
-do_clf: [True, True, True]
-visible_gpu: ['2', '3']
+exp_id: 'mask_token' 
+do_ft: [True]
+do_clf: [True]
+visible_gpu: ['2']
 
 pretrain:
-  tag: ['first', 'second', 'third']
-  weights: ['./presentation/results/comparison/2024-03-12_21-26-21',
-            './presentation/results/comparison/2024-03-12_21-29-51',
-            './presentation/results/comparison/2024-03-12_21-32-41']
+  tag: ['first']
+  weights: ['./presentation/results/astromer_2/2024-03-19_21-11-56/',]
 
 data:
   paths : ['./data/records/alcock/fold_0/alcock_20', 
