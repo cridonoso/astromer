@@ -51,7 +51,7 @@ def get_loaders(opt):
 
 
 def get_model(opt):
-    if opt.arch == 'bugstromer':
+    if opt.arch == 'zero':
         model = get_Bugstromer(num_layers=opt.num_layers,
                                d_model=opt.num_heads*opt.head_dim,
                                num_heads=opt.num_heads,
