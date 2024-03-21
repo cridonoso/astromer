@@ -30,6 +30,7 @@ def get_loaders(opt):
                               nsp_prob=opt.nsp_prob,
                               sampling=True,
                               shuffle=True,
+                              normalize='minmax',
                               repeat=1,
                               aversion=opt.arch)
 
@@ -42,6 +43,7 @@ def get_loaders(opt):
                               nsp_prob=opt.nsp_prob,
                               sampling=True,
                               shuffle=False,
+                              normalize='minmax',
                               repeat=1,
                               aversion=opt.arch)
 

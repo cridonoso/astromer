@@ -96,7 +96,7 @@ class HeadAttentionMulti(tf.keras.layers.Layer):
 
         output = self.dense(concat_attention)  # (batch_size, seq_len_q, d_model)
         
-        return output, attention_weights, qk_values
+        return output, attention_weights, qk_values, (q,k,v)
 
     def get_config(self):
         config = super().get_config()

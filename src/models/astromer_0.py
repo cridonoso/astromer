@@ -105,7 +105,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         output = self.dense(concat_attention)  # (batch_size, seq_len_q, d_model)
 
-        return output, attention_weights, qkvalues
+        return output, attention_weights, qkvalues, (q,k,v)
 
 class RegLayer(Layer):
     def __init__(self, **kwargs):
@@ -143,7 +143,7 @@ class EncoderLayer(tf.keras.layers.Layer):
         self.dropout2 = tf.keras.layers.Dropout(rate)
 
     def call(self, x, training, mask, return_weights=False):
-        attn_output, w, qkvalues = self.mha(x, mask)  # (batch_size, input_seq_len, d_model)
+        attn_output, w, qkvalues, qkv = self.mha(x, mask)  # (batch_size, input_seq_len, d_model)
         attn_output = self.dropout1(attn_output, training=training)
 
         if self.use_leak:
@@ -160,7 +160,7 @@ class EncoderLayer(tf.keras.layers.Layer):
             out2 = self.layernorm2(ffn_output)
         
         if return_weights:
-            return out2, w, qkvalues
+            return out2, w, qkvalues, qkv
         return out2
 
 class Encoder(tf.keras.layers.Layer):
@@ -187,12 +187,12 @@ class Encoder(tf.keras.layers.Layer):
 
         for i in range(self.num_layers):
             if return_weights:
-                x, w, qkvalues = self.enc_layers[i](x, training=training, mask=data['mask_in'], return_weights=True)
+                x, w, qkvalues, qkv = self.enc_layers[i](x, training=training, mask=data['mask_in'], return_weights=True)
             else:
                 x = self.enc_layers[i](x, training=training, mask=data['mask_in'], return_weights=False)
         
         if return_weights:
-            return x, w, qkvalues
+            return x, w, qkvalues, qkv
         
         return x  # (batch_size, input_seq_len, d_model)
     

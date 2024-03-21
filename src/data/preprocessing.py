@@ -66,10 +66,12 @@ def min_max_scaler(batch, on='input', axis=0):
     """
     min_value = tf.reduce_min(batch['input'], axis, name='min_value')
     max_value = tf.reduce_max(batch['input'], axis, name='max_value')
+    batch['mean_values'] = max_value
     min_value = tf.expand_dims(min_value, axis)
     max_value = tf.expand_dims(max_value, axis)
     batch['input'] = tf.math.divide_no_nan(batch['input'] - min_value,
                                            max_value-min_value)
+    
     return batch
 
 def sample_lc(sample, max_obs, binary=True):

@@ -46,7 +46,9 @@ def get_ASTROMER(num_layers=2,
 
     placeholder = build_input(window_size)
 
-    msk_placeholder = AddMSKToken(trainable=True, on=['input'], name='msk_token')(placeholder)
+    msk_placeholder = AddMSKToken(trainable=True, 
+                                  window_size=window_size, 
+                                  on=['input'], name='msk_token')(placeholder)
 
     encoder = Encoder(window_size=window_size,
                       num_layers=num_layers,

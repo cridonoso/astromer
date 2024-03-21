@@ -37,7 +37,7 @@ class AttentionBlock(tf.keras.layers.Layer):
 		self.dropout2 = tf.keras.layers.Dropout(self.dropout)
 
 	def call(self, x, training, mask=None, return_weights=False):
-		attn_output, att_weights, qk_values = self.mha(x, training=training, mask=mask)  # (batch_size, input_seq_len, d_model)
+		attn_output, att_weights, qk_values, (q,k,v) = self.mha(x, training=training, mask=mask)  # (batch_size, input_seq_len, d_model)
 		attn_output = self.dropout1(attn_output, training=training)
 
 		if self.use_leak:
@@ -54,7 +54,7 @@ class AttentionBlock(tf.keras.layers.Layer):
 		ffn_output  = self.layernorm2(ffn_output, training=training)
 
 		if return_weights:
-			return ffn_output, att_weights, qk_values
+			return ffn_output, att_weights, qk_values, (q,k,v)
 
 		return ffn_output
 

@@ -78,7 +78,7 @@ class Encoder(Model):
         x = self.dropout_layer(x, training=training)
         for i in range(self.num_layers):
             if return_weights:
-                x, w, qkvalues =  self.enc_layers[i](x, training=training, 
+                x, w, qkvalues, qkv =  self.enc_layers[i](x, training=training, 
                                                      mask=inputs['mask_in'], 
                                                      return_weights=True)
             else:
@@ -86,7 +86,7 @@ class Encoder(Model):
         x = self.output_transform(x)
         
         if return_weights:
-            return x, w, qkvalues
+            return x, w, qkvalues, qkv
         return  x # (batch_size, input_seq_len, d_model)
 
 class SkipEncoder(Encoder):
