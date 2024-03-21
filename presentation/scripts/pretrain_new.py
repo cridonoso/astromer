@@ -190,7 +190,7 @@ if __name__ == '__main__':
                         help='Dropout to use on the output of each attention layer (before mixer layer)')
     parser.add_argument('--m-alpha', default=1., type=float,
                         help='Alpha used within mask self-attention')
-    parser.add_argument('--mask-format', default='QK', type=str,
+    parser.add_argument('--mask-format', default=None, type=str,
                         help='mask on Query and Key tokens (QK) or Query tokens only (Q)')
     parser.add_argument('--use-leak', action='store_true', help='Use Custom Scheduler during training')
 

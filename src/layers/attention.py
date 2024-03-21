@@ -40,6 +40,7 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK'):
         scaled_attention_logits += mask_rshp*m_alpha
         
     if mask_format == None:
+        print('[INFO] No mask, Hyperbolic tanh! >:v')
         # softmax is normalized on the last axis (seq_len_k) so that the scores add up to 1.
         attention_weights = tf.keras.activations.tanh(scaled_attention_logits)
     else:
