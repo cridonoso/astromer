@@ -44,7 +44,7 @@ def get_ASTROMER(num_layers=2,
                  m_alpha=-0.5,
                  mask_format='Q',
                  use_leak=False,
-                 loss_format='rmse'
+                 loss_format='rmse',
                  correct_loss=False):
 
     placeholder = build_input(window_size)
