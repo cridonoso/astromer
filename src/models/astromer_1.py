@@ -43,7 +43,8 @@ def get_ASTROMER(num_layers=2,
                  batch_size=None,
                  m_alpha=-0.5,
                  mask_format='Q',
-                 use_leak=False):
+                 use_leak=False,
+                 loss_format='rmse'):
 
     placeholder = build_input(window_size)
 
@@ -69,7 +70,7 @@ def get_ASTROMER(num_layers=2,
 
     x = RegLayer(name='regression')(x)
 
-    return CustomModel(inputs=placeholder, outputs=x, name="ASTROMER-1")
+    return CustomModel(loss_format=loss_format, inputs=placeholder, outputs=x, name="ASTROMER-1")
 
 class CustomModel(Model):
     def __init__(self, loss_format='rmse', *args, **kwargs):
