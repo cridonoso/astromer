@@ -44,7 +44,8 @@ def get_ASTROMER(num_layers=2,
                  m_alpha=-0.5,
                  mask_format='Q',
                  use_leak=False,
-                 loss_format='rmse'):
+                 loss_format='rmse'
+                 correct_loss=False):
 
     placeholder = build_input(window_size)
 
@@ -70,21 +71,23 @@ def get_ASTROMER(num_layers=2,
 
     x = RegLayer(name='regression')(x)
 
-    return CustomModel(loss_format=loss_format, inputs=placeholder, outputs=x, name="ASTROMER-1")
+    return CustomModel(correct_loss=correct_loss, loss_format=loss_format, inputs=placeholder, outputs=x, name="ASTROMER-1")
 
 class CustomModel(Model):
-    def __init__(self, loss_format='rmse', *args, **kwargs):
+    def __init__(self, correct_loss=False, loss_format='rmse', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.loss_format = loss_format
+        self.correct_loss = correct_loss
         
     def train_step(self, data):
         x, y = data
         with tf.GradientTape() as tape:
             y_pred = self(x, training=True)  # Forward pass
+            
             rmse = custom_rmse(y_true=y['target'],
                                y_pred=y_pred,
                                mask=y['mask_out'],
-                               weights=y['w_error'])
+                               weights=y['w_error'] if self.correct_loss else None)
             
             corr = pearson_loss(y['target'], y_pred, x['mask_in'])
             
@@ -113,7 +116,7 @@ class CustomModel(Model):
         rmse = custom_rmse(y_true=y['target'],
                            y_pred=y_pred,
                            mask=y['mask_out'],
-                           weights=y['w_error'])
+                           weights=y['w_error'] if self.correct_loss else None)
         corr = pearson_loss(y['target'], y_pred, x['mask_in'])
         
         r2_value = custom_r2(y_true=y['target'], 
