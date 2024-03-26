@@ -179,7 +179,7 @@ def get_loader(dataset,
                cache=False,
                return_ids=False,
                return_lengths=False,
-               aversion='skip'):
+               aversion='base'):
 
 
     assert isinstance(dataset, (list, str)), '[ERROR] Invalid format'
@@ -212,6 +212,7 @@ def get_loader(dataset,
     
     if normalize is None:
         dataset = dataset.map(nothing)
+        
     if normalize == 'zero-mean':
         dataset = dataset.map(standardize)
 
@@ -238,8 +239,9 @@ def get_loader(dataset,
                                                 num_cls=num_cls,
                                                 aversion=aversion),
                   num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
+    
     if cache:
+        print('[INFO] Cache activated')
         dataset = dataset.cache()
 
     # #PREFETCH BATCHES

@@ -51,7 +51,8 @@ def standardize(batch, on='input', axis=0):
         type: tf.Dataset
     """
     mean_value = tf.reduce_mean(batch['input'], axis, name='mean_value')
-    batch['input'] = batch['input'] - tf.expand_dims(mean_value, axis)
+#     bias = tf.random.uniform(0, 1, )
+    batch['input'] = batch['input'] - tf.expand_dims(mean_value, axis) 
     batch['mean_values'] = mean_value
     return batch
 

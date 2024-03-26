@@ -30,8 +30,9 @@ def get_loaders(opt):
                               nsp_prob=opt.nsp_prob,
                               sampling=True,
                               shuffle=True,
-                              normalize='minmax',
-                              repeat=1,
+                              cache=True,
+                              normalize='zero-mean',
+                              repeat=opt.repeat,
                               aversion=opt.arch)
 
     valid_loader = get_loader(os.path.join(opt.data, 'validation'),
@@ -43,7 +44,8 @@ def get_loaders(opt):
                               nsp_prob=opt.nsp_prob,
                               sampling=True,
                               shuffle=False,
-                              normalize='minmax',
+                              cache=True,
+                              normalize='zero-mean',
                               repeat=1,
                               aversion=opt.arch)
 
@@ -195,6 +197,8 @@ if __name__ == '__main__':
     parser.add_argument('--use-leak', action='store_true', help='Use Custom Scheduler during training')
 
     # =========================================================
+    parser.add_argument('--repeat', default=1, type=float,
+                        help='repeat data')
     parser.add_argument('--lr', default=1e-5, type=float,
                         help='learning rate')
     parser.add_argument('--bs', default=2500, type=int,

@@ -1,5 +1,5 @@
 import tensorflow as tf
-
+import tensorflow_probability as tfp
 # @tf.function
 def custom_rmse(y_true, y_pred, mask=None, weights=None):
     inp_shp = tf.shape(y_true)
@@ -14,7 +14,30 @@ def custom_rmse(y_true, y_pred, mask=None, weights=None):
     mse_mean = tf.reduce_mean(mse_mean)
     
     return tf.math.sqrt(mse_mean)
-    
+
+def pearson_loss(y_true, y_pred, mask):
+    def fn(a, b, mask):
+        a = tf.boolean_mask(a, mask)
+        b = tf.boolean_mask(b, mask)
+        
+        a_mean = tf.reduce_mean(a)
+        b_mean = tf.reduce_mean(b)
+        
+        num = tf.math.multiply_no_nan(a - a_mean, b - b_mean)
+        num = tf.reduce_sum(num)
+        
+        fac_0 = tf.reduce_sum(tf.pow(a - a_mean, 2))
+        fac_1 = tf.reduce_sum(tf.pow(b - b_mean, 2))
+        den = tf.math.multiply_no_nan(fac_0, fac_1)
+        den = tf.math.sqrt(den)
+        
+        corr = tf.math.divide_no_nan(num, den)
+        return corr
+    vals = tf.map_fn(lambda x: fn(x[0], x[1], x[2]), 
+                     elems=(y_true, y_pred, mask), 
+                     fn_output_signature=tf.float32)
+    return 1. - tf.reduce_mean(vals)
+
 @tf.function
 def rmse_for_nsp(y_true, y_pred, mask=None, nsp_label=None, segment_emb=None):
     inp_shp = tf.shape(y_true)

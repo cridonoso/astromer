@@ -18,6 +18,8 @@ from tensorflow.keras.layers import TimeDistributed, LayerNormalization, Dense, 
 
 
 def build_model(params, return_weights=False):
+    if not 'mask_format' in params.keys():
+        params['mask_format'] = None
     if params['arch'] == 'zero':
         print('[INFO] Zero architecture loaded')
         model = get_Bugstromer(num_layers=params['num_layers'],

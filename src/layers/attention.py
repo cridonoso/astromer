@@ -29,7 +29,8 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK'):
         mask_rshp = tf.minimum(1., mask_rshp)
         mask_rshp = tf.expand_dims(mask_rshp, 1)
         scaled_attention_logits += (mask_rshp*m_alpha)
-    
+        attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
+        
     if mask_format == 'QK':
         print('[INFO] Masking Query and Key tokens')
         steps = tf.shape(scaled_attention_logits)[2]
@@ -38,14 +39,18 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK'):
         mask_rshp = tf.minimum(1., mask_rshp)
         mask_rshp = tf.expand_dims(mask_rshp, 1)
         scaled_attention_logits += mask_rshp*m_alpha
-        
-    if mask_format == None:
+        attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
+    
+    if mask_format == 'tanh':
         print('[INFO] No mask, Hyperbolic tanh! >:v')
         # softmax is normalized on the last axis (seq_len_k) so that the scores add up to 1.
         attention_weights = tf.keras.activations.tanh(scaled_attention_logits)
-    else:
-        attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
-    
+        
+    if mask_format == 'logits':
+        print('[INFO] No mask, just logits')
+        # softmax is normalized on the last axis (seq_len_k) so that the scores add up to 1.
+        attention_weights = scaled_attention_logits
+        
     output = tf.matmul(attention_weights, v, name='Z')  # (..., seq_len_q, depth_v)
 
     return output, attention_weights, qk_values

@@ -24,7 +24,6 @@ class AddMSKToken(Layer):
 
     def call(self, inputs, training):
         msk_token = tf.tile(self.msk_token, [self.window_size, 1])
-        print(msk_token)
         for key in self.on:
             partial = tf.multiply(inputs[key], 1.-inputs['mask_in'])
             partial_mask = tf.multiply(inputs['mask_in'], msk_token)

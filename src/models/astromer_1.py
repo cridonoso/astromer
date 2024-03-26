@@ -4,6 +4,7 @@ import toml
 import os
 
 from src.losses             import custom_rmse
+from src.losses.rmse import pearson_loss
 from src.metrics            import custom_r2
 from tensorflow.keras.layers import Input, Layer, Dense
 from tensorflow.keras        import Model
@@ -41,7 +42,7 @@ def get_ASTROMER(num_layers=2,
                  window_size=100,
                  batch_size=None,
                  m_alpha=-0.5,
-                 mask_format=None,
+                 mask_format='Q',
                  use_leak=False):
 
     placeholder = build_input(window_size)
@@ -71,9 +72,10 @@ def get_ASTROMER(num_layers=2,
     return CustomModel(inputs=placeholder, outputs=x, name="ASTROMER-1")
 
 class CustomModel(Model):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, loss_format='rmse', *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        self.loss_format = loss_format
+        
     def train_step(self, data):
         x, y = data
         with tf.GradientTape() as tape:
@@ -82,16 +84,27 @@ class CustomModel(Model):
                                y_pred=y_pred,
                                mask=y['mask_out'],
                                weights=y['w_error'])
-
+            
+            corr = pearson_loss(y['target'], y_pred, x['mask_in'])
+            
             r2_value = custom_r2(y_true=y['target'], 
                                  y_pred=y_pred, 
                                  mask=y['mask_out'])
-
+            
+            if self.loss_format == 'rmse':
+                loss = rmse
+                
+            if self.loss_format == 'rmse+p':
+                loss = rmse + corr
+            
+            if self.loss_format == 'p':
+                loss = corr
+                
         trainable_vars = self.trainable_variables
-        gradients = tape.gradient(rmse, trainable_vars)
+        gradients = tape.gradient(loss, trainable_vars)
         self.optimizer.apply_gradients(zip(gradients, trainable_vars))
 
-        return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
+        return {'loss': loss, 'r_square':r2_value, 'rmse':rmse, 'p': corr}
 
     def test_step(self, data):
         x, y = data
@@ -100,11 +113,22 @@ class CustomModel(Model):
                            y_pred=y_pred,
                            mask=y['mask_out'],
                            weights=y['w_error'])
-
+        corr = pearson_loss(y['target'], y_pred, x['mask_in'])
+        
         r2_value = custom_r2(y_true=y['target'], 
                              y_pred=y_pred, 
                              mask=y['mask_out'])
-        return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
+        
+        if self.loss_format == 'rmse':
+            loss = rmse
+
+        if self.loss_format == 'rmse+p':
+            loss = rmse + corr
+
+        if self.loss_format == 'p':
+            loss = corr
+            
+        return {'loss': loss, 'r_square':r2_value, 'rmse':rmse, 'p': corr}
     
     def predict_step(self, data):
         x, y = data
@@ -113,4 +137,5 @@ class CustomModel(Model):
         return {'reconstruction': y_pred, 
                 'magnitudes': y['target'],
                 'times': x['times'],
-                'probed_mask': y['mask_out']}
+                'probed_mask': y['mask_out'],
+               'mask_in': x['mask_in']}

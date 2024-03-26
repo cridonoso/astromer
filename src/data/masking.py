@@ -106,8 +106,8 @@ def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
                                    tf.random.shuffle(seq_magn),
                                    rnd_frac,
                                    name='set_random')
-    if msk_frac == 1.:
-        mask_in  =  1.- mask_out
+#     if msk_frac == 1.:
+#         mask_in  =  1.- mask_out
 
     mask_out = tf.reshape(mask_out, [time_steps, 1])
     mask_in = tf.reshape(mask_in, [time_steps, 1])
