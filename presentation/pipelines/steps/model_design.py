@@ -9,8 +9,8 @@ from src.models.astromer_skip import get_ASTROMER as get_Skip
 
 from src.models.astromer_nsp import  build_input as build_input_nsp
 from src.models.astromer_skip import  build_input as build_input_skip
-from src.models.astromer_1 import build_input as build_input_redux
-from src.models.astromer_0 import  build_input as build_input_base
+from src.models.astromer_1 import build_input as build_input_base
+# from src.models.astromer_0 import  build_input as build_input_base
 
 
 from tensorflow.keras import Model
@@ -46,7 +46,9 @@ def build_model(params, return_weights=False):
                           window_size=params['window_size'],
                           m_alpha=params['m_alpha'],
                           mask_format=params['mask_format'],
-                          use_leak=params['use_leak'])
+                          use_leak=params['use_leak'],
+                          loss_format=params['loss_format'],
+                          correct_loss=params['correct_loss'])
 
     if params['arch'] == 'skip':
         model = get_Skip(num_layers=params['num_layers'],

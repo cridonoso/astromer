@@ -1,12 +1,13 @@
 
-exp_id: 'mask_token' 
-do_ft: [True]
-do_clf: [True]
-visible_gpu: ['2']
+exp_id: 'lfgr' 
+do_ft: [True, True]
+do_clf: [True, True]
+visible_gpu: ['0']
 
 pretrain:
-  tag: ['first']
-  weights: ['./presentation/results/astromer_2/2024-03-19_21-11-56/',]
+  tag: ['softmax', 'pearson']
+  weights: ['./presentation/results/lfgr/2024-03-25_18-27-29/',
+            './presentation/results/lfgr/2024-03-26_04-14-20/']
 
 data:
   paths : ['./data/records/alcock/fold_0/alcock_20', 
