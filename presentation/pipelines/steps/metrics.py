@@ -28,7 +28,12 @@ def evaluate_ft(astromer, test_loader, params, prefix='test_'):
         metrics['{}r2'.format(prefix)]      = r2
         metrics['{}rmse'.format(prefix)]    = rmse
         metrics['{}pearson'.format(prefix)] = p
-
+    if params['arch'] == 'zero':
+        rmse, r2, loss = astromer.evaluate(test_loader)
+        metrics['{}loss'.format(prefix)]    = loss
+        metrics['{}r2'.format(prefix)]      = r2
+        metrics['{}rmse'.format(prefix)]    = rmse
+    
     return metrics
 
 def evaluate_clf(classifier, test_loader, params, prefix='test_'):

@@ -41,6 +41,21 @@ def create_loss_weigths(errors):
     return W
 
 
+def random_mean(batch, on='input', axis=0):
+    """
+    Standardize input tensor given a dataset batch
+    Args:
+        dataset: batched dataset
+
+    Returns:
+        type: tf.Dataset
+    """
+    mean_value = tf.reduce_mean(batch['input'], axis, name='mean_value')
+    bias = tf.random.uniform((), -5, 5)
+    batch['input'] = batch['input'] - tf.expand_dims(mean_value, axis) + bias
+    batch['mean_values'] = mean_value + bias
+    return batch
+
 def standardize(batch, on='input', axis=0):
     """
     Standardize input tensor given a dataset batch

@@ -94,7 +94,9 @@ def get_avg_mlp(inputs, mask, num_cls):
     x = tf.math.divide_no_nan(x, tf.reduce_sum(mask, 1))
 
     x = Dense(1024, activation='relu')(x)
+    x = Dropout(0.3)(x)
     x = Dense(512, activation='relu')(x)
+    x = Dropout(0.3)(x)
     x = Dense(256, activation='relu')(x)
     x = LayerNormalization(name='layer_norm')(x)
     y_pred = Dense(num_cls, name='output_layer')(x)

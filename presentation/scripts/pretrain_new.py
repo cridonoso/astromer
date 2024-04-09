@@ -31,7 +31,7 @@ def get_loaders(opt):
                               sampling=True,
                               shuffle=True,
                               cache=True,
-                              normalize='zero-mean',
+                              normalize=opt.norm,
                               repeat=opt.repeat,
                               aversion=opt.arch)
 
@@ -45,7 +45,7 @@ def get_loaders(opt):
                               sampling=True,
                               shuffle=False,
                               cache=True,
-                              normalize='zero-mean',
+                              normalize=opt.norm,
                               repeat=1,
                               aversion=opt.arch)
 
@@ -201,6 +201,8 @@ if __name__ == '__main__':
     parser.add_argument('--correct-loss', action='store_true', help='Use error bars to weigh loss')
     parser.add_argument('--loss-format', default='rmse', type=str,
                         help='what consider during loss: rmse - rmse+p - p')
+    parser.add_argument('--norm', default='zero-mean', type=str,
+                        help='normalization: zero-mean - random-mean')
 
     # =========================================================
     parser.add_argument('--repeat', default=1, type=float,

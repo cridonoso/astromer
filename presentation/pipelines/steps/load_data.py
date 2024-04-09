@@ -6,7 +6,7 @@ from src.data.zero import pretraining_pipeline
 from src.data import get_loader
 
 def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False, normalize='zero-mean', sampling=False):
-
+    
     if clf_mode:
         print('Classification Mode')
         num_cls = pd.read_csv(os.path.join(data_path, 'objects.csv')).shape[0]
@@ -26,7 +26,12 @@ def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False, n
             nsp_prob = params['nsp_prob']
         except:
             nsp_prob = 0.
-            
+    
+
+    if not 'norm' in list(params.keys()):
+        norm = 'zero-mean'
+    else:
+        norm = params['norm']
     train_loader = get_loader(os.path.join(data_path, 'train'),
                               batch_size=batch_size,
                               window_size=params['window_size'],
@@ -36,7 +41,7 @@ def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False, n
                               nsp_prob=nsp_prob,
                               sampling=sampling,
                               shuffle=True,
-                               normalize=normalize,
+                              normalize=norm,
                               repeat=1,
                               aversion=params['arch'],
                               num_cls=num_cls)
@@ -50,7 +55,7 @@ def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False, n
                               nsp_prob=nsp_prob,
                               sampling=sampling,
                               shuffle=False,
-                               normalize=normalize,
+                              normalize=norm,
                               repeat=1,
                               aversion=params['arch'],
                               num_cls=num_cls)
@@ -64,7 +69,7 @@ def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False, n
                               nsp_prob=nsp_prob,
                               sampling=sampling,
                               shuffle=False,
-                              normalize=normalize,
+                              normalize=norm,
                               repeat=1,
                               aversion=params['arch'],
                               num_cls=num_cls)
