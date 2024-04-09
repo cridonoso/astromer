@@ -10,7 +10,7 @@ from src.models.astromer_skip import get_ASTROMER as get_Skip
 from src.models.astromer_nsp import  build_input as build_input_nsp
 from src.models.astromer_skip import  build_input as build_input_skip
 from src.models.astromer_1 import build_input as build_input_base
-# from src.models.astromer_0 import  build_input as build_input_base
+from src.models.astromer_0 import build_input as build_input_zero
 
 
 from tensorflow.keras import Model
@@ -125,7 +125,12 @@ def build_classifier(astromer, params, astromer_trainable, num_cls=None, arch='a
         encoder = astromer.get_layer('encoder')
         encoder.trainable = astromer_trainable
         embedding = encoder(inp_placeholder)
-        # redux return single vector, adapt classifier to recieve this input
+
+    if params['arch'] == 'zero':
+        inp_placeholder = build_input_zero(params['window_size'])
+        encoder = astromer.get_layer('encoder')
+        encoder.trainable = astromer_trainable
+        embedding = encoder(inp_placeholder)
 
     if params['arch'] == 'base' or params['arch'] == 'normal':
         inp_placeholder = build_input_base(params['window_size'])
