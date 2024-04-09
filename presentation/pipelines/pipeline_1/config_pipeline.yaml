@@ -1,13 +1,12 @@
 
 exp_id: 'lfgr-dropout' 
-do_ft: [True, True]
-do_clf: [True, True]
+do_ft: [False]
+do_clf: [True]
 visible_gpu: ['0']
 
 pretrain:
-  tag: ['classic', 'pearson']
-  weights: ['./presentation/results/lfgr/2024-04-02_22-26-03/',
-            './presentation/results/lfgr/2024-04-05_14-31-32/']
+  tag: ['zero']
+  weights: ['./presentation/results/lfgr/2024-04-05_14-31-32/']
 
 data:
   paths : ['./data/records/alcock/fold_0/alcock_20', 
