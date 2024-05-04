@@ -14,7 +14,7 @@ from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoi
 from tensorflow.keras.optimizers import Adam
 from functools import partial
 
-from presentation.pipelines.steps.model_design import build_model, build_classifier
+from presentation.pipelines.steps.model_design import load_pt_model, build_classifier
 from presentation.pipelines.steps.metrics import evaluate_ft, evaluate_clf
 from presentation.pipelines.steps.load_data import build_loader
 
@@ -67,10 +67,6 @@ def finetune_step(trial, run_index, config):
         tags = {**tags, **params}
         mlflow.set_tags(tags=tags) # I think this is not necessary 
         # mlflow.log_params(params) 
-
-        # Build Astromer model
-        astromer = build_model(params)
-
         # Setup optimizer and Compile model
         if config['finetuning']['scheduler']:
             print('[INFO] Using Custom Scheduler')
@@ -78,13 +74,18 @@ def finetune_step(trial, run_index, config):
         else:
             print('[INFO] Using Adam Optimizer')            
             lr = config['finetuning']['lr']
+        
+        ft_optimizer = Adam(lr, 
+                            beta_1=0.9,
+                            beta_2=0.98,
+                            epsilon=1e-9,
+                            clipnorm=1e-4, # VERY IMPORTANT
+                            name='astromer_optimizer')
 
-        astromer.load_weights(os.path.join(pt_folder, 'pretraining', 'weights')).expect_partial()
-        astromer.compile(optimizer=Adam(lr, 
-                         beta_1=0.9,
-                         beta_2=0.98,
-                         epsilon=1e-9,
-                         name='astromer_optimizer'))
+        # Build Astromer model
+        astromer, _ = load_pt_model(os.path.join(pt_folder, 'pretraining'), 
+                                 optimizer=ft_optimizer)
+
 
         # Load downstream data 
         loaders = build_loader(data_path, 
@@ -141,7 +142,7 @@ def finetune(index, config, n_jobs=4):
         study.optimize(partial_ft, n_trials=n_datasets, n_jobs=n_jobs)
 
 
-def classification_step(trial, run_index, config):
+def classification_step(trial, run_index, config, clfarch):
     # Pptuna trial numbers start from 0
     trial_number  = trial.number
     pt_folder     = config['pretrain']['weights'][run_index]
@@ -149,7 +150,7 @@ def classification_step(trial, run_index, config):
     target_folder = os.path.normpath(config['data']['target'][trial_number])
 
     # Create target folder for finetuning werights
-    clf_folder = os.path.join(pt_folder, 'classification', target_folder, config['classification']['clf_arch'])
+    clf_folder = os.path.join(pt_folder, 'classification', target_folder, clfarch)
     os.makedirs(clf_folder, exist_ok=True)
     
     # This specific of target sintax (please see config_pipeline.yaml)
@@ -165,10 +166,10 @@ def classification_step(trial, run_index, config):
             'fold': fold_numb
         }
 
-
         # Pretraining params
         ft_weights = os.path.join(pt_folder, 'finetuning', target_folder)
         try:
+            print('[INFO] Finetuning weights detected. Loading finetuning...')
             with open(os.path.join(ft_weights, 'config.toml'), 'r') as file:
                 params = toml.load(file)
         except:
@@ -184,12 +185,11 @@ def classification_step(trial, run_index, config):
         mlflow.set_tags(tags=tags) # I think this is not necessary 
         mlflow.log_params(params) 
         mlflow.log_params({
-               'clf_name': config['classification']['clf_arch'],
+               'clf_name': clfarch,
                'astromer_trainable': config['classification']['astromer_trainable']
         })
         # Build Astromer model
-        astromer = build_model(params)
-        astromer.load_weights(os.path.join(ft_weights, 'weights')).expect_partial()
+        astromer, pt_config = load_pt_model(ft_weights)
 
         # Load downstream data 
         loaders = build_loader(data_path, 
@@ -204,7 +204,7 @@ def classification_step(trial, run_index, config):
                                       params, 
                                       astromer_trainable=config['classification']['astromer_trainable'],
                                       num_cls = loaders['n_classes'],
-                                      arch=config['classification']['clf_arch'])
+                                      arch=clfarch)
 
 
         # Load Callbacks
@@ -236,7 +236,7 @@ def classification_step(trial, run_index, config):
             "dataset": [data_name],
             "fold": [fold_numb],
             "spc": [setup_spc] , 
-            "clf":[config['classification']['clf_arch']],
+            "clf":[clfarch],
             "clf_test_f1": [metrics['test_f1']],
             "clf_test_acc": [metrics['test_acc']],
             "clf_test_recall": [metrics['test_recall']],
@@ -261,17 +261,18 @@ def classify(index, config, n_jobs=1):
     print(f"Experiment ID: {experiment_id}")
 
     # child_id
-    child_exp_id = config['pretrain']['tag'][index]+'/'+config['classification']['clf_arch']
+    for clfarch in config['classification']['clf_arch']:
+        child_exp_id = config['pretrain']['tag'][index]+'/'+clfarch
 
-    with mlflow.start_run(experiment_id=experiment_id, run_name=child_exp_id):
-        study = optuna.create_study(direction="maximize") 
+        with mlflow.start_run(experiment_id=experiment_id, run_name=child_exp_id):
+            study = optuna.create_study(direction="maximize") 
 
-        # setup parameters of the function that will be called later
-        partial_ft = partial(classification_step, run_index=index, config=config)
-        
-        # optimize over the number of datasets
-        n_datasets = len(config['data']['paths'])
-        study.optimize(partial_ft, n_trials=n_datasets, n_jobs=n_jobs)
+            # setup parameters of the function that will be called later
+            partial_clf = partial(classification_step, run_index=index, config=config, clfarch=clfarch)
+            
+            # optimize over the number of datasets
+            n_datasets = len(config['data']['paths'])
+            study.optimize(partial_clf, n_trials=n_datasets, n_jobs=n_jobs)
 
     return child_exp_id
 

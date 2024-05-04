@@ -9,114 +9,150 @@ from src.training.scheduler import CustomSchedule
 from tensorflow.keras.optimizers.experimental import AdamW
 from tqdm import tqdm
 
-def tensorboard_log(logs, writer, step=0):
-	with writer.as_default():
-		for key, value in logs.items():
-			tf.summary.scalar(key, value, step=step)
+def draw_graph(model, dataset, writer, logdir=''):
+    '''Decorator that reports store fn graph.'''
 
-def average_logs(logs):
-	N = len(logs)
-	average_dict = {}
-	for key in logs[0].keys():
-		sum_log = sum(log[key] for log in logs)
-		average_dict[key] = float(sum_log/N)
-	return average_dict
+    @tf.function
+    def fn(x):
+        x = model(x)
 
-def merge_metrics(**kwargs):
-    merged = {}
-    for key, value in kwargs.items():
-        for subkey, subvalue in value.items():
-            if key ==  'train':
-                merged['{}'.format(subkey)] = subvalue
-            else:
-                merged['{}_{}'.format(key, subkey)] = subvalue
-    return merged
+    tf.summary.trace_on(graph=True, profiler=False)
+    fn(dataset)
+    with writer.as_default():
+        tf.summary.trace_export(
+            name='model',
+            step=0,
+            profiler_outdir=logdir)
 
-def train(model, 
-          train_loader, 
-          valid_loader, 
-          num_epochs=1000, 
-          lr=1e-3, 
-          project_path=None, 
-          debug=False, 
+
+def save_scalar(writer, value, step, name=''):
+    with writer.as_default():
+        tf.summary.scalar(name, value.result(), step=step)
+        
+@tf.function
+def train_step(model, batch, opt):
+    with tf.GradientTape() as tape:
+        x_pred = model(batch)
+
+        mse = custom_rmse(y_true=batch['output'],
+                         y_pred=x_pred,
+                         mask=batch['mask_out'])
+
+
+    grads = tape.gradient(mse, model.trainable_weights)
+    opt.apply_gradients(zip(grads, model.trainable_weights))
+    return mse
+
+@tf.function
+def valid_step(model, batch, return_pred=False, normed=False):
+    with tf.GradientTape() as tape:
+        x_pred = model(batch)
+        x_true = batch['output']
+        mse = custom_rmse(y_true=x_true,
+                          y_pred=x_pred,
+                          mask=batch['mask_out'])
+
+    if return_pred:
+        return mse, x_pred, x_true
+    return mse
+
+def train(model,
+          train_dataset,
+          valid_dataset,
           patience=20,
-          train_step_fn=None,
-          test_step_fn=None,
-          argparse_dict=None,
-          scheduler=False,
-          callbacks=None,
-          rmse_factor=0.5,
-          reset_states=False):
+          exp_path='./experiments/test',
+          epochs=1,
+          finetuning=False,
+          use_random=True,
+          num_cls=2,
+          lr=1e-3,
+          verbose=1):
 
-    start = time.time()
+    os.makedirs(exp_path, exist_ok=True)
 
-    os.makedirs(project_path, exist_ok=True)
+    # Tensorboard
+    train_writter = tf.summary.create_file_writer(
+                                    os.path.join(exp_path, 'logs', 'train'))
+    valid_writter = tf.summary.create_file_writer(
+                                    os.path.join(exp_path, 'logs', 'valid'))
 
-    print('[INFO] Project Path: {}'.format(os.path.join(project_path)))
-    if debug:
-        print('[INFO] DEBGUGING MODE')
-        num_epochs   = 2
-        train_loader = train_loader.take(5)
-        valid_loader = valid_loader.take(5)
+    batch = [t for t in train_dataset.take(1)][0]
+    draw_graph(model, batch, train_writter, exp_path)
 
-    if argparse_dict is not None:
-        with open(os.path.join(project_path, 'config.toml'), 'w') as f:
-            toml.dump(argparse_dict, f)
+    # Optimizer
+    
+    custom_lr = CustomSchedule(model.get_layer('encoder').d_model)
+    
+    optimizer = tf.keras.optimizers.Adam(custom_lr,
+                                         beta_1=0.9,
+                                         beta_2=0.98,
+                                         epsilon=1e-9)
+    
+    # To save metrics
+    train_mse  = tf.keras.metrics.Mean(name='train_mse')
+    valid_mse  = tf.keras.metrics.Mean(name='valid_mse')
 
-    __callbacks = CallbackList(callbacks=callbacks, model=model)
-    if callbacks is not None: print('[INFO] Callbacks added')
-
-    # ======= TRAINING LOOP =========
-    if scheduler:
-        print('[INFO] Using Custom Scheduler')
-        lr = CustomSchedule(argparse_dict['head_dim'])
-    if reset_states: print('[INFO] Reset state activated')
-    optimizer = Adam(lr, 
-                     beta_1=0.9,
-                     beta_2=0.98,
-                     epsilon=1e-9,
-                     name='astromer_optimizer')
+    # Training Loop
+    best_loss = 999999.
     es_count = 0
-    min_loss = 1e9
-    best_train_log, best_val_log = None, None
-    ebar = tqdm(range(num_epochs), total=num_epochs)
-    logs = {}
-    __callbacks.on_train_begin(logs=logs)
-    for epoch in ebar:
-        __callbacks.on_epoch_begin(epoch, logs=logs)
-        train_logs, valid_logs = [], [] 
+    pbar = tqdm(range(epochs), desc='epoch')
+    for epoch in pbar:
+        for train_batch in train_dataset:
+            mse = train_step(model, train_batch, optimizer)
+            train_mse.update_state(mse)
 
-        for batch, (x, y) in enumerate(train_loader):
-            __callbacks.on_batch_begin(batch, logs=logs)
-            __callbacks.on_train_batch_begin(batch, logs=logs)
-            logs = train_step_fn(model, x, y, optimizer, rmse_factor=rmse_factor)
-            train_logs.append(logs)
-            __callbacks.on_train_batch_end(batch, logs=logs)
-            __callbacks.on_batch_end(batch, logs=logs)
-        
-        if reset_states: model.reset_states()
+        for valid_batch in valid_dataset:
+            mse = valid_step(model, valid_batch)
+            valid_mse.update_state(mse)
 
-        for x, y in valid_loader:
-            __callbacks.on_batch_begin(batch, logs=logs)
-            __callbacks.on_test_batch_begin(batch, logs=logs)
-            logs = test_step_fn(model, x, y, rmse_factor=rmse_factor)
-            valid_logs.append(logs)
-            __callbacks.on_test_batch_end(batch, logs=logs)
-            __callbacks.on_batch_end(batch, logs=logs)
+        msg = 'EPOCH {} - ES COUNT: {}/{} train mse: {:.4f} - val mse: {:.4f}'.format(epoch,
+                                                                                      es_count,
+                                                                                      patience,
+                                                                                      train_mse.result(),
+                                                                                      valid_mse.result())
 
-        epoch_train_metrics = average_logs(train_logs)
-        epoch_valid_metrics = average_logs(valid_logs)
-        logs = merge_metrics(train=epoch_train_metrics, val=epoch_valid_metrics)
-        __callbacks.on_epoch_end(epoch, logs=logs)
-        
-        ebar.set_description('STOP: {:02d}/{:02d} LOSS: {:.3f}/{:.3f} R2:{:.3f}/{:.3f}'.format(es_count, 
-                                                                            patience, 
-                                                                            logs['loss'],
-                                                                            logs['val_loss'],
-                                                                            logs['r_square'],
-                                                                            logs['val_r_square']))
+        pbar.set_description(msg)
 
-    elapsed = time.time() - start
-    __callbacks.on_train_end(logs=logs)
+        save_scalar(train_writter, train_mse, epoch, name='mse')
+        save_scalar(valid_writter, valid_mse, epoch, name='mse')
 
-    return model
+
+        if valid_mse.result() < best_loss:
+            best_loss = valid_mse.result()
+            es_count = 0.
+            model.save_weights(os.path.join(exp_path, 'weights'))
+        else:
+            es_count+=1.
+        if es_count == patience:
+            print('[INFO] Early Stopping Triggered')
+            break
+
+        train_mse.reset_states()
+        valid_mse.reset_states()
+
+def predict(model,
+            dataset,
+            conf,
+            predic_proba=False):
+
+    total_mse, inputs, reconstructions = [], [], []
+    masks, times = [], []
+    for step, batch in tqdm(enumerate(dataset), desc='prediction'):
+        mse, x_pred, x_true = valid_step(model,
+                                         batch,
+                                         return_pred=True,
+                                         normed=True)
+
+        total_mse.append(mse)
+        times.append(batch['times'])
+        inputs.append(x_true)
+        reconstructions.append(x_pred)
+        masks.append(batch['mask_out'])
+
+    res = {'mse':tf.reduce_mean(total_mse).numpy(),
+           'x_pred': tf.concat(reconstructions, 0),
+           'x_true': tf.concat(inputs, 0),
+           'mask': tf.concat(masks, 0),
+           'time': tf.concat(times, 0)}
+
+    return res

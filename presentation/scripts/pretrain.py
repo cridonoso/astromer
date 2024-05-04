@@ -4,7 +4,9 @@ import toml
 import sys
 import os
 
-from src.models.astromer_0 import get_ASTROMER as get_Base
+
+from src.models.astromer_0 import get_ASTROMER as get_Bugstromer
+from src.models.astromer_1 import get_ASTROMER as get_Base
 from src.models.astromer_nsp import get_ASTROMER as get_NSP
 from src.models.astromer_skip import get_ASTROMER as get_Skip
 
@@ -13,98 +15,11 @@ from datetime import datetime
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
 from tensorflow.keras.optimizers import Adam
 
+from.src.training.utils import train
 from src.training.scheduler import CustomSchedule
-from src.data.zero import pretraining_pipeline
-from src.data import get_loader
 
-
-def get_loaders(opt):
-    if opt.arch == 'base':
-        train_loader = pretraining_pipeline(os.path.join(opt.data, 'train'),
-                                            batch_size= 5 if opt.debug else opt.bs, 
-                                            window_size=opt.window_size,
-                                            shuffle=True,
-                                            sampling=True,
-                                            repeat=4,
-                                            msk_frac=opt.probed,
-                                            rnd_frac=opt.rs,
-                                            same_frac=opt.rs)
-
-        valid_loader = pretraining_pipeline(os.path.join(opt.data, 'val'),
-                                            batch_size=5 if opt.debug else opt.bs,
-                                            window_size=opt.window_size,
-                                            shuffle=False,
-                                            sampling=True,
-                                            msk_frac=opt.probed,
-                                            rnd_frac=opt.rs,
-                                            same_frac=opt.rs)
-    if opt.arch == 'skip' or opt.arch == 'nsp':
-        train_loader = get_loader(os.path.join(opt.data, 'train'),
-                                  batch_size=5 if opt.debug else opt.bs,
-                                  window_size=opt.window_size,
-                                  probed_frac=opt.probed,
-                                  random_frac=opt.rs,
-                                  nsp_prob=opt.nsp_prob,
-                                  sampling=True,
-                                  shuffle=True,
-                                  repeat=4,
-                                  aversion=opt.arch)
-
-        valid_loader = get_loader(os.path.join(opt.data, 'val'),
-                                  batch_size=5 if opt.debug else opt.bs,
-                                  window_size=opt.window_size,
-                                  probed_frac=opt.probed,
-                                  random_frac=opt.rs,
-                                  nsp_prob=opt.nsp_prob,
-                                  sampling=True,
-                                  shuffle=False,
-                                  repeat=1,
-                                  aversion=opt.arch)
-
-    return {
-        'train': train_loader, 'validation': valid_loader
-    }
-
-
-def get_model(opt):
-    if opt.arch == 'base':
-        model = get_Base(num_layers=opt.num_layers,
-                         d_model=opt.head_dim*opt.num_heads,
-                         num_heads=opt.num_heads,
-                         dff=opt.mixer,
-                         base=opt.pe_base,
-                         rate=opt.dropout,
-                         use_leak=False,
-                         maxlen=opt.window_size,
-                         m_alpha=opt.m_alpha,
-                         mask_format=opt.mask_format)
-
-    if opt.arch == 'skip':
-        model = get_Skip(num_layers=opt.num_layers,
-                         num_heads=opt.num_heads,
-                         head_dim=opt.head_dim,
-                         mixer_size=opt.mixer,
-                         dropout=opt.dropout,
-                         pe_base=opt.pe_base,
-                         pe_dim=opt.pe_dim,
-                         pe_c=opt.pe_exp,
-                         window_size=opt.window_size,
-                         m_alpha=opt.m_alpha,
-                         mask_format=opt.mask_format)
-    if opt.arch == 'nsp':
-        model = get_NSP(num_layers=opt.num_layers,
-                        num_heads=opt.num_heads,
-                        head_dim=opt.head_dim,
-                        mixer_size=opt.mixer,
-                        dropout=opt.dropout,
-                        pe_base=opt.pe_base,
-                        pe_dim=opt.pe_dim,
-                        pe_c=opt.pe_exp,
-                        window_size=opt.window_size,
-                        m_alpha=opt.m_alpha,
-                        mask_format=opt.mask_format)
-
-    return model
+from presentation.pipelines.steps.model_design import build_model
+from presentation.pipelines.steps.load_data import build_loader
 
 def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
@@ -115,7 +30,7 @@ def run(opt):
     os.makedirs(EXPDIR, exist_ok=True)
 
     # ========== DATA ========================================
-    loaders = get_loaders(opt)
+    loaders = build_loader(opt)
 
     # ======= MODEL ========================================
     model = get_model(opt)
@@ -125,34 +40,20 @@ def run(opt):
         print('[INFO] Restoring previous training')
         model.load_weights(os.path.join(opt.checkpoint, 'weights'))
         
-    if opt.scheduler:
-        print('[INFO] Using Custom Scheduler')
-        lr = CustomSchedule(d_model=int(opt.head_dim*opt.num_heads))
-    else:
-        lr = opt.lr
-
-    model.compile(optimizer=Adam(lr, 
-                             beta_1=0.9,
-                             beta_2=0.98,
-                             epsilon=1e-9,
-                             name='astromer_optimizer'))
-
     with open(os.path.join(EXPDIR, 'config.toml'), 'w') as f:
         toml.dump(opt.__dict__, f)
 
-    cbks = [TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
-            EarlyStopping(monitor='val_loss', patience=opt.patience),
-            ModelCheckpoint(filepath=os.path.join(EXPDIR, 'weights'),
-                            save_weights_only=True,
-                            save_best_only=True,
-                            save_freq='epoch',
-                            verbose=1)]
-
-    model.fit(loaders['train'], 
-              epochs=2 if opt.debug else opt.num_epochs, 
-              validation_data=loaders['validation'],
-              callbacks=cbks)
-
+    train(model,
+              train_dataset,
+              valid_dataset,
+              patience=20,
+              exp_path='./experiments/test',
+              epochs=1,
+              finetuning=False,
+              use_random=True,
+              num_cls=2,
+              lr=1e-3,
+              verbose=1)
 
 
 if __name__ == '__main__':
@@ -189,10 +90,21 @@ if __name__ == '__main__':
                         help='Dropout to use on the output of each attention layer (before mixer layer)')
     parser.add_argument('--m-alpha', default=1., type=float,
                         help='Alpha used within mask self-attention')
-    parser.add_argument('--mask-format', default='QK', type=str,
+    parser.add_argument('--mask-format', default=None, type=str,
                         help='mask on Query and Key tokens (QK) or Query tokens only (Q)')
-
+    parser.add_argument('--use-leak', action='store_true', help='Use Custom Scheduler during training')
+    parser.add_argument('--no-cache', action='store_true', help='no cache dataset')
+    
+    parser.add_argument('--correct-loss', action='store_true', help='Use error bars to weigh loss')
+    parser.add_argument('--loss-format', default='rmse', type=str,
+                        help='what consider during loss: rmse - rmse+p - p')
+    parser.add_argument('--norm', default='zero-mean', type=str,
+                        help='normalization: zero-mean - random-mean')
+    parser.add_argument('--temperature', default=0., type=float,
+                        help='Temperature used within the softmax argument')
     # =========================================================
+    parser.add_argument('--repeat', default=1, type=int,
+                        help='repeat data')
     parser.add_argument('--lr', default=1e-5, type=float,
                         help='learning rate')
     parser.add_argument('--bs', default=2500, type=int,
@@ -202,12 +114,14 @@ if __name__ == '__main__':
     parser.add_argument('--num_epochs', default=10000, type=int,
                         help='Number of epochs')
     parser.add_argument('--window-size', default=200, type=int,
-                        help='windows size of the PSFs')\
+                        help='windows size of the PSFs')
     # ==========================================================
-    parser.add_argument('--probed', default=0.5, type=float,
+    parser.add_argument('--probed', default=0.2, type=float,
                         help='Probed percentage')
     parser.add_argument('--rs', default=0.2, type=float,
                         help='Probed fraction to be randomized or unmasked')
+    parser.add_argument('--same', default=None, type=float,
+                        help='Fraction to make visible during masked-self attention while evaluating during loss')
     # ONLY NSP =================================================
     parser.add_argument('--nsp-prob', default=0.5, type=float,
                         help='Probability of randomize second segment in NSP pretraining task')

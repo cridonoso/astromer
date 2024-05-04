@@ -119,49 +119,7 @@ def dict_to_json(varsdic, conf_file):
     with open(conf_file, 'w') as json_file:
         json.dump(varsdic, json_file, indent=4)
         
-        
-
-# def mf_check_run_exists(experiment_name:str, run_name:str)->bool:
-#     try:
-#         experiment_meta = dict(mf.get_experiment_by_name(experiment_name))
-#         experiment_id = experiment_meta["experiment_id"]
-#         run = mf.MlflowClient().search_runs(experiment_ids=[str(experiment_id)],
-#                                             filter_string=f"tags.`mlflow.runName` = '{run_name}'")
-#         if run:
-#             return True
-#         else:
-#             return False
-#     except:
-#         return False
     
-# def mf_create_or_get_experiment_id(experiment_name:str):
-#     # Check if the experiment exists
-#     experiment = mf.get_experiment_by_name(experiment_name)
-
-#     if experiment:
-#         # If the experiment exists, return its ID
-#         return experiment.experiment_id
-#     else:
-#         # If the experiment doesn't exist, create a new one and return its ID
-#         return mf.create_experiment(experiment_name)
-    
-    
-# def mf_set_tracking_uri(tracking_uri:str):
-#     mf.set_tracking_uri(tracking_uri)
-    
-# def mf_set_experiment(experiment_id=None,experiment_name=None):
-#     if experiment_id:
-#         mf.set_experiment(experiment_id=experiment_id)
-#     elif not experiment_id and experiment_name:
-#         mf.set_experiment(experiment_name=experiment_name)
-#     else:
-#         ValueError("""Neither experiment name of experiment id is passed, please pass either of them to set the 
-#                    current experiemnt""")
-        
-
-        
-
-        
     
     
     

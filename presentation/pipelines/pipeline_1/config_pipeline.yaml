@@ -1,13 +1,12 @@
 
 exp_id: 'temperature' 
-do_ft: [False, False]
-do_clf: [True, True]
+do_ft: [False]
+do_clf: [True]
 visible_gpu: ['0']
 
 pretrain:
-  tag: ['t0.2', 't0.4']
-  weights: ['./presentation/results/temp/2024-04-13_04-04-34/',
-            './presentation/results/temp/2024-04-18_20-49-50/']
+  tag: ['zero_0']
+  weights: ['./presentation/results/temp/2024-04-13_04-04-34']
 
 data:
   paths : ['./data/records/alcock/fold_0/alcock_20', 
@@ -53,10 +52,10 @@ data:
          ]
 
 finetuning:
-  lr : 0.001
+  lr : 0.00001
   scheduler: False
-  batch_size : 512
-  patience : 30
+  batch_size : 1024
+  patience : 20
   num_epochs : 10000
   probed : 0.2
   debug : False
@@ -64,9 +63,9 @@ finetuning:
 classification:
   lr : 0.001
   batch_size : 512
-  patience : 30
+  patience : 20
   num_epochs : 10000
-  clf_arch: 'avg_mlp'
+  clf_arch: ['avg_mlp', 'skip_avg_mlp']
   astromer_trainable: False
   debug : False
   

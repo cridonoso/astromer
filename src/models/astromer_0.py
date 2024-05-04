@@ -176,7 +176,7 @@ class Encoder(tf.keras.layers.Layer):
                             for _ in range(num_layers)]
         self.dropout = tf.keras.layers.Dropout(rate)
 
-    def call(self, data, training=False, return_weights=False):
+    def call(self, data, training=False, return_weights=False, z_by_layer=False):
         # adding embedding and position encoding.
         x_pe = positional_encoding(data['times'], self.d_model, mjd=True)
 
@@ -185,15 +185,20 @@ class Encoder(tf.keras.layers.Layer):
 
         x = self.dropout(transformed_input, training=training)
 
+        output_by_layer = []
         for i in range(self.num_layers):
             if return_weights:
-                x, w, qkvalues = self.enc_layers[i](x, training=training, mask=data['mask_in'], return_weights=True)
+                x, w, qkvalues = self.enc_layers[i](x, training=training, mask=data['mask_in'], 
+                                                    return_weights=True)
             else:
                 x = self.enc_layers[i](x, training=training, mask=data['mask_in'], return_weights=False)
+            output_by_layer.append(x)
         
         if return_weights:
             return x, w, qkvalues
         
+        if z_by_layer:
+            return output_by_layer
         return x  # (batch_size, input_seq_len, d_model)
     
 def build_input(length):
@@ -267,7 +272,7 @@ class CustomModel(Model):
         x, y = data
 
         with tf.GradientTape() as tape:
-            x_pred = self(x, training=True)
+            x_pred = self(x, training=False)
             rmse = custom_rmse(y_true=y['target'],
                               y_pred=x_pred,
                               mask=y['mask_out'],
