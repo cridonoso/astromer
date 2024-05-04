@@ -105,7 +105,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         output = self.dense(concat_attention)  # (batch_size, seq_len_q, d_model)
 
-        return output, attention_weights, qkvalues, (q,k,v)
+        return output, attention_weights, qkvalues
 
 class RegLayer(Layer):
     def __init__(self, **kwargs):
@@ -143,7 +143,7 @@ class EncoderLayer(tf.keras.layers.Layer):
         self.dropout2 = tf.keras.layers.Dropout(rate)
 
     def call(self, x, training, mask, return_weights=False):
-        attn_output, w, qkvalues, qkv = self.mha(x, mask)  # (batch_size, input_seq_len, d_model)
+        attn_output, w, qkvalues = self.mha(x, mask)  # (batch_size, input_seq_len, d_model)
         attn_output = self.dropout1(attn_output, training=training)
 
         if self.use_leak:
@@ -160,7 +160,7 @@ class EncoderLayer(tf.keras.layers.Layer):
             out2 = self.layernorm2(ffn_output)
         
         if return_weights:
-            return out2, w, qkvalues, qkv
+            return out2, w, qkvalues
         return out2
 
 class Encoder(tf.keras.layers.Layer):
@@ -187,12 +187,12 @@ class Encoder(tf.keras.layers.Layer):
 
         for i in range(self.num_layers):
             if return_weights:
-                x, w, qkvalues, qkv = self.enc_layers[i](x, training=training, mask=data['mask_in'], return_weights=True)
+                x, w, qkvalues = self.enc_layers[i](x, training=training, mask=data['mask_in'], return_weights=True)
             else:
                 x = self.enc_layers[i](x, training=training, mask=data['mask_in'], return_weights=False)
         
         if return_weights:
-            return x, w, qkvalues, qkv
+            return x, w, qkvalues
         
         return x  # (batch_size, input_seq_len, d_model)
     
@@ -222,7 +222,10 @@ def get_ASTROMER(num_layers=2,
                  batch_size=None,
                  m_alpha=1,
                  mask_format='QK',
-                 return_weights=False):
+                 return_weights=False,
+                 loss_format='mse',
+                 correct_loss=False,
+                 temperature=0.):
 
     placeholder = build_input(maxlen)
 
@@ -250,14 +253,16 @@ def get_ASTROMER(num_layers=2,
                            outputs={'output': x, 'w': w, 'qk_values':qkvalues}, 
                            name="ASTROMER")
     
-    return CustomModel(inputs=placeholder, outputs=x, name="ASTROMER")
+    return CustomModel(correct_loss=correct_loss, loss_format=loss_format, inputs=placeholder, outputs=x, name="ASTROMER-0")
 
 
 ### KERAS MODEL 
 class CustomModel(Model):
-    def __init__(self, *args, **kwargs):
+    def __init__(self,correct_loss=False, loss_format='mse', *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        self.loss_format = loss_format
+        self.correct_loss = correct_loss
+        
     def train_step(self, data):
         x, y = data
 
@@ -265,7 +270,8 @@ class CustomModel(Model):
             x_pred = self(x, training=True)
             rmse = custom_rmse(y_true=y['target'],
                               y_pred=x_pred,
-                              mask=y['mask_out'])
+                              mask=y['mask_out'],
+                              root=False if self.loss_format == 'mse' else True)
             r2_value = custom_r2(y['target'], x_pred, mask=y['mask_out'])
 
         grads = tape.gradient(rmse, self.trainable_weights)
@@ -277,7 +283,8 @@ class CustomModel(Model):
         x_pred = self(x, training=False)
         rmse = custom_rmse(y_true=y['target'],
                           y_pred=x_pred,
-                          mask=y['mask_out'])
+                          mask=y['mask_out'],
+                          root=False if self.loss_format == 'mse' else True)
         r2_value = custom_r2(y['target'], x_pred, mask=y['mask_out'])
         return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
     
@@ -288,4 +295,5 @@ class CustomModel(Model):
         return {'reconstruction': x_pred, 
                 'magnitudes': y['target'],
                 'times': x['times'],
+                'mask_in': x['mask_in'],
                 'probed_mask': y['mask_out']}

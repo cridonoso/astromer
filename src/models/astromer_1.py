@@ -45,7 +45,8 @@ def get_ASTROMER(num_layers=2,
                  mask_format='Q',
                  use_leak=False,
                  loss_format='rmse',
-                 correct_loss=False):
+                 correct_loss=False,
+                 temperature=0.):
 
     placeholder = build_input(window_size)
 
@@ -65,6 +66,7 @@ def get_ASTROMER(num_layers=2,
                       m_alpha=m_alpha,
                       mask_format=mask_format,
                       use_leak=use_leak,
+                      temperature=temperature,
                       name='encoder')
 
     x = encoder(msk_placeholder)
@@ -142,4 +144,4 @@ class CustomModel(Model):
                 'magnitudes': y['target'],
                 'times': x['times'],
                 'probed_mask': y['mask_out'],
-               'mask_in': x['mask_in']}
+                'mask_in': x['mask_in']}

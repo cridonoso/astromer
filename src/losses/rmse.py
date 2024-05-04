@@ -1,7 +1,7 @@
 import tensorflow as tf
 import tensorflow_probability as tfp
 # @tf.function
-def custom_rmse(y_true, y_pred, mask=None, weights=None):
+def custom_rmse(y_true, y_pred, mask=None, weights=None, root=True):
     inp_shp = tf.shape(y_true)
     
     residuals = tf.square(y_true - y_pred)
@@ -13,8 +13,12 @@ def custom_rmse(y_true, y_pred, mask=None, weights=None):
     mse_mean = tf.math.divide_no_nan(residuals, tf.reduce_sum(mask, 1))
     mse_mean = tf.reduce_mean(mse_mean)
     
-    return tf.math.sqrt(mse_mean)
-
+    if root:
+        return tf.math.sqrt(mse_mean)
+    else:
+        print('[INFO] Using MSE')
+        return mse_mean
+    
 def pearson_loss(y_true, y_pred, mask):
     def fn(a, b, mask):
         a = tf.boolean_mask(a, mask)

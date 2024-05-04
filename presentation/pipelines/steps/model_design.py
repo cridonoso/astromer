@@ -20,6 +20,10 @@ from tensorflow.keras.layers import TimeDistributed, LayerNormalization, Dense, 
 def build_model(params, return_weights=False):
     if not 'mask_format' in params.keys():
         params['mask_format'] = None
+        
+    if 'temperature' not in params.keys():
+        params['temperature'] = 0.
+        
     if params['arch'] == 'zero':
         print('[INFO] Zero architecture loaded')
         model = get_Bugstromer(num_layers=params['num_layers'],
@@ -48,7 +52,8 @@ def build_model(params, return_weights=False):
                           mask_format=params['mask_format'],
                           use_leak=params['use_leak'],
                           loss_format=params['loss_format'],
-                          correct_loss=params['correct_loss'])
+                          correct_loss=params['correct_loss'],
+                          temperature=params['temperature'])
 
     if params['arch'] == 'skip':
         model = get_Skip(num_layers=params['num_layers'],
@@ -94,9 +99,21 @@ def get_avg_mlp(inputs, mask, num_cls):
     x = tf.math.divide_no_nan(x, tf.reduce_sum(mask, 1))
 
     x = Dense(1024, activation='relu')(x)
-    x = Dropout(0.3)(x)
     x = Dense(512, activation='relu')(x)
-    x = Dropout(0.3)(x)
+    x = Dense(256, activation='relu')(x)
+    x = LayerNormalization(name='layer_norm')(x)
+    y_pred = Dense(num_cls, name='output_layer')(x)
+    return y_pred
+
+def get_avg_mlp_dp(inputs, mask, num_cls):
+    x = tf.multiply(inputs, mask) 
+    x = tf.reduce_sum(x, 1)
+    x = tf.math.divide_no_nan(x, tf.reduce_sum(mask, 1))
+
+    x = Dense(1024, activation='relu')(x)
+    x = Dropout(0.2)(x)
+    x = Dense(512, activation='relu')(x)
+    x = Dropout(0.2)(x)
     x = Dense(256, activation='relu')(x)
     x = LayerNormalization(name='layer_norm')(x)
     y_pred = Dense(num_cls, name='output_layer')(x)
@@ -153,10 +170,13 @@ def build_classifier(astromer, params, astromer_trainable, num_cls=None, arch='a
         embedding = tf.reshape(embedding, [-1, params['window_size'], params['head_dim']*params['num_heads']])
 
     mask = 1.- inp_placeholder['mask_in']
-
+       
     if arch == 'mlp_avg':
         output = get_mlp_avg(embedding, mask, num_cls)
 
+    if arch == 'avg_mlp_dp':
+        output = get_avg_mlp_dp(embedding, mask, num_cls)
+    
     if arch == 'avg_mlp':
         output = get_avg_mlp(embedding, mask, num_cls)
 
@@ -164,7 +184,7 @@ def build_classifier(astromer, params, astromer_trainable, num_cls=None, arch='a
         output = get_linear(embedding, mask, num_cls)
 
     if arch == 'skip_avg_mlp':
-        # skip model classifier missing
+        # skip model missing classifier
         pass
 
     clf = CustomModel(inputs=inp_placeholder, 

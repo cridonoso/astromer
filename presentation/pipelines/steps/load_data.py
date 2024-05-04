@@ -32,6 +32,7 @@ def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False, n
         norm = 'zero-mean'
     else:
         norm = params['norm']
+
     train_loader = get_loader(os.path.join(data_path, 'train'),
                               batch_size=batch_size,
                               window_size=params['window_size'],
@@ -45,7 +46,7 @@ def build_loader(data_path, params, batch_size=5, clf_mode=False, debug=False, n
                               repeat=1,
                               aversion=params['arch'],
                               num_cls=num_cls)
-
+    
     valid_loader = get_loader(os.path.join(data_path, 'val'),
                               batch_size=batch_size,
                               window_size=params['window_size'],

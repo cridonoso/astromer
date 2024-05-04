@@ -21,6 +21,7 @@ class Encoder(Model):
                  m_alpha=-0.5,
                  mask_format='Q',
                  use_leak=False,
+                 temperature=0.,
                  **kwargs):
         super().__init__(**kwargs)
         # super().__init__(**kwargs)
@@ -37,6 +38,7 @@ class Encoder(Model):
         self.mask_format    = mask_format
         self.m_alpha        = m_alpha
         self.use_leak       = use_leak
+        self.temp           = temperature
         self.inp_transform  = tf.keras.layers.Dense(self.pe_dim, name='inp_transform')
 
         self.positional_encoder = PositionalEncoder(self.pe_dim, 
@@ -51,6 +53,7 @@ class Encoder(Model):
                                           mask_format=self.mask_format, 
                                           m_alpha=self.m_alpha,
                                           use_leak=self.use_leak,
+                                          temperature=self.temp,
                                           name=f'att_layer_{i}')
                             for i in range(self.num_layers)]
         
@@ -86,7 +89,7 @@ class Encoder(Model):
         x = self.output_transform(x)
         
         if return_weights:
-            return x, w, qkvalues, qkv
+            return x, w, qkvalues
         return  x # (batch_size, input_seq_len, d_model)
 
 class SkipEncoder(Encoder):

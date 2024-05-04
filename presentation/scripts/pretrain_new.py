@@ -30,7 +30,7 @@ def get_loaders(opt):
                               nsp_prob=opt.nsp_prob,
                               sampling=True,
                               shuffle=True,
-                              cache=True,
+                              cache=False if opt.no_cache else True,
                               normalize=opt.norm,
                               repeat=opt.repeat,
                               aversion=opt.arch)
@@ -44,7 +44,7 @@ def get_loaders(opt):
                               nsp_prob=opt.nsp_prob,
                               sampling=True,
                               shuffle=False,
-                              cache=True,
+                              cache=False if opt.no_cache else True,
                               normalize=opt.norm,
                               repeat=1,
                               aversion=opt.arch)
@@ -66,7 +66,10 @@ def get_model(opt):
                                maxlen=opt.window_size,
                                m_alpha=opt.m_alpha,
                                mask_format=opt.mask_format,
-                               return_weights=False)
+                               return_weights=False,
+                               loss_format=opt.loss_format,
+                               correct_loss=opt.correct_loss,
+                               temperature=opt.temperature)
         
     if opt.arch == 'base':
         model = get_Base(num_layers=opt.num_layers,
@@ -82,7 +85,8 @@ def get_model(opt):
                          mask_format=opt.mask_format,
                          use_leak=opt.use_leak,
                          loss_format=opt.loss_format,
-                         correct_loss=opt.correct_loss)
+                         correct_loss=opt.correct_loss,
+                         temperature=opt.temperature)
 
     if opt.arch == 'skip':
         model = get_Skip(num_layers=opt.num_layers,
@@ -197,15 +201,17 @@ if __name__ == '__main__':
     parser.add_argument('--mask-format', default=None, type=str,
                         help='mask on Query and Key tokens (QK) or Query tokens only (Q)')
     parser.add_argument('--use-leak', action='store_true', help='Use Custom Scheduler during training')
+    parser.add_argument('--no-cache', action='store_true', help='no cache dataset')
     
     parser.add_argument('--correct-loss', action='store_true', help='Use error bars to weigh loss')
     parser.add_argument('--loss-format', default='rmse', type=str,
                         help='what consider during loss: rmse - rmse+p - p')
     parser.add_argument('--norm', default='zero-mean', type=str,
                         help='normalization: zero-mean - random-mean')
-
+    parser.add_argument('--temperature', default=0., type=float,
+                        help='Temperature used within the softmax argument')
     # =========================================================
-    parser.add_argument('--repeat', default=1, type=float,
+    parser.add_argument('--repeat', default=1, type=int,
                         help='repeat data')
     parser.add_argument('--lr', default=1e-5, type=float,
                         help='learning rate')

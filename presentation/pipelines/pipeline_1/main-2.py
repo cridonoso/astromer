@@ -275,7 +275,7 @@ def classify(index, config, n_jobs=1):
 
     return child_exp_id
 
-@hydra.main(version_base=None, config_path=".", config_name="config_pipeline")
+@hydra.main(version_base=None, config_path=".", config_name="config_pipeline-dp")
 def pipeline(cfg: DictConfig) -> None:
     config = cfg
     OmegaConf.set_struct(config, False)

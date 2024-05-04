@@ -1,13 +1,14 @@
 
 exp_id: 'temperature' 
-do_ft: [False, False]
-do_clf: [True, True]
-visible_gpu: ['0']
+do_ft: [True, True, True]
+do_clf: [True, True, True]
+visible_gpu: ['3']
 
 pretrain:
-  tag: ['t0.2', 't0.4']
-  weights: ['./presentation/results/temp/2024-04-13_04-04-34/',
-            './presentation/results/temp/2024-04-18_20-49-50/']
+  tag: ['zero', 'zero_clean', 't0.8']
+  weights: ['./presentation/results/zero/2024-04-29_05-06-25',
+            './presentation/results/zero/2024-04-24_16-13-23',
+            './presentation/results/temp/2024-04-24_01-07-33']
 
 data:
   paths : ['./data/records/alcock/fold_0/alcock_20', 
@@ -55,7 +56,7 @@ data:
 finetuning:
   lr : 0.001
   scheduler: False
-  batch_size : 512
+  batch_size : 1024
   patience : 30
   num_epochs : 10000
   probed : 0.2
