@@ -2,7 +2,7 @@
 exp_id: 'temperature' 
 do_ft: [True, True, True, True, True, True]
 do_clf: [True, True, True, True, True, True]
-visible_gpu: ['0']
+visible_gpu: ['3']
 
 pretrain:
   tag: ['zero_1e5', 'zero_1e3', 'zero_clean', 'temp_02', 'temp_04', 'temp_08']
