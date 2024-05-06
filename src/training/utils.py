@@ -81,8 +81,11 @@ def train(model,
     draw_graph(model, batch, train_writter, exp_path)
 
     # Optimizer
-    
-    d_model = model.get_layer('encoder').num_heads * model.get_layer('encoder').head_dim 
+    try:
+        d_model = model.get_layer('encoder').num_heads * model.get_layer('encoder').head_dim 
+    except:
+        d_model = model.get_layer('encoder').d_model
+
     custom_lr = CustomSchedule(d_model)
     
     optimizer = tf.keras.optimizers.Adam(custom_lr,

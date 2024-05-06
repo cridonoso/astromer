@@ -58,7 +58,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
     parser.add_argument('--scheduler', action='store_true', help='Use Custom Scheduler during training')
 
-    parser.add_argument('--arch', default='base', type=str,
+    parser.add_argument('--arch', default='zero', type=str,
                         help='Astromer architecture: "base" (paper), "nsp", or "skip"')
 
     parser.add_argument('--num-layers', default=2, type=int,
