@@ -4,19 +4,8 @@ import toml
 import sys
 import os
 
-
-from src.models.astromer_0 import get_ASTROMER as get_Bugstromer
-from src.models.astromer_1 import get_ASTROMER as get_Base
-from src.models.astromer_nsp import get_ASTROMER as get_NSP
-from src.models.astromer_skip import get_ASTROMER as get_Skip
-
 from datetime import datetime
-
-from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
-from tensorflow.keras.optimizers import Adam
-
-from.src.training.utils import train
-from src.training.scheduler import CustomSchedule
+from src.training.utils import train
 
 from presentation.pipelines.steps.model_design import build_model
 from presentation.pipelines.steps.load_data import build_loader
@@ -30,10 +19,13 @@ def run(opt):
     os.makedirs(EXPDIR, exist_ok=True)
 
     # ========== DATA ========================================
-    loaders = build_loader(opt)
+    loaders = build_loader(data_path=opt.data, 
+                           params=opt.__dict__,
+                           batch_size=opt.bs,
+                           sampling=True)
 
     # ======= MODEL ========================================
-    model = get_model(opt)
+    model = build_model(opt.__dict__)
 
     # ============================================================
     if opt.checkpoint != '-1':
@@ -44,16 +36,13 @@ def run(opt):
         toml.dump(opt.__dict__, f)
 
     train(model,
-              train_dataset,
-              valid_dataset,
-              patience=20,
-              exp_path='./experiments/test',
-              epochs=1,
-              finetuning=False,
-              use_random=True,
-              num_cls=2,
-              lr=1e-3,
-              verbose=1)
+          loaders['train'],
+          loaders['validation'],
+          patience=20,
+          exp_path=EXPDIR,
+          epochs=opt.num_epochs,
+          lr=1e-3,
+          verbose=1)
 
 
 if __name__ == '__main__':
@@ -90,7 +79,7 @@ if __name__ == '__main__':
                         help='Dropout to use on the output of each attention layer (before mixer layer)')
     parser.add_argument('--m-alpha', default=1., type=float,
                         help='Alpha used within mask self-attention')
-    parser.add_argument('--mask-format', default=None, type=str,
+    parser.add_argument('--mask-format', default='QK', type=str,
                         help='mask on Query and Key tokens (QK) or Query tokens only (Q)')
     parser.add_argument('--use-leak', action='store_true', help='Use Custom Scheduler during training')
     parser.add_argument('--no-cache', action='store_true', help='no cache dataset')

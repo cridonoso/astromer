@@ -73,7 +73,8 @@ def get_ASTROMER(num_layers=2,
 
     x = RegLayer(name='regression')(x)
 
-    return CustomModel(correct_loss=correct_loss, loss_format=loss_format, inputs=placeholder, outputs=x, name="ASTROMER-1")
+    return CustomModel(correct_loss=correct_loss, loss_format=loss_format, 
+                       inputs=placeholder, outputs=x, name="ASTROMER-1")
 
 class CustomModel(Model):
     def __init__(self, correct_loss=False, loss_format='rmse', *args, **kwargs):

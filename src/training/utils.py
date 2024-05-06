@@ -7,6 +7,8 @@ from tensorflow.keras.callbacks import CallbackList
 from tensorflow.keras.optimizers import Adam
 from src.training.scheduler import CustomSchedule
 from tensorflow.keras.optimizers.experimental import AdamW
+from src.losses.rmse import custom_rmse
+
 from tqdm import tqdm
 
 def draw_graph(model, dataset, writer, logdir=''):
@@ -31,12 +33,13 @@ def save_scalar(writer, value, step, name=''):
         
 @tf.function
 def train_step(model, batch, opt):
+    x, y = batch
     with tf.GradientTape() as tape:
-        x_pred = model(batch)
+        x_pred = model(x)
 
-        mse = custom_rmse(y_true=batch['output'],
-                         y_pred=x_pred,
-                         mask=batch['mask_out'])
+        mse = custom_rmse(y_true=y['target'],
+                          y_pred=x_pred,
+                          mask=y['mask_out'])
 
 
     grads = tape.gradient(mse, model.trainable_weights)
@@ -45,12 +48,12 @@ def train_step(model, batch, opt):
 
 @tf.function
 def valid_step(model, batch, return_pred=False, normed=False):
+    x, y = batch
     with tf.GradientTape() as tape:
-        x_pred = model(batch)
-        x_true = batch['output']
-        mse = custom_rmse(y_true=x_true,
+        x_pred = model(x)
+        mse = custom_rmse(y_true=y['target'],
                           y_pred=x_pred,
-                          mask=batch['mask_out'])
+                          mask=y['mask_out'])
 
     if return_pred:
         return mse, x_pred, x_true
@@ -63,8 +66,6 @@ def train(model,
           exp_path='./experiments/test',
           epochs=1,
           finetuning=False,
-          use_random=True,
-          num_cls=2,
           lr=1e-3,
           verbose=1):
 
@@ -72,16 +73,17 @@ def train(model,
 
     # Tensorboard
     train_writter = tf.summary.create_file_writer(
-                                    os.path.join(exp_path, 'logs', 'train'))
+                                    os.path.join(exp_path, 'tensorboard', 'train'))
     valid_writter = tf.summary.create_file_writer(
-                                    os.path.join(exp_path, 'logs', 'valid'))
+                                    os.path.join(exp_path, 'tensorboard', 'validation'))
 
-    batch = [t for t in train_dataset.take(1)][0]
+    batch = [x for x, _ in train_dataset.take(1)][0]
     draw_graph(model, batch, train_writter, exp_path)
 
     # Optimizer
     
-    custom_lr = CustomSchedule(model.get_layer('encoder').d_model)
+    d_model = model.get_layer('encoder').num_heads * model.get_layer('encoder').head_dim 
+    custom_lr = CustomSchedule(d_model)
     
     optimizer = tf.keras.optimizers.Adam(custom_lr,
                                          beta_1=0.9,
@@ -98,6 +100,7 @@ def train(model,
     pbar = tqdm(range(epochs), desc='epoch')
     for epoch in pbar:
         for train_batch in train_dataset:
+            x, y  = train_batch
             mse = train_step(model, train_batch, optimizer)
             train_mse.update_state(mse)
 
