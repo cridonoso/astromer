@@ -22,7 +22,8 @@ def run(opt):
     loaders = build_loader(data_path=opt.data, 
                            params=opt.__dict__,
                            batch_size=opt.bs,
-                           sampling=True)
+                           sampling=True,
+                           repeat=opt.repeat)
 
     # ======= MODEL ========================================
     model = build_model(opt.__dict__)
