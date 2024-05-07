@@ -11,6 +11,7 @@ if [[ $gpu == $true ]]; then
    --rm \
    --privileged=true \
    --mount "type=bind,src=$(pwd),dst=/home/" \
+   --userns=keep-id \
    --workdir /home/ \
    -p 8886:8886 \
    -p 6006:6006 \
@@ -23,6 +24,7 @@ else
    --rm \
    --privileged=true \
    --mount "type=bind,src=$(pwd),dst=/home/" \
+   --userns=keep-id \
    --workdir /home/ \
    -p 8886:8886 \
    -p 6006:6006 \
