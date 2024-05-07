@@ -27,7 +27,6 @@ def get_loaders(opt):
                               probed_frac=opt.probed,
                               random_frac=opt.rs,
                               same_frac=opt.same,
-                              nsp_prob=opt.nsp_prob,
                               sampling=True,
                               shuffle=True,
                               cache=False if opt.no_cache else True,
@@ -41,7 +40,6 @@ def get_loaders(opt):
                               probed_frac=opt.probed,
                               random_frac=opt.rs,
                               same_frac=opt.same,
-                              nsp_prob=opt.nsp_prob,
                               sampling=True,
                               shuffle=False,
                               cache=False if opt.no_cache else True,
@@ -166,19 +164,19 @@ def run(opt):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--exp-name', default='pretrain', type=str,
+    parser.add_argument('--exp-name', default='alcock_test', type=str,
                     help='Project name')
-    parser.add_argument('--data', default='./data/records/macho', type=str,
+    parser.add_argument('--data', default='./data/records/alcock/fold_0/alcock', type=str,
                     help='Data folder where tf.record files are located')
+    
     parser.add_argument('--checkpoint', default='-1', type=str,
                         help='Restore training by using checkpoints. This is the route to the checkpoint folder.')
     parser.add_argument('--gpu', default='-1', type=str,
                         help='GPU to be used. -1 means no GPU will be used')
     parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
     parser.add_argument('--scheduler', action='store_true', help='Use Custom Scheduler during training')
-
     parser.add_argument('--arch', default='base', type=str,
-                        help='Astromer architecture: "base" (paper), "nsp", or "skip"')
+                        help='Astromer architecture: "zero" (paper) or "base"(new version)')
 
     parser.add_argument('--num-layers', default=2, type=int,
                         help='Number of Attention Layers')
@@ -196,26 +194,33 @@ if __name__ == '__main__':
                         help='Units to be used on the hidden layer of a feed-forward network that combines head outputs within an attention layer')
     parser.add_argument('--dropout', default=0., type=float,
                         help='Dropout to use on the output of each attention layer (before mixer layer)')
-    parser.add_argument('--m-alpha', default=1., type=float,
-                        help='Alpha used within mask self-attention')
-    parser.add_argument('--mask-format', default=None, type=str,
+    parser.add_argument('--m-alpha', default=-1000000000, type=float,
+                        help='Alpha used within mask self-attention. -1e9 by default. Use 1 for "zero" arch')
+    parser.add_argument('--mask-format', default='K', type=str,
                         help='mask on Query and Key tokens (QK) or Query tokens only (Q)')
-    parser.add_argument('--use-leak', action='store_true', help='Use Custom Scheduler during training')
-    parser.add_argument('--no-cache', action='store_true', help='no cache dataset')
-    
-    parser.add_argument('--correct-loss', action='store_true', help='Use error bars to weigh loss')
     parser.add_argument('--loss-format', default='rmse', type=str,
                         help='what consider during loss: rmse - rmse+p - p')
+    # ==========================================================
+    parser.add_argument('--probed', default=0.5, type=float,
+                        help='Probed percentage')
+    parser.add_argument('--rs', default=0.2, type=float,
+                        help='Probed fraction to be randomized or unmasked')
+    parser.add_argument('--same', default=None, type=float,
+                        help='Fraction to make visible during masked-self attention while evaluating during loss')
     parser.add_argument('--norm', default='zero-mean', type=str,
                         help='normalization: zero-mean - random-mean')
     parser.add_argument('--temperature', default=0., type=float,
                         help='Temperature used within the softmax argument')
+    # ==========================================================
+    parser.add_argument('--use-leak', action='store_true', help='Use Custom Scheduler during training')
+    parser.add_argument('--no-cache', action='store_true', help='no cache dataset')
+    parser.add_argument('--correct-loss', action='store_true', help='Use error bars to weigh loss')
     # =========================================================
     parser.add_argument('--repeat', default=1, type=int,
                         help='repeat data')
     parser.add_argument('--lr', default=1e-5, type=float,
                         help='learning rate')
-    parser.add_argument('--bs', default=2500, type=int,
+    parser.add_argument('--bs', default=1024, type=int,
                         help='Batch size')
     parser.add_argument('--patience', default=20, type=int,
                         help='Earlystopping threshold in number of epochs')
@@ -223,16 +228,7 @@ if __name__ == '__main__':
                         help='Number of epochs')
     parser.add_argument('--window-size', default=200, type=int,
                         help='windows size of the PSFs')
-    # ==========================================================
-    parser.add_argument('--probed', default=0.2, type=float,
-                        help='Probed percentage')
-    parser.add_argument('--rs', default=0.2, type=float,
-                        help='Probed fraction to be randomized or unmasked')
-    parser.add_argument('--same', default=None, type=float,
-                        help='Fraction to make visible during masked-self attention while evaluating during loss')
-    # ONLY NSP =================================================
-    parser.add_argument('--nsp-prob', default=0.5, type=float,
-                        help='Probability of randomize second segment in NSP pretraining task')
+
 
 
     opt = parser.parse_args()        
