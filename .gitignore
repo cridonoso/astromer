@@ -25,3 +25,4 @@ data/embeddings/
 data/records_parquet
 
 daniel
+run_cris.sh

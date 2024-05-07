@@ -1,3 +1,4 @@
+tensorflow_probability==0.19
 notebook==6.5.6
 scikit-learn
 joblib
@@ -7,4 +8,3 @@ mlflow
 gdown
 tqdm
 toml
-run_cris.sh
