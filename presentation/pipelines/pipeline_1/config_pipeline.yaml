@@ -2,7 +2,7 @@
 exp_id: 'temperature' 
 do_ft: [True, True, True, True, True, True]
 do_clf: [True, True, True, True, True, True]
-visible_gpu: ['3']
+visible_gpu: ['0']
 
 pretrain:
   tag: ['zero_1e5', 'zero_1e3', 'zero_clean', 'temp_02', 'temp_04', 'temp_08']
@@ -12,9 +12,9 @@ pretrain:
             './presentation/results/temp/2024-04-13_04-04-34',
             './presentation/results/temp/2024-04-18_20-49-50',
             './presentation/results/temp/2024-04-24_01-07-33' ]
-
 data:
-  paths : ['./data/records/alcock/fold_0/alcock_20', 
+  paths : [
+          './data/records/alcock/fold_0/alcock_20', 
            './data/records/alcock/fold_1/alcock_20',
            './data/records/alcock/fold_2/alcock_20',
            './data/records/alcock/fold_0/alcock_100', 
@@ -35,7 +35,8 @@ data:
            './data/records/atlas/fold_2/atlas_500',
          ]
 
-  target : ['macho/fold_0/macho_20', 
+  target : [
+            'macho/fold_0/macho_20', 
             'macho/fold_1/macho_20',
             'macho/fold_2/macho_20',
             'macho/fold_0/macho_100', 
@@ -62,12 +63,12 @@ finetuning:
   batch_size : 1024
   patience : 20
   num_epochs : 10000
-  probed : 0.2
+  probed : 0.5
   debug : False
   
 classification:
   lr : 0.001
-  batch_size : 512
+  batch_size : 1024
   patience : 20
   num_epochs : 10000
   clf_arch: ['avg_mlp', 'skip_avg_mlp']

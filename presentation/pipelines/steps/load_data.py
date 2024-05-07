@@ -10,7 +10,8 @@ def build_loader(data_path, params, batch_size=5,
                  normalize='zero-mean', 
                  sampling=False,
                  repeat=1,
-                 old_version=False):
+                 old_version=False,
+                 return_test=False):
     
     if clf_mode:
         print('Classification Mode')
@@ -45,8 +46,8 @@ def build_loader(data_path, params, batch_size=5,
                                  msk_frac=probed,
                                  rnd_frac=random,
                                  same_frac=same,
-                                 sampling=True,
-                                 shuffle=False,
+                                 sampling=sampling,
+                                 shuffle=True,
                                  repeat=repeat,
                                  num_cls=num_cls,
                                  normalize='zero-mean', # 'minmax'
@@ -60,7 +61,7 @@ def build_loader(data_path, params, batch_size=5,
                                  msk_frac=probed,
                                  rnd_frac=random,
                                  same_frac=same,
-                                 sampling=True,
+                                 sampling=sampling,
                                  shuffle=False,
                                  repeat=1,
                                  num_cls=num_cls,
@@ -69,6 +70,20 @@ def build_loader(data_path, params, batch_size=5,
                                  return_ids=False,
                                  return_lengths=False,
                                  key_format=params['arch'])
+        if return_test:
+            test_loader = get_loader(os.path.join(data_path, 'test'),
+                                      batch_size=batch_size,
+                                      window_size=params['window_size'],
+                                      probed_frac=probed,
+                                      random_frac=random,
+                                      same_frac=same,
+                                      nsp_prob=nsp_prob,
+                                      sampling=sampling,
+                                      shuffle=False,
+                                      normalize=norm,
+                                      repeat=1,
+                                      aversion=params['arch'],
+                                      num_cls=num_cls)
     else:
         train_loader = get_loader(os.path.join(data_path, 'train'),
                                   batch_size=batch_size,
@@ -84,7 +99,7 @@ def build_loader(data_path, params, batch_size=5,
                                   aversion=params['arch'],
                                   num_cls=num_cls)
         
-        valid_loader = get_loader(os.path.join(data_path, 'val'),
+        valid_loader = get_loader(os.path.join(data_path, 'validation'),
                                   batch_size=batch_size,
                                   window_size=params['window_size'],
                                   probed_frac=probed,
@@ -97,24 +112,31 @@ def build_loader(data_path, params, batch_size=5,
                                   repeat=1,
                                   aversion=params['arch'],
                                   num_cls=num_cls)
-
-        # test_loader = get_loader(os.path.join(data_path, 'test'),
-        #                           batch_size=batch_size,
-        #                           window_size=params['window_size'],
-        #                           probed_frac=probed,
-        #                           random_frac=random,
-        #                           same_frac=same,
-        #                           nsp_prob=nsp_prob,
-        #                           sampling=sampling,
-        #                           shuffle=False,
-        #                           normalize=norm,
-        #                           repeat=1,
-        #                           aversion=params['arch'],
-        #                           num_cls=num_cls)
+        if return_test:
+            test_loader = get_loader(os.path.join(data_path, 'test'),
+                                      batch_size=batch_size,
+                                      window_size=params['window_size'],
+                                      probed_frac=probed,
+                                      random_frac=random,
+                                      same_frac=same,
+                                      nsp_prob=nsp_prob,
+                                      sampling=sampling,
+                                      shuffle=False,
+                                      normalize=norm,
+                                      repeat=1,
+                                      aversion=params['arch'],
+                                      num_cls=num_cls)
         
-    return {
-        'train': train_loader.take(2) if debug else train_loader,
-        'validation': valid_loader.take(2) if debug else valid_loader,
-        # 'test': test_loader.take(2) if debug else test_loader,
-        'n_classes': num_cls,
-    }
+    if return_test:
+        return {
+            'train': train_loader.take(2) if debug else train_loader,
+            'validation': valid_loader.take(2) if debug else valid_loader,
+            'test': test_loader.take(2) if debug else test_loader,
+            'n_classes': num_cls,
+        }
+    else:
+        return {
+            'train': train_loader.take(2) if debug else train_loader,
+            'validation': valid_loader.take(2) if debug else valid_loader,
+            'n_classes': num_cls,
+        }

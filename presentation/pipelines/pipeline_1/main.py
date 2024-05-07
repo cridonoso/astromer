@@ -79,7 +79,7 @@ def finetune_step(trial, run_index, config):
                             beta_1=0.9,
                             beta_2=0.98,
                             epsilon=1e-9,
-                            clipnorm=1e-4, # VERY IMPORTANT
+                            clipnorm=1e-4,
                             name='astromer_optimizer')
 
         # Build Astromer model
@@ -92,6 +92,9 @@ def finetune_step(trial, run_index, config):
                                params, 
                                batch_size=config['finetuning']['batch_size'],
                                clf_mode=False,
+                               sampling=False,
+                               normalize='zero-mean',
+                               old_version=False,
                                debug=config['finetuning']['debug'])
 
         # Load Callbacks
@@ -105,6 +108,7 @@ def finetune_step(trial, run_index, config):
 
         # Finetune model
         astromer.fit(loaders['train'], 
+                     batch_size=config['finetuning']['batch_size'],
                      epochs=1 if config['finetuning']['debug'] else config['finetuning']['num_epochs'], 
                      validation_data=loaders['validation'],
                      callbacks=cbks)
@@ -196,8 +200,11 @@ def classification_step(trial, run_index, config, clfarch):
                                params, 
                                batch_size=config['classification']['batch_size'],
                                clf_mode=True,
+                               sampling=False,
+                               normalize='zero-mean',
+                               old_version=False,
+                               return_test=True,
                                debug=config['classification']['debug'])
-
         
         # Load classifier
         classifier = build_classifier(astromer, 
@@ -222,6 +229,7 @@ def classification_step(trial, run_index, config, clfarch):
 
         classifier.fit(loaders['train'], 
                         epochs=1 if config['classification']['debug'] else config['classification']['num_epochs'], 
+                        batch_size=config['classification']['batch_size'],
                         validation_data=loaders['validation'],
                         callbacks=cbks)
 

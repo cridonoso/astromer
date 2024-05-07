@@ -135,6 +135,7 @@ def train(model,
 
         train_mse.reset_states()
         valid_mse.reset_states()
+    return model
 
 def predict(model,
             dataset,
