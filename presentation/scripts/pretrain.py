@@ -10,6 +10,7 @@ from src.training.utils import train
 from presentation.pipelines.steps.model_design import build_model
 from presentation.pipelines.steps.load_data import build_loader
 
+
 def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
 
@@ -23,7 +24,8 @@ def run(opt):
                            params=opt.__dict__,
                            batch_size=opt.bs,
                            sampling=True,
-                           repeat=opt.repeat)
+                           repeat=opt.repeat,
+                           old_version=True)
 
     # ======= MODEL ========================================
     model = build_model(opt.__dict__)
@@ -106,11 +108,11 @@ if __name__ == '__main__':
     parser.add_argument('--window-size', default=200, type=int,
                         help='windows size of the PSFs')
     # ==========================================================
-    parser.add_argument('--probed', default=0.2, type=float,
+    parser.add_argument('--probed', default=0.5, type=float,
                         help='Probed percentage')
     parser.add_argument('--rs', default=0.2, type=float,
                         help='Probed fraction to be randomized or unmasked')
-    parser.add_argument('--same', default=None, type=float,
+    parser.add_argument('--same', default=0.2, type=float,
                         help='Fraction to make visible during masked-self attention while evaluating during loss')
     # ONLY NSP =================================================
     parser.add_argument('--nsp-prob', default=0.5, type=float,
