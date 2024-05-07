@@ -11,6 +11,7 @@ records/
 presentation/experiments/astromer_0/backup/
 wandb
 *.record
+*.swp
 
 mlruns/
 outputs
@@ -25,4 +26,3 @@ data/embeddings/
 data/records_parquet
 
 daniel
-run_cris.sh
