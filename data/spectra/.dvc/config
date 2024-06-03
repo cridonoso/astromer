@@ -1,0 +1,4 @@
+[core]
+    remote = gdrive-astromer
+['remote "gdrive-astromer"']
+    url = gdrive://1Msvi6KIaek01yhKUJtVG6YAL3KvA8CnR
