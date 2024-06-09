@@ -77,8 +77,7 @@ def run(opt):
         test_metadata['subset_0']       = ['test']*test_metadata.shape[0]
         final_metadata = pd.concat([selected_train, validation_metadata, test_metadata])
 
-        print(target_path)
-        return 
+
         pipeline = CustomCleanPipeline(metadata=final_metadata,
                                        config_path=os.path.join(target_path, 'config.toml'))
 
