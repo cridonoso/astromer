@@ -204,7 +204,7 @@ def get_loader(dataset,
         dataset = dataset.repeat(repeat)
     
     dataset = dataset.filter(filter_fn)
-
+    
     # CREATE WINDOWS
     dataset = to_windows(dataset,
                          window_size=window_size,

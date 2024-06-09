@@ -10,7 +10,7 @@ import toml
 import sys
 import os
 
-from src.data.record import DataPipeline
+from src.data.record import DataPipeline, create_config_toml
 
 import time
 import polars as pl
@@ -48,33 +48,44 @@ def run(opt):
     OBSPATH  = os.path.join(opt.data, 'light_curves')
     
     metadata = pd.read_parquet(METAPATH)
-    metadata['Class'] = pd.Categorical(metadata['Class'])
-    metadata['Label'] = metadata['Class'].cat.codes
-    metadata['Path']  = metadata['Path'].apply(lambda x: os.path.join(OBSPATH, x)) 
+    metadata['Band'] = metadata['Band'].astype(str)
+    metadata['ID'] = metadata['ID'].astype(str)
     
+    target_path = opt.data.replace('praw', 'precords')
+
+    create_config_toml(parquet_id='newID',
+                       target=target_path,
+                       context_features=['ID', 'Label', 'Class', 'N', 'Band', 'shard'],
+                       sequential_features=['mjd', 'mag', 'errmag'],
+                       context_dtypes=['string', 'integer', 'string', 'integer', 'string', 'integer'],
+                       sequential_dtypes=['float', 'float', 'float'])
 
     if opt.debug:
         metadata = metadata.sample(20)
         print('[INFO] Debugging: ', metadata.shape)
         
-    custom_pipeline = CustomCleanPipeline(metadata=metadata,
-                                          config_path=opt.config)
+    # Train - Val - Test split
+    test_metadata = metadata.sample(frac=0.25)
+    rest = metadata[~metadata['newID'].isin(test_metadata['newID'])]
+    assert test_metadata['newID'].isin(rest['newID']).sum() == 0 # check if there are duplicated indices
 
-    if 'test' in metadata.sset.unique():
-        test_metadata = metadata[metadata['sset'] == 'test']
-        test_metadata = [test_metadata]*opt.folds
-    else:
-        test_metadata = None
+    validation_metadata = rest.sample(frac=0.25)
+    train_metadata = rest[~rest['newID'].isin(validation_metadata['newID'])]
+    assert train_metadata['newID'].isin(validation_metadata['newID']).sum() == 0 # check if there are duplicated indices
+
+    train_metadata['subset_0'] = ['train']*train_metadata.shape[0]
+    validation_metadata['subset_0'] = ['validation']*validation_metadata.shape[0]
+    test_metadata['subset_0'] = ['test']*test_metadata.shape[0]
+    final_metadata = pd.concat([train_metadata, validation_metadata, test_metadata])
+    
+    pipeline = CustomCleanPipeline(metadata=final_metadata,
+                                          config_path=os.path.join(target_path, 'config.toml'))
 
 
-    custom_pipeline.train_val_test(val_frac=opt.val_frac, 
-                                   test_meta=test_metadata, 
-                                   k_fold=opt.folds)
 
-    var = custom_pipeline.run(observations_path=OBSPATH, 
-                              metadata_path=METAPATH,
-                              n_jobs=16,
-                              elements_per_shard=opt.elements_per_shard)
+    var = pipeline.run(observations_path=OBSPATH, 
+                       n_jobs=8,
+                       elements_per_shard=20000)
 
     end = time.time()
     print('\n [INFO] ELAPSED: ', end - start)
