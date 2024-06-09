@@ -60,8 +60,9 @@ def run(opt):
         print('[INFO] Creating dataset with {} samples'.format(n_samples))
         selected_train = train_metadata.sample(n=int(n_samples))
 
-        target_path = opt.data.replace('praw', 'precords')
-        target_path = os.path.join(target_path, '{}'.format(int(n_samples)))
+        ds_name = opt.data.split('/')[-1]
+
+        target_path = os.path.join(opt.target, ds_name, '{}'.format(int(n_samples)))
         
         create_config_toml(parquet_id='newID',
                            target=target_path,
@@ -76,6 +77,8 @@ def run(opt):
         test_metadata['subset_0']       = ['test']*test_metadata.shape[0]
         final_metadata = pd.concat([selected_train, validation_metadata, test_metadata])
 
+        print(target_path)
+        return 
         pipeline = CustomCleanPipeline(metadata=final_metadata,
                                        config_path=os.path.join(target_path, 'config.toml'))
 
@@ -94,7 +97,7 @@ if __name__ == '__main__':
     parser.add_argument('--config', default='./data/raw_data_parquet/alcock/config.toml', type=str,
                     help='Config file specifying context and sequential features')
 
-    parser.add_argument('--target', default='./data/records_parquet/', type=str,
+    parser.add_argument('--target', default='./data/records/', type=str,
                     help='target folder to save records files')
 
 
