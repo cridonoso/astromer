@@ -51,44 +51,43 @@ def run(opt):
     metadata['Band'] = metadata['Band'].astype(str)
     metadata['ID'] = metadata['ID'].astype(str)
     
-    target_path = opt.data.replace('praw', 'precords')
+    test_metadata  = metadata.sample(frac=0.2)
+    rest_metadata  = metadata[~metadata['ID'].isin(test_metadata['ID'])]
 
-    create_config_toml(parquet_id='newID',
-                       target=target_path,
-                       context_features=['ID', 'Label', 'Class', 'N', 'Band', 'shard'],
-                       sequential_features=['mjd', 'mag', 'errmag'],
-                       context_dtypes=['string', 'integer', 'string', 'integer', 'string', 'integer'],
-                       sequential_dtypes=['float', 'float', 'float'])
+    validation_metadata = rest_metadata.sample(frac=0.15)
+    train_metadata = rest_metadata[~rest_metadata['ID'].isin(validation_metadata['ID'])]
+    for n_samples in [1e2, 1e3, 1e4, 1e5, 1e6]:
+        print('[INFO] Creating dataset with {} samples'.format(n_samples))
+        selected_train = train_metadata.sample(n=int(n_samples))
 
-    if opt.debug:
-        metadata = metadata.sample(20)
-        print('[INFO] Debugging: ', metadata.shape)
+        ds_name = opt.data.split('/')[-1]
+
+        target_path = os.path.join(opt.target, ds_name, '{}'.format(int(n_samples)))
         
-    # Train - Val - Test split
-    test_metadata = metadata.sample(frac=0.25)
-    rest = metadata[~metadata['newID'].isin(test_metadata['newID'])]
-    assert test_metadata['newID'].isin(rest['newID']).sum() == 0 # check if there are duplicated indices
-
-    validation_metadata = rest.sample(frac=0.25)
-    train_metadata = rest[~rest['newID'].isin(validation_metadata['newID'])]
-    assert train_metadata['newID'].isin(validation_metadata['newID']).sum() == 0 # check if there are duplicated indices
-
-    train_metadata['subset_0'] = ['train']*train_metadata.shape[0]
-    validation_metadata['subset_0'] = ['validation']*validation_metadata.shape[0]
-    test_metadata['subset_0'] = ['test']*test_metadata.shape[0]
-    final_metadata = pd.concat([train_metadata, validation_metadata, test_metadata])
-    
-    pipeline = CustomCleanPipeline(metadata=final_metadata,
-                                          config_path=os.path.join(target_path, 'config.toml'))
+        create_config_toml(parquet_id='newID',
+                           target=target_path,
+                           context_features=['ID', 'Label', 'Class', 'N', 'Band', 'shard'],
+                           sequential_features=['mjd', 'mag', 'errmag'],
+                           context_dtypes=['string', 'integer', 'string', 'integer', 'string', 'integer'],
+                           sequential_dtypes=['float', 'float', 'float'])
 
 
+        selected_train['subset_0']      = ['train']*selected_train.shape[0]
+        validation_metadata['subset_0'] = ['validation']*validation_metadata.shape[0]
+        test_metadata['subset_0']       = ['test']*test_metadata.shape[0]
+        final_metadata = pd.concat([selected_train, validation_metadata, test_metadata])
 
-    var = pipeline.run(observations_path=OBSPATH, 
-                       n_jobs=8,
-                       elements_per_shard=20000)
 
-    end = time.time()
-    print('\n [INFO] ELAPSED: ', end - start)
+        pipeline = CustomCleanPipeline(metadata=final_metadata,
+                                       config_path=os.path.join(target_path, 'config.toml'))
+
+
+        var = pipeline.run(observations_path=OBSPATH, 
+                           n_jobs=8,
+                           elements_per_shard=20000)
+
+        end = time.time()
+        print('\n [INFO] ELAPSED: ', end - start)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -97,16 +96,9 @@ if __name__ == '__main__':
     parser.add_argument('--config', default='./data/raw_data_parquet/alcock/config.toml', type=str,
                     help='Config file specifying context and sequential features')
 
-    parser.add_argument('--target', default='./data/records_parquet/', type=str,
+    parser.add_argument('--target', default='./data/records/', type=str,
                     help='target folder to save records files')
 
-
-    parser.add_argument('--folds', default=1, type=int,
-                    help='number of folds')
-    parser.add_argument('--val-frac', default=0.2, type=float,
-                    help='Validation fraction')
-    parser.add_argument('--test-frac', default=0.2, type=float,
-                    help='Validation fraction')
 
     parser.add_argument('--elements-per-shard', default=20000, type=int,
                     help='Number of light curves per shard')

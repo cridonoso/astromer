@@ -95,7 +95,8 @@ def finetune_step(trial, run_index, config):
                                sampling=False,
                                normalize='zero-mean',
                                old_version=False,
-                               debug=config['finetuning']['debug'])
+                               debug=config['finetuning']['debug'],
+                               return_test=True)
 
         # Load Callbacks
         cbks = [EarlyStopping(monitor='val_loss', patience=config['finetuning']['patience']),

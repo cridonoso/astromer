@@ -80,6 +80,37 @@ def write_config(context_features: List[str], sequential_features: List[str], co
         logging.error(f'Error while writing the config file: {str(e)}')
         raise e
 
+def create_config_toml(parquet_id='newID', 
+                       target='./data/precords/test', 
+                       context_features=['ID', 'Label'],
+                       sequential_features=['mjd', 'mag', 'err'],
+                       context_dtypes=['string', 'integer'],
+                       sequential_dtypes=['float', 'float', 'float']):
+    
+    os.makedirs(target, exist_ok=True)
+    config_dict = {
+        'id_column':{
+            'value': parquet_id,
+            'dtype': 'integer'
+        },
+        'target':{
+            'value': target,
+            'dtype': 'string'
+        },
+        'context_features': {
+            'value': context_features,
+            'dtypes': context_dtypes, 
+        },
+        'sequential_features':{
+            'value': sequential_features,
+            'dtypes': sequential_dtypes,
+        }
+
+    }
+    with open(os.path.join(target, 'config.toml'), 'w') as handle:
+        toml.dump(config_dict, handle)
+    print('[INFO] Toml file succefully created at: {}'.format(target))
+    
 class DataPipeline:
     """
     Args:
@@ -110,8 +141,8 @@ class DataPipeline:
         self.context_features_dtype    = config['context_features']['dtypes']
         self.sequential_features       = config['sequential_features']['value']
         self.sequential_features_dtype = config['sequential_features']['dtypes']
-        self.output_folder             = config['general']['target']['value']
-        self.id_column                 = config['general']['id_column']['value']
+        self.output_folder             = config['target']['value']
+        self.id_column                 = config['id_column']['value']
 
         assert self.metadata[self.id_column].dtype == int, \
         'ID column should be an integer Serie but {} was given'.format(self.metadata[self.id_column].dtype)
@@ -119,7 +150,7 @@ class DataPipeline:
         if metadata is not None:
             print('[INFO] {} samples loaded'.format(metadata.shape[0]))
 
-        self.metadata['subset_0'] = ['full']*self.metadata.shape[0]
+#         self.metadata['subset_0'] = ['full']*self.metadata.shape[0]
 
         os.makedirs(self.output_folder, exist_ok=True)
 
@@ -209,52 +240,52 @@ class DataPipeline:
 
 
     
-    def train_val_test(self,
-                       val_frac=0.2,
-                       test_frac=0.2,
-                       test_meta=None,
-                       val_meta=None,
-                       shuffle=True,
-                       id_column_name=None,
-                       k_fold=1):
+#     def train_val_test(self,
+#                        val_frac=0.2,
+#                        test_frac=0.2,
+#                        test_meta=None,
+#                        val_meta=None,
+#                        shuffle=True,
+#                        id_column_name=None,
+#                        k_fold=1):
 
-        if k_fold > 1 and test_meta is not None:
-            assert len(test_meta) == k_fold, 'test_meta should be a list containing {}-fold subsets'.format(k_fold)
+#         if k_fold > 1 and test_meta is not None:
+#             assert len(test_meta) == k_fold, 'test_meta should be a list containing {}-fold subsets'.format(k_fold)
 
-        if id_column_name is None:
-            id_column_name = self.metadata.columns[0]
-        print('[INFO] Using {} col as sample identifier'.format(id_column_name))
+#         if id_column_name is None:
+#             id_column_name = self.metadata.columns[0]
+#         print('[INFO] Using {} col as sample identifier'.format(id_column_name))
 
-        if (type(test_meta) is not list) and (k_fold > 1) and (type(test_meta) != type(None)):
-            raise ValueError(f'k_fold={k_fold} does not match with number of test frames. Please provide a list of testing frames for each fold')
-        if (type(val_meta) is not list) and (k_fold > 1) and (type(val_meta) != type(None)):
-            raise ValueError(f'k_fold={k_fold} does not match with number of validation frames.Please, provide a list of validation frames for each fold')
+#         if (type(test_meta) is not list) and (k_fold > 1) and (type(test_meta) != type(None)):
+#             raise ValueError(f'k_fold={k_fold} does not match with number of test frames. Please provide a list of testing frames for each fold')
+#         if (type(val_meta) is not list) and (k_fold > 1) and (type(val_meta) != type(None)):
+#             raise ValueError(f'k_fold={k_fold} does not match with number of validation frames.Please, provide a list of validation frames for each fold')
 
-        if test_meta is None: test_meta = []
-        if val_meta is None: val_meta = []
+#         if test_meta is None: test_meta = []
+#         if val_meta is None: val_meta = []
 
-        for k in range(k_fold):
-            if shuffle:
-                print('[INFO] Shuffling')
-                self.metadata = self.metadata.sample(frac=1)
+#         for k in range(k_fold):
+#             if shuffle:
+#                 print('[INFO] Shuffling')
+#                 self.metadata = self.metadata.sample(frac=1)
 
-            try:
-                test_meta[k]
-            except:
-                test_meta.append(self.metadata.sample(frac=test_frac))
-            self.metadata = substract_frames(self.metadata, test_meta[k], on=id_column_name)
+#             try:
+#                 test_meta[k]
+#             except:
+#                 test_meta.append(self.metadata.sample(frac=test_frac))
+#             self.metadata = substract_frames(self.metadata, test_meta[k], on=id_column_name)
 
-            try:
-                val_meta[k]
-            except:
-                val_meta.append(self.metadata.sample(frac=val_frac))
-            self.metadata = substract_frames(self.metadata, val_meta[k], on=id_column_name)
+#             try:
+#                 val_meta[k]
+#             except:
+#                 val_meta.append(self.metadata.sample(frac=val_frac))
+#             self.metadata = substract_frames(self.metadata, val_meta[k], on=id_column_name)
 
-            self.metadata['subset_{}'.format(k)]    = ['train']*self.metadata.shape[0]
-            val_meta[k]['subset_{}'.format(k)]      = ['validation']*val_meta[k].shape[0]
-            test_meta[k]['subset_{}'.format(k)]     = ['test']*test_meta[k].shape[0]
+#             self.metadata['subset_{}'.format(k)]    = ['train']*self.metadata.shape[0]
+#             val_meta[k]['subset_{}'.format(k)]      = ['validation']*val_meta[k].shape[0]
+#             test_meta[k]['subset_{}'.format(k)]     = ['test']*test_meta[k].shape[0]
 
-            self.metadata = pd.concat([self.metadata, val_meta[k], test_meta[k]])
+#             self.metadata = pd.concat([self.metadata, val_meta[k], test_meta[k]])
 
 
     def prepare_data(self, container : np.ndarray, elements_per_shard : int, subset : str, fold_n : int):
@@ -298,15 +329,16 @@ class DataPipeline:
         Preprocessing applied to each light curve separately
         """
         # First feature is time
-        inputs = inputs.sort(self.sequential_features[0]) 
+        inputs = inputs.sort(self.sequential_features[0])    
         return inputs
 
     def observations_step(self):
         """
         Preprocessing applied to all observations. Filter only
         """
-        fn = pl.col("errmag") < 1.  # Clean the data on the big lazy dataframe
-        return fn
+        fn_0 = pl.col("errmag") < 1.  # Clean the data on the big lazy dataframe
+        fn_1 = pl.col("errmag") > 0.  
+        return fn_0 & fn_1
 
     def read_all_parquets(self, observations_path : str) -> pd.DataFrame:
         """
@@ -358,24 +390,19 @@ class DataPipeline:
         print('[INFO] Creating {} random folds'.format(n_folds))
         print('Not implemented yet hehehe...')
 
-    def run(self, observations_path :str , metadata_path : str, n_jobs : int =1, elements_per_shard : int = 5000) -> None: 
+    def run(self, observations_path :str , n_jobs : int =1, elements_per_shard : int = 5000) -> None: 
         """
         Executes the DataPipeline operations which includes reading parquet files, processing samples and writing records.
         
         Args:
             observations_path (str): Directory path of parquet files containing light curves observations
-            metadata_path (str): Path for metadata file
             n_jobs (int): The maximum number of concurrently running jobs. Default is 1
             elements_per_shard (int): Maximum number of elements per shard. Default is 5000
         """
         if not os.path.exists(observations_path):
             logging.error("The specified parquets path does not exist")
             raise FileNotFoundError("The specified parquets path does not exist")
-        
-        if not os.path.isfile(metadata_path):
-            logging.error("The specified metadata path does not exist")
-            raise FileNotFoundError("The specified metadata path does not exist")
-        
+          
         # Start the operations
         logging.info("Starting DataPipeline operations")
 

@@ -157,6 +157,7 @@ def run(opt):
 
     model.fit(loaders['train'], 
               epochs=2 if opt.debug else opt.num_epochs, 
+              batch_size=5 if opt.debug else opt.bs,
               validation_data=loaders['validation'],
               callbacks=cbks)
 

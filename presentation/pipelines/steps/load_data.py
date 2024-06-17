@@ -11,7 +11,10 @@ def build_loader(data_path, params, batch_size=5,
                  sampling=False,
                  repeat=1,
                  old_version=False,
-                 return_test=False):
+                 return_test=False,
+                 probed=None,
+                 same=None,
+                 random=None):
     
     if clf_mode:
         print('Classification Mode')
@@ -22,10 +25,10 @@ def build_loader(data_path, params, batch_size=5,
         same = 0.
     else:
         num_cls = None
-        probed = params['probed']
-        random = params['rs']
+        probed = probed if probed is not None else params['probed']
+        random = random if random is not None else params['rs']
         try:
-            same = params['same']
+            same = same if same is not None else params['same']
         except:
             same  = None
         try:
