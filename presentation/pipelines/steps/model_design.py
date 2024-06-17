@@ -43,20 +43,20 @@ def build_model(params, return_weights=False):
 
     if params['arch'] == 'base':
         model = get_Base(num_layers=params['num_layers'],
-                          num_heads=params['num_heads'],
-                          head_dim=params['head_dim'],
-                          mixer_size=params['mixer'],
-                          dropout=params['dropout'],
-                          pe_base=params['pe_base'],
-                          pe_dim=params['pe_dim'],
-                          pe_c=params['pe_exp'],
-                          window_size=params['window_size'],
-                          m_alpha=params['m_alpha'],
-                          mask_format=params['mask_format'],
-                          use_leak=params['use_leak'],
-                          loss_format=params['loss_format'],
-                          correct_loss=params['correct_loss'],
-                          temperature=params['temperature'])
+                         num_heads=params['num_heads'],
+                         head_dim=params['head_dim'],
+                         mixer_size=params['mixer'],
+                         dropout=params['dropout'],
+                         pe_base=params['pe_base'],
+                         pe_dim=params['pe_dim'],
+                         pe_c=params['pe_exp'],
+                         window_size=params['window_size'],
+                         m_alpha=params['m_alpha'],
+                         mask_format=params['mask_format'],
+                         use_leak=params['use_leak'],
+                         loss_format=params['loss_format'],
+                         correct_loss=params['correct_loss'],
+                         temperature=params['temperature'])
 
     if params['arch'] == 'skip':
         model = get_Skip(num_layers=params['num_layers'],
