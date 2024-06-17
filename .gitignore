@@ -11,6 +11,7 @@ records/
 presentation/experiments/astromer_0/backup/
 wandb
 *.record
+*.swp
 
 mlruns/
 outputs
@@ -26,4 +27,3 @@ data/records_parquet
 data/praw/
 data/precords/
 daniel
-run_cris.sh
