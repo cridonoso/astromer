@@ -39,7 +39,7 @@ def finetune_step(trial, run_index, config):
     target_folder = os.path.normpath(config['data']['target'][trial_number])
 
     # Create target folder for finetuning werights
-    ft_folder = os.path.join(pt_folder, 'finetuning', target_folder)
+    ft_folder = os.path.join(pt_folder, 'finetuning-2', target_folder)
     os.makedirs(ft_folder, exist_ok=True)
     
     # This specific of target sintax (please see config_pipeline.yaml)
@@ -155,7 +155,7 @@ def classification_step(trial, run_index, config, clfarch):
     target_folder = os.path.normpath(config['data']['target'][trial_number])
 
     # Create target folder for finetuning werights
-    clf_folder = os.path.join(pt_folder, 'classification', target_folder, clfarch)
+    clf_folder = os.path.join(pt_folder, 'classification-2', target_folder, clfarch)
     os.makedirs(clf_folder, exist_ok=True)
     
     # This specific of target sintax (please see config_pipeline.yaml)
@@ -285,7 +285,7 @@ def classify(index, config, n_jobs=1):
 
     return child_exp_id
 
-@hydra.main(version_base=None, config_path=".", config_name="config_pipeline")
+@hydra.main(version_base=None, config_path=".", config_name="config_pipeline-2")
 def pipeline(cfg: DictConfig) -> None:
     config = cfg
     OmegaConf.set_struct(config, False)

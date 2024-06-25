@@ -87,8 +87,9 @@ class Encoder(Model):
                                                      return_weights=True)
             else:
                 x =  self.enc_layers[i](x, training=training, mask=inputs['mask_in'])
-        x = self.output_transform(x)
-        output_by_layer.append(x)
+                
+            x = self.output_transform(x)
+            output_by_layer.append(x)
 
         if return_weights:
             return x, w, qkvalues

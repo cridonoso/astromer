@@ -1,8 +1,8 @@
 
-exp_id: 'maogat' 
-do_ft: [False, False, False]
+exp_id: 'maogat-2' 
+do_ft: [True, True, True]
 do_clf: [True, True, True]
-visible_gpu: ['0']
+visible_gpu: ['3']
 
 pretrain:
   tag: ['classical', 'temp05', 'logits']
@@ -55,9 +55,9 @@ data:
          ]
 
 finetuning:
-  lr : 0.00001
+  lr : 0.001
   scheduler: False
-  batch_size : 1024
+  batch_size : 2000
   patience : 20
   num_epochs : 10000
   probed : 0.5

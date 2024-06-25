@@ -11,7 +11,7 @@ from src.utils import get_metrics
 from presentation.pipelines.steps.model_design import load_pt_model
 from presentation.pipelines.steps.load_data import build_loader 
 
-def get_metrics(output):
+def compute_metrics(output):
     y = tf.ragged.boolean_mask(output['magnitudes'], output['probed_mask'])
     y_hat = tf.ragged.boolean_mask(output['reconstruction'], output['probed_mask'])
     
@@ -34,7 +34,7 @@ def run(opt):
     astromer, config = load_pt_model(opt.model)
     df = pd.DataFrame(config, index=[0])
     nsamples = df['data'].values[0].split('/')[-3] 
-    loaders = build_loader(os.path.join(df['data']), 
+    loaders = build_loader(df['data'].values[0], 
                            config, 
                            batch_size=opt.bs,
                            clf_mode=False,
@@ -42,7 +42,7 @@ def run(opt):
                            return_test=True,
                            normalize='zero-mean')     
     output = astromer.predict(loaders['test'])
-    r2_value, mse_value = get_metrics(output)
+    r2_value, mse_value = compute_metrics(output)
     
     valid_loss = get_metrics(os.path.join(opt.model, 'tensorboard', 'validation'), 
                                 metric_name='epoch_loss')

@@ -6,7 +6,8 @@ from src.data.zero import pretraining_pipeline
 from src.data import get_loader
 
 def build_loader(data_path, params, batch_size=5, 
-                 clf_mode=False, debug=False, 
+                 clf_mode=False, 
+                 debug=False, 
                  normalize='zero-mean', 
                  sampling=False,
                  repeat=1,

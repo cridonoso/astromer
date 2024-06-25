@@ -12,9 +12,9 @@ from src.models.astromer_skip import  build_input as build_input_skip
 from src.models.astromer_1 import build_input as build_input_base
 from src.models.astromer_0 import build_input as build_input_zero
 
-
+from src.layers.input import GammaWeight
 from tensorflow.keras import Model
-from tensorflow.keras.layers import TimeDistributed, LayerNormalization, Dense, Dropout
+from tensorflow.keras.layers import TimeDistributed, LayerNormalization, Dense, Dropout, Softmax
 
 
 def build_model(params, return_weights=False):
@@ -42,6 +42,7 @@ def build_model(params, return_weights=False):
                            temperature=params['temperature'])
 
     if params['arch'] == 'base':
+        print('[INFO] Loading BASE')
         model = get_Base(num_layers=params['num_layers'],
                          num_heads=params['num_heads'],
                          head_dim=params['head_dim'],
@@ -147,15 +148,8 @@ def get_skip_avg_mlp(inputs, mask, num_cls):
     x = tf.multiply(x, mask) 
     x = tf.reduce_sum(x, 2)
     x = tf.math.divide_no_nan(x, tf.reduce_sum(mask, 2))
-
-    initial_value = tf.random.truncated_normal([len(inputs)])
-    gamma = tf.Variable(initial_value=initial_value,
-                        trainable=True)
-    gamma = tf.keras.layers.Softmax()(gamma)
-    gamma = tf.reshape(gamma, [len(inputs), 1, 1])
-    x = tf.multiply(x, gamma)
-    x = tf.reduce_mean(x, axis=0)
-
+        
+    x = GammaWeight(name='gamma_weight')(x)
     x = Dense(1024, activation='relu')(x)
     x = Dense(512, activation='relu')(x)
     x = Dense(256, activation='relu')(x)
@@ -184,22 +178,18 @@ def build_classifier(astromer, params, astromer_trainable, num_cls=None, arch='a
         inp_placeholder = build_input_base(params['window_size'])
         encoder = astromer.get_layer('encoder')
         encoder.trainable = astromer_trainable
+        input_embedding, _ = encoder.input_format(inp_placeholder)
         embedding = encoder(inp_placeholder, z_by_layer=True)
-
+        if arch == 'skip_avg_mlp':
+            embedding.insert(0, input_embedding)
+        
+        
     if params['arch'] == 'skip':
         inp_placeholder = build_input_skip(params['window_size'])
         encoder = astromer.get_layer('encoder')
         encoder.trainable = astromer_trainable
         embedding = encoder(inp_placeholder)
         
-    if params['arch'] == 'nsp':
-        inp_placeholder = build_input_nsp(params['window_size'])      
-        encoder = astromer.get_layer('encoder')
-        encoder.trainable = astromer_trainable
-        embedding = encoder(inp_placeholder)
-        embedding = tf.slice(embedding, [0, 1, 0], [-1, -1,-1], name='slice_obs')
-        embedding = tf.reshape(embedding, [-1, params['window_size'], params['head_dim']*params['num_heads']])
-
     mask = 1.- inp_placeholder['mask_in']
        
     print('[INFO] Using {} clf architecture with {}'.format(arch, params['arch']))

@@ -145,8 +145,11 @@ def get_windows(sample, max_obs, binary=True):
     input_dict['label']  = tf.tile([input_dict['label']], [len(splits)])
     input_dict['lcid']   = tf.tile([input_dict['lcid']], [len(splits)])
     input_dict['length'] = tf.tile([input_dict['length']], [len(splits)])
-    input_dict['N']   = tf.tile([input_dict['N']], [len(splits)])
-    input_dict['shard'] = tf.tile([input_dict['shard']], [len(splits)])
+    try:
+        input_dict['N']   = tf.tile([input_dict['N']], [len(splits)])
+        input_dict['shard'] = tf.tile([input_dict['shard']], [len(splits)])
+    except:
+        pass
     input_dict['input']  = splits
 
     return input_dict

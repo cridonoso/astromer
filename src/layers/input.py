@@ -1,7 +1,28 @@
 import tensorflow as tf
 
-from tensorflow.keras.layers import Layer
+from tensorflow.keras.layers import Layer, Softmax
 
+class GammaWeight(Layer):
+    """ Weighted trainable average between attention outputs and input embeddings """
+    def __init__(self, **kwargs):
+
+        super().__init__(**kwargs)
+
+        self.softmax_act = Softmax(name='softmax')
+        
+    def build(self, input_shape):
+        initial_value = tf.ones([input_shape[0]]) * 1/input_shape[0]
+        self.gamma = tf.Variable(initial_value=initial_value,
+                            trainable=True,
+                            name='gamma')
+        
+    def call(self, inputs, training):
+        gamma = self.softmax_act(self.gamma)
+        gamma = tf.reshape(gamma, [tf.shape(inputs)[0], 1, 1])
+        x = tf.multiply(inputs, gamma)
+        x = tf.reduce_mean(x, axis=0)
+        return x
+    
 class AddMSKToken(Layer):
     """ Create MSK token """
     def __init__(self, 
