@@ -107,6 +107,6 @@ if __name__ == '__main__':
                  './data/records/atlas/fold_1/atlas_100',
                  './data/records/atlas/fold_2/atlas_100']
     
-    for clf_arch in ['skip_avg_mlp']:
+    for clf_arch in ['avg_mlp', 'skip_avg_mlp']:
         for dp in datapaths:
             clf_step(opt, dp, clf_arch)
