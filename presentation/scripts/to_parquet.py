@@ -30,6 +30,12 @@ def process_sample(i, row):
     df['newID'] = row.newID*np.ones(df.shape[0]).astype(np.int64)
     return df
 
+def process_sample_2(i, row):
+    df = pd.read_csv(row['path'], names=['mjd', 'mag', 'err'], delim_whitespace=True)
+    df = df.iloc[:, :3]
+    df.columns = ['mjd', 'mag', 'errmag']
+    df['newID'] = row.newID*np.ones(df.shape[0]).astype(np.int64)
+    return df
 def run(opt):
     
     opt.data = os.path.normpath(opt.data)
@@ -54,7 +60,7 @@ def run(opt):
 
     threads = Parallel(n_jobs=opt.n_jobs, backend='loky')
 
-    dfs = threads(delayed(process_sample)(i, row) for i, row in metadata.iterrows()) 
+    dfs = threads(delayed(process_sample_2)(i, row) for i, row in metadata.iterrows()) 
 
     ids_parquet = []
     for batch, begin in enumerate(np.arange(0, len(dfs), opt.samples_per_chunk)):

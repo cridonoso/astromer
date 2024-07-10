@@ -1,5 +1,6 @@
 #!/bin/bash
 declare -A dictionary
+dictionary["catalina"]="1t4XUC6PgW4Piv6F3S5Nv5nCJe-jOIkCQ"
 dictionary["alcock"]="18a4DGPlyJ21DI9HrKS-jJtaA2iIqFDQO"
 dictionary["macho"]="1ReqDHn9jKPIS_g8Xm0ThYUDM-XaLcUP3"
 dictionary["ogle"]="1L1oiq9pRRGpOVm13b2dyCQhMiVFn3o7x"

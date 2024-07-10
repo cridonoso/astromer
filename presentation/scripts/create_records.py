@@ -48,16 +48,19 @@ def run(opt):
     OBSPATH  = os.path.join(opt.data, 'light_curves')
     
     metadata = pd.read_parquet(METAPATH)
-    metadata['Band'] = metadata['Band'].astype(str)
+    try:
+        metadata['Band'] = metadata['Band'].astype(str)
+    except:
+        pass
     metadata['ID'] = metadata['ID'].astype(str)
     
     target_path = opt.data.replace('praw', 'precords')
 
     create_config_toml(parquet_id='newID',
                        target=target_path,
-                       context_features=['ID', 'Label', 'Class', 'N', 'Band', 'shard'],
+                       context_features=['ID', 'Label', 'Class', 'shard'],
                        sequential_features=['mjd', 'mag', 'errmag'],
-                       context_dtypes=['string', 'integer', 'string', 'integer', 'string', 'integer'],
+                       context_dtypes=['string', 'integer', 'string', 'integer'],
                        sequential_dtypes=['float', 'float', 'float'])
 
     if opt.debug:

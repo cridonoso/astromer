@@ -23,7 +23,7 @@ def build_model(params, return_weights=False):
         
     if 'temperature' not in params.keys():
         params['temperature'] = 0.
-        
+
     if params['arch'] == 'zero':
         print('[INFO] Zero architecture loaded')
         model = get_Zero(num_layers=params['num_layers'],
@@ -157,8 +157,6 @@ def get_skip_avg_mlp(inputs, mask, num_cls):
     y_pred = Dense(num_cls, name='output_layer')(x)
 
     return y_pred
-
-
 
 def build_classifier(astromer, params, astromer_trainable, num_cls=None, arch='avg_mlp'):
     # Build classifier

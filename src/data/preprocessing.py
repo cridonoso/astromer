@@ -141,15 +141,11 @@ def get_windows(sample, max_obs, binary=True):
                                             max_obs),  pivots,
                        infer_shape=False,
                        fn_output_signature=(tf.float32))
-
-    input_dict['label']  = tf.tile([input_dict['label']], [len(splits)])
-    input_dict['lcid']   = tf.tile([input_dict['lcid']], [len(splits)])
-    input_dict['length'] = tf.tile([input_dict['length']], [len(splits)])
-    try:
-        input_dict['N']   = tf.tile([input_dict['N']], [len(splits)])
-        input_dict['shard'] = tf.tile([input_dict['shard']], [len(splits)])
-    except:
-        pass
+    
+    for k in input_dict.keys():
+        if k == 'input': continue
+        input_dict[k]  = tf.tile([input_dict[k]], [tf.shape(pivots)[0]])
+        
     input_dict['input']  = splits
 
     return input_dict

@@ -1,4 +1,5 @@
 import tensorflow as tf
+import glob
 import os
 
 @tf.function
@@ -220,7 +221,7 @@ def get_windows(sample, max_obs, binary=True):
                                             max_obs),  pivots,
                        infer_shape=False,
                        fn_output_signature=(tf.float32))
-
+    
     y        = tf.tile([input_dict['label']], [len(splits)])
     ids      = tf.tile([input_dict['lcid']], [len(splits)])
     orig_len = tf.tile([input_dict['length']], [len(splits)])
@@ -331,6 +332,7 @@ def deserialize(sample):
                             )
 
     input_dict = dict()
+
     input_dict['lcid']   = tf.cast(context['id'], tf.string)
     input_dict['length'] = tf.cast(context['length'], tf.int32)
     input_dict['label']  = tf.cast(context['label'], tf.int32)
@@ -356,15 +358,15 @@ def load_records(records_dir):
     Returns:
         type: tf.Dataset instance
     """
-    rec_paths = []
-    for folder in os.listdir(records_dir):
-        if folder.endswith('.csv'):
-            continue
-        for x in os.listdir(os.path.join(records_dir, folder)):
-            rec_paths.append(os.path.join(records_dir, folder, x))
-
-    dataset = tf.data.TFRecordDataset(rec_paths)
+    try:
+        rec_paths = glob.glob(os.path.join(records_dir, '*.record'))
+        dataset = tf.data.TFRecordDataset(rec_paths)
+    except:
+        rec_paths = glob.glob(os.path.join(records_dir, '*', '*.record'))
+        dataset = tf.data.TFRecordDataset(rec_paths)
+    
     dataset = dataset.map(deserialize)
+        
     return dataset
 
 def create_generator(list_of_arrays, labels=None, ids=None):
@@ -475,7 +477,8 @@ def pretraining_pipeline(dataset,
 
     if isinstance(dataset, str):
         dataset = load_records(dataset)
-
+        
+    return dataset
     if shuffle:
         SHUFFLE_BUFFER = 10000
         dataset = dataset.shuffle(SHUFFLE_BUFFER)
@@ -484,11 +487,12 @@ def pretraining_pipeline(dataset,
     if repeat is not None:
         #print('[INFO] Repeating dataset x{} times'.format(repeat))
         dataset = dataset.repeat(repeat)
-
+    
     # CREATE WINDOWS
     dataset = to_windows(dataset,
                          window_size=window_size,
                          sampling=sampling)
+    
 
     if normalize == 'zero-mean':
         dataset = dataset.map(standardize)
@@ -501,7 +505,7 @@ def pretraining_pipeline(dataset,
                            rnd_frac=rnd_frac,
                            same_frac=same_frac,
                            window_size=window_size)
-
+    
     shapes = {'input' :[None, 3],
               'lcid'  :(),
               'length':(),
@@ -551,7 +555,7 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
         'mask_out':batch['mask_out']
         
     }
-        
+
     if num_cls is not None:
         outputs = tf.one_hot(batch['label'], num_cls)
     else:

@@ -14,8 +14,8 @@ from presentation.pipelines.steps.load_data import build_loader
 from presentation.pipelines.steps.metrics import evaluate_ft
 
 def ft_step(opt, data_path):
-    
-    ft_model = data_path.split('./data/records/')[-1]
+    factos = data_path.split('/')
+    ft_model = '/'.join(factos[3:])
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
     EXPDIR = os.path.join(opt.pt_model, '..', opt.exp_name, ft_model)
     print('[INFO] Exp dir: ', EXPDIR)
@@ -28,7 +28,10 @@ def ft_step(opt, data_path):
                   beta_2=0.98,
                   epsilon=1e-9,
                   name='astromer_optimizer')
+    
+    
     model, model_config = load_pt_model(opt.pt_model, optimizer=ft_opt)
+    
     
     # ========== DATA ========================================
     loaders = build_loader(data_path, 
@@ -41,7 +44,9 @@ def ft_step(opt, data_path):
                            return_test=True,
                            probed=None,
                            same=None,
-                           random=None)
+                           random=None,
+                           old_version=False)
+#                            old_version=True if model_config['arch'] == 'zero' else False)
 
     with open(os.path.join(EXPDIR, 'config.toml'), 'w') as f:
         toml.dump(model_config, f)
@@ -82,19 +87,19 @@ if __name__ == '__main__':
 
 
     opt = parser.parse_args()        
-    
-    datapaths = ['./data/records/alcock/fold_0/alcock_20', 
-                 './data/records/alcock/fold_1/alcock_20',
-                 './data/records/alcock/fold_2/alcock_20',
-                 './data/records/alcock/fold_0/alcock_100', 
-                 './data/records/alcock/fold_1/alcock_100',
-                 './data/records/alcock/fold_2/alcock_100',
-                 './data/records/atlas/fold_0/atlas_20', 
-                 './data/records/atlas/fold_1/atlas_20',
-                 './data/records/atlas/fold_2/atlas_20',
-                 './data/records/atlas/fold_0/atlas_100', 
-                 './data/records/atlas/fold_1/atlas_100',
-                 './data/records/atlas/fold_2/atlas_100']
+    datapaths = ['./data/precords/catalina/fold_0/catalina']  
+#     datapaths = ['./data/records/alcock/fold_0/alcock_20', 
+#                  './data/records/alcock/fold_1/alcock_20',
+#                  './data/records/alcock/fold_2/alcock_20',
+#                  './data/records/alcock/fold_0/alcock_100', 
+#                  './data/records/alcock/fold_1/alcock_100',
+#                  './data/records/alcock/fold_2/alcock_100',
+#                  './data/records/atlas/fold_0/atlas_20', 
+#                  './data/records/atlas/fold_1/atlas_20',
+#                  './data/records/atlas/fold_2/atlas_20',
+#                  './data/records/atlas/fold_0/atlas_100', 
+#                  './data/records/atlas/fold_1/atlas_100',
+#                  './data/records/atlas/fold_2/atlas_100']
     
     
     for dp in datapaths:

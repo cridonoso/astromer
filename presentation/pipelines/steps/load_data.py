@@ -20,7 +20,7 @@ def build_loader(data_path, params, batch_size=5,
     if clf_mode:
         print('Classification Mode')
         num_cls = pd.read_csv(os.path.join(data_path, 'objects.csv')).shape[0]
-        probed = 1.
+        probed = 0. if old_version else 1.
         random = 0.
         nsp_prob = 0. 
         same = 0.
@@ -44,6 +44,7 @@ def build_loader(data_path, params, batch_size=5,
         norm = params['norm']
 
     if old_version:        
+        print('[INFO] Using old dataloader')
         train_loader = pretraining_pipeline(os.path.join(data_path, 'train'),
                                  batch_size=batch_size,
                                  window_size=params['window_size'],
@@ -59,6 +60,7 @@ def build_loader(data_path, params, batch_size=5,
                                  return_ids=False,
                                  return_lengths=False,
                                  key_format=params['arch'])
+        
         valid_loader = pretraining_pipeline(os.path.join(data_path, 'validation'),
                                  batch_size=batch_size,
                                  window_size=params['window_size'],
@@ -75,19 +77,21 @@ def build_loader(data_path, params, batch_size=5,
                                  return_lengths=False,
                                  key_format=params['arch'])
         if return_test:
-            test_loader = get_loader(os.path.join(data_path, 'test'),
-                                      batch_size=batch_size,
-                                      window_size=params['window_size'],
-                                      probed_frac=probed,
-                                      random_frac=random,
-                                      same_frac=same,
-                                      nsp_prob=nsp_prob,
-                                      sampling=sampling,
-                                      shuffle=False,
-                                      normalize=norm,
-                                      repeat=1,
-                                      aversion=params['arch'],
-                                      num_cls=num_cls)
+            test_loader = pretraining_pipeline(os.path.join(data_path, 'test'),
+                                 batch_size=batch_size,
+                                 window_size=params['window_size'],
+                                 msk_frac=probed,
+                                 rnd_frac=random,
+                                 same_frac=same,
+                                 sampling=sampling,
+                                 shuffle=False,
+                                 repeat=1,
+                                 num_cls=num_cls,
+                                 normalize='zero-mean', # 'minmax'
+                                 cache=False,
+                                 return_ids=False,
+                                 return_lengths=False,
+                                 key_format=params['arch'])
     else:
         train_loader = get_loader(os.path.join(data_path, 'train'),
                                   batch_size=batch_size,
