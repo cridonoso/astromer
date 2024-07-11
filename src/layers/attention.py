@@ -21,12 +21,10 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK', tempe
     dk = tf.cast(tf.shape(k)[-1], tf.float32)
     scaled_attention_logits = matmul_qk / tf.math.sqrt(dk)
     if temperature != 0.:
-        print('[INFO] Temperature: {:.2f}'.format(temperature))
         scaled_attention_logits = scaled_attention_logits / temperature
-                    
+    
     qk_values = scaled_attention_logits
     if mask_format == 'K':
-        print('[INFO] Masking Keys tokens only')
         steps = tf.shape(scaled_attention_logits)[2]
         mask_rshp = tf.tile(mask, [1,1,steps])
         mask_rshp = tf.transpose(mask_rshp, [0,2,1])
@@ -36,7 +34,6 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK', tempe
         attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
 
     if mask_format == 'Q':
-        print('[INFO] Masking Query tokens only')
         steps = tf.shape(scaled_attention_logits)[2]
         mask_rshp = tf.tile(mask, [1,1,steps])
         mask_rshp = tf.transpose(mask_rshp, [0,1,2])
@@ -46,7 +43,6 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK', tempe
         attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
         
     if mask_format == 'QK':
-        print('[INFO] Masking Query and Key tokens')
         steps = tf.shape(scaled_attention_logits)[2]
         mask_rshp = tf.tile(mask, [1,1,steps])
         mask_rshp += tf.transpose(mask_rshp, [0,1,2])
@@ -56,12 +52,10 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK', tempe
         attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
     
     if mask_format == 'tanh':
-        print('[INFO] No mask, Hyperbolic tanh! >:v')
         # softmax is normalized on the last axis (seq_len_k) so that the scores add up to 1.
         attention_weights = tf.keras.activations.tanh(scaled_attention_logits)
         
     if mask_format == 'logits':
-        print('[INFO] No mask, just logits')
         # softmax is normalized on the last axis (seq_len_k) so that the scores add up to 1.
         attention_weights = scaled_attention_logits
         

@@ -19,13 +19,13 @@ from src.layers.input import AddMSKToken
 def build_input(window_size, batch_size=None):
     magnitudes  = Input(shape=(window_size, 1),
                   batch_size=batch_size,
-                  name='magnitudes')
+                  name='input')
     times       = Input(shape=(window_size, 1),
                   batch_size=batch_size,
                   name='times')
     att_mask    = Input(shape=(window_size, 1),
                   batch_size=batch_size,
-                  name='att_mask') 
+                  name='mask_in') 
 
     return {'input':magnitudes,
             'times':times,
@@ -47,6 +47,9 @@ def get_ASTROMER(num_layers=2,
                  loss_format='rmse',
                  correct_loss=False,
                  temperature=0.):
+    
+    print('[INFO] Temperature: {:.2f}'.format(temperature))
+    print('[INFO] Mask format: {}'.format(mask_format))
 
     placeholder = build_input(window_size)
 

@@ -2,12 +2,14 @@ import tensorflow as tf
 import multiprocessing
 import glob
 import os
-from src.data.preprocessing import to_windows, standardize, min_max_scaler, nothing
-from src.data.preprocessing import unstandardize, shift_times, create_loss_weigths, random_mean
-from src.data.gap import set_gap, invert_mask
+from src.data import preprocessing as pp
 from src.data.masking import mask_dataset
 from src.data.record import deserialize
-from src.data.nsp import apply_nsp
+
+#to_windows, standardize, min_max_scaler, nothing
+#unstandardize, shift_times, create_loss_weigths, random_mean
+
+
 
 def load_records(records_dir):
     """
@@ -103,49 +105,16 @@ def format_inp_astromer(batch,
 
     if aversion == 'base':
         input_original  = unstandardize(batch)
-        times           = tf.slice(input_original, [0, 0, 0], [-1, -1, 1])
-        shifted_times   = shift_times(times, max_days=31)
-        back_times      = tf.slice(batch['input_modified'], [0, 0, 0], [-1, -1, 1])
-
         inputs['input'] =  batch['input_modified']
-
-        # inputs['back_times'] =  times
-        inputs['times'] =  times
+        inputs['times'] =  tf.slice(input_original, [0, 0, 0], [-1, -1, 1])
         inputs['mask_in'] =  batch['mask_in']
 
         errors = tf.slice(input_original, [0, 0, 2], [-1,-1, 1])
         outputs['target']   =  tf.slice(batch['input'], [0,0,1], [-1,-1,1])
-        outputs['w_error']    =  create_loss_weigths(errors)
+        outputs['w_error']  =  create_loss_weigths(errors)
         outputs['mask_out'] =  batch['mask_out']
         outputs['lcid']     = batch['lcid']
-            
-    if aversion == 'skip':
-        inputs['input'] = batch['input_modified']
-        times = tf.slice(batch['input'], [0,0,0], [-1,-1,1])
-        inp_size = tf.shape(batch['input'])
-        t0 = tf.slice(batch['input'], [0,0,0], [-1,inp_size[1]-1,1])
-        t1 = tf.slice(batch['input'], [0,1,0], [-1,-1,1])
-        dt = t1 - t0
-        inputs['times']   = tf.concat([tf.zeros([inp_size[0], 1, 1]), dt], axis=1)
-        inputs['mask_in'] = batch['mask_in']
-
-        outputs['target'] = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
-        outputs['error']  = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
-        outputs['mask_out'] = batch['mask_out']
-    
-    if aversion == 'nsp':
-        inputs['input']   = batch['nsp_magnitudes']
-        inputs['times']   = batch['nsp_times']
-        inputs['mask_in'] = batch['mask_in']
-        inputs['seg_emb'] = tf.expand_dims(batch['seg_emb'], axis=-1)
-        
-        outputs['target'] = batch['target_magnitudes']
-        outputs['error']  = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
-        outputs['original']  = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
-        outputs['mask_out']  = batch['mask_out']
-        outputs['seg_emb']   = tf.where(inputs['seg_emb'] == -1., 1., 0.)
-        outputs['nsp_label'] = batch['nsp_label']
-    
+               
 
     if num_cls is not None:
         outputs = tf.one_hot(batch['label'], num_cls)
@@ -170,12 +139,11 @@ def get_loader(dataset,
                probed_frac=.2,
                random_frac=.1,
                same_frac=None,
-               nsp_prob=0.5,
                sampling=True,
                shuffle=False,
                repeat=1,
                num_cls=None,
-               normalize='zero-mean', # 'minmax'
+               normalize='zero-mean',
                cache=False,
                return_ids=False,
                return_lengths=False,
@@ -188,6 +156,9 @@ def get_loader(dataset,
         same_frac = random_frac
         
     print('[INFO] Probed: {:.2f} Random: {:.2f} Same: {:.2f}'.format(probed_frac, random_frac, same_frac))
+    print('[INFO] Normalization: ', normalize)
+    
+    
     if isinstance(dataset, list):
         dataset = load_numpy(dataset)
 
@@ -199,31 +170,30 @@ def get_loader(dataset,
         dataset = dataset.shuffle(SHUFFLE_BUFFER)
 
     # REPEAT LIGHT CURVES
-    if repeat is not None:
+    if repeat > 1:
         print('[INFO] Repeating dataset x{} times'.format(repeat))
         dataset = dataset.repeat(repeat)
     
     dataset = dataset.filter(filter_fn)
     
     # CREATE WINDOWS
-    dataset = to_windows(dataset,
+    dataset = pp.to_windows(dataset,
                          window_size=window_size,
                          sampling=sampling)
-    print('[INFO] Normalization: ', normalize)
+   
     if normalize is None:
-        dataset = dataset.map(nothing)
+        dataset = dataset.map(pp.nothing)
         
     if normalize == 'zero-mean':
-        dataset = dataset.map(standardize)
+        dataset = dataset.map(pp.standardize)
     
     if normalize == 'random-mean':
-        dataset = dataset.map(random_mean)
+        dataset = dataset.map(pp.random_mean)
 
     if normalize == 'minmax':
-        dataset = dataset.map(min_max_scaler)
+        dataset = dataset.map(pp.min_max_scaler)
         
     
-    print('[INFO] Loading PT task: Masking')
     dataset, shapes = mask_dataset(dataset,
                            msk_frac=probed_frac,
                            rnd_frac=random_frac,
@@ -231,10 +201,6 @@ def get_loader(dataset,
                            window_size=window_size)
     dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
 
-    if aversion == 'nsp':
-        print('[INFO] NSP format activated')
-        dataset = apply_nsp(dataset, nsp_prob)
-    
     # FORMAT INPUT DICTONARY
     dataset = dataset.map(lambda x: format_inp_astromer(x,
                                                 return_ids=return_ids,

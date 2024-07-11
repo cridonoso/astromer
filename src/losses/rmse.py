@@ -1,5 +1,4 @@
 import tensorflow as tf
-import tensorflow_probability as tfp
 
 @tf.function
 def custom_rmse(y_true, y_pred, mask=None, weights=None, root=True):

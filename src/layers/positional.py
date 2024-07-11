@@ -79,6 +79,7 @@ class PositionalEncoder(tf.keras.layers.Layer):
 		self.base = base
 		self.c = tf.cast(c, tf.float32)
 
+	@tf.function
 	def call(self, inputs):
 		angle_rads = get_angles_astromer(inputs,
 										 self.d_model,

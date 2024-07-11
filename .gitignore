@@ -28,3 +28,4 @@ data/records_parquet
 data/praw/
 data/precords/
 daniel
+run_cris.sh

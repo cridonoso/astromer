@@ -54,7 +54,7 @@ class RegLayer(Layer):
 		self.reg_layer = Dense(1, name='reconstruction')
 		self.bn_0 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
 
-	def call(self, inputs, training):
+	def call(self, inputs, training=False):
 		x = self.bn_0(inputs, training=training)
 		x = self.reg_layer(x)
 		return x
