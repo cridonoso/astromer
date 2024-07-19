@@ -27,5 +27,6 @@ data/embeddings/
 data/records_parquet
 data/praw/
 data/precords/
+data/raw_parquet
 daniel
 run_cris.sh

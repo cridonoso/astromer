@@ -3,7 +3,7 @@ scikit-learn
 notebook
 seaborn
 joblib
-polars
+polars==0.20.10
 pandas
 mlflow
 gdown

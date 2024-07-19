@@ -15,6 +15,8 @@ from src.data.record import DataPipeline, create_config_toml
 import time
 import polars as pl
 
+os.environ["CUDA_VISIBLE_DEVICES"]="-1"
+
 class CustomCleanPipeline(DataPipeline):
     def lightcurve_step(self, inputs):
         """
@@ -40,52 +42,51 @@ class CustomCleanPipeline(DataPipeline):
 def run(opt):
     
     start = time.time()
+    if os.path.exists(opt.config):
+        print('[INFO] Loading config.toml at {}'.format(opt.config))
+        with open(opt.config) as handle:
+            config = toml.load(handle)
 
-    opt.data = os.path.normpath(opt.data)
-
-
-    METAPATH = os.path.join(opt.data, 'metadata.parquet')
-    OBSPATH  = os.path.join(opt.data, 'light_curves')
+    METAPATH   = config['context_features']['path']
+    OBSPATH    = config['sequential_features']['path']
+    TARGETPATH = config['target']['path']
     
     metadata = pd.read_parquet(METAPATH)
-    try:
-        metadata['Band'] = metadata['Band'].astype(str)
-    except:
-        pass
-    metadata['ID'] = metadata['ID'].astype(str)
-    
-    target_path = opt.data.replace('praw', 'precords')
 
-    create_config_toml(parquet_id='newID',
-                       target=target_path,
-                       context_features=['ID', 'Label', 'Class', 'shard'],
-                       sequential_features=['mjd', 'mag', 'errmag'],
-                       context_dtypes=['string', 'integer', 'string', 'integer'],
-                       sequential_dtypes=['float', 'float', 'float'])
-
-    if opt.debug:
-        metadata = metadata.sample(20)
-        print('[INFO] Debugging: ', metadata.shape)
+    got_test = False
+    if os.path.exists(config['context_features']['test_path']):
+        print('[INFO] Loading test metadata at {}'.format(config['context_features']['test_path']))  
+        test_metadata = pd.read_parquet(config['context_features']['test_path'])
+        metadata = pd.concat([test_metadata, metadata])
+        got_test = True
         
-    # Train - Val - Test split
-    test_metadata = metadata.sample(frac=0.25)
-    rest = metadata[~metadata['newID'].isin(test_metadata['newID'])]
-    assert test_metadata['newID'].isin(rest['newID']).sum() == 0 # check if there are duplicated indices
-
-    validation_metadata = rest.sample(frac=0.25)
-    train_metadata = rest[~rest['newID'].isin(validation_metadata['newID'])]
-    assert train_metadata['newID'].isin(validation_metadata['newID']).sum() == 0 # check if there are duplicated indices
-
-    train_metadata['subset_0'] = ['train']*train_metadata.shape[0]
-    validation_metadata['subset_0'] = ['validation']*validation_metadata.shape[0]
-    test_metadata['subset_0'] = ['test']*test_metadata.shape[0]
-    final_metadata = pd.concat([train_metadata, validation_metadata, test_metadata])
+    for fold_k in range(opt.folds):
     
-    pipeline = CustomCleanPipeline(metadata=final_metadata,
-                                          config_path=os.path.join(target_path, 'config.toml'))
+        # ==== TEST DATA ==========================================
+        if not got_test:
+            test_metadata = metadata.sample(frac=opt.test_frac)
+            
+        rest = metadata[~metadata['newID'].isin(test_metadata['newID'])]
+        assert test_metadata['newID'].isin(rest['newID']).sum() == 0 # check if there are duplicated indices
+    
+        # ==== VALIDATION/TRAIN DATA ==============================
+        validation_metadata = rest.sample(frac=opt.val_frac)
+        train_metadata = rest[~rest['newID'].isin(validation_metadata['newID'])]
+        assert train_metadata['newID'].isin(validation_metadata['newID']).sum() == 0 # check if there are duplicated indices
+    
+        # ==== FOLD =======================================
+        train_metadata['subset_{}'.format(fold_k)] = ['train']*train_metadata.shape[0]
+        validation_metadata['subset_{}'.format(fold_k)] = ['validation']*validation_metadata.shape[0]
+        test_metadata['subset_{}'.format(fold_k)] = ['test']*test_metadata.shape[0]
 
+        curr_meta = pd.concat([train_metadata, validation_metadata, test_metadata], axis=0)
+        cols_to_use = curr_meta.columns.difference(metadata.columns)
+        metadata = pd.merge(metadata, curr_meta[cols_to_use], left_index=True, right_index=True, how='outer')
 
-
+        
+    pipeline = CustomCleanPipeline(metadata=metadata,
+                                   config_path=opt.config)
+    
     var = pipeline.run(observations_path=OBSPATH, 
                        n_jobs=8,
                        elements_per_shard=20000)
@@ -95,14 +96,8 @@ def run(opt):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data', default='./data/raw_data_parquet/alcock', type=str,
-                    help='raw_data folder (parquet only)')
     parser.add_argument('--config', default='./data/raw_data_parquet/alcock/config.toml', type=str,
                     help='Config file specifying context and sequential features')
-
-    parser.add_argument('--target', default='./data/records_parquet/', type=str,
-                    help='target folder to save records files')
-
 
     parser.add_argument('--folds', default=1, type=int,
                     help='number of folds')
@@ -113,9 +108,6 @@ if __name__ == '__main__':
 
     parser.add_argument('--elements-per-shard', default=20000, type=int,
                     help='Number of light curves per shard')
-
-
-    parser.add_argument('--debug', action='store_true', help='a debugging flag to be used when testing.')
 
 
     opt = parser.parse_args()        

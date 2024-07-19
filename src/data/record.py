@@ -141,9 +141,10 @@ class DataPipeline:
         self.context_features_dtype    = config['context_features']['dtypes']
         self.sequential_features       = config['sequential_features']['value']
         self.sequential_features_dtype = config['sequential_features']['dtypes']
-        self.output_folder             = config['target']['value']
+        self.output_folder             = config['target']['path']
         self.id_column                 = config['id_column']['value']
 
+        self.check_dtypes()        
         assert self.metadata[self.id_column].dtype == int, \
         'ID column should be an integer Serie but {} was given'.format(self.metadata[self.id_column].dtype)
         
@@ -154,6 +155,38 @@ class DataPipeline:
 
         os.makedirs(self.output_folder, exist_ok=True)
 
+    def check_dtypes(self):
+        sample = pd.read_parquet(
+            os.path.join(self.config['sequential_features']['path'], 'shard_000.parquet'))
+                
+        a = [self.context_features, self.sequential_features]
+        b = [self.context_features_dtype, self.sequential_features_dtype]
+        c = ['context', 'sequence']
+        d = [self.metadata, sample]
+        for features, fdtype, name, df in zip(a, b, c, d):
+            partial = []
+
+            for key in features:
+                if df[key].dtype == object:
+                    partial.append('string')
+                if df[key].dtype == float:
+                    partial.append('float')
+                if np.issubdtype(df[key].dtype, np.integer):
+                    partial.append('integer')
+
+            if partial != fdtype:
+                print('[WARN] Inconsistent data types in {}. Overwritting config...'.format(name))
+                if name == 'context':
+                    self.context_features_dtype = partial
+                    self.config['context_features']['dtypes'] = partial
+                                    
+                if name == 'sequence':
+                    self.sequential_features_dtype = partial
+                    self.config['sequential_features']['dtypes'] = partial
+
+        with open(self.config_path, 'w') as f:
+            toml.dump(self.config, f)
+        
     @staticmethod
     def aux_serialize(sel : pl.DataFrame, 
                       path : str, 
@@ -356,7 +389,9 @@ class DataPipeline:
 
 
         # Read the parquet filez lazily
-        paths = os.path.join(observations_path, '*.parquet')
+        paths = ['{}/shard_{}.parquet'.format(observations_path, 
+                                              str(s).rjust(3, '0')) for s in self.metadata['shard'].unique()]
+
         scan = pl.scan_parquet(paths)
 
         # Using partial information, extract only the necessary objects

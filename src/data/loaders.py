@@ -73,8 +73,6 @@ def load_numpy(samples,
     return dataset
 
 def format_inp_astromer(batch, 
-                        return_ids=False, 
-                        return_lengths=False, 
                         num_cls=None, 
                         nsp_test=False,
                         aversion='base'):
@@ -104,26 +102,19 @@ def format_inp_astromer(batch,
         outputs['w_error']  = tf.ones_like(inputs['times'], dtype=tf.float32)
 
     if aversion == 'base':
-        input_original  = unstandardize(batch)
+        input_original  = pp.unstandardize(batch)
         inputs['input'] =  batch['input_modified']
         inputs['times'] =  tf.slice(input_original, [0, 0, 0], [-1, -1, 1])
         inputs['mask_in'] =  batch['mask_in']
 
         errors = tf.slice(input_original, [0, 0, 2], [-1,-1, 1])
         outputs['target']   =  tf.slice(batch['input'], [0,0,1], [-1,-1,1])
-        outputs['w_error']  =  create_loss_weigths(errors)
+        outputs['w_error']  =  pp.create_loss_weigths(errors)
         outputs['mask_out'] =  batch['mask_out']
         outputs['lcid']     = batch['lcid']
                
-
     if num_cls is not None:
-        outputs = tf.one_hot(batch['label'], num_cls)
-    
-    if return_ids:     
-        outputs = tf.one_hot(batch['label'], num_cls), batch['lcid']
-        
-    if return_lengths:
-        outputs = tf.one_hot(batch['label'], num_cls), batch['lenght']
+        outputs = tf.one_hot(batch['label'], num_cls)        
 
     return inputs, outputs
 
@@ -145,8 +136,6 @@ def get_loader(dataset,
                num_cls=None,
                normalize='zero-mean',
                cache=False,
-               return_ids=False,
-               return_lengths=False,
                aversion='base'):
 
 
@@ -203,8 +192,6 @@ def get_loader(dataset,
 
     # FORMAT INPUT DICTONARY
     dataset = dataset.map(lambda x: format_inp_astromer(x,
-                                                return_ids=return_ids,
-                                                return_lengths=return_lengths,
                                                 num_cls=num_cls,
                                                 aversion=aversion),
                   num_parallel_calls=tf.data.experimental.AUTOTUNE)
