@@ -11,16 +11,6 @@ ASTROMER is a deep learning model that can encode single-band light curves using
 
 Training ASTROMER from scratch can be expensive. However, we provide pre-trained weights that can be used to load representations already adjusted on millions of samples. Users can then easily fine-tune the model on new data. Fine-tuning involves training the pre-trained model on new datasets, which are typically smaller than the pre-training dataset.
 
-## Features
-- BERT-based masking technique
-- Skip connections between attention layers
-- Pre-trained weights
-  - MACHO R-band light curves
-
-- Predefined experiments to reproduce publication results (`presentation/experiments/*`)
-- Data preprocessing, saving and reading [tf.Records](https://www.tensorflow.org/tutorials/load_data/tfrecord) (`/src/data.py`)
-- Dockerfile and scripts for building (`build_container.sh`) and run (`run_container.sh`) the ASTROMER container
-
 ## Weights
 
 | Version Tag | Pretraining data | Description | Test RMSE/R-square | Link |
@@ -28,26 +18,39 @@ Training ASTROMER from scratch can be expensive. However, we provide pre-trained
 | v0 | MACHO | Paper's model | 0.147/0.80 | [Download Weights](https://github.com/astromer-science/weights/raw/nightly/macho_0.zip)
 | v1  | MACHO | New implementation of the paper's model | 0.135/0.198 | [Download Weights](https://drive.google.com/file/d/1AB5ubqlQtMheSnYlIxYTYGa_Xm-_L8FL/view?usp=sharing)
 
-(*) Best performance on classification task
 ## Directory tree
 ```
 📦astromer
  ┣ 📂data
  ┃ ┣ 📜 get_data.sh: download data (raw and preprocessed) from gdrive
+ ┃ ┣ 📜 config.toml: config template for converting parquet to records
  ┃ ┗ 📜 README.md: instructions how to use get_data.sh 
- ┣ 📂 presentation: everything that depends on the model code (i.e., experiments, plots and figures)
- ┃ ┣ 📂 experiments: experiments folder
- ┃ ┃ ┣ 📂 astromer_0: published version experiments
- ┃ ┃ ┗ 📂 astromer_2: latest version experiments
+ ┣ 📂 presentation: everything that depends on the model code (i.e., pipelines, figures, visualization notebooks...)
+ ┃ ┣ 📂 results: experiments folder
  ┃ ┣ 📂 figures
- ┃ ┣ 📂 notebooks: util notebooks to visualize data
- ┃ ┣ 📜 template.toml: template to run pipelines within the experiments subdirectories
- ┃ ┗ 📜 utils.py: useful and general functions to create pipelines
+ ┃ ┣ 📂 notebooks: util notebooks to visualize data, model features and results
+ ┃ ┣ 📂 pipelines:
+ ┃ ┃ ┗ 📂 pipeline_0
+ ┃ ┃ ┃ ┗ 📜 finetune.py: Script for running finetunining step on a pretrained model
+ ┃ ┃ ┃ ┗ 📜 classify.py: Script for running classification on a pretrained/finetuned model
+ ┃ ┃ ┃ ┗ 📜 utils.py: utils functions for pipeline_0
+ ┃ ┃ ┃ ┗ 📜 run.bash: bash script to run the whole pipeline on several pre-trained models
+ ┃ ┃ ┗ 📂 steps: functions that are invariant to the pipeline and will be always used 
+ ┃ ┃ ┃ ┗ 📜 load_data.py: functions to easily load records
+ ┃ ┃ ┃ ┗ 📜 metrics.py: functions to get general metrics and tensorboard logs 
+ ┃ ┃ ┃ ┗ 📜 model_design.py: function to easily load Astromer
+ ┃ ┃ ┃ ┗ 📜 utils.py: function for custom training [DEPRECATED]
+ ┃ ┃ ┗ 📜 utils.py: useful and general functions to create pipelines
+ ┃ ┣ 📂 scripts:
+ ┃ ┃ ┗ 📜 create_records.py: Script for creating records. It assumes data is in parquet format using the standard structure.
+ ┃ ┃ ┗ 📜 create_sset.py: Script for creating pretraining subsets with different number of samples  
+ ┃ ┃ ┗ 📜 pretrain.py: Script for pretrain a model from scratch
+ ┃ ┃ ┗ 📜 test_model.py: Evaluate a pre-trained model on a testing set (tf.record)
+ ┃ ┃ ┗ 📜 to_parquet.py: Transform old-version raw data to new structure based on parquet files
  ┣ 📂 src: Model source code
  ┃ ┗ 📂 data: functions related to data manipulation
  ┃ ┃ ┣ 📜 loaders.py: main script containing functions to load and format data
  ┃ ┃ ┣ 📜 masking.py: masking functions inspired on BERT training strategy
- ┃ ┃ ┣ 📜 nsp.py: next sentence prediction functions inspired on BERT training strategy
  ┃ ┃ ┣ 📜 preprocessing.py: general functions to standardize, cut windows, among others.
  ┃ ┃ ┗ 📜 record.py: functions to create and load tensorflow record files
  ┃ ┗ 📂 layers: Custom layers used to build ASTROMER model
