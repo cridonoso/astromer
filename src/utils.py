@@ -2,6 +2,7 @@ import tensorflow as tf
 import seaborn as sns
 import pandas as pd
 import numpy as np
+import toml
 import json
 import os
 
@@ -86,6 +87,7 @@ def my_summary_iterator(path):
 
 def get_metrics(path_logs, metric_name='epoch_loss', full_logs=True, show_keys=False, nlog=-1):
     train_logs = [x for x in os.listdir(path_logs) if x.endswith('.v2')][nlog]
+
     path_train = os.path.join(path_logs, train_logs)
 
     if full_logs:
@@ -100,17 +102,46 @@ def get_metrics(path_logs, metric_name='epoch_loss', full_logs=True, show_keys=F
         print(ea.Tags())
 
     try:
-        metrics = pd.DataFrame([(w,s,tf.make_ndarray(t))for w,s,t in ea.Tensors(metric_name)],
+        metrics = pd.DataFrame([(w,s,tf.make_ndarray(t)) for w,s,t in ea.Tensors(metric_name)],
                     columns=['wall_time', 'step', 'value'])
     except:
-        frames = []
-        for file in os.listdir(path_logs):
-            if not file.endswith('.csv'): continue
-            if metric_name in file:
-                metrics = pd.read_csv(os.path.join(path_logs, file))
-                metrics.columns = ['wall_time', 'step', 'value']
+        metrics = pd.DataFrame([(x.wall_time, x.step, tf.make_ndarray(x.tensor_proto)) for x in ea.Tensors(metric_name)],
+                                columns=['wall_time', 'step', 'value'])
         
     return metrics
+
+def tensorboard_logs(folder):
+    config_file = os.path.join(folder, 'config.toml')
+    with open(config_file, 'r') as file:
+        config = toml.load(file)  
+      
+    path_logs = os.path.join(folder, 'tensorboard', 'train')
+    train_logs = [x for x in os.listdir(path_logs) if x.endswith('.v2')][-1]
+    ea = event_accumulator.EventAccumulator(os.path.join(path_logs, train_logs))
+    ea.Reload()
+    metric_names = ea.Tags()['tensors'][1:]
+
+    output = []
+    for sset in ['train', 'validation']:
+        sset_df = []
+        for metric in metric_names:
+            df = get_metrics(os.path.join(folder, 'tensorboard', sset), metric_name=metric)
+            df = df.rename(columns={'value': metric.split('_')[-1]})
+            sset_df.append(df.iloc[:, -1])
+            
+        curr = pd.concat(sset_df, axis=1)
+        general = df.iloc[:, :-1]
+        curr = pd.concat([general, curr], axis=1)
+
+        curr['exp_name']    = [config['exp_name']]*curr.shape[0] 
+        curr['probed']      = [config['probed']]*curr.shape[0] 
+        curr['rs']          = [config['rs']]*curr.shape[0] 
+        curr['arch']        = [config['arch']]*curr.shape[0] 
+        curr['m_alpha']     = [config['m_alpha']]*curr.shape[0] 
+        curr['mask_format'] = [config['mask_format']]*curr.shape[0] 
+        curr['temperature'] = [config['temperature']]*curr.shape[0] 
+        output.append(curr)
+    return output
 
 def dict_to_json(varsdic, conf_file):
     now = datetime.now()

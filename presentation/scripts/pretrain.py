@@ -104,7 +104,7 @@ if __name__ == '__main__':
                         help='Probed percentage')
     parser.add_argument('--rs', default=0.2, type=float,
                         help='Probed fraction to be randomized or unmasked')
-    parser.add_argument('--same', default=None, type=float,
+    parser.add_argument('--same', default=0.2, type=float,
                         help='Fraction to make visible during masked-self attention while evaluating during loss')
     parser.add_argument('--norm', default='zero-mean', type=str,
                         help='normalization: zero-mean - random-mean')

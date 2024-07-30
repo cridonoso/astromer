@@ -6,7 +6,7 @@ import toml
 import sys
 import os
 
-from sklearn.metrics import r2_score, mean_squared_error
+from sklearn.metrics import r2_score, root_mean_squared_error
 from src.utils import get_metrics
 from presentation.pipelines.steps.model_design import load_pt_model
 from presentation.pipelines.steps.load_data import build_loader 
@@ -20,8 +20,12 @@ def compute_metrics(output):
     for i in range(output['magnitudes'].shape[0]):
         y = tf.boolean_mask(output['magnitudes'][i], output['probed_mask'][i])
         y_hat = tf.boolean_mask(output['reconstruction'][i], output['probed_mask'][i])
+        y = y.numpy()
+        y_hat = y_hat.numpy()
+        print(y.shape, y_hat.shape)
+        
         r2_values.append(r2_score(y, y_hat))
-        mse_values.append(mean_squared_error(y, y_hat, squared=False))
+        mse_values.append(root_mean_squared_error(y, y_hat))
         
     test_r2   = np.mean(r2_values) 
     test_mse = np.mean(mse_values)
@@ -30,10 +34,8 @@ def compute_metrics(output):
 
 def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
-
     astromer, config = load_pt_model(opt.model)
     df = pd.DataFrame(config, index=[0])
-    nsamples = df['data'].values[0].split('/')[-3] 
     loaders = build_loader(df['data'].values[0], 
                            config, 
                            batch_size=opt.bs,

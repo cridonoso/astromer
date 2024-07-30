@@ -23,7 +23,7 @@ def load_records(records_dir):
     record_files = glob.glob(os.path.join(records_dir, '*.record'))
     if len(record_files) == 0:
         record_files = glob.glob(os.path.join(records_dir, '*', '*.record'))
-        
+
     raw_dataset = tf.data.TFRecordDataset(record_files)
     raw_dataset = raw_dataset.map(lambda x: deserialize(x, records_dir))
     return raw_dataset

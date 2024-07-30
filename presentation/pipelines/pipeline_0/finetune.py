@@ -15,7 +15,8 @@ from presentation.pipelines.steps.metrics import evaluate_ft
 
 def ft_step(opt, data_path):
     factos = data_path.split('/')
-    ft_model = '/'.join(factos[3:])
+    ft_model = '/'.join(factos[-3:])
+
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
     EXPDIR = os.path.join(opt.pt_model, '..', opt.exp_name, ft_model)
     print('[INFO] Exp dir: ', EXPDIR)
@@ -41,12 +42,7 @@ def ft_step(opt, data_path):
                            normalize='zero-mean', 
                            sampling=False,
                            repeat=1,
-                           return_test=True,
-                           probed=None,
-                           same=None,
-                           random=None,
-                           old_version=False)
-#                            old_version=True if model_config['arch'] == 'zero' else False)
+                           return_test=True)
 
     with open(os.path.join(EXPDIR, 'config.toml'), 'w') as f:
         toml.dump(model_config, f)
@@ -79,28 +75,33 @@ if __name__ == '__main__':
                         help='Restore training by using checkpoints. This is the route to the checkpoint folder.')
     parser.add_argument('--gpu', default='-1', type=str,
                         help='GPU to be used. -1 means no GPU will be used')
-    parser.add_argument('--bs', default=2500, type=int,
+    parser.add_argument('--bs', default=2000, type=int,
                         help='Finetuning batch size')
     parser.add_argument('--lr', default=0.001, type=float,
                         help='Finetuning learning rate')
 
-
-
     opt = parser.parse_args()        
-    datapaths = ['./data/precords/catalina/fold_0/catalina']  
-#     datapaths = ['./data/records/alcock/fold_0/alcock_20', 
-#                  './data/records/alcock/fold_1/alcock_20',
-#                  './data/records/alcock/fold_2/alcock_20',
-#                  './data/records/alcock/fold_0/alcock_100', 
-#                  './data/records/alcock/fold_1/alcock_100',
-#                  './data/records/alcock/fold_2/alcock_100',
-#                  './data/records/atlas/fold_0/atlas_20', 
-#                  './data/records/atlas/fold_1/atlas_20',
-#                  './data/records/atlas/fold_2/atlas_20',
-#                  './data/records/atlas/fold_0/atlas_100', 
-#                  './data/records/atlas/fold_1/atlas_100',
-#                  './data/records/atlas/fold_2/atlas_100']
-    
+    # datapaths = ['./data/precords/catalina/fold_0/catalina']  
+    datapaths = [
+                 # './data/records/alcock/fold_0/alcock_20', 
+                 # './data/records/alcock/fold_1/alcock_20',
+                 # './data/records/alcock/fold_2/alcock_20',
+                 # './data/records/alcock/fold_0/alcock_100', 
+                 # './data/records/alcock/fold_1/alcock_100',
+                 # './data/records/alcock/fold_2/alcock_100',
+                 './data/records/alcock/fold_0/alcock_500', 
+                 './data/records/alcock/fold_1/alcock_500',
+                 './data/records/alcock/fold_2/alcock_500',
+                 # './data/records/atlas/fold_0/atlas_20', 
+                 # './data/records/atlas/fold_1/atlas_20',
+                 # './data/records/atlas/fold_2/atlas_20',
+                 # './data/records/atlas/fold_0/atlas_100', 
+                 # './data/records/atlas/fold_1/atlas_100',
+                 # './data/records/atlas/fold_2/atlas_100',
+                 './data/records/atlas/fold_0/atlas_500', 
+                 './data/records/atlas/fold_1/atlas_500',
+                 './data/records/atlas/fold_2/atlas_500'
+    ]
     
     for dp in datapaths:
         ft_step(opt, dp)
