@@ -53,11 +53,14 @@ Training ASTROMER from scratch can be expensive. However, we provide pre-trained
  ┃ ┃ ┣ 📜 masking.py: masking functions inspired on BERT training strategy
  ┃ ┃ ┣ 📜 preprocessing.py: general functions to standardize, cut windows, among others.
  ┃ ┃ ┗ 📜 record.py: functions to create and load tensorflow record files
+ ┃ ┃ ┗ 📜 zero.py: old functions to load tf.records. [not being used in this implementation]
  ┃ ┗ 📂 layers: Custom layers used to build ASTROMER model
- ┃ ┃ ┣ 📜 attention.py: Multihead attention
- ┃ ┃ ┣ 📜 custom_rnn.py: Custom LSTM with normalization inside the recurrence (used in https://arxiv.org/abs/2106.03736)
- ┃ ┃ ┣ 📜 encoder.py: Encoder layers that mixed self-attention layers and (non)linear transformations.
- ┃ ┃ ┣ 📜 output.py: Output layers that take the embeddings and project them to other spaces (regression/classification)
+ ┃ ┃ ┣ 📜 attblock.py: Attention block definition. Each block contain self-attention heads, normalization and transformation layers.
+ ┃ ┃ ┣ 📜 attention.py: Multi-head self-attention layers.
+ ┃ ┃ ┣ 📜 custom_rnn.py: Normalized LSTM [not being used in this implementation].
+ ┃ ┃ ┣ 📜 encoders.py: Astromer encoder definition. It also contains encoder alternatives that inherit from the parent class.
+ ┃ ┃ ┣ 📜 input.py: Input transformation layers
+ ┃ ┃ ┣ 📜 output.py: Layers that take the embeddings and project them to desired outputs (regression/classification)
  ┃ ┃ ┗ 📜 positional.py: Positional encoder class
  ┃ ┗ 📂 losses
  ┃ ┃ ┣ 📜 bce.py: Masked binary cross-entropy (used with NSP)
@@ -66,10 +69,8 @@ Training ASTROMER from scratch can be expensive. However, we provide pre-trained
  ┃ ┃ ┣ 📜 acc.py: masked accuracy
  ┃ ┃ ┗ 📜 r2.py: masked r-square
  ┃ ┗ 📂 models: ASTROMER model architectures
- ┃ ┃ ┣ 📜 nsp.py: ASTROMER + NSP
- ┃ ┃ ┣ 📜 second.py: ASTROMER + NSP + SkipCon
- ┃ ┃ ┣ 📜 skip.py: ASTROMER + SkipCon
- ┃ ┃ ┗ 📜 zero.py: ASTROMER
+ ┃ ┃ ┣ 📜 astromer_0.py: Astromer v0 (Donoso et.al. 2023)
+ ┃ ┃ ┣ 📜 astromer_1.py: Astromer v1 (Donoso et.al. 2024 in PROGRESS)
  ┃ ┗ 📂 training
  ┃ ┃ ┗ 📜 scheduler.py: Custom scheduler presented in https://arxiv.org/abs/1706.03762
  ┃ ┣ 📜 __init__.py
