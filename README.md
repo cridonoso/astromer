@@ -13,12 +13,10 @@ Training ASTROMER from scratch can be expensive. However, we provide pre-trained
 
 ## Features
 - BERT-based masking technique
-- Next Segment Prediction available
 - Skip connections between attention layers
 - Pre-trained weights
   - MACHO R-band light curves
-  - ATLAS 
-  - ~ZTF~
+
 - Predefined experiments to reproduce publication results (`presentation/experiments/*`)
 - Data preprocessing, saving and reading [tf.Records](https://www.tensorflow.org/tutorials/load_data/tfrecord) (`/src/data.py`)
 - Dockerfile and scripts for building (`build_container.sh`) and run (`run_container.sh`) the ASTROMER container
@@ -28,8 +26,7 @@ Training ASTROMER from scratch can be expensive. However, we provide pre-trained
 | Version Tag | Pretraining data | Description | Test RMSE/R-square | Link |
 | --- | --- | --- | --- | --- |
 | v0 | MACHO | Paper's model | 0.147/0.80 | [Download Weights](https://github.com/astromer-science/weights/raw/nightly/macho_0.zip)
-| v1  | MACHO | New implementation of the paper's model | 0.173/0.72 | [Download Weights](https://github.com/astromer-science/weights/raw/nightly/macho_1.zip)
-| v1c (*) | MACHO Clean | New implementation of the paper's model trained on Clean MACHO | 0.064/0.83 | [Download Weights](https://github.com/astromer-science/weights/raw/nightly/macho_1c.zip)
+| v1  | MACHO | New implementation of the paper's model | 0.135/0.198 | [Download Weights]((https://drive.google.com/file/d/1AB5ubqlQtMheSnYlIxYTYGa_Xm-_L8FL/view?usp=sharing))
 
 (*) Best performance on classification task
 ## Directory tree
