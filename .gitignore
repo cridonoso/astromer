@@ -4,9 +4,29 @@
 .ipynb_checkpoints/
 weights
 user
+literature
+results
+data/records_new
+records/
+presentation/experiments/astromer_0/backup/
+wandb
+*.record
+*.swp
 
+mlruns/
+outputs
 presentation/experiments/astromer_0/results
 presentation/experiments/astromer_1/results
 presentation/experiments/astromer_2/results
+presentation/transitive_results/
 
+data/embeddings/
 /data/records
+/data/raw_data
+/data/raw_data_parquet
+data/records_parquet
+data/praw/
+data/precords/
+data/raw_parquet
+daniel
+run_cris.sh

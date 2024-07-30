@@ -1,4 +1,5 @@
 import tensorflow as tf
+import glob
 import os
 
 @tf.function
@@ -201,9 +202,16 @@ def get_windows(sample, max_obs, binary=True):
         input_dict = sample
 
     sequence = input_dict['input']
-    rest = input_dict['length']%max_obs
 
-    pivots = tf.tile([max_obs], [tf.cast(input_dict['length']/max_obs, tf.int32)])
+    #rest = input_dict['length']%max_obs
+    #pivots = tf.tile([max_obs], [tf.cast(input_dict['length']/max_obs, tf.int32)])
+    
+    num_full_obs = input_dict['length'] // max_obs
+    if input_dict['length'] % max_obs == 0:
+        pivots = tf.tile([max_obs], [num_full_obs - 1])  # Ajuste aquí para evitar el último split redundante
+    else:
+        pivots = tf.tile([max_obs], [num_full_obs])
+
     pivots = tf.concat([[0], pivots], 0)
     pivots = tf.math.cumsum(pivots)
 
@@ -213,7 +221,7 @@ def get_windows(sample, max_obs, binary=True):
                                             max_obs),  pivots,
                        infer_shape=False,
                        fn_output_signature=(tf.float32))
-
+    
     y        = tf.tile([input_dict['label']], [len(splits)])
     ids      = tf.tile([input_dict['lcid']], [len(splits)])
     orig_len = tf.tile([input_dict['length']], [len(splits)])
@@ -269,6 +277,7 @@ def to_windows(dataset,
         dataset = dataset.padded_batch(batch_size)
 
     return dataset
+
 def min_max_scaler(batch, on='input', axis=0):
     """
     Normalize input tensor given a dataset batch
@@ -323,6 +332,7 @@ def deserialize(sample):
                             )
 
     input_dict = dict()
+
     input_dict['lcid']   = tf.cast(context['id'], tf.string)
     input_dict['length'] = tf.cast(context['length'], tf.int32)
     input_dict['label']  = tf.cast(context['label'], tf.int32)
@@ -348,15 +358,15 @@ def load_records(records_dir):
     Returns:
         type: tf.Dataset instance
     """
-    rec_paths = []
-    for folder in os.listdir(records_dir):
-        if folder.endswith('.csv'):
-            continue
-        for x in os.listdir(os.path.join(records_dir, folder)):
-            rec_paths.append(os.path.join(records_dir, folder, x))
-
-    dataset = tf.data.TFRecordDataset(rec_paths)
+    try:
+        rec_paths = glob.glob(os.path.join(records_dir, '*.record'))
+        dataset = tf.data.TFRecordDataset(rec_paths)
+    except:
+        rec_paths = glob.glob(os.path.join(records_dir, '*', '*.record'))
+        dataset = tf.data.TFRecordDataset(rec_paths)
+    
     dataset = dataset.map(deserialize)
+        
     return dataset
 
 def create_generator(list_of_arrays, labels=None, ids=None):
@@ -467,33 +477,35 @@ def pretraining_pipeline(dataset,
 
     if isinstance(dataset, str):
         dataset = load_records(dataset)
-
+        
+    return dataset
     if shuffle:
         SHUFFLE_BUFFER = 10000
         dataset = dataset.shuffle(SHUFFLE_BUFFER)
 
     # REPEAT LIGHT CURVES
     if repeat is not None:
-        print('[INFO] Repeating dataset x{} times'.format(repeat))
+        #print('[INFO] Repeating dataset x{} times'.format(repeat))
         dataset = dataset.repeat(repeat)
-
+    
     # CREATE WINDOWS
     dataset = to_windows(dataset,
                          window_size=window_size,
                          sampling=sampling)
+    
 
     if normalize == 'zero-mean':
         dataset = dataset.map(standardize)
     if normalize == 'minmax':
         dataset = dataset.map(min_max_scaler)
     
-    print('[INFO] Loading PT task: Masking')
+    #print('[INFO] Loading PT task: Masking')
     dataset = mask_dataset(dataset,
                            msk_frac=msk_frac,
                            rnd_frac=rnd_frac,
                            same_frac=same_frac,
                            window_size=window_size)
-
+    
     shapes = {'input' :[None, 3],
               'lcid'  :(),
               'length':(),
@@ -503,15 +515,18 @@ def pretraining_pipeline(dataset,
               'mask_in': [None, None],
               'mask_out': [None, None]}
     
+    #if batch_size is not None:
     dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
 
     # FORMAT INPUT DICTONARY
-    dataset = dataset.map(lambda x: format_inp_astromer(x,
-                                                return_ids=return_ids,
-                                                return_lengths=return_lengths,
-                                                num_cls=num_cls,
-                                                key_format=key_format),
-                  num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    dataset = dataset.map(lambda x: format_inp_astromer(
+        x,
+        return_ids=return_ids,
+        return_lengths=return_lengths,
+        num_cls=num_cls,
+        key_format=key_format), 
+        num_parallel_calls=tf.data.experimental.AUTOTUNE
+        )
 
     if cache:
         dataset = dataset.cache()
@@ -540,7 +555,7 @@ def format_inp_astromer(batch, return_ids=False, return_lengths=False, num_cls=N
         'mask_out':batch['mask_out']
         
     }
-        
+
     if num_cls is not None:
         outputs = tf.one_hot(batch['label'], num_cls)
     else:

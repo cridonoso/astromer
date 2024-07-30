@@ -1,11 +1,15 @@
 import tensorflow as tf
 import multiprocessing
+import glob
 import os
-
+from src.data import preprocessing as pp
+from src.data.masking import mask_dataset
 from src.data.record import deserialize
-from src.data.preprocessing import to_windows, min_max_scaler, standardize_dataset, standardize
-from src.data.masking import get_probed, add_random
-from src.data.nsp import randomize_v2
+
+#to_windows, standardize, min_max_scaler, nothing
+#unstandardize, shift_times, create_loss_weigths, random_mean
+
+
 
 def load_records(records_dir):
     """
@@ -16,16 +20,13 @@ def load_records(records_dir):
     Returns:
         type: tf.Dataset instance
     """
-    rec_paths = []
-    for folder in os.listdir(records_dir):
-        if folder.endswith('.csv'):
-            continue
-        for x in os.listdir(os.path.join(records_dir, folder)):
-            rec_paths.append(os.path.join(records_dir, folder, x))
+    record_files = glob.glob(os.path.join(records_dir, '*.record'))
+    if len(record_files) == 0:
+        record_files = glob.glob(os.path.join(records_dir, '*', '*.record'))
 
-    dataset = tf.data.TFRecordDataset(rec_paths)    
-    dataset = dataset.map(deserialize)
-    return dataset
+    raw_dataset = tf.data.TFRecordDataset(record_files)
+    raw_dataset = raw_dataset.map(lambda x: deserialize(x, records_dir))
+    return raw_dataset
 
 def create_generator(list_of_arrays, labels=None, ids=None):
     """
@@ -71,163 +72,135 @@ def load_numpy(samples,
                                                         'length':()})
     return dataset
 
+def format_inp_astromer(batch, 
+                        num_cls=None, 
+                        nsp_test=False,
+                        aversion='base'):
+    """
+    Buildng ASTROMER input
 
-def format_input(input_dict, cls_token=None, num_cls=None, test_mode=False):
-    times = tf.slice(input_dict['input'], [0, 0, 0], [-1, -1, 1])
-    times = min_max_scaler(times)
+    Args:
+        batch (type): a batch of windows and their properties
 
-    magnitudes = tf.slice(input_dict['nsp_input'], [0, 0, 1], [-1, -1, 1])
-    att_mask = tf.expand_dims(input_dict['att_mask'], axis=-1)
-    seg_emb  = tf.expand_dims(input_dict['seg_emb'], axis=-1)
+    Returns:
+        type: A tuple (x, y) tuple where x are the inputs and y the labels
+    """
 
-    if cls_token is not None:
-        inp_shape = tf.shape(input_dict['nsp_input'])
-        cls_vector = tf.ones([inp_shape[0], 1, 1], dtype=tf.float32)
-        magnitudes = tf.concat([cls_vector*cls_token, magnitudes], axis=1)
-        times = tf.concat([1.-cls_vector, times], axis=1)
-        att_mask = tf.concat([1.-cls_vector, att_mask], axis=1)
-        seg_emb = tf.concat([1.-cls_vector, seg_emb], axis=1)
+    inputs, outputs = {}, {}
+    if aversion=='zero':
+        print('[INFO] Zero')
+        inputs['input']    =  batch['input_modified']
+        inputs['times']    =  tf.slice(batch['input'], [0, 0, 0], [-1, -1, 1])
+        
+        inputs['mask_in']  = batch['mask_in']
+        inputs['mask_out'] = batch['mask_out']
+        
+        outputs['target']   = tf.slice(batch['input'], [0,0,1], [-1,-1,1])
+        outputs['error']    = tf.slice(batch['input'], [0,0,2], [-1,-1,1])
+        outputs['mask_out'] = batch['mask_out']
+        outputs['lcid']     = batch['lcid']
+        outputs['w_error']  = tf.ones_like(inputs['times'], dtype=tf.float32)
 
-    inputs = {
-        'magnitudes': magnitudes,
-        'times': times,
-        'att_mask': att_mask,
-        'seg_emb': seg_emb,
-    }
+    if aversion == 'base':
+        input_original  = pp.unstandardize(batch)
+        inputs['input'] =  batch['input_modified']
+        inputs['times'] =  tf.slice(input_original, [0, 0, 0], [-1, -1, 1])
+        inputs['mask_in'] =  batch['mask_in']
+
+        errors = tf.slice(input_original, [0, 0, 2], [-1,-1, 1])
+        outputs['target']   =  tf.slice(batch['input'], [0,0,1], [-1,-1,1])
+        outputs['w_error']  =  pp.create_loss_weigths(errors)
+        outputs['mask_out'] =  batch['mask_out']
+        outputs['lcid']     = batch['lcid']
+               
+    if num_cls is not None:
+        outputs = tf.one_hot(batch['label'], num_cls)        
+
+    return inputs, outputs
+
+def filter_fn(input_dict):
+    if tf.less(tf.shape(input_dict['input'])[0], 5):
+        return False
+    else:
+        return True
     
-    if test_mode:
-        print('[INFO] TESTING MODE')
-        inputs['original'] = input_dict['original']
-        inputs['mask'] = input_dict['mask']
+def get_loader(dataset,
+               batch_size=None,
+               window_size=200,
+               probed_frac=.2,
+               random_frac=.1,
+               same_frac=None,
+               sampling=True,
+               shuffle=False,
+               repeat=1,
+               num_cls=None,
+               normalize='zero-mean',
+               cache=False,
+               aversion='base'):
 
-    if num_cls is not None:
-        outputs = tf.one_hot(input_dict['label'], num_cls)
 
-    else:
-        outputs = {
-            'magnitudes': tf.slice(input_dict['input_pre_nsp'], [0, 0, 1], [-1, -1, 1]),
-            'nsp_label': input_dict['nsp_label'],
-            'probed_mask': tf.expand_dims(input_dict['probed_mask'], -1),
-            'lcid': input_dict['lcid']
-        }
+    assert isinstance(dataset, (list, str)), '[ERROR] Invalid format'
+    assert batch_size is not None, '[ERROR] Undefined batch size'
+    if same_frac is None:
+        same_frac = random_frac
+        
+    print('[INFO] Probed: {:.2f} Random: {:.2f} Same: {:.2f}'.format(probed_frac, random_frac, same_frac))
+    print('[INFO] Normalization: ', normalize)
+    
+    
+    if isinstance(dataset, list):
+        dataset = load_numpy(dataset)
 
-    return inputs, outputs
-
-def format_input_no_nsp(input_dict, num_cls=None, test_mode=False):
-    times = tf.slice(input_dict['input'], [0, 0, 0], [-1, -1, 1])
-    magnitudes = tf.slice(input_dict['input'], [0, 0, 1], [-1, -1, 1])
-    att_mask = tf.expand_dims(input_dict['att_mask'], axis=-1)
-
-    inputs = {
-        'magnitudes': magnitudes,
-        'times': times,
-        'att_mask': att_mask,
-    }
-    if test_mode:
-        print('[INFO] TESTING MODE')
-        inputs['original'] = input_dict['original']
-        inputs['mask'] = input_dict['mask']
-
-    if num_cls is not None:
-        outputs = tf.one_hot(input_dict['label'], num_cls)
-
-    else:
-        outputs = {
-            'magnitudes': tf.slice(input_dict['original'], [0, 0, 1], [-1, -1, 1]),
-            'probed_mask': tf.expand_dims(input_dict['probed_mask'], -1),
-        }
-
-    return inputs, outputs
-
-def load_data(dataset, 
-              batch_size=16, 
-              probed=0.4, 
-              random_same=0.2, 
-              window_size=1000, 
-              nsp_prob=.5, 
-              repeat=1, 
-              sampling=False, 
-              shuffle=False,
-              njobs=None,
-              num_cls=None,
-              test_mode=False,
-              off_nsp=False):
-    print('[INFO] Probed: {:.2f} Random: {:.2f}'.format(probed, random_same))
-    if not off_nsp:
-        print('[INFO] NSP PROB: {:.2f}'.format(nsp_prob))
-    if njobs is None:
-        njobs = multiprocessing.cpu_count()//2
-
-    dataset = load_records(dataset)
-
-    # REPEAT
-    dataset = dataset.repeat(repeat)
-
-    # CREATE WINDOWS
-    dataset, sizes = to_windows(dataset,
-                         window_size=window_size,
-                         sampling=sampling)
-
-    # STANDARDIZE
-    dataset = dataset.map(standardize)
-
-    # CREATE BATCHES
-    dataset = dataset.padded_batch(batch_size, padded_shapes=sizes)
-            
-    # MASKING
-    dataset = dataset.map(lambda x: get_probed(x, probed=probed, njobs=njobs))
-    dataset = dataset.map(lambda x: add_random(x, random_frac=random_same, njobs=njobs))
-
-    # NSP
-    if off_nsp:
-        dataset = dataset.map(lambda x: format_input_no_nsp(x, num_cls=num_cls, test_mode=test_mode))
-    else:
-        dataset = dataset.map(lambda x: randomize_v2(x, nsp_prob=nsp_prob))
-        dataset = dataset.map(lambda x: format_input(x, num_cls=num_cls, test_mode=test_mode))
-
+    if isinstance(dataset, str):
+        dataset = load_records(records_dir=dataset)
+    
     if shuffle:
         SHUFFLE_BUFFER = 10000
         dataset = dataset.shuffle(SHUFFLE_BUFFER)
 
-    # PREFETCH
-    dataset = dataset.prefetch(2)
-
-    return dataset
-
-# ========================================================
-def format_input_lc(input_dict, num_cls):
-    x = {
-        'input': input_dict['input'],
-        'mask': input_dict['mask']
-    }
-
-    y = tf.one_hot(input_dict['label'], num_cls)
-    return x, y
-
-def load_light_curves(dataset, 
-                      num_cls=1,
-                      batch_size=16, 
-                      window_size=200, 
-                      repeat=1,
-                      cache=False, 
-                      njobs=None):
-    '''
-    Load data for downstream tasks.
-    LC without normalizing
-    '''
-    if njobs is None:
-        njobs = multiprocessing.cpu_count()//2
-        
-    dataset = load_records(dataset)
-
-    dataset, sizes = to_windows(dataset,
+    # REPEAT LIGHT CURVES
+    if repeat > 1:
+        print('[INFO] Repeating dataset x{} times'.format(repeat))
+        dataset = dataset.repeat(repeat)
+    
+    dataset = dataset.filter(filter_fn)
+    
+    # CREATE WINDOWS
+    dataset = pp.to_windows(dataset,
                          window_size=window_size,
-                         sampling=False)
+                         sampling=sampling)
+   
+    if normalize is None:
+        dataset = dataset.map(pp.nothing)
+        
+    if normalize == 'zero-mean':
+        dataset = dataset.map(pp.standardize)
+    
+    if normalize == 'random-mean':
+        dataset = dataset.map(pp.random_mean)
 
-    dataset = dataset.padded_batch(batch_size, padded_shapes=sizes)
+    if normalize == 'minmax':
+        dataset = dataset.map(pp.min_max_scaler)
+        
+    
+    dataset, shapes = mask_dataset(dataset,
+                           msk_frac=probed_frac,
+                           rnd_frac=random_frac,
+                           same_frac=same_frac,
+                           window_size=window_size)
+    dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
 
+    # FORMAT INPUT DICTONARY
+    dataset = dataset.map(lambda x: format_inp_astromer(x,
+                                                num_cls=num_cls,
+                                                aversion=aversion),
+                  num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    
+    if cache:
+        print('[INFO] Cache activated')
+        dataset = dataset.cache()
+
+    # #PREFETCH BATCHES
     dataset = dataset.prefetch(2)
-
-    dataset = dataset.map(lambda x: format_input_lc(x, num_cls))
 
     return dataset

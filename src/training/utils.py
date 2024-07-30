@@ -3,118 +3,163 @@ import toml
 import time
 import os
 
+from tensorflow.keras.callbacks import CallbackList
 from tensorflow.keras.optimizers import Adam
 from src.training.scheduler import CustomSchedule
 from tensorflow.keras.optimizers.experimental import AdamW
+from src.losses.rmse import custom_rmse
+
 from tqdm import tqdm
 
-def tensorboard_log(logs, writer, step=0):
-	with writer.as_default():
-		for key, value in logs.items():
-			tf.summary.scalar(key, value, step=step)
+def draw_graph(model, dataset, writer, logdir=''):
+    '''Decorator that reports store fn graph.'''
 
-def average_logs(logs):
-	N = len(logs)
-	average_dict = {}
-	for key in logs[0].keys():
-		sum_log = sum(log[key] for log in logs)
-		average_dict[key] = float(sum_log/N)
-	return average_dict
+    @tf.function
+    def fn(x):
+        x = model(x)
 
-def train(model, 
-          train_loader, 
-          valid_loader, 
-          num_epochs=1000, 
-          lr=1e-3, 
-          test_loader=None, 
-          project_path=None, 
-          debug=False, 
-          patience=20,
-          train_step_fn=None,
-          test_step_fn=None,
-          argparse_dict=None,
-          scheduler=False):
+    tf.summary.trace_on(graph=True, profiler=False)
+    fn(dataset)
+    with writer.as_default():
+        tf.summary.trace_export(
+            name='model',
+            step=0,
+            profiler_outdir=logdir)
 
-    start = time.time()
 
-    os.makedirs(project_path, exist_ok=True)
-
-    if debug:
-        print('[INFO] DEBGUGING MODE')
-        num_epochs   = 2
-        train_loader = train_loader.take(2)
-        valid_loader = valid_loader.take(2)
-        if test_loader is not None:
-            test_loader = test_loader.take(1)
-
-    if argparse_dict is not None:
-        with open(os.path.join(project_path, 'config.toml'), 'w') as f:
-            toml.dump(argparse_dict, f)
-
-    # ======= TRAINING LOOP =========
-    train_writer = tf.summary.create_file_writer(os.path.join(project_path, 'logs', 'train'))
-    valid_writer = tf.summary.create_file_writer(os.path.join(project_path, 'logs', 'validation'))
-    print('[INFO] Logs: {}'.format(os.path.join(project_path, 'logs')))
-    if scheduler:
-        print('[INFO] Using Custom Scheduler')
-        lr = CustomSchedule(argparse_dict['head_dim'])
+def save_scalar(writer, value, step, name=''):
+    with writer.as_default():
+        tf.summary.scalar(name, value.result(), step=step)
         
-    optimizer = Adam(lr, 
-                     beta_1=0.9,
-                     beta_2=0.98,
-                     epsilon=1e-9,
-                     name='astromer_optimizer')
+@tf.function
+def train_step(model, batch, opt):
+    x, y = batch
+    with tf.GradientTape() as tape:
+        x_pred = model(x)
+
+        mse = custom_rmse(y_true=y['target'],
+                          y_pred=x_pred,
+                          mask=y['mask_out'])
+
+
+    grads = tape.gradient(mse, model.trainable_weights)
+    opt.apply_gradients(zip(grads, model.trainable_weights))
+    return mse
+
+@tf.function
+def valid_step(model, batch, return_pred=False, normed=False):
+    x, y = batch
+    with tf.GradientTape() as tape:
+        x_pred = model(x)
+        mse = custom_rmse(y_true=y['target'],
+                          y_pred=x_pred,
+                          mask=y['mask_out'])
+
+    if return_pred:
+        return mse, x_pred, x_true
+    return mse
+
+def train(model,
+          train_dataset,
+          valid_dataset,
+          patience=20,
+          exp_path='./experiments/test',
+          epochs=1,
+          finetuning=False,
+          lr=1e-3,
+          verbose=1):
+
+    os.makedirs(exp_path, exist_ok=True)
+
+    # Tensorboard
+    train_writter = tf.summary.create_file_writer(
+                                    os.path.join(exp_path, 'tensorboard', 'train'))
+    valid_writter = tf.summary.create_file_writer(
+                                    os.path.join(exp_path, 'tensorboard', 'validation'))
+
+    batch = [x for x, _ in train_dataset.take(1)][0]
+    draw_graph(model, batch, train_writter, exp_path)
+
+    # Optimizer
+    try:
+        d_model = model.get_layer('encoder').num_heads * model.get_layer('encoder').head_dim 
+    except:
+        d_model = model.get_layer('encoder').d_model
+
+    custom_lr = CustomSchedule(d_model)
+    
+    optimizer = tf.keras.optimizers.Adam(custom_lr,
+                                         beta_1=0.9,
+                                         beta_2=0.98,
+                                         epsilon=1e-9)
+    
+    # To save metrics
+    train_mse  = tf.keras.metrics.Mean(name='train_mse')
+    valid_mse  = tf.keras.metrics.Mean(name='valid_mse')
+
+    # Training Loop
+    best_loss = 999999.
     es_count = 0
-    min_loss = 1e9
-    best_train_log, best_val_log = None, None
-    ebar = tqdm(range(num_epochs), total=num_epochs)
+    pbar = tqdm(range(epochs), desc='epoch')
+    for epoch in pbar:
+        for train_batch in train_dataset:
+            x, y  = train_batch
+            mse = train_step(model, train_batch, optimizer)
+            train_mse.update_state(mse)
 
-    for epoch in ebar:
-        train_logs, valid_logs = [], [] 
-        for x, y in train_loader:
-            logs = train_step_fn(model, x, y, optimizer)
-            train_logs.append(logs)
+        for valid_batch in valid_dataset:
+            mse = valid_step(model, valid_batch)
+            valid_mse.update_state(mse)
 
-        for x, y in valid_loader:
-            logs = test_step_fn(model, x, y)
-            valid_logs.append(logs)
+        msg = 'EPOCH {} - ES COUNT: {}/{} train mse: {:.4f} - val mse: {:.4f}'.format(epoch,
+                                                                                      es_count,
+                                                                                      patience,
+                                                                                      train_mse.result(),
+                                                                                      valid_mse.result())
 
-        epoch_train_metrics = average_logs(train_logs)
-        epoch_valid_metrics = average_logs(valid_logs)
+        pbar.set_description(msg)
 
-        tensorboard_log(epoch_train_metrics, train_writer, step=epoch)
-        tensorboard_log(epoch_valid_metrics, valid_writer, step=epoch)
+        save_scalar(train_writter, train_mse, epoch, name='mse')
+        save_scalar(valid_writter, valid_mse, epoch, name='mse')
 
-        if tf.math.greater(min_loss, epoch_valid_metrics['loss']):
-            min_loss = epoch_valid_metrics['loss']
-            best_train_log = epoch_train_metrics
-            best_val_log = epoch_valid_metrics
-            es_count = 0
-            model.save_weights(os.path.join(project_path, 'weights', 'weights'))
+
+        if valid_mse.result() < best_loss:
+            best_loss = valid_mse.result()
+            es_count = 0.
+            model.save_weights(os.path.join(exp_path, 'weights'))
         else:
-            es_count = es_count + 1
-
+            es_count+=1.
         if es_count == patience:
-            print('[INFO] Early Stopping Triggered at epoch {:03d}'.format(epoch))
+            print('[INFO] Early Stopping Triggered')
             break
 
-        ebar.set_description('STOP: {:02d}/{:02d} LOSS: {:.3f}/{:.3f} R2:{:.3f}/{:.3f}'.format(es_count, 
-                                                                            patience, 
-                                                                            epoch_train_metrics['loss'],
-                                                                            epoch_valid_metrics['loss'],
-                                                                            epoch_train_metrics['r_square'],
-                                                                            epoch_valid_metrics['r_square']))
+        train_mse.reset_states()
+        valid_mse.reset_states()
+    return model
 
-    elapsed = time.time() - start
+def predict(model,
+            dataset,
+            conf,
+            predic_proba=False):
 
-    if test_loader is not None:
-        test_writer = tf.summary.create_file_writer(os.path.join(project_path, 'logs', 'test'))
-        test_logs = []
-        for x, y in test_loader:
-            logs = test_step_fn(model, x, y)
-            test_logs.append(logs)
-        test_metrics = average_logs(test_logs)
-        tensorboard_log(test_metrics, test_writer, step=0)
-        tensorboard_log(test_metrics, test_writer, step=num_epochs)
+    total_mse, inputs, reconstructions = [], [], []
+    masks, times = [], []
+    for step, batch in tqdm(enumerate(dataset), desc='prediction'):
+        mse, x_pred, x_true = valid_step(model,
+                                         batch,
+                                         return_pred=True,
+                                         normed=True)
 
-    return model, (best_train_log, best_val_log, test_metrics)
+        total_mse.append(mse)
+        times.append(batch['times'])
+        inputs.append(x_true)
+        reconstructions.append(x_pred)
+        masks.append(batch['mask_out'])
+
+    res = {'mse':tf.reduce_mean(total_mse).numpy(),
+           'x_pred': tf.concat(reconstructions, 0),
+           'x_true': tf.concat(inputs, 0),
+           'mask': tf.concat(masks, 0),
+           'time': tf.concat(times, 0)}
+
+    return res

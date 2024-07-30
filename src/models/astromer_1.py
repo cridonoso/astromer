@@ -1,129 +1,151 @@
 import tensorflow as tf
+import numpy as np
 import toml
 import os
 
 from src.losses             import custom_rmse
+from src.losses.rmse import pearson_loss
 from src.metrics            import custom_r2
 from tensorflow.keras.layers import Input, Layer, Dense
 from tensorflow.keras        import Model
 import tensorflow as tf
+from pathlib import Path
+import joblib
 
 from src.layers import Encoder, RegLayer
+from src.layers.input import AddMSKToken
 
-def build_input(length):
-	serie  = Input(shape=(length, 1),
-				  batch_size=None,
-				  name='input')
-	times  = Input(shape=(length, 1),
-				  batch_size=None,
-				  name='times')
-	mask   = Input(shape=(length, 1),
-				  batch_size=None,
-				  name='mask')
 
-	return {'magnitudes':serie,
-			'att_mask':mask,
-			'times':times}
+def build_input(window_size, batch_size=None):
+    magnitudes  = Input(shape=(window_size, 1),
+                  batch_size=batch_size,
+                  name='input')
+    times       = Input(shape=(window_size, 1),
+                  batch_size=batch_size,
+                  name='times')
+    att_mask    = Input(shape=(window_size, 1),
+                  batch_size=batch_size,
+                  name='mask_in') 
+
+    return {'input':magnitudes,
+            'times':times,
+            'mask_in':att_mask}
 
 def get_ASTROMER(num_layers=2,
-				 num_heads=2,
-				 head_dim=64,
-				 mixer_size=256,
-				 dropout=0.1,
-				 pe_base=1000,
-				 pe_dim=128,
-				 pe_c=1,
-				 window_size=100,
-				 batch_size=None,
-				 encoder_mode='normal',
-				 average_layers=False,
-				 mask_format='first'):
-
-	placeholder = build_input(window_size)
-
-	encoder = Encoder(window_size=window_size,
-					  num_layers=num_layers,
-					  num_heads=num_heads,
-					  head_dim=head_dim,
-					  mixer_size=mixer_size,
-					  dropout=dropout,
-					  pe_base=pe_base,
-					  pe_dim=pe_dim,
-					  pe_c=pe_c,
-					  average_layers=average_layers,
-					  mask_format=mask_format,
-					  name='encoder')
-
-	x = encoder(placeholder)
-	x = RegLayer(name='regression')(x)
-
-	return Model(inputs=placeholder, outputs=x, name="ASTROMER-1")
-
-
-@tf.function
-def train_step(model, x, y, optimizer):
-	with tf.GradientTape() as tape:
-		x_pred = model(x, training=True)
-		rmse = custom_rmse(y_true=y['magnitudes'],
-						  y_pred=x_pred,
-						  mask=y['probed_mask'])
-		r2_value = custom_r2(y['magnitudes'], x_pred, y['probed_mask'])
-
-	grads = tape.gradient(rmse, model.trainable_weights)
-	optimizer.apply_gradients(zip(grads, model.trainable_weights))
-	return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
-
-
-@tf.function
-def test_step(model, x, y, return_pred=False):
-	x_pred = model(x, training=False)
-	rmse = custom_rmse(y_true=y['magnitudes'],
-					  y_pred=x_pred,
-					  mask=y['probed_mask'])
-	r2_value = custom_r2(y['magnitudes'], x_pred, y['probed_mask'])
-	if return_pred:
-		return x_pred
-	return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
-
-def predict(model, test_loader):
-	n_batches = sum([1 for _, _ in test_loader])
-	print('[INFO] Processing {} batches'.format(n_batches))
-	y_pred = tf.TensorArray(dtype=tf.float32, size=n_batches)
-	y_true = tf.TensorArray(dtype=tf.float32, size=n_batches)
-	masks  = tf.TensorArray(dtype=tf.float32, size=n_batches)
-	times  = tf.TensorArray(dtype=tf.float32, size=n_batches)
-	for index, (x, y) in enumerate(test_loader):
-		outputs = test_step(model, x, y, return_pred=True)
-		y_pred = y_pred.write(index, outputs)
-		y_true = y_true.write(index, y['magnitudes'])
-		masks  = masks.write(index, y['probed_mask'])
-		times = times.write(index, x['times'])
-
-	y_pred = tf.concat([times.concat(), y_pred.concat()], axis=2)
-	y_true = tf.concat([times.concat(), y_true.concat()], axis=2)
-	return y_pred, y_true, masks.concat()
-
-def restore_model(model_folder, mask_format=None):
-    with open(os.path.join(model_folder, 'config.toml'), 'r') as f:
-        model_config = toml.load(f)
+                 num_heads=2,
+                 head_dim=64,
+                 mixer_size=256,
+                 dropout=0.1,
+                 pe_base=1000,
+                 pe_dim=128,
+                 pe_c=1,
+                 window_size=100,
+                 batch_size=None,
+                 m_alpha=-0.5,
+                 mask_format='Q',
+                 use_leak=False,
+                 loss_format='rmse',
+                 correct_loss=False,
+                 temperature=0.):
     
-    if 'mask_format' in model_config:
-        mask_format = model_config['mask_format']
+    print('[INFO] Temperature: {:.2f}'.format(temperature))
+    print('[INFO] Mask format: {}'.format(mask_format))
 
-    astromer = get_ASTROMER(num_layers=model_config['num_layers'],
-                            num_heads=model_config['num_heads'],
-                            head_dim=model_config['head_dim'],
-                            mixer_size=model_config['mixer'],
-                            dropout=model_config['dropout'],
-                            pe_base=model_config['pe_base'],
-                            pe_dim=model_config['pe_dim'],
-                            pe_c=model_config['pe_exp'],
-                            window_size=model_config['window_size'],
-                            encoder_mode=model_config['encoder_mode'],
-                            average_layers=model_config['avg_layers'],
-                            mask_format=mask_format)
-    print(mask_format)
-    print('[INFO] LOADING PRETRAINED WEIGHTS')
-    astromer.load_weights(os.path.join(model_folder, 'weights', 'weights'))
+    placeholder = build_input(window_size)
 
-    return astromer, model_config
+    msk_placeholder = AddMSKToken(trainable=True, 
+                                  window_size=window_size, 
+                                  on=['input'], name='msk_token')(placeholder)
+
+    encoder = Encoder(window_size=window_size,
+                      num_layers=num_layers,
+                      num_heads=num_heads,
+                      head_dim=head_dim,
+                      mixer_size=mixer_size,
+                      dropout=dropout,
+                      pe_base=pe_base,
+                      pe_dim=pe_dim,
+                      pe_c=pe_c,
+                      m_alpha=m_alpha,
+                      mask_format=mask_format,
+                      use_leak=use_leak,
+                      temperature=temperature,
+                      name='encoder')
+
+    x = encoder(msk_placeholder)
+
+    x = RegLayer(name='regression')(x)
+
+    return CustomModel(correct_loss=correct_loss, loss_format=loss_format, 
+                       inputs=placeholder, outputs=x, name="ASTROMER-1")
+
+class CustomModel(Model):
+    def __init__(self, correct_loss=False, loss_format='rmse', *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.loss_format = loss_format
+        self.correct_loss = correct_loss
+        
+    def train_step(self, data):
+        x, y = data
+        with tf.GradientTape() as tape:
+            y_pred = self(x, training=True)  # Forward pass
+            
+            rmse = custom_rmse(y_true=y['target'],
+                               y_pred=y_pred,
+                               mask=y['mask_out'],
+                               weights=y['w_error'] if self.correct_loss else None)
+            
+            corr = pearson_loss(y['target'], y_pred, x['mask_in'])
+            
+            r2_value = custom_r2(y_true=y['target'], 
+                                 y_pred=y_pred, 
+                                 mask=y['mask_out'])
+            
+            if self.loss_format == 'rmse':
+                loss = rmse
+                
+            if self.loss_format == 'rmse+p':
+                loss = rmse + corr
+            
+            if self.loss_format == 'p':
+                loss = corr
+                
+        trainable_vars = self.trainable_variables
+        gradients = tape.gradient(loss, trainable_vars)
+        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+
+        return {'loss': loss, 'r_square':r2_value, 'rmse':rmse, 'p': corr}
+
+    def test_step(self, data):
+        x, y = data
+        y_pred = self(x, training=False)
+        rmse = custom_rmse(y_true=y['target'],
+                           y_pred=y_pred,
+                           mask=y['mask_out'],
+                           weights=y['w_error'] if self.correct_loss else None)
+        corr = pearson_loss(y['target'], y_pred, x['mask_in'])
+        
+        r2_value = custom_r2(y_true=y['target'], 
+                             y_pred=y_pred, 
+                             mask=y['mask_out'])
+        
+        if self.loss_format == 'rmse':
+            loss = rmse
+
+        if self.loss_format == 'rmse+p':
+            loss = rmse + corr
+
+        if self.loss_format == 'p':
+            loss = corr
+            
+        return {'loss': loss, 'r_square':r2_value, 'rmse':rmse, 'p': corr}
+    
+    def predict_step(self, data):
+        x, y = data
+        y_pred = self(x, training=False)
+        
+        return {'reconstruction': y_pred, 
+                'magnitudes': y['target'],
+                'times': x['times'],
+                'probed_mask': y['mask_out'],
+                'mask_in': x['mask_in']}
