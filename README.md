@@ -26,7 +26,7 @@ Training ASTROMER from scratch can be expensive. However, we provide pre-trained
 | Version Tag | Pretraining data | Description | Test RMSE/R-square | Link |
 | --- | --- | --- | --- | --- |
 | v0 | MACHO | Paper's model | 0.147/0.80 | [Download Weights](https://github.com/astromer-science/weights/raw/nightly/macho_0.zip)
-| v1  | MACHO | New implementation of the paper's model | 0.135/0.198 | [Download Weights]((https://drive.google.com/file/d/1AB5ubqlQtMheSnYlIxYTYGa_Xm-_L8FL/view?usp=sharing))
+| v1  | MACHO | New implementation of the paper's model | 0.135/0.198 | [Download Weights](https://drive.google.com/file/d/1AB5ubqlQtMheSnYlIxYTYGa_Xm-_L8FL/view?usp=sharing)
 
 (*) Best performance on classification task
 ## Directory tree
