@@ -85,43 +85,7 @@ Training ASTROMER from scratch can be expensive. However, we provide pre-trained
  ```
 ## Get started
 
-We recomend to use [Docker](https://docs.docker.com/get-docker/) since it provides a **kernel-isolated** 
-and **identical environment** to the one used by the authors
-
-The `Dockerfile` contains all the configuration for running ASTROMER model. No need to touch it,
-`build_container.sh` and `run_container.sh` make the work for you :slightly_smiling_face:	
-
-The first step is to build the container,
-```bash
-  bash build_container.sh
-```
-It creates a "virtual machine", named `astromer`, containing all the dependencies such as python, tensorflow, among others. 
-
-The next and final step is running the ASTROMER container,
-```
-  bash run_container.sh
-```
-The above script looks for the container named `astromer` and run it on top of [your kernel](https://www.techtarget.com/searchdatacenter/definition/kernel#:~:text=The%20kernel%20is%20the%20essential,systems%2C%20device%20control%20and%20networking.).
-Automatically, the script recognizes if there are GPUs, making them visible inside the container.
-
-By default the `run_container.sh` script opens the ports `8888` and `6006` 
-for **jupyter notebook** and [**tensorboard**](https://github.com/cridonoso/tensorboard_tutorials), resepectively.
-To run them, use the usal commands but adding the following lines:
-
-For Jupyter Notebook 
-```
-jupyter notebook --ip 0.0.0.0
-```
-(Optionally) You can add the `--no-browser` tag in order to avoid warnings.
-
-For Tensorboard
-```
-tensorboard --logdir <my-logs-folder> --host 0.0.0.0
-```
-
-Finally, **if you do not want to use Docker** the `requirements.txt` file contains 
-all the packages needed to run ASTROMER.
-Use `pip install -r requirements.txt` on your local python to install them.
+The easiest way to run Astromer code on your 
 
 ## USAGE
 
