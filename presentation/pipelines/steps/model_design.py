@@ -66,6 +66,14 @@ def load_pt_model(pt_path, optimizer=None):
     return model, pt_config
 
 
+def get_avg_clf(inputs, mask, num_cls):
+    x = tf.multiply(inputs, mask) 
+    x = tf.reduce_sum(x, 1)
+    x = tf.math.divide_no_nan(x, tf.reduce_sum(mask, 1))
+    x = layers.LayerNormalization(name='layer_norm')(x)
+    y_pred = layers.Dense(num_cls, name='output_layer')(x)
+    return y_pred
+    
 def get_avg_mlp(inputs, mask, num_cls):
     x = tf.multiply(inputs, mask) 
     x = tf.reduce_sum(x, 1)
@@ -146,6 +154,9 @@ def build_classifier(astromer, params, astromer_trainable, num_cls=None, arch='a
     mask = 1.- inp_placeholder['mask_in']
        
     print('[INFO] Using {} clf architecture with {}'.format(arch, params['arch']))
+    if arch == 'avg_clf':
+        output = get_avg_clf(embedding[-1], mask, num_cls)
+        
     if arch == 'mlp_avg':
         output = get_mlp_avg(embedding[-1], mask, num_cls)
 

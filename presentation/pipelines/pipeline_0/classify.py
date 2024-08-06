@@ -55,7 +55,7 @@ def clf_step(opt, data_path, mlp_arch='avg_mlp'):
                   metrics=['accuracy'])
     
     cbks = [TensorBoard(log_dir=os.path.join(CLFDIR, 'tensorboard')),
-            EarlyStopping(monitor='val_loss', patience=20),
+            EarlyStopping(monitor='val_loss', patience=40),
             ModelCheckpoint(filepath=os.path.join(CLFDIR, 'weights'),
                             save_weights_only=True,
                             save_best_only=True,
@@ -87,9 +87,9 @@ if __name__ == '__main__':
                         help='Restore training by using checkpoints. This is the route to the checkpoint folder.')
     parser.add_argument('--gpu', default='-1', type=str,
                         help='GPU to be used. -1 means no GPU will be used')
-    parser.add_argument('--bs', default=512, type=int,
+    parser.add_argument('--bs', default=2000, type=int,
                         help='Finetuning batch size')
-    parser.add_argument('--lr', default=0.001, type=float,
+    parser.add_argument('--lr', default=0.00001, type=float,
                         help='Finetuning learning rate')
     parser.add_argument('--train-astromer', action='store_true', help='Train Astromer when classifying')
 
@@ -97,21 +97,21 @@ if __name__ == '__main__':
     opt = parser.parse_args()        
     
     datapaths = [
-                 # './data/records/alcock/fold_0/alcock_20', 
-                 # './data/records/alcock/fold_1/alcock_20',
-                 # './data/records/alcock/fold_2/alcock_20',
-                 # './data/records/alcock/fold_0/alcock_100', 
-                 # './data/records/alcock/fold_1/alcock_100',
-                 # './data/records/alcock/fold_2/alcock_100',
+                 './data/records/alcock/fold_0/alcock_20', 
+                 './data/records/alcock/fold_1/alcock_20',
+                 './data/records/alcock/fold_2/alcock_20',
+                 './data/records/alcock/fold_0/alcock_100', 
+                 './data/records/alcock/fold_1/alcock_100',
+                 './data/records/alcock/fold_2/alcock_100',
                  './data/records/alcock/fold_0/alcock_500', 
                  './data/records/alcock/fold_1/alcock_500',
                  './data/records/alcock/fold_2/alcock_500',
-                 # './data/records/atlas/fold_0/atlas_20', 
-                 # './data/records/atlas/fold_1/atlas_20',
-                 # './data/records/atlas/fold_2/atlas_20',
-                 # './data/records/atlas/fold_0/atlas_100', 
-                 # './data/records/atlas/fold_1/atlas_100',
-                 # './data/records/atlas/fold_2/atlas_100',
+                 './data/records/atlas/fold_0/atlas_20', 
+                 './data/records/atlas/fold_1/atlas_20',
+                 './data/records/atlas/fold_2/atlas_20',
+                 './data/records/atlas/fold_0/atlas_100', 
+                 './data/records/atlas/fold_1/atlas_100',
+                 './data/records/atlas/fold_2/atlas_100',
                  './data/records/atlas/fold_0/atlas_500', 
                  './data/records/atlas/fold_1/atlas_500',
                  './data/records/atlas/fold_2/atlas_500'

@@ -59,7 +59,10 @@ def run(opt):
         test_metadata = pd.read_parquet(config['context_features']['test_path'])
         metadata = pd.concat([test_metadata, metadata])
         got_test = True
-        
+    
+    # if there is a column associated with the testing subset, and split the dataframe 
+    # got_test = true
+    
     for fold_k in range(opt.folds):
     
         # ==== TEST DATA ==========================================
@@ -88,13 +91,15 @@ def run(opt):
                                    config_path=opt.config)
     
     var = pipeline.run(observations_path=OBSPATH, 
-                       n_jobs=8,
-                       elements_per_shard=20000)
+                       n_jobs=opt.njobs,
+                       elements_per_shard=opt.elements_per_shard)
 
     end = time.time()
     print('\n [INFO] ELAPSED: ', end - start)
 
 if __name__ == '__main__':
+    # python -m presentation.scripts.create_records --config ./data/my_data_folder/config.toml
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default='./data/raw_data_parquet/alcock/config.toml', type=str,
                     help='Config file specifying context and sequential features')
@@ -106,6 +111,9 @@ if __name__ == '__main__':
     parser.add_argument('--test-frac', default=0.2, type=float,
                     help='Validation fraction')
 
+    parser.add_argument('--njobs', default=4, type=int,
+                    help='Number of cores to use')
+    
     parser.add_argument('--elements-per-shard', default=20000, type=int,
                     help='Number of light curves per shard')
 

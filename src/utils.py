@@ -115,7 +115,7 @@ def tensorboard_logs(folder):
     with open(config_file, 'r') as file:
         config = toml.load(file)  
       
-    path_logs = os.path.join(folder, 'tensorboard', 'train')
+    path_logs = os.path.join(folder, 'tensorboard', 'validation')
     train_logs = [x for x in os.listdir(path_logs) if x.endswith('.v2')][-1]
     ea = event_accumulator.EventAccumulator(os.path.join(path_logs, train_logs))
     ea.Reload()
@@ -123,24 +123,26 @@ def tensorboard_logs(folder):
 
     output = []
     for sset in ['train', 'validation']:
-        sset_df = []
-        for metric in metric_names:
-            df = get_metrics(os.path.join(folder, 'tensorboard', sset), metric_name=metric)
-            df = df.rename(columns={'value': metric.split('_')[-1]})
-            sset_df.append(df.iloc[:, -1])
-            
-        curr = pd.concat(sset_df, axis=1)
-        general = df.iloc[:, :-1]
-        curr = pd.concat([general, curr], axis=1)
-
-        curr['exp_name']    = [config['exp_name']]*curr.shape[0] 
-        curr['probed']      = [config['probed']]*curr.shape[0] 
-        curr['rs']          = [config['rs']]*curr.shape[0] 
-        curr['arch']        = [config['arch']]*curr.shape[0] 
-        curr['m_alpha']     = [config['m_alpha']]*curr.shape[0] 
-        curr['mask_format'] = [config['mask_format']]*curr.shape[0] 
-        curr['temperature'] = [config['temperature']]*curr.shape[0] 
-        output.append(curr)
+        try:
+            sset_df = []
+            for metric in metric_names:
+                df = get_metrics(os.path.join(folder, 'tensorboard', sset), metric_name=metric)
+                df = df.rename(columns={'value': metric.split('_')[-1]})
+                sset_df.append(df.iloc[:, -1])
+                
+            curr = pd.concat(sset_df, axis=1)
+            general = df.iloc[:, :-1]
+            curr = pd.concat([general, curr], axis=1)
+            curr['exp_name']    = [config['exp_name']]*curr.shape[0] 
+            curr['probed']      = [config['probed']]*curr.shape[0] 
+            curr['rs']          = [config['rs']]*curr.shape[0] 
+            curr['arch']        = [config['arch']]*curr.shape[0] 
+            curr['m_alpha']     = [config['m_alpha']]*curr.shape[0] 
+            curr['mask_format'] = [config['mask_format']]*curr.shape[0] 
+            curr['temperature'] = [config['temperature']]*curr.shape[0] 
+            output.append(curr)
+        except:
+            output.append([])
     return output
 
 def dict_to_json(varsdic, conf_file):
