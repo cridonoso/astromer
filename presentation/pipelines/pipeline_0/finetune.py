@@ -77,27 +77,27 @@ if __name__ == '__main__':
                         help='GPU to be used. -1 means no GPU will be used')
     parser.add_argument('--bs', default=2000, type=int,
                         help='Finetuning batch size')
-    parser.add_argument('--lr', default=0.001, type=float,
+    parser.add_argument('--lr', default=0.0001, type=float,
                         help='Finetuning learning rate')
 
     opt = parser.parse_args()        
     # datapaths = ['./data/precords/catalina/fold_0/catalina']  
     datapaths = [
-                 # './data/records/alcock/fold_0/alcock_20', 
-                 # './data/records/alcock/fold_1/alcock_20',
-                 # './data/records/alcock/fold_2/alcock_20',
-                 # './data/records/alcock/fold_0/alcock_100', 
-                 # './data/records/alcock/fold_1/alcock_100',
-                 # './data/records/alcock/fold_2/alcock_100',
+                 './data/records/alcock/fold_0/alcock_20', 
+                 './data/records/alcock/fold_1/alcock_20',
+                 './data/records/alcock/fold_2/alcock_20',
+                 './data/records/alcock/fold_0/alcock_100', 
+                 './data/records/alcock/fold_1/alcock_100',
+                 './data/records/alcock/fold_2/alcock_100',
                  './data/records/alcock/fold_0/alcock_500', 
                  './data/records/alcock/fold_1/alcock_500',
                  './data/records/alcock/fold_2/alcock_500',
-                 # './data/records/atlas/fold_0/atlas_20', 
-                 # './data/records/atlas/fold_1/atlas_20',
-                 # './data/records/atlas/fold_2/atlas_20',
-                 # './data/records/atlas/fold_0/atlas_100', 
-                 # './data/records/atlas/fold_1/atlas_100',
-                 # './data/records/atlas/fold_2/atlas_100',
+                 './data/records/atlas/fold_0/atlas_20', 
+                 './data/records/atlas/fold_1/atlas_20',
+                 './data/records/atlas/fold_2/atlas_20',
+                 './data/records/atlas/fold_0/atlas_100', 
+                 './data/records/atlas/fold_1/atlas_100',
+                 './data/records/atlas/fold_2/atlas_100',
                  './data/records/atlas/fold_0/atlas_500', 
                  './data/records/atlas/fold_1/atlas_500',
                  './data/records/atlas/fold_2/atlas_500'
