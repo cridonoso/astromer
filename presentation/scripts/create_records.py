@@ -48,7 +48,6 @@ def run(opt):
             config = toml.load(handle)
 
     METAPATH   = config['context_features']['path']
-    OBSPATH    = config['sequential_features']['path']
     TARGETPATH = config['target']['path']
     
     metadata = pd.read_parquet(METAPATH)
@@ -90,7 +89,7 @@ def run(opt):
     pipeline = CustomCleanPipeline(metadata=metadata,
                                    config_path=opt.config)
     
-    var = pipeline.run(observations_path=OBSPATH, 
+    var = pipeline.run(pipeline.obs_path, 
                        n_jobs=opt.njobs,
                        elements_per_shard=opt.elements_per_shard)
 

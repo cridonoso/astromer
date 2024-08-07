@@ -142,6 +142,7 @@ class DataPipeline:
         self.sequential_features       = config['sequential_features']['value']
         self.sequential_features_dtype = config['sequential_features']['dtypes']
         self.output_folder             = config['target']['path']
+        self.obs_path                  = config['sequential_features']['path']
         self.id_column                 = config['id_column']['value']
 
         self.check_dtypes()        
@@ -272,55 +273,6 @@ class DataPipeline:
             raise e
 
 
-    
-#     def train_val_test(self,
-#                        val_frac=0.2,
-#                        test_frac=0.2,
-#                        test_meta=None,
-#                        val_meta=None,
-#                        shuffle=True,
-#                        id_column_name=None,
-#                        k_fold=1):
-
-#         if k_fold > 1 and test_meta is not None:
-#             assert len(test_meta) == k_fold, 'test_meta should be a list containing {}-fold subsets'.format(k_fold)
-
-#         if id_column_name is None:
-#             id_column_name = self.metadata.columns[0]
-#         print('[INFO] Using {} col as sample identifier'.format(id_column_name))
-
-#         if (type(test_meta) is not list) and (k_fold > 1) and (type(test_meta) != type(None)):
-#             raise ValueError(f'k_fold={k_fold} does not match with number of test frames. Please provide a list of testing frames for each fold')
-#         if (type(val_meta) is not list) and (k_fold > 1) and (type(val_meta) != type(None)):
-#             raise ValueError(f'k_fold={k_fold} does not match with number of validation frames.Please, provide a list of validation frames for each fold')
-
-#         if test_meta is None: test_meta = []
-#         if val_meta is None: val_meta = []
-
-#         for k in range(k_fold):
-#             if shuffle:
-#                 print('[INFO] Shuffling')
-#                 self.metadata = self.metadata.sample(frac=1)
-
-#             try:
-#                 test_meta[k]
-#             except:
-#                 test_meta.append(self.metadata.sample(frac=test_frac))
-#             self.metadata = substract_frames(self.metadata, test_meta[k], on=id_column_name)
-
-#             try:
-#                 val_meta[k]
-#             except:
-#                 val_meta.append(self.metadata.sample(frac=val_frac))
-#             self.metadata = substract_frames(self.metadata, val_meta[k], on=id_column_name)
-
-#             self.metadata['subset_{}'.format(k)]    = ['train']*self.metadata.shape[0]
-#             val_meta[k]['subset_{}'.format(k)]      = ['validation']*val_meta[k].shape[0]
-#             test_meta[k]['subset_{}'.format(k)]     = ['test']*test_meta[k].shape[0]
-
-#             self.metadata = pd.concat([self.metadata, val_meta[k], test_meta[k]])
-
-
     def prepare_data(self, container : np.ndarray, elements_per_shard : int, subset : str, fold_n : int):
         """Prepare the data to be saved as records"""
         if container is None or not hasattr(container, '__iter__'):
@@ -425,16 +377,15 @@ class DataPipeline:
         print('[INFO] Creating {} random folds'.format(n_folds))
         print('Not implemented yet hehehe...')
 
-    def run(self, observations_path :str , n_jobs : int =1, elements_per_shard : int = 5000) -> None: 
+    def run(self,  n_jobs : int =1, elements_per_shard : int = 5000) -> None: 
         """
         Executes the DataPipeline operations which includes reading parquet files, processing samples and writing records.
         
         Args:
-            observations_path (str): Directory path of parquet files containing light curves observations
             n_jobs (int): The maximum number of concurrently running jobs. Default is 1
             elements_per_shard (int): Maximum number of elements per shard. Default is 5000
         """
-        if not os.path.exists(observations_path):
+        if not os.path.exists(self.obs_path):
             logging.error("The specified parquets path does not exist")
             raise FileNotFoundError("The specified parquets path does not exist")
           
@@ -446,7 +397,7 @@ class DataPipeline:
         
         
         print('[INFO] Reading parquet')
-        new_df = self.read_all_parquets(observations_path)
+        new_df = self.read_all_parquets(self.obs_path)
         print('[INFO] Light curves loaded')
         self.new_df = new_df
 
