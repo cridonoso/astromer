@@ -89,8 +89,7 @@ def run(opt):
     pipeline = CustomCleanPipeline(metadata=metadata,
                                    config_path=opt.config)
     
-    var = pipeline.run(pipeline.obs_path, 
-                       n_jobs=opt.njobs,
+    var = pipeline.run(n_jobs=opt.njobs,
                        elements_per_shard=opt.elements_per_shard)
 
     end = time.time()
