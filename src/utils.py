@@ -140,6 +140,9 @@ def tensorboard_logs(folder):
             curr['m_alpha']     = [config['m_alpha']]*curr.shape[0] 
             curr['mask_format'] = [config['mask_format']]*curr.shape[0] 
             curr['temperature'] = [config['temperature']]*curr.shape[0] 
+            curr['lr']          = [config['lr']]*curr.shape[0] 
+            curr['scheduler']   = [config['scheduler']]*curr.shape[0] 
+            curr['leak']        = [config['use_leak']]*curr.shape[0] 
             output.append(curr)
         except:
             output.append([])
