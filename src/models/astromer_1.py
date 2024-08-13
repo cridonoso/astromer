@@ -46,6 +46,7 @@ def get_ASTROMER(num_layers=2,
                  use_leak=False,
                  loss_format='rmse',
                  correct_loss=False,
+                 trainable_mask=True,
                  temperature=0.):
     
     print('[INFO] Temperature: {:.2f}'.format(temperature))
@@ -53,9 +54,11 @@ def get_ASTROMER(num_layers=2,
 
     placeholder = build_input(window_size)
 
-    msk_placeholder = AddMSKToken(trainable=True, 
-                                  window_size=window_size, 
-                                  on=['input'], name='msk_token')(placeholder)
+    if trainable_mask:
+        print('[INFO] Adding trainable MSK token')
+        placeholder = AddMSKToken(trainable=True, 
+                                    window_size=window_size, 
+                                    on=['input'], name='msk_token')(placeholder)
 
     encoder = Encoder(window_size=window_size,
                       num_layers=num_layers,
@@ -72,7 +75,7 @@ def get_ASTROMER(num_layers=2,
                       temperature=temperature,
                       name='encoder')
 
-    x = encoder(msk_placeholder)
+    x = encoder(placeholder)
 
     x = RegLayer(name='regression')(x)
 
