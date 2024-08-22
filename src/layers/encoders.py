@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from src.layers.attblock import AttentionBlock
-from src.layers.positional import PositionalEncoder
+from src.layers.positional import positional_encoding
 
 
 class Encoder(tf.keras.Model):
@@ -39,10 +39,6 @@ class Encoder(tf.keras.Model):
         self.temp           = temperature
         self.inp_transform  = tf.keras.layers.Dense(self.pe_dim, name='inp_transform')
 
-        self.positional_encoder = PositionalEncoder(self.pe_dim, 
-                                                    base=self.pe_base, 
-                                                    c=self.pe_c, 
-                                                    name='PosEncoding')
         
         self.enc_layers = [AttentionBlock(self.head_dim, 
                                           self.num_heads, 
@@ -54,7 +50,7 @@ class Encoder(tf.keras.Model):
                                           temperature=self.temp,
                                           name=f'att_layer_{i}')
                             for i in range(self.num_layers)]
-        
+
         self.dropout_layer = tf.keras.layers.Dropout(dropout)
 
     def input_format(self, inputs):
@@ -65,8 +61,12 @@ class Encoder(tf.keras.Model):
             window_size = self.window_size
             x = inputs['input']
 
-        x_transformed = self.inp_transform(x)   
-        x_pe = self.positional_encoder(inputs['times'])
+        x_transformed = self.inp_transform(x)           
+        x_pe = positional_encoding(inputs['times'], 
+                                   self.pe_dim, 
+                                   base=self.pe_base, 
+                                   mjd=True, 
+                                   c=self.pe_c)
         x = x_transformed + x_pe   
         return x , window_size
 

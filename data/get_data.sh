@@ -1,10 +1,10 @@
 #!/bin/bash
 declare -A dictionary
-dictionary["catalina"]="1t4XUC6PgW4Piv6F3S5Nv5nCJe-jOIkCQ"
+dictionary["catalina"]="1rHJpj4eUUOuuGJlEFSPmBEirF5Ww26Nk"
 dictionary["alcock"]="18a4DGPlyJ21DI9HrKS-jJtaA2iIqFDQO"
-dictionary["macho"]="1ReqDHn9jKPIS_g8Xm0ThYUDM-XaLcUP3"
-dictionary["ogle"]="1L1oiq9pRRGpOVm13b2dyCQhMiVFn3o7x"
-dictionary["atlas"]="1pMzeL9BAwMXqra9iFUHLpGyclJzz-VM9"
+dictionary["macho"]="1MInBPl0mt4Eerq5zxQsPMgJU-CbwLc8u"
+dictionary["ogle"]="1B8fgyPrNNR5FQdGwPAIWmMk87aL1RZRD"
+dictionary["atlas"]="125euwxpF0WY_oWq3jVtq9c5pNyUISAOO"
 
 dictionary["alcock-record"]="1bEETbIgsVjhpkfR0LdYxnYQ8eeaq4wol"
 dictionary["macho-record"]="1QLXAsTkaryYUqhjKAM0wh6XKh3tG1M0k"

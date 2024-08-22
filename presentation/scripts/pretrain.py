@@ -108,7 +108,8 @@ if __name__ == '__main__':
                         help='Fraction to make visible during masked-self attention while evaluating during loss')
     parser.add_argument('--norm', default='zero-mean', type=str,
                         help='normalization: zero-mean - random-mean')
-    
+    parser.add_argument('--no-msk-token', action='store_true', help='Do not add trainable MSK token in the input')
+
     # ==== TRAINING ===================================================
     parser.add_argument('--lr', default=1e-5, type=float,
                         help='learning rate')

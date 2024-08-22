@@ -17,6 +17,9 @@ def build_model(params, return_weights=False):
     if 'temperature' not in params.keys():
         params['temperature'] = 0.
 
+    if not 'no_msk_token' in params.keys():
+        params['no_msk_token'] = False
+
     if params['arch'] == 'zero':
         print('[INFO] Zero architecture loaded')
         model = get_Zero(num_layers=params['num_layers'],
@@ -50,6 +53,7 @@ def build_model(params, return_weights=False):
                          use_leak=params['use_leak'],
                          loss_format=params['loss_format'],
                          correct_loss=params['correct_loss'],
+                         trainable_mask=params['no_msk_token'],
                          temperature=params['temperature'])
 
     return model
