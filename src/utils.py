@@ -119,14 +119,18 @@ def tensorboard_logs(folder):
     train_logs = [x for x in os.listdir(path_logs) if x.endswith('.v2')][-1]
     ea = event_accumulator.EventAccumulator(os.path.join(path_logs, train_logs))
     ea.Reload()
-    metric_names = ea.Tags()['tensors'][1:]
 
+    if 'paper' in folder:
+        metric_names = ea.Tags()['tensors']
+
+    else:
+        metric_names = ea.Tags()['tensors'][1:]
     output = []
     for sset in ['train', 'validation']:
         try:
             sset_df = []
             for metric in metric_names:
-                df = get_metrics(os.path.join(folder, 'tensorboard', sset), metric_name=metric)
+                df = get_metrics(os.path.join(folder, 'tensorboard', sset), metric_name=metric, show_keys=False)
                 df = df.rename(columns={'value': metric.split('_')[-1]})
                 sset_df.append(df.iloc[:, -1])
                 
@@ -143,9 +147,18 @@ def tensorboard_logs(folder):
             curr['lr']          = [config['lr']]*curr.shape[0] 
             curr['scheduler']   = [config['scheduler']]*curr.shape[0] 
             curr['leak']        = [config['use_leak']]*curr.shape[0] 
+            
+            if 'paper' in folder:
+                curr['mse'] = curr['mse']
+                curr['loss'] = curr['mse']
+                curr['square'] = np.zeros_like(curr['mse'])
+                curr = curr.rename(columns={'mse':'rmse'})
+                
             output.append(curr)
         except:
             output.append([])
+
+        
     return output
 
 def dict_to_json(varsdic, conf_file):

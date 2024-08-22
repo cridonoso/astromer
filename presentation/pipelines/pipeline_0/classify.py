@@ -87,9 +87,9 @@ if __name__ == '__main__':
                         help='Restore training by using checkpoints. This is the route to the checkpoint folder.')
     parser.add_argument('--gpu', default='-1', type=str,
                         help='GPU to be used. -1 means no GPU will be used')
-    parser.add_argument('--bs', default=2000, type=int,
+    parser.add_argument('--bs', default=256, type=int,
                         help='Finetuning batch size')
-    parser.add_argument('--lr', default=0.00001, type=float,
+    parser.add_argument('--lr', default=0.001, type=float,
                         help='Finetuning learning rate')
     parser.add_argument('--train-astromer', action='store_true', help='Train Astromer when classifying')
 

@@ -22,7 +22,6 @@ def compute_metrics(output):
         y_hat = tf.boolean_mask(output['reconstruction'][i], output['probed_mask'][i])
         y = y.numpy()
         y_hat = y_hat.numpy()
-        print(y.shape, y_hat.shape)
         
         r2_values.append(r2_score(y, y_hat))
         mse_values.append(root_mean_squared_error(y, y_hat))

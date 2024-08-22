@@ -21,7 +21,7 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK', tempe
     dk = tf.cast(tf.shape(k)[-1], tf.float32)
     scaled_attention_logits = matmul_qk / tf.math.sqrt(dk)
     if temperature != 0.:
-        scaled_attention_logits = scaled_attention_logits * temperature
+        scaled_attention_logits = scaled_attention_logits * (1/temperature)
     
     qk_values = scaled_attention_logits
     if mask_format == 'K':
@@ -45,7 +45,7 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK', tempe
     if mask_format == 'QK':
         steps = tf.shape(scaled_attention_logits)[2]
         mask_rshp = tf.tile(mask, [1,1,steps])
-        mask_rshp += tf.transpose(mask_rshp, [0,1,2])
+        mask_rshp += tf.transpose(mask_rshp, [0,2,1])
         mask_rshp = tf.minimum(1., mask_rshp)
         mask_rshp = tf.expand_dims(mask_rshp, 1)
         scaled_attention_logits += mask_rshp*m_alpha            
