@@ -42,7 +42,7 @@ def run(opt):
                            batch_size=opt.bs,
                            debug=opt.debug,
                            normalize=opt.norm,
-                           sampling=False,
+                           sampling=opt.sampling,
                            repeat=opt.repeat,
                            return_test=True,
                            )
@@ -108,6 +108,7 @@ if __name__ == '__main__':
                         help='Fraction to make visible during masked-self attention while evaluating during loss')
     parser.add_argument('--norm', default='zero-mean', type=str,
                         help='normalization: zero-mean - random-mean')
+    parser.add_argument('--sampling', action='store_true', help='sampling windows')
     parser.add_argument('--no-msk-token', action='store_true', help='Do not add trainable MSK token in the input')
 
     # ==== TRAINING ===================================================
