@@ -132,7 +132,7 @@ def run(opt):
             toml.dump(opt.__dict__, f)
 
         pbar  = tqdm(range(opt.num_epochs), total=opt.num_epochs)
-        pbar.set_description("Epoch 0 - rmse: -/- rsquare: -/-", refresh=True)
+        pbar.set_description("Epoch 0 (p={}) - rmse: -/- rsquare: -/-", refresh=True)
         pbar.set_postfix(item=0)    
         # ========= Training Loop ==================================
         es_count = 0
@@ -177,7 +177,8 @@ def run(opt):
                 print('[INFO] Early Stopping Triggered at epoch {:03d}'.format(epoch))
                 break
             
-            pbar.set_description("Epoch {} - rmse: {:.3f}/{:.3f} rsquare: {:.3f}-{:.3f}".format(epoch, 
+            pbar.set_description("Epoch {} (p={}) - rmse: {:.3f}/{:.3f} rsquare: {:.3f}-{:.3f}".format(epoch, 
+                                                                                                es_count,
                                                                                                 tr_rmse,
                                                                                                 vl_rmse,
                                                                                                 tr_rsquare,
