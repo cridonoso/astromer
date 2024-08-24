@@ -153,7 +153,6 @@ def run(opt):
 
             for batch in valid_batches:
                 pbar.set_postfix(item=numbatch)
-                metrics = test_step(astromer, batch)
                 metrics = distributed_test_step(astromer, batch, mirrored_strategy)
                 epoch_vl_rmse.append(metrics['rmse'])
                 epoch_vl_rsquare.append(metrics['rsquare'])
