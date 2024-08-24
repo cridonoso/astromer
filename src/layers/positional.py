@@ -40,7 +40,6 @@ def positional_encoding(times, d_model, base=10000, mjd=False, c=2.):
             indices = tf.tile(indices, [tf.shape(times)[0], 1])
             indices = tf.expand_dims(indices, 2)
         
-        print(f'[INFO] Using PE with c: {c}')
         angle_rads = get_angles_astromer(indices, d_model)
         
         # SIN AND COS

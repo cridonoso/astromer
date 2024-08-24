@@ -6,6 +6,7 @@ import argparse
 import math
 import toml
 import os
+from tqdm import tqdm
 
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
 from tensorflow.keras.optimizers import Adam
@@ -16,12 +17,63 @@ from presentation.pipelines.steps.model_design import build_model, load_pt_model
 from presentation.pipelines.steps.load_data import build_loader
 from presentation.pipelines.steps.metrics import evaluate_ft
 
+from src.losses.rmse import custom_rmse
+from src.metrics import custom_r2
 
 def replace_config(source, target):
     for key in ['data', 'no_cache', 'exp_name', 'checkpoint', 
                 'gpu', 'lr', 'bs', 'patience', 'num_epochs', 'scheduler']:
         target[key] = source[key]
     return target
+
+def tensorboard_log(name, value, writer, step=0):
+	with writer.as_default():
+		tf.summary.scalar(name, value, step=step)
+
+def train_step(model, inputs, optimizer):
+    x, y = inputs
+    with tf.GradientTape() as tape:
+        y_pred = model(x, training=True)
+        rmse = custom_rmse(y_true=y['target'],
+                            y_pred=y_pred,
+                            mask=y['mask_out'],
+                            weights=None)
+                    
+        r2_value = custom_r2(y_true=y['target'], 
+                            y_pred=y_pred, 
+                            mask=y['mask_out'])
+        loss = rmse
+
+    gradients = tape.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    return {'loss':loss, 'rmse': rmse, 'rsquare':r2_value}
+
+def test_step(model, inputs):
+    x, y = inputs
+
+    y_pred = model(x, training=False)
+    rmse = custom_rmse(y_true=y['target'],
+                        y_pred=y_pred,
+                        mask=y['mask_out'],
+                        weights=None)
+                
+    r2_value = custom_r2(y_true=y['target'], 
+                        y_pred=y_pred, 
+                        mask=y['mask_out'])
+    loss = rmse
+    return {'loss':loss, 'rmse': rmse, 'rsquare':r2_value}
+
+@tf.function
+def distributed_train_step(model, batch, optimizer, strategy):
+    per_replica_losses = strategy.run(train_step, args=(model, batch, optimizer))
+    return strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_losses,
+                            axis=None)
+
+@tf.function
+def distributed_test_step(model, batch, strategy):
+    per_replica_losses = strategy.run(test_step, args=(model, batch))
+    return strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_losses,
+                            axis=None)
 
 def run(opt):
 
@@ -38,6 +90,22 @@ def run(opt):
     EXPDIR = os.path.join(ROOT, 'results', opt.exp_name, trial, 'pretraining')
     os.makedirs(EXPDIR, exist_ok=True)
 
+    # ========== DATA ========================================
+    loaders = build_loader(data_path=opt.data, 
+                        params=opt.__dict__,
+                        batch_size=opt.bs,
+                        debug=opt.debug,
+                        normalize=opt.norm,
+                        sampling=False,
+                        repeat=opt.repeat,
+                        return_test=True,
+                        )
+    
+    train_batches = mirrored_strategy.experimental_distribute_dataset(loaders['train'])
+    valid_batches = mirrored_strategy.experimental_distribute_dataset(loaders['validation'])
+    train_writer = tf.summary.create_file_writer(os.path.join(EXPDIR, 'tensorboard', 'train'))
+    valid_writer = tf.summary.create_file_writer(os.path.join(EXPDIR, 'tensorboard', 'validation'))
+
     with mirrored_strategy.scope():
         # ======= MODEL ========================================
         if opt.checkpoint != '-1':
@@ -47,16 +115,6 @@ def run(opt):
         else:
             astromer = build_model(opt.__dict__)
             
-        # ========== DATA ========================================
-        loaders = build_loader(data_path=opt.data, 
-                            params=opt.__dict__,
-                            batch_size=opt.bs,
-                            debug=opt.debug,
-                            normalize=opt.norm,
-                            sampling=False,
-                            repeat=opt.repeat,
-                            return_test=True,
-                            )
         # ========== COMPILE =====================================
         if opt.scheduler:
             print('[INFO] Using Custom Scheduler')
@@ -64,30 +122,66 @@ def run(opt):
         else:
             lr = opt.lr
 
-        astromer.compile(optimizer=Adam(lr, 
-                        beta_1=0.9,
-                        beta_2=0.98,
-                        epsilon=1e-9,
-                        name='astromer_optimizer'))
-
+        optimizer = Adam(lr, 
+                         beta_1=0.9,
+                         beta_2=0.98,
+                         epsilon=1e-9,
+                         name='astromer_optimizer')
+                        
         with open(os.path.join(EXPDIR, 'config.toml'), 'w') as f:
             toml.dump(opt.__dict__, f)
 
-        cbks = [TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
-                EarlyStopping(monitor='val_loss', patience=opt.patience),
-                ModelCheckpoint(filepath=os.path.join(EXPDIR, 'weights'),
-                                save_weights_only=True,
-                                save_best_only=True,
-                                save_freq='epoch',
-                                verbose=0)]
+        pbar  = tqdm(range(opt.num_epochs), total=opt.num_epochs)
+        # ========= Training Loop ==================================
+        es_count = 0
+        min_loss = 1e9
+        for epoch in pbar:
+            epoch_tr_rmse    = []
+            epoch_tr_rsquare = []
+            epoch_vl_rmse    = []
+            epoch_vl_rsquare = []
 
-        astromer.fit(loaders['train'], 
-                    epochs=2 if opt.debug else opt.num_epochs, 
-                    batch_size=5 if opt.debug else opt.bs,
-                    validation_data=loaders['validation'],
-                    validation_batch_size=opt.bs,
-                    callbacks=cbks)
+            for batch in train_batches:
+                metrics = distributed_train_step(astromer, batch, optimizer, mirrored_strategy)
+                epoch_tr_rmse.append(metrics['rmse'])
+                epoch_tr_rsquare.append(metrics['rsquare'])
 
+            for batch in valid_batches:
+                metrics = test_step(astromer, batch)
+                metrics = distributed_test_step(astromer, batch, mirrored_strategy)
+                epoch_vl_rmse.append(metrics['rmse'])
+                epoch_vl_rsquare.append(metrics['rsquare'])
+
+            tr_rmse    = tf.reduce_mean(epoch_tr_rmse)
+            tr_rsquare = tf.reduce_mean(epoch_tr_rsquare)
+            vl_rmse    = tf.reduce_mean(epoch_vl_rmse)
+            vl_rsquare = tf.reduce_mean(epoch_vl_rsquare)
+
+            tensorboard_log('rmse', tr_rmse, train_writer, step=epoch)
+            tensorboard_log('rsquare', tr_rsquare, train_writer, step=epoch)
+            tensorboard_log('rmse', vl_rmse, valid_writer, step=epoch)
+            tensorboard_log('rsquare', vl_rsquare, valid_writer, step=epoch)
+            
+            if tf.math.greater(min_loss, vl_rmse):
+                min_loss = vl_rmse
+                es_count = 0
+                astromer.save_weights(os.path.join(EXPDIR, 'weights'))
+            else:
+                es_count = es_count + 1
+
+            if es_count == opt.patience:
+                print('[INFO] Early Stopping Triggered at epoch {:03d}'.format(epoch))
+                break
+
+            pbar.set_description("Epoch {} - rmse: {:.3f}/{:.3f} rsquare: {:.3f}-{:.3f}".format(epoch, 
+                                                                                                tr_rmse,
+                                                                                                vl_rmse,
+                                                                                                tr_rsquare,
+                                                                                                vl_rsquare))
+
+
+        print('[INFO] Testing...')
+        astromer.compile(optimizer=optimizer)
         evaluate_ft(astromer, loaders['test'], opt.__dict__)
 
 if __name__ == '__main__':
@@ -128,7 +222,7 @@ if __name__ == '__main__':
                         help='Batch size')
     parser.add_argument('--patience', default=20, type=int,
                         help='Earlystopping threshold in number of epochs')
-    parser.add_argument('--num_epochs', default=10000, type=int,
+    parser.add_argument('--num-epochs', default=10000, type=int,
                         help='Number of epochs')
     parser.add_argument('--scheduler', action='store_true', help='Use Custom Scheduler during training')
     parser.add_argument('--correct-loss', action='store_true', help='Use error bars to weigh loss')
