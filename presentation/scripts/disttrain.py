@@ -96,7 +96,7 @@ def run(opt):
                         batch_size=opt.bs,
                         debug=opt.debug,
                         normalize=opt.norm,
-                        sampling=False,
+                        sampling=opt.sampling,
                         repeat=opt.repeat,
                         return_test=True,
                         )
@@ -152,7 +152,6 @@ def run(opt):
                 epoch_tr_rsquare.append(metrics['rsquare'])
 
             for batch in valid_batches:
-                pbar.set_postfix(item=numbatch)
                 metrics = distributed_test_step(astromer, batch, mirrored_strategy)
                 epoch_vl_rmse.append(metrics['rmse'])
                 epoch_vl_rsquare.append(metrics['rsquare'])
@@ -218,6 +217,8 @@ if __name__ == '__main__':
                         help='Fraction to make visible during masked-self attention while evaluating during loss')
     parser.add_argument('--norm', default='zero-mean', type=str,
                         help='normalization: zero-mean - random-mean')
+    parser.add_argument('--sampling', action='store_true', help='sampling windows')
+
     parser.add_argument('--no-msk-token', action='store_true', help='Do not add trainable MSK token in the input')
 
     # ==== TRAINING ===================================================
