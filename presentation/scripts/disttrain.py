@@ -132,21 +132,27 @@ def run(opt):
             toml.dump(opt.__dict__, f)
 
         pbar  = tqdm(range(opt.num_epochs), total=opt.num_epochs)
+        pbar.set_description("Epoch 0 - rmse: -/- rsquare: -/-", refresh=True)
+        pbar.set_postfix(item=0)    
         # ========= Training Loop ==================================
         es_count = 0
         min_loss = 1e9
         for epoch in pbar:
+            pbar.set_postfix(item1=epoch)
             epoch_tr_rmse    = []
             epoch_tr_rsquare = []
             epoch_vl_rmse    = []
             epoch_vl_rsquare = []
 
-            for batch in train_batches:
+            for numbatch, batch in enumerate(train_batches):
+                pbar.set_postfix(item=numbatch)
+
                 metrics = distributed_train_step(astromer, batch, optimizer, mirrored_strategy)
                 epoch_tr_rmse.append(metrics['rmse'])
                 epoch_tr_rsquare.append(metrics['rsquare'])
 
             for batch in valid_batches:
+                pbar.set_postfix(item=numbatch)
                 metrics = test_step(astromer, batch)
                 metrics = distributed_test_step(astromer, batch, mirrored_strategy)
                 epoch_vl_rmse.append(metrics['rmse'])
@@ -172,7 +178,7 @@ def run(opt):
             if es_count == opt.patience:
                 print('[INFO] Early Stopping Triggered at epoch {:03d}'.format(epoch))
                 break
-
+            
             pbar.set_description("Epoch {} - rmse: {:.3f}/{:.3f} rsquare: {:.3f}-{:.3f}".format(epoch, 
                                                                                                 tr_rmse,
                                                                                                 vl_rmse,
