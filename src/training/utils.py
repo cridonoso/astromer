@@ -1,165 +1,144 @@
+'''
+DISTRIBUTED TRAINING
+'''
 import tensorflow as tf
+import argparse
+import math
 import toml
-import time
 import os
-
-from tensorflow.keras.callbacks import CallbackList
-from tensorflow.keras.optimizers import Adam
-from src.training.scheduler import CustomSchedule
-from tensorflow.keras.optimizers.experimental import AdamW
-from src.losses.rmse import custom_rmse
-
 from tqdm import tqdm
 
-def draw_graph(model, dataset, writer, logdir=''):
-    '''Decorator that reports store fn graph.'''
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
+from tensorflow.keras.optimizers import Adam
+from datetime import datetime
 
-    @tf.function
-    def fn(x):
-        x = model(x)
+from src.training.scheduler import CustomSchedule
+from presentation.pipelines.steps.model_design import build_model, load_pt_model
+from presentation.pipelines.steps.load_data import build_loader
+from presentation.pipelines.steps.metrics import evaluate_ft
 
-    tf.summary.trace_on(graph=True, profiler=False)
-    fn(dataset)
-    with writer.as_default():
-        tf.summary.trace_export(
-            name='model',
-            step=0,
-            profiler_outdir=logdir)
+from src.losses.rmse import custom_rmse
+from src.metrics import custom_r2
 
+def replace_config(source, target):
+    for key in ['data', 'no_cache', 'exp_name', 'checkpoint', 
+                'gpu', 'lr', 'bs', 'patience', 'num_epochs', 'scheduler']:
+        target[key] = source[key]
+    return target
 
-def save_scalar(writer, value, step, name=''):
-    with writer.as_default():
-        tf.summary.scalar(name, value.result(), step=step)
-        
-@tf.function
-def train_step(model, batch, opt):
-    x, y = batch
-    with tf.GradientTape() as tape:
-        x_pred = model(x)
-
-        mse = custom_rmse(y_true=y['target'],
-                          y_pred=x_pred,
-                          mask=y['mask_out'])
-
-
-    grads = tape.gradient(mse, model.trainable_weights)
-    opt.apply_gradients(zip(grads, model.trainable_weights))
-    return mse
+def tensorboard_log(name, value, writer, step=0):
+	with writer.as_default():
+		tf.summary.scalar(name, value, step=step)
 
 @tf.function
-def valid_step(model, batch, return_pred=False, normed=False):
-    x, y = batch
+def train_step(model, inputs, optimizer):
+    x, y = inputs
     with tf.GradientTape() as tape:
-        x_pred = model(x)
-        mse = custom_rmse(y_true=y['target'],
-                          y_pred=x_pred,
-                          mask=y['mask_out'])
+        y_pred = model(x, training=True)
+        rmse = custom_rmse(y_true=y['target'],
+                            y_pred=y_pred,
+                            mask=y['mask_out'],
+                            weights=None)
+                    
+        r2_value = custom_r2(y_true=y['target'], 
+                            y_pred=y_pred, 
+                            mask=y['mask_out'])
+        loss = rmse
 
-    if return_pred:
-        return mse, x_pred, x_true
-    return mse
+    gradients = tape.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    return {'loss':loss, 'rmse': rmse, 'rsquare':r2_value}
 
-def train(model,
-          train_dataset,
-          valid_dataset,
-          patience=20,
-          exp_path='./experiments/test',
-          epochs=1,
-          finetuning=False,
-          lr=1e-3,
-          verbose=1):
+@tf.function
+def test_step(model, inputs):
+    x, y = inputs
 
-    os.makedirs(exp_path, exist_ok=True)
+    y_pred = model(x, training=False)
+    rmse = custom_rmse(y_true=y['target'],
+                        y_pred=y_pred,
+                        mask=y['mask_out'],
+                        weights=None)
+                
+    r2_value = custom_r2(y_true=y['target'], 
+                        y_pred=y_pred, 
+                        mask=y['mask_out'])
+    loss = rmse
+    return {'loss':loss, 'rmse': rmse, 'rsquare':r2_value}
 
-    # Tensorboard
-    train_writter = tf.summary.create_file_writer(
-                                    os.path.join(exp_path, 'tensorboard', 'train'))
-    valid_writter = tf.summary.create_file_writer(
-                                    os.path.join(exp_path, 'tensorboard', 'validation'))
+@tf.function
+def distributed_train_step(model, batch, optimizer, strategy):
+    per_replica_losses = strategy.run(train_step, args=(model, batch, optimizer))
+    return strategy.reduce(tf.distribute.ReduceOp.MEAN, per_replica_losses,
+                            axis=None)
 
-    batch = [x for x, _ in train_dataset.take(1)][0]
-    draw_graph(model, batch, train_writter, exp_path)
+@tf.function
+def distributed_test_step(model, batch, strategy):
+    per_replica_losses = strategy.run(test_step, args=(model, batch))
+    return strategy.reduce(tf.distribute.ReduceOp.MEAN, per_replica_losses,
+                            axis=None)
 
-    # Optimizer
-    try:
-        d_model = model.get_layer('encoder').num_heads * model.get_layer('encoder').head_dim 
-    except:
-        d_model = model.get_layer('encoder').d_model
 
-    custom_lr = CustomSchedule(d_model)
-    
-    optimizer = tf.keras.optimizers.Adam(custom_lr,
-                                         beta_1=0.9,
-                                         beta_2=0.98,
-                                         epsilon=1e-9)
-    
-    # To save metrics
-    train_mse  = tf.keras.metrics.Mean(name='train_mse')
-    valid_mse  = tf.keras.metrics.Mean(name='valid_mse')
+def train(model, optimizer, train_data, validation_data, num_epochs=1000, es_patience=20, test_data=None, project_folder=''):
 
-    # Training Loop
-    best_loss = 999999.
+
+    train_writer = tf.summary.create_file_writer(os.path.join(project_folder, 'tensorboard', 'train'))
+    valid_writer = tf.summary.create_file_writer(os.path.join(project_folder, 'tensorboard', 'validation'))
+
+
+    pbar  = tqdm(range(num_epochs), total=num_epochs)
+    pbar.set_description("Epoch 0 (p={}) - rmse: -/- rsquare: -/-", refresh=True)
+    pbar.set_postfix(item=0)    
+    # ========= Training Loop ==================================
     es_count = 0
-    pbar = tqdm(range(epochs), desc='epoch')
+    min_loss = 1e9
     for epoch in pbar:
-        for train_batch in train_dataset:
-            x, y  = train_batch
-            mse = train_step(model, train_batch, optimizer)
-            train_mse.update_state(mse)
+        pbar.set_postfix(item1=epoch)
+        epoch_tr_rmse    = []
+        epoch_tr_rsquare = []
+        epoch_vl_rmse    = []
+        epoch_vl_rsquare = []
 
-        for valid_batch in valid_dataset:
-            mse = valid_step(model, valid_batch)
-            valid_mse.update_state(mse)
+        for numbatch, batch in enumerate(train_data):
+            pbar.set_postfix(item=numbatch)
+            metrics = train_step(model, batch, optimizer)
+            epoch_tr_rmse.append(metrics['rmse'])
+            epoch_tr_rsquare.append(metrics['rsquare'])
 
-        msg = 'EPOCH {} - ES COUNT: {}/{} train mse: {:.4f} - val mse: {:.4f}'.format(epoch,
-                                                                                      es_count,
-                                                                                      patience,
-                                                                                      train_mse.result(),
-                                                                                      valid_mse.result())
+        for batch in validation_data:
+            metrics = test_step(model, batch)
+            epoch_vl_rmse.append(metrics['rmse'])
+            epoch_vl_rsquare.append(metrics['rsquare'])
 
-        pbar.set_description(msg)
+        tr_rmse    = tf.reduce_mean(epoch_tr_rmse)
+        tr_rsquare = tf.reduce_mean(epoch_tr_rsquare)
+        vl_rmse    = tf.reduce_mean(epoch_vl_rmse)
+        vl_rsquare = tf.reduce_mean(epoch_vl_rsquare)
 
-        save_scalar(train_writter, train_mse, epoch, name='mse')
-        save_scalar(valid_writter, valid_mse, epoch, name='mse')
-
-
-        if valid_mse.result() < best_loss:
-            best_loss = valid_mse.result()
-            es_count = 0.
-            model.save_weights(os.path.join(exp_path, 'weights'))
+        tensorboard_log('rmse', tr_rmse, train_writer, step=epoch)
+        tensorboard_log('rsquare', tr_rsquare, train_writer, step=epoch)
+        tensorboard_log('rmse', vl_rmse, valid_writer, step=epoch)
+        tensorboard_log('rsquare', vl_rsquare, valid_writer, step=epoch)
+        
+        if tf.math.greater(min_loss, vl_rmse):
+            min_loss = vl_rmse
+            es_count = 0
+            model.save_weights(os.path.join(project_folder, 'weights'))
         else:
-            es_count+=1.
-        if es_count == patience:
-            print('[INFO] Early Stopping Triggered')
+            es_count = es_count + 1
+
+        if es_count == es_patience:
+            print('[INFO] Early Stopping Triggered at epoch {:03d}'.format(epoch))
             break
+        
+        pbar.set_description("Epoch {} (p={}) - rmse: {:.3f}/{:.3f} rsquare: {:.3f}-{:.3f}".format(epoch, 
+                                                                                            es_count,
+                                                                                            tr_rmse,
+                                                                                            vl_rmse,
+                                                                                            tr_rsquare,
+                                                                                            vl_rsquare))
 
-        train_mse.reset_states()
-        valid_mse.reset_states()
-    return model
 
-def predict(model,
-            dataset,
-            conf,
-            predic_proba=False):
-
-    total_mse, inputs, reconstructions = [], [], []
-    masks, times = [], []
-    for step, batch in tqdm(enumerate(dataset), desc='prediction'):
-        mse, x_pred, x_true = valid_step(model,
-                                         batch,
-                                         return_pred=True,
-                                         normed=True)
-
-        total_mse.append(mse)
-        times.append(batch['times'])
-        inputs.append(x_true)
-        reconstructions.append(x_pred)
-        masks.append(batch['mask_out'])
-
-    res = {'mse':tf.reduce_mean(total_mse).numpy(),
-           'x_pred': tf.concat(reconstructions, 0),
-           'x_true': tf.concat(inputs, 0),
-           'mask': tf.concat(masks, 0),
-           'time': tf.concat(times, 0)}
-
-    return res
+    print('[INFO] Testing...')
+    model.compile(optimizer=optimizer)
+    if test_data is not None:
+        evaluate_ft(model, test_data)

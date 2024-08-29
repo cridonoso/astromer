@@ -164,6 +164,7 @@ class EncoderLayer(tf.keras.layers.Layer):
         return out2
 
 class Encoder(tf.keras.layers.Layer):
+    __name__ = 'zero'
     def __init__(self, num_layers, d_model, num_heads, dff,
                  base=10000, rate=0.1, use_leak=False, m_alpha=1., mask_format='QK', return_weights=False,**kwargs):
         super(Encoder, self).__init__(**kwargs)
@@ -263,6 +264,7 @@ def get_ASTROMER(num_layers=2,
 
 ### KERAS MODEL 
 class CustomModel(Model):
+    __name__ = 'zero'
     def __init__(self,correct_loss=False, loss_format='mse', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.loss_format = loss_format
