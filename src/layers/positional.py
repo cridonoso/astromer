@@ -55,6 +55,11 @@ def positional_encoding(times, d_model, base=10000, mjd=False, c=2.):
         pos_encoding = tf.transpose(x_transpose, [2, 1, 0])
         return tf.cast(pos_encoding, dtype=tf.float32)
 
+class PositionalEncoder2(tf.keras.layers.Layer):
+    def call(self, times, d_model, base=10000, mjd=False, c=2.):
+        return positional_encoding(times, d_model, base=base, mjd=mjd, c=c)
+
+   
 class PositionalEncoder(tf.keras.layers.Layer):
     def __init__(self, d_model, base=1000, c=2, **kwargs):
         super(PositionalEncoder, self).__init__(**kwargs) 

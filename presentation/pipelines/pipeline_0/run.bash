@@ -12,14 +12,8 @@
 #              './presentation/results/macho_750000/2024-07-23_14-45-39'
 #              './presentation/results/macho_1000000/2024-07-23_14-46-24')
             
-# model_paths=('./presentation/results/macho_alpha/2024-08-13_11-26-48'
-#              './presentation/results/macho_alpha/2024-08-13_23-16-07'
-#              './presentation/results/macho_alpha/2024-08-13_23-16-52'
-#              './presentation/results/macho_alpha/2024-08-15_20-48-51'
-#              './presentation/results/macho_alpha/2024-08-15_20-48-57'
-#              './presentation/results/macho_alpha/2024-08-15_20-49-05')
 
-model_paths=('./presentation/results/paper/')
+model_paths=('./presentation/results/alpha/2024-08-27_02-00-55/')
 
 for str in ${model_paths[@]}; do
   echo [INFO] Testing $str

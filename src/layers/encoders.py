@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from src.layers.attblock import AttentionBlock
-from src.layers.positional import positional_encoding
+from src.layers.positional import positional_encoding, PositionalEncoder2
 
 
 class Encoder(tf.keras.Model):
@@ -38,7 +38,7 @@ class Encoder(tf.keras.Model):
         self.use_leak       = use_leak
         self.temp           = temperature
         self.inp_transform  = tf.keras.layers.Dense(self.pe_dim, name='inp_transform')
-
+        
         
         self.enc_layers = [AttentionBlock(self.head_dim, 
                                           self.num_heads, 
@@ -52,7 +52,7 @@ class Encoder(tf.keras.Model):
                             for i in range(self.num_layers)]
 
         self.dropout_layer = tf.keras.layers.Dropout(dropout)
-
+        self.pe = PositionalEncoder2()
     def input_format(self, inputs):
         if 'seg_emb' in inputs.keys():
             window_size = self.window_size + 1 # if seg_emb exists then NSP is being applied
@@ -62,11 +62,16 @@ class Encoder(tf.keras.Model):
             x = inputs['input']
 
         x_transformed = self.inp_transform(x)           
-        x_pe = positional_encoding(inputs['times'], 
-                                   self.pe_dim, 
-                                   base=self.pe_base, 
-                                   mjd=True, 
-                                   c=self.pe_c)
+        x_pe = self.pe(inputs['times'], 
+                       self.pe_dim, 
+                       base=self.pe_base, 
+                       mjd=True, 
+                       c=self.pe_c)
+        # x_pe = positional_encoding(inputs['times'], 
+        #                            self.pe_dim, 
+        #                            base=self.pe_base, 
+        #                            mjd=True, 
+        #                            c=self.pe_c)
         x = x_transformed + x_pe   
         return x , window_size
 

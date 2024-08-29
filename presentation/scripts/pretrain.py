@@ -134,7 +134,7 @@ if __name__ == '__main__':
                         help='Head dimension')
     parser.add_argument('--pe-dim', default=256, type=int,
                         help='Positional encoder size - i.e., Number of frequencies')
-    parser.add_argument('--pe-base', default=1000, type=int,
+    parser.add_argument('--pe-base', default=10000, type=int,
                         help='Positional encoder base')
     parser.add_argument('--pe-exp', default=2, type=int,
                         help='Positional encoder exponent')
