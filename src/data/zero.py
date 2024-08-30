@@ -358,12 +358,17 @@ def load_records(records_dir):
     Returns:
         type: tf.Dataset instance
     """
-    try:
-        rec_paths = glob.glob(os.path.join(records_dir, '*.record'))
-        dataset = tf.data.TFRecordDataset(rec_paths)
-    except:
-        rec_paths = glob.glob(os.path.join(records_dir, '*', '*.record'))
-        dataset = tf.data.TFRecordDataset(rec_paths)
+    name = '*.record'
+    middle = []
+    rec_paths= []
+    while rec_paths == []:
+        init = os.path.join(records_dir, *middle,  name)
+        rec_paths = glob.glob(init)
+        middle.append('*')
+    
+    dataset = tf.data.TFRecordDataset(rec_paths)    
+
+    dataset = tf.data.TFRecordDataset(rec_paths)
     
     dataset = dataset.map(deserialize)
         
@@ -478,7 +483,7 @@ def pretraining_pipeline(dataset,
     if isinstance(dataset, str):
         dataset = load_records(dataset)
         
-    return dataset
+
     if shuffle:
         SHUFFLE_BUFFER = 10000
         dataset = dataset.shuffle(SHUFFLE_BUFFER)

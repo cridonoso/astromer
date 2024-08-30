@@ -164,7 +164,6 @@ class EncoderLayer(tf.keras.layers.Layer):
         return out2
 
 class Encoder(tf.keras.layers.Layer):
-    __name__ = 'zero'
     def __init__(self, num_layers, d_model, num_heads, dff,
                  base=10000, rate=0.1, use_leak=False, m_alpha=1., mask_format='QK', return_weights=False,**kwargs):
         super(Encoder, self).__init__(**kwargs)
