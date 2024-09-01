@@ -124,7 +124,8 @@ def tensorboard_logs(folder):
         metric_names = ea.Tags()['tensors']
 
     else:
-        metric_names = ea.Tags()['tensors'][1:]
+        metric_names = ea.Tags()['tensors']
+
     output = []
     for sset in ['train', 'validation']:
         try:

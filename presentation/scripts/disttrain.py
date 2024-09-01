@@ -80,10 +80,7 @@ def run(opt):
     # os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu.split(',')
     devices = ['/gpu:{}'.format(dev) for dev in opt.gpu.split(',')]
 
-    mirrored_strategy = tf.distribute.MirroredStrategy(
-                devices=devices,
-                cross_device_ops=tf.distribute.HierarchicalCopyAllReduce())
-
+    mirrored_strategy = tf.distribute.MirroredStrategy(devices=devices)
 
     ROOT = './presentation/'
     trial = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")

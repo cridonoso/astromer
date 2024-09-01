@@ -46,12 +46,12 @@ def run(opt):
     r2_value, mse_value = compute_metrics(output)
     
     valid_loss = get_metrics(os.path.join(opt.model, 'tensorboard', 'validation'), 
-                                metric_name='epoch_loss')
+                                metric_name='rmse')
     
     best_loss = valid_loss[valid_loss['value']==valid_loss['value'].min()]
 
     valid_rsquare = get_metrics(os.path.join(opt.model, 'tensorboard', 'validation'), 
-                                metric_name='epoch_r_square')
+                                metric_name='rsquare')
     
     metrics = {
         'test_r2': [r2_value],

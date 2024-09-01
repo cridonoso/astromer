@@ -57,8 +57,8 @@ def get_ASTROMER(num_layers=2,
     if trainable_mask:
         print('[INFO] Adding trainable MSK token')
         placeholder = AddMSKToken(trainable=True, 
-                                    window_size=window_size, 
-                                    on=['input'], name='msk_token')(placeholder)
+                                  window_size=window_size, 
+                                  on=['input'], name='msk_token')(placeholder)
 
     encoder = Encoder(window_size=window_size,
                       num_layers=num_layers,
@@ -97,7 +97,8 @@ class CustomModel(Model):
             rmse = custom_rmse(y_true=y['target'],
                                y_pred=y_pred,
                                mask=y['mask_out'],
-                               weights=y['w_error'] if self.correct_loss else None)
+                               weights=y['w_error'] if self.correct_loss else None,
+                               root=True if self.loss_format == 'rmse' else False)
             
             r2_value = custom_r2(y_true=y['target'], 
                                  y_pred=y_pred, 

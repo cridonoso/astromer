@@ -12,9 +12,11 @@ from tensorflow.keras.optimizers import Adam
 from presentation.pipelines.steps.model_design import load_pt_model 
 from presentation.pipelines.steps.load_data import build_loader 
 from presentation.pipelines.steps.metrics import evaluate_ft
+from src.training.utils import train
 
-def ft_step(opt, data_path):
-    factos = data_path.split('/')
+
+def ft_step(opt):
+    factos = opt.data.split('/')
     ft_model = '/'.join(factos[-3:])
 
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
@@ -24,18 +26,18 @@ def ft_step(opt, data_path):
     
     
     # ======= MODEL ========================================
-    ft_opt = Adam(opt.lr, 
-                  beta_1=0.9,
-                  beta_2=0.98,
-                  epsilon=1e-9,
-                  name='astromer_optimizer')
+    optimizer = Adam(opt.lr, 
+                     beta_1=0.9,
+                     beta_2=0.98,
+                     epsilon=1e-9,
+                     name='astromer_optimizer')
     
     
-    model, model_config = load_pt_model(opt.pt_model, optimizer=ft_opt)
+    model, model_config = load_pt_model(opt.pt_model)
     
     
     # ========== DATA ========================================
-    loaders = build_loader(data_path, 
+    loaders = build_loader(opt.data, 
                            model_config, 
                            batch_size=opt.bs, 
                            clf_mode=False, 
@@ -47,28 +49,27 @@ def ft_step(opt, data_path):
     with open(os.path.join(EXPDIR, 'config.toml'), 'w') as f:
         toml.dump(model_config, f)
 
-    cbks = [TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
-            EarlyStopping(monitor='val_loss', patience=20),
-            ModelCheckpoint(filepath=os.path.join(EXPDIR, 'weights'),
-                            save_weights_only=True,
-                            save_best_only=True,
-                            save_freq='epoch',
-                            verbose=1)]
+
+    model = train(model, 
+                  optimizer, 
+                  train_data=loaders['train'], 
+                  validation_data=loaders['validation'], 
+                  num_epochs=1000000, 
+                  es_patience=20, 
+                  test_data=None, 
+                  project_folder=EXPDIR)
+
     
-   
-    model.fit(loaders['train'], 
-              epochs=1000000, 
-              batch_size=opt.bs,
-              validation_data=loaders['validation'],
-              callbacks=cbks)
-    
-    ft_metrics = evaluate_ft(model, loaders['test'], model_config, prefix='test_')
+    ft_metrics = evaluate_ft(model, loaders['test'])
     with open(os.path.join(EXPDIR, 'test_metrics.toml'), "w") as toml_file:
         toml.dump(ft_metrics, toml_file)
-    
+
+    tf.keras.backend.clear_session()  
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--data', default='./data/records/alcock/fold_0/alcock_20', type=str,
+                    help='DOWNSTREAM data path')
     parser.add_argument('--exp-name', default='finetuning', type=str,
                     help='Project name')
     parser.add_argument('--pt-model', default='-1', type=str,
@@ -81,27 +82,5 @@ if __name__ == '__main__':
                         help='Finetuning learning rate')
 
     opt = parser.parse_args()        
-    # datapaths = ['./data/precords/catalina/fold_0/catalina']  
-    datapaths = [
-                 './data/records/alcock/fold_0/alcock_20', 
-                 './data/records/alcock/fold_1/alcock_20',
-                 './data/records/alcock/fold_2/alcock_20',
-                 './data/records/alcock/fold_0/alcock_100', 
-                 './data/records/alcock/fold_1/alcock_100',
-                 './data/records/alcock/fold_2/alcock_100',
-                 './data/records/alcock/fold_0/alcock_500', 
-                 './data/records/alcock/fold_1/alcock_500',
-                 './data/records/alcock/fold_2/alcock_500',
-                 './data/records/atlas/fold_0/atlas_20', 
-                 './data/records/atlas/fold_1/atlas_20',
-                 './data/records/atlas/fold_2/atlas_20',
-                 './data/records/atlas/fold_0/atlas_100', 
-                 './data/records/atlas/fold_1/atlas_100',
-                 './data/records/atlas/fold_2/atlas_100',
-                 './data/records/atlas/fold_0/atlas_500', 
-                 './data/records/atlas/fold_1/atlas_500',
-                 './data/records/atlas/fold_2/atlas_500'
-    ]
-    
-    for dp in datapaths:
-        ft_step(opt, dp)
+
+    ft_step(opt)

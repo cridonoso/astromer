@@ -30,30 +30,31 @@ def tensorboard_log(name, value, writer, step=0):
 	with writer.as_default():
 		tf.summary.scalar(name, value, step=step)
 
-@tf.function
+@tf.function(reduce_retracing=True)
 def train_step(model, inputs, optimizer):
+    # HERE WE NEED TO TAKE MODEL LOSS FORMAT and COMPUTE ACCORDINGLY
     x, y = inputs
     with tf.GradientTape() as tape:
-        y_pred = model(x, training=True)
+        y_pred = model(x, training=tf.constant(True))
         rmse = custom_rmse(y_true=y['target'],
                             y_pred=y_pred,
-                            mask=y['mask_out'],
-                            weights=None)
+                            mask=y['mask_out'])
                     
         r2_value = custom_r2(y_true=y['target'], 
                             y_pred=y_pred, 
                             mask=y['mask_out'])
         loss = rmse
 
-    gradients = tape.gradient(loss, model.trainable_variables)
-    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+        gradients = tape.gradient(loss, model.trainable_variables)
+        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
     return {'loss':loss, 'rmse': rmse, 'rsquare':r2_value}
 
-@tf.function
+@tf.function(reduce_retracing=True)
 def test_step(model, inputs):
+    # HERE WE NEED TO TAKE MODEL LOSS FORMAT and COMPUTE ACCORDINGLY
     x, y = inputs
 
-    y_pred = model(x, training=False)
+    y_pred = model(x, training=tf.constant(False))
     rmse = custom_rmse(y_true=y['target'],
                         y_pred=y_pred,
                         mask=y['mask_out'],
@@ -142,3 +143,4 @@ def train(model, optimizer, train_data, validation_data, num_epochs=1000, es_pat
     model.compile(optimizer=optimizer)
     if test_data is not None:
         evaluate_ft(model, test_data)
+    return model

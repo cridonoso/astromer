@@ -140,7 +140,7 @@ if __name__ == '__main__':
     parser.add_argument('--mask-format', default='K', type=str,
                         help='mask on Query and Key tokens (QK) or Query tokens only (Q)')
     parser.add_argument('--loss-format', default='rmse', type=str,
-                        help='what consider during loss: rmse - rmse+p - p')
+                        help='what consider during loss: rmse - mse - p')
     parser.add_argument('--use-leak', action='store_true',
                         help='Use Custom Scheduler during training')  
     parser.add_argument('--temperature', default=0., type=float,
