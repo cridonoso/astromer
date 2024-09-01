@@ -48,7 +48,17 @@ def run(opt):
     OBSPATH  = os.path.join(opt.data, 'light_curves')
     
     metadata = pd.read_parquet(METAPATH)
-    metadata['Band'] = metadata['Band'].astype(str)
+    try:
+        metadata['Band'] = metadata['Band'].astype(str)
+    except:
+        pass
+    
+    groups = metadata[['Class', 'Label']].groupby('Class')
+    objects = []
+    for d, a in groups:
+        objects.append({'Class': a.Label.iloc[0], 'Label':a.shape[0]}) 
+    objects = pd.DataFrame(objects)
+        
     metadata['ID'] = metadata['ID'].astype(str)
     
     test_metadata  = metadata.sample(frac=0.2)

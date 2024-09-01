@@ -54,6 +54,12 @@ def run(opt):
         pass
     metadata['ID'] = metadata['ID'].astype(str)
     
+    groups = metadata[['Class', 'Label']].groupby('Class')
+    objects = []
+    for d, a in groups:
+        objects.append({'Class': a.Label.iloc[0], 'Label':a.shape[0]}) 
+    objects = pd.DataFrame(objects)    
+    
     target_path = opt.data.replace('praw', 'precords')
 
     create_config_toml(parquet_id='newID',
@@ -82,15 +88,19 @@ def run(opt):
     final_metadata = pd.concat([train_metadata, validation_metadata, test_metadata])
     
     pipeline = CustomCleanPipeline(metadata=final_metadata,
-                                          config_path=os.path.join(target_path, 'config.toml'))
+                                   config_path=os.path.join(target_path, 'config.toml'))
 
 
 
-    var = pipeline.run(observations_path=OBSPATH, 
-                       n_jobs=8,
-                       elements_per_shard=20000)
-
+#     var = pipeline.run(observations_path=OBSPATH, 
+#                        n_jobs=8,
+#                        elements_per_shard=20000)
+    
+    objects.to_csv(os.path.join(target_path, 'fold_0', 'catalina', 'train', 'objects.csv'))
+    objects.to_csv(os.path.join(target_path, 'fold_0', 'catalina', 'validation', 'objects.csv'))
+    objects.to_csv(os.path.join(target_path, 'fold_0', 'catalina', 'test', 'objects.csv'))
     end = time.time()
+    
     print('\n [INFO] ELAPSED: ', end - start)
 
 if __name__ == '__main__':

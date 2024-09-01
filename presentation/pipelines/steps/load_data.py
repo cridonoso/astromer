@@ -19,7 +19,7 @@ def build_loader(data_path, params, batch_size=5,
     
     if clf_mode:
         print('Classification Mode')
-        num_cls = pd.read_csv(os.path.join(data_path, 'objects.csv')).shape[0]
+        num_cls = pd.read_csv(os.path.join(data_path, 'train', 'objects.csv')).shape[0]
         probed = 0. if old_version else 1.
         random = 0.
         nsp_prob = 0. 
