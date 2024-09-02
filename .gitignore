@@ -30,3 +30,7 @@ data/precords/
 data/raw_parquet
 daniel
 run_cris.sh
+
+data/temp/
+client_secrets.json
+mycreds.txt
