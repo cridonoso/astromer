@@ -32,13 +32,13 @@ def tensorboard_log(name, value, writer, step=0):
 
 @tf.function(reduce_retracing=True)
 def train_step(model, inputs, optimizer):
-    # HERE WE NEED TO TAKE MODEL LOSS FORMAT and COMPUTE ACCORDINGLY
     x, y = inputs
     with tf.GradientTape() as tape:
         y_pred = model(x, training=tf.constant(True))
         rmse = custom_rmse(y_true=y['target'],
                             y_pred=y_pred,
-                            mask=y['mask_out'])
+                            mask=y['mask_out'],
+                            root=True if model.loss_format == 'rmse' else False)
                     
         r2_value = custom_r2(y_true=y['target'], 
                             y_pred=y_pred, 
@@ -51,14 +51,13 @@ def train_step(model, inputs, optimizer):
 
 @tf.function(reduce_retracing=True)
 def test_step(model, inputs):
-    # HERE WE NEED TO TAKE MODEL LOSS FORMAT and COMPUTE ACCORDINGLY
     x, y = inputs
 
     y_pred = model(x, training=tf.constant(False))
     rmse = custom_rmse(y_true=y['target'],
-                        y_pred=y_pred,
-                        mask=y['mask_out'],
-                        weights=None)
+                       y_pred=y_pred,
+                       mask=y['mask_out'],
+                       root=True if model.loss_format == 'rmse' else False)
                 
     r2_value = custom_r2(y_true=y['target'], 
                         y_pred=y_pred, 
@@ -96,28 +95,38 @@ def train(model, optimizer, train_data, validation_data, num_epochs=1000, es_pat
         pbar.set_postfix(item1=epoch)
         epoch_tr_rmse    = []
         epoch_tr_rsquare = []
+        epoch_tr_loss    = []
         epoch_vl_rmse    = []
         epoch_vl_rsquare = []
+        epoch_vl_loss    = []
 
         for numbatch, batch in enumerate(train_data):
             pbar.set_postfix(item=numbatch)
             metrics = train_step(model, batch, optimizer)
             epoch_tr_rmse.append(metrics['rmse'])
             epoch_tr_rsquare.append(metrics['rsquare'])
+            epoch_tr_loss.append(metrics['loss'])
 
         for batch in validation_data:
             metrics = test_step(model, batch)
             epoch_vl_rmse.append(metrics['rmse'])
             epoch_vl_rsquare.append(metrics['rsquare'])
+            epoch_vl_loss.append(metrics['loss'])
 
         tr_rmse    = tf.reduce_mean(epoch_tr_rmse)
         tr_rsquare = tf.reduce_mean(epoch_tr_rsquare)
         vl_rmse    = tf.reduce_mean(epoch_vl_rmse)
         vl_rsquare = tf.reduce_mean(epoch_vl_rsquare)
+        tr_loss    = tf.reduce_mean(epoch_tr_loss)
+        vl_loss    = tf.reduce_mean(epoch_vl_loss)
 
+        tensorboard_log('loss', tr_loss, train_writer, step=epoch)
+        tensorboard_log('loss', vl_loss, valid_writer, step=epoch)
+        
         tensorboard_log('rmse', tr_rmse, train_writer, step=epoch)
-        tensorboard_log('rsquare', tr_rsquare, train_writer, step=epoch)
         tensorboard_log('rmse', vl_rmse, valid_writer, step=epoch)
+        
+        tensorboard_log('rsquare', tr_rsquare, train_writer, step=epoch)
         tensorboard_log('rsquare', vl_rsquare, valid_writer, step=epoch)
         
         if tf.math.greater(min_loss, vl_rmse):
@@ -131,7 +140,7 @@ def train(model, optimizer, train_data, validation_data, num_epochs=1000, es_pat
             print('[INFO] Early Stopping Triggered at epoch {:03d}'.format(epoch))
             break
         
-        pbar.set_description("Epoch {} (p={}) - rmse: {:.3f}/{:.3f} rsquare: {:.3f}-{:.3f}".format(epoch, 
+        pbar.set_description("Epoch {} (p={}) - rmse: {:.3f}/{:.3f} rsquare: {:.3f}/{:.3f}".format(epoch, 
                                                                                             es_count,
                                                                                             tr_rmse,
                                                                                             vl_rmse,
