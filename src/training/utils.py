@@ -80,15 +80,13 @@ def distributed_test_step(model, batch, strategy):
 
 
 def train(model, optimizer, train_data, validation_data, num_epochs=1000, es_patience=20, test_data=None, project_folder=''):
-
-
     train_writer = tf.summary.create_file_writer(os.path.join(project_folder, 'tensorboard', 'train'))
     valid_writer = tf.summary.create_file_writer(os.path.join(project_folder, 'tensorboard', 'validation'))
-
 
     pbar  = tqdm(range(num_epochs), total=num_epochs)
     pbar.set_description("Epoch 0 (p={}) - rmse: -/- rsquare: -/-", refresh=True)
     pbar.set_postfix(item=0)    
+
     # ========= Training Loop ==================================
     es_count = 0
     min_loss = 1e9
