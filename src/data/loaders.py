@@ -11,6 +11,21 @@ from src.data.record import deserialize
 
 
 
+def load_records_v2(record_files):
+    """
+    Load records files containing serialized light curves.
+
+    Args:
+        records_dir (str): records folder
+    Returns:
+        type: tf.Dataset instance
+    """
+    records_dir = record_files[0].split('/')[:-1] 
+    records_dir = '/'.join(records_dir)
+    raw_dataset = tf.data.TFRecordDataset(record_files)
+    raw_dataset = raw_dataset.map(lambda x: deserialize(x, records_dir))
+    return raw_dataset
+    
 def load_records(records_dir):
     """
     Load records files containing serialized light curves.
@@ -149,7 +164,7 @@ def get_loader(dataset,
     
     
     if isinstance(dataset, list):
-        dataset = load_numpy(dataset)
+        dataset = load_records_v2(dataset)
 
     if isinstance(dataset, str):
         dataset = load_records(records_dir=dataset)

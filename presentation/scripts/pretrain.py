@@ -27,6 +27,7 @@ def run(opt):
     ROOT = './presentation/'
     trial = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     EXPDIR = os.path.join(ROOT, 'results', opt.exp_name, trial, 'pretraining')
+    print('[INFO] Saving weights on {}'.format(EXPDIR))
     os.makedirs(EXPDIR, exist_ok=True)
     # ======= MODEL ========================================
     if opt.checkpoint != '-1':
@@ -68,7 +69,6 @@ def run(opt):
           validation_data=loaders['validation'], 
           num_epochs=2 if opt.debug else opt.num_epochs, 
           es_patience=opt.patience, 
-          test_data=loaders['test'], 
           project_folder=EXPDIR)
 
 

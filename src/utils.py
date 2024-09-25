@@ -139,6 +139,7 @@ def tensorboard_logs(folder):
             general = df.iloc[:, :-1]
             curr = pd.concat([general, curr], axis=1)
             curr['exp_name']    = [config['exp_name']]*curr.shape[0] 
+            curr['data']        = [config['data']]*curr.shape[0] 
             curr['probed']      = [config['probed']]*curr.shape[0] 
             curr['rs']          = [config['rs']]*curr.shape[0] 
             curr['arch']        = [config['arch']]*curr.shape[0] 

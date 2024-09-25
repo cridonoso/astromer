@@ -64,8 +64,6 @@ def ft_step(opt):
     with open(os.path.join(EXPDIR, 'test_metrics.toml'), "w") as toml_file:
         toml.dump(ft_metrics, toml_file)
 
-    tf.keras.backend.clear_session()  
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', default='./data/records/alcock/fold_0/alcock_20', type=str,

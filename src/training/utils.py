@@ -30,11 +30,12 @@ def tensorboard_log(name, value, writer, step=0):
 	with writer.as_default():
 		tf.summary.scalar(name, value, step=step)
 
-@tf.function(reduce_retracing=True)
+@tf.function()
 def train_step(model, inputs, optimizer):
     x, y = inputs
     with tf.GradientTape() as tape:
-        y_pred = model(x, training=tf.constant(True))
+        y_pred = model(x, training=True)
+        
         rmse = custom_rmse(y_true=y['target'],
                             y_pred=y_pred,
                             mask=y['mask_out'],
@@ -49,7 +50,7 @@ def train_step(model, inputs, optimizer):
         optimizer.apply_gradients(zip(gradients, model.trainable_variables))
     return {'loss':loss, 'rmse': rmse, 'rsquare':r2_value}
 
-@tf.function(reduce_retracing=True)
+@tf.function()
 def test_step(model, inputs):
     x, y = inputs
 
