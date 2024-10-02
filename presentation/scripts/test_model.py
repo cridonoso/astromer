@@ -33,7 +33,10 @@ def compute_metrics(output):
 
 def run(opt):
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
+    
     astromer, config = load_pt_model(opt.model)
+    print('[INFO] {} loaded'.format(opt.model))
+    
     df = pd.DataFrame(config, index=[0])
     loaders = build_loader(df['data'].values[0], 
                            config, 

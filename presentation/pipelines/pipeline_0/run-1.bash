@@ -43,20 +43,20 @@ data_paths=('./data/shared/records/alcock/fold_0/alcock_20'
 #              './presentation/results/temperature/2024-09-20_12-25-37',
 #              './presentation/results/temperature/2024-09-25_10-21-22')
 
-model_paths=('./presentation/results/best_0_to_1/2024-09-25_10-25-47'
-             './presentation/results/best_0_to_1/2024-09-25_10-25-57')
+model_paths=('./presentation/results/astromer_1/2024-09-05_17-51-59'
+             './presentation/results/astromer_1/2024-09-13_15-40-17')
 
 for str in ${model_paths[@]}; do
     echo [INFO] Testing $str
-    python -m presentation.scripts.test_model  --model $str/pretraining --gpu 0
+    python -m presentation.scripts.test_model  --model $str/pretraining --gpu 1
 done
 
 for str in ${model_paths[@]}; do
     for dp in ${data_paths[@]}; do
         echo [INFO] Starting FT $str
-        python -m presentation.pipelines.pipeline_0.finetune --pt-model $str/pretraining --data $dp --gpu 0
+        python -m presentation.pipelines.pipeline_0.finetune --pt-model $str/pretraining --data $dp --gpu 1
         
         echo [INFO] Starting CLF $str
-        python -m presentation.pipelines.pipeline_0.classify --pt-model $str/pretraining --data $dp --gpu 0
+        python -m presentation.pipelines.pipeline_0.classify --pt-model $str/pretraining --data $dp --gpu 1
     done
 done
