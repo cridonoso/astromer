@@ -329,6 +329,5 @@ def get_loader(dataset,
                                 num_cls=num_cls,
                                 normalize=normalize,
                                 cache=cache,
-                                aversion=aversion,
-                                distributed=distributed)
+                                aversion=aversion)
         return dataset
