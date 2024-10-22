@@ -14,7 +14,9 @@ def build_loader(data_path, params, batch_size=5,
                  shuffle=True,
                  probed=None,
                  same=None,
-                 random=None):
+                 random=None,
+                 distributed=False,
+                 target_path='.'):
     
     norm = normalize if normalize is not None else params['norm']
 
@@ -36,32 +38,47 @@ def build_loader(data_path, params, batch_size=5,
         val_path = os.path.join(data_path, 'val')    
         print('[INFO] Changing path: ', val_path)
 
-
-    train_loader = get_loader(os.path.join(data_path, 'train'),
-                                batch_size=batch_size,
-                                window_size=params['window_size'],
-                                probed_frac=probed,
-                                random_frac=random,
-                                same_frac=same,
-                                sampling=sampling,
-                                shuffle=shuffle,
-                                normalize=norm,
-                                repeat=repeat,
-                                aversion=params['arch'],
-                                num_cls=num_cls)
-    
-    valid_loader = get_loader(val_path,
-                                batch_size=batch_size,
-                                window_size=params['window_size'],
-                                probed_frac=probed,
-                                random_frac=random,
-                                same_frac=same,
-                                sampling=sampling,
-                                shuffle=False,
-                                normalize=norm,
-                                repeat=1,
-                                aversion=params['arch'],
-                                num_cls=num_cls)
+    if distributed:
+        train_loader, valid_loader = get_loader(os.path.join(data_path, 'train'),
+                                                batch_size=batch_size,
+                                                window_size=params['window_size'],
+                                                probed_frac=probed,
+                                                random_frac=random,
+                                                same_frac=same,
+                                                sampling=sampling,
+                                                shuffle=shuffle,
+                                                normalize=norm,
+                                                repeat=repeat,
+                                                aversion=params['arch'],
+                                                num_cls=num_cls,
+                                                distributed=True, 
+                                                target_path=target_path)
+    else:
+        train_loader = get_loader(os.path.join(data_path, 'train'),
+                                    batch_size=batch_size,
+                                    window_size=params['window_size'],
+                                    probed_frac=probed,
+                                    random_frac=random,
+                                    same_frac=same,
+                                    sampling=sampling,
+                                    shuffle=shuffle,
+                                    normalize=norm,
+                                    repeat=repeat,
+                                    aversion=params['arch'],
+                                    num_cls=num_cls)
+        
+        valid_loader = get_loader(val_path,
+                                    batch_size=batch_size,
+                                    window_size=params['window_size'],
+                                    probed_frac=probed,
+                                    random_frac=random,
+                                    same_frac=same,
+                                    sampling=sampling,
+                                    shuffle=False,
+                                    normalize=norm,
+                                    repeat=1,
+                                    aversion=params['arch'],
+                                    num_cls=num_cls)
     if return_test:
         test_loader = get_loader(os.path.join(data_path, 'test'),
                                     batch_size=batch_size,

@@ -91,14 +91,16 @@ def run(opt):
 
     # ========== DATA ========================================
     loaders = build_loader(data_path=opt.data, 
-                        params=opt.__dict__,
-                        batch_size=opt.bs,
-                        debug=opt.debug,
-                        normalize=opt.norm,
-                        sampling=opt.sampling,
-                        repeat=opt.repeat,
-                        return_test=True,
-                        )
+                           params=opt.__dict__,
+                           batch_size=opt.bs,
+                           debug=opt.debug,
+                           normalize=opt.norm,
+                           sampling=opt.sampling,
+                           repeat=opt.repeat,
+                           return_test=True,
+                           distributed=True,
+                           target_path=EXPDIR,
+                            )
     
     train_batches = mirrored_strategy.experimental_distribute_dataset(loaders['train'])
     valid_batches = mirrored_strategy.experimental_distribute_dataset(loaders['validation'])
