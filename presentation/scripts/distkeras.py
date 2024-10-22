@@ -56,6 +56,8 @@ def run(opt):
                             sampling=False,
                             repeat=opt.repeat,
                             return_test=True,
+                            distributed=True,
+                            target_path=EXPDIR,
                             )
         # ========== COMPILE =====================================
         if opt.scheduler:

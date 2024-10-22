@@ -16,6 +16,7 @@ from src.data.record import deserialize
 def get_validation(path, validation=0.2, target_path=''):
     file = os.path.join(target_path, 'train_val_split.toml')
     if os.path.exists(file):
+        print('[INFO] Loading train and validation datasets')
         with open(file, 'r') as f:
             output = toml.load(f)
         return output
@@ -81,10 +82,11 @@ def load_records_distributed(records_dir, validation, target_path):
     paths = get_validation(records_dir,
                            validation=validation, 
                            target_path=target_path)
+    
     datasets = []
     for sset in paths.keys():
         raw_dataset = tf.data.TFRecordDataset(paths[sset])
-        raw_dataset = raw_dataset.map(lambda x: deserialize(x, records_dir))
+        raw_dataset = raw_dataset.map(lambda x: deserialize(x, os.path.join(records_dir, sset)))
         datasets.append(raw_dataset)
 
     return datasets
@@ -209,11 +211,15 @@ def run_pipeline(dataset,
     
     dataset = dataset.filter(filter_fn)
     
+    
     # CREATE WINDOWS
     dataset = pp.to_windows(dataset,
                          window_size=window_size,
                          sampling=sampling)
-   
+    
+    return dataset
+    
+    
     if normalize is None:
         dataset = dataset.map(pp.nothing)
         
@@ -245,7 +251,7 @@ def run_pipeline(dataset,
         print('[INFO] Cache activated')
         dataset = dataset.cache()
 
-    # #PREFETCH BATCHES
+    #PREFETCH BATCHES
     dataset = dataset.prefetch(2)
 
     return dataset
@@ -281,7 +287,6 @@ def get_loader(dataset,
                     load_records_distributed(dataset, 
                                              validation=0.2, 
                                              target_path=target_path)
-        
         training_dataset   = run_pipeline(training_dataset,
                                           batch_size=batch_size,
                                           window_size=window_size,
@@ -317,17 +322,55 @@ def get_loader(dataset,
 
         if isinstance(dataset, str):
             dataset = load_records(records_dir=dataset)
-        dataset = run_pipeline(dataset,
-                                batch_size=batch_size,
-                                window_size=window_size,
-                                probed_frac=probed_frac,
-                                random_frac=random_frac,
-                                same_frac=same_frac,
-                                sampling=sampling,
-                                shuffle=shuffle,
-                                repeat=repeat,
-                                num_cls=num_cls,
-                                normalize=normalize,
-                                cache=cache,
-                                aversion=aversion)
+            
+        if shuffle:
+            SHUFFLE_BUFFER = 10000
+            dataset = dataset.shuffle(SHUFFLE_BUFFER)
+    
+        # REPEAT LIGHT CURVES
+        if repeat > 1:
+            print('[INFO] Repeating dataset x{} times'.format(repeat))
+            dataset = dataset.repeat(repeat)
+        
+        dataset = dataset.filter(filter_fn)
+        
+        
+        # CREATE WINDOWS
+        dataset = pp.to_windows(dataset,
+                             window_size=window_size,
+                             sampling=sampling)        
+        
+        if normalize is None:
+            dataset = dataset.map(pp.nothing)
+            
+        if normalize == 'zero-mean':
+            dataset = dataset.map(pp.standardize)
+        
+        if normalize == 'random-mean':
+            dataset = dataset.map(pp.random_mean)
+    
+        if normalize == 'minmax':
+            dataset = dataset.map(pp.min_max_scaler)
+            
+        
+        dataset, shapes = mask_dataset(dataset,
+                               msk_frac=probed_frac,
+                               rnd_frac=random_frac,
+                               same_frac=same_frac,
+                               window_size=window_size)
+        
+        dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
+    
+        # FORMAT INPUT DICTONARY
+        dataset = dataset.map(lambda x: format_inp_astromer(x,
+                                                    num_cls=num_cls,
+                                                    aversion=aversion),
+                      num_parallel_calls=tf.data.experimental.AUTOTUNE)
+        
+        if cache:
+            print('[INFO] Cache activated')
+            dataset = dataset.cache()
+    
+        #PREFETCH BATCHES
+        dataset = dataset.prefetch(2)
         return dataset

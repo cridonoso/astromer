@@ -72,11 +72,13 @@ def set_random(serie_1, mask_1, serie_2, rnd_frac, name='set_random'):
 
         return serie_1, mask_1
 
-
-def mask_sample(input_dict, msk_frac, rnd_frac, same_frac, max_obs):
+@tf.function
+def mask_sample(sample, msk_frac, rnd_frac, same_frac, max_obs):
     '''
     OLD VERSION
     '''
+    input_dict = sample.copy()
+    
     x = input_dict['input']
 
     seq_time = tf.slice(x, [0, 0], [-1, 1])
