@@ -294,8 +294,7 @@ def get_loader(dataset,
                                           num_cls=num_cls,
                                           normalize=normalize,
                                           cache=cache,
-                                          aversion=aversion,
-                                          distributed=distributed)
+                                          aversion=aversion)
         
         validation_dataset = run_pipeline(validation_dataset,
                                           batch_size=batch_size,
@@ -309,8 +308,7 @@ def get_loader(dataset,
                                           num_cls=num_cls,
                                           normalize=normalize,
                                           cache=cache,
-                                          aversion=aversion,
-                                          distributed=distributed)
+                                          aversion=aversion)
                 
         return training_dataset, validation_dataset
     else:
