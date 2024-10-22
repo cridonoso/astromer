@@ -86,6 +86,7 @@ def load_records_distributed(records_dir, validation, target_path):
         raw_dataset = tf.data.TFRecordDataset(paths[sset])
         raw_dataset = raw_dataset.map(lambda x: deserialize(x, records_dir))
         datasets.append(raw_dataset)
+
     return datasets
 
 def create_generator(list_of_arrays, labels=None, ids=None):
@@ -275,13 +276,13 @@ def get_loader(dataset,
     print('[INFO] Normalization: ', normalize)
     
     if distributed:
-
         print('[INFO] Creating validation and train datasets')
-        dataset = load_records_distributed(dataset, 
-                                           validation=0.2, 
-                                           target_path=target_path)
+        training_dataset, validation_dataset = \
+                    load_records_distributed(dataset, 
+                                             validation=0.2, 
+                                             target_path=target_path)
         
-        validation_dataset = run_pipeline(dataset['validation'],
+        training_dataset   = run_pipeline(training_dataset,
                                           batch_size=batch_size,
                                           window_size=window_size,
                                           probed_frac=probed_frac,
@@ -296,7 +297,7 @@ def get_loader(dataset,
                                           aversion=aversion,
                                           distributed=distributed)
         
-        training_dataset   = run_pipeline(dataset['train'],
+        validation_dataset = run_pipeline(validation_dataset,
                                           batch_size=batch_size,
                                           window_size=window_size,
                                           probed_frac=probed_frac,
@@ -310,7 +311,7 @@ def get_loader(dataset,
                                           cache=cache,
                                           aversion=aversion,
                                           distributed=distributed)
-        
+                
         return training_dataset, validation_dataset
     else:
         if isinstance(dataset, list):
