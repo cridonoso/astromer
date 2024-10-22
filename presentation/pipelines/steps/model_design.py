@@ -128,7 +128,7 @@ def get_skip_avg_mlp(inputs, mask, num_cls):
     x = tf.multiply(x, mask) 
     x = tf.reduce_sum(x, 2)
     x = tf.math.divide_no_nan(x, tf.reduce_sum(mask, 2))
-        
+
     x = GammaWeight(name='gamma_weight')(x)
     x = layers.Dense(1024, activation='relu')(x)
     x = layers.Dense(512, activation='relu')(x)

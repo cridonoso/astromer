@@ -43,8 +43,10 @@ data_paths=('./data/shared/records/alcock/fold_0/alcock_20'
 #              './presentation/results/temperature/2024-09-20_12-25-37',
 #              './presentation/results/temperature/2024-09-25_10-21-22')
 
-model_paths=('./presentation/results/best_0_to_1/2024-09-25_10-25-47'
-             './presentation/results/best_0_to_1/2024-09-25_10-25-57')
+#model_paths=('./presentation/results/astromer_0.5/2024-10-01_22-30-05'
+#             './presentation/results/astromer_0.5/2024-10-01_22-30-40')
+
+model_paths=('./presentation/results/astromer_0.5/2024-10-15_09-58-27')
 
 for str in ${model_paths[@]}; do
     echo [INFO] Testing $str

@@ -13,11 +13,11 @@ class GammaWeight(Layer):
     def build(self, input_shape):
         initial_value = tf.ones([input_shape[0]]) * 1/input_shape[0]
         self.gamma = tf.Variable(initial_value=initial_value,
-                            trainable=True,
-                            name='gamma')
+                                 trainable=True,
+                                 name='gamma')
         
     def call(self, inputs, training):
-        gamma = self.softmax_act(self.gamma)
+        gamma = self.softmax_act(tf.expand_dims(self.gamma, 0))
         gamma = tf.reshape(gamma, [tf.shape(inputs)[0], 1, 1])
         x = tf.multiply(inputs, gamma)
         x = tf.reduce_mean(x, axis=0)
