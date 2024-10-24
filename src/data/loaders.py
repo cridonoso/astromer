@@ -13,7 +13,7 @@ from src.data.record import deserialize
 
 
 
-def get_validation(path, validation=0.2, target_path=''):
+def get_validation(path, validation=0.2, test_folder=None, target_path=''):
     file = os.path.join(target_path, 'train_val_split.toml')
     if os.path.exists(file):
         print('[INFO] Loading train and validation datasets')
@@ -31,6 +31,11 @@ def get_validation(path, validation=0.2, target_path=''):
     train_paths       = np.array(records_path)[train_indices].tolist()
 
     output = {'validation': validation_paths, 'train': train_paths}
+    
+    if test_folder is not None:
+        test_paths = glob.glob(os.path.join(test_folder, '*.record'))
+        output['test'] = test_paths
+        
     if target_path is not None:
         with open(file, 'w') as f:
             toml.dump(output, f )
@@ -46,8 +51,7 @@ def load_records_v2(record_files):
     Returns:
         type: tf.Dataset instance
     """
-    records_dir = record_files[0].split('/')[:-1] 
-    records_dir = '/'.join(records_dir)
+    records_dir = os.path.dirname(record_files[0])
     raw_dataset = tf.data.TFRecordDataset(record_files)
     raw_dataset = raw_dataset.map(lambda x: deserialize(x, records_dir))
     return raw_dataset
@@ -187,19 +191,36 @@ def filter_fn(input_dict):
     else:
         return True
     
-def run_pipeline(dataset,
-                 batch_size, 
-                 shuffle=True, 
-                 repeat=1, 
-                 window_size=200, 
-                 sampling=True, 
-                 normalize='zero-mean',
-                 probed_frac=0.5,
-                 random_frac=0,
-                 same_frac=0.5,
-                 num_cls=None,
-                 aversion='base',
-                 cache=True):
+def get_loader(dataset,
+               batch_size=None,
+               window_size=200,
+               probed_frac=.2,
+               random_frac=.1,
+               same_frac=None,
+               sampling=True,
+               shuffle=False,
+               repeat=1,
+               num_cls=None,
+               normalize='zero-mean',
+               cache=False,
+               aversion='base'):
+
+
+    assert isinstance(dataset, (list, str)), '[ERROR] Invalid format'
+    assert batch_size is not None, '[ERROR] Undefined batch size'
+    if same_frac is None:
+        same_frac = random_frac
+        
+    print('[INFO] Probed: {:.2f} Random: {:.2f} Same: {:.2f}'.format(probed_frac, random_frac, same_frac))
+    print('[INFO] Normalization: ', normalize)
+    
+
+    if isinstance(dataset, list):
+        dataset = load_records_v2(dataset)
+
+    if isinstance(dataset, str):
+        dataset = load_records(records_dir=dataset)
+        
     if shuffle:
         SHUFFLE_BUFFER = 10000
         dataset = dataset.shuffle(SHUFFLE_BUFFER)
@@ -215,10 +236,7 @@ def run_pipeline(dataset,
     # CREATE WINDOWS
     dataset = pp.to_windows(dataset,
                          window_size=window_size,
-                         sampling=sampling)
-    
-    return dataset
-    
+                         sampling=sampling)        
     
     if normalize is None:
         dataset = dataset.map(pp.nothing)
@@ -252,125 +270,5 @@ def run_pipeline(dataset,
         dataset = dataset.cache()
 
     #PREFETCH BATCHES
-    dataset = dataset.prefetch(2)
-
+    dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset
-
-def get_loader(dataset,
-               batch_size=None,
-               window_size=200,
-               probed_frac=.2,
-               random_frac=.1,
-               same_frac=None,
-               sampling=True,
-               shuffle=False,
-               repeat=1,
-               num_cls=None,
-               normalize='zero-mean',
-               cache=False,
-               aversion='base',
-               distributed=False,
-               target_path='.'):
-
-
-    assert isinstance(dataset, (list, str)), '[ERROR] Invalid format'
-    assert batch_size is not None, '[ERROR] Undefined batch size'
-    if same_frac is None:
-        same_frac = random_frac
-        
-    print('[INFO] Probed: {:.2f} Random: {:.2f} Same: {:.2f}'.format(probed_frac, random_frac, same_frac))
-    print('[INFO] Normalization: ', normalize)
-    
-    if distributed:
-        print('[INFO] Creating validation and train datasets')
-        training_dataset, validation_dataset = \
-                    load_records_distributed(dataset, 
-                                             validation=0.2, 
-                                             target_path=target_path)
-        training_dataset   = run_pipeline(training_dataset,
-                                          batch_size=batch_size,
-                                          window_size=window_size,
-                                          probed_frac=probed_frac,
-                                          random_frac=random_frac,
-                                          same_frac=same_frac,
-                                          sampling=sampling,
-                                          shuffle=shuffle,
-                                          repeat=repeat,
-                                          num_cls=num_cls,
-                                          normalize=normalize,
-                                          cache=cache,
-                                          aversion=aversion)
-        
-        validation_dataset = run_pipeline(validation_dataset,
-                                          batch_size=batch_size,
-                                          window_size=window_size,
-                                          probed_frac=probed_frac,
-                                          random_frac=random_frac,
-                                          same_frac=same_frac,
-                                          sampling=sampling,
-                                          shuffle=shuffle,
-                                          repeat=repeat,
-                                          num_cls=num_cls,
-                                          normalize=normalize,
-                                          cache=cache,
-                                          aversion=aversion)
-                
-        return training_dataset, validation_dataset
-    else:
-        if isinstance(dataset, list):
-            dataset = load_records_v2(dataset, batch_size)
-
-        if isinstance(dataset, str):
-            dataset = load_records(records_dir=dataset)
-            
-        if shuffle:
-            SHUFFLE_BUFFER = 10000
-            dataset = dataset.shuffle(SHUFFLE_BUFFER)
-    
-        # REPEAT LIGHT CURVES
-        if repeat > 1:
-            print('[INFO] Repeating dataset x{} times'.format(repeat))
-            dataset = dataset.repeat(repeat)
-        
-        dataset = dataset.filter(filter_fn)
-        
-        
-        # CREATE WINDOWS
-        dataset = pp.to_windows(dataset,
-                             window_size=window_size,
-                             sampling=sampling)        
-        
-        if normalize is None:
-            dataset = dataset.map(pp.nothing)
-            
-        if normalize == 'zero-mean':
-            dataset = dataset.map(pp.standardize)
-        
-        if normalize == 'random-mean':
-            dataset = dataset.map(pp.random_mean)
-    
-        if normalize == 'minmax':
-            dataset = dataset.map(pp.min_max_scaler)
-            
-        
-        dataset, shapes = mask_dataset(dataset,
-                               msk_frac=probed_frac,
-                               rnd_frac=random_frac,
-                               same_frac=same_frac,
-                               window_size=window_size)
-        
-        dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
-    
-        # FORMAT INPUT DICTONARY
-        dataset = dataset.map(lambda x: format_inp_astromer(x,
-                                                    num_cls=num_cls,
-                                                    aversion=aversion),
-                      num_parallel_calls=tf.data.experimental.AUTOTUNE)
-        
-        if cache:
-            print('[INFO] Cache activated')
-            dataset = dataset.cache()
-    
-        #PREFETCH BATCHES
-        dataset = dataset.prefetch(2)
-        return dataset

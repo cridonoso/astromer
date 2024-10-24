@@ -13,6 +13,8 @@ from tensorflow.keras.optimizers import Adam
 from datetime import datetime
 
 from src.training.scheduler import CustomSchedule
+from src.data.loaders import get_validation
+
 from presentation.pipelines.steps.model_design import build_model, load_pt_model
 from presentation.pipelines.steps.load_data import build_loader
 from presentation.pipelines.steps.metrics import evaluate_ft
@@ -90,17 +92,19 @@ def run(opt):
     os.makedirs(EXPDIR, exist_ok=True)
 
     # ========== DATA ========================================
-    loaders = build_loader(data_path=opt.data, 
+    sset_dictonary = get_validation(os.path.join(opt.data, 'train'), 
+                                    validation=0.2, 
+                                    test_folder=os.path.join(opt.data, 'test'),
+                                    target_path=EXPDIR)
+    
+    loaders = build_loader(data_path=sset_dictonary, 
                            params=opt.__dict__,
                            batch_size=opt.bs,
                            debug=opt.debug,
                            normalize=opt.norm,
                            sampling=opt.sampling,
                            repeat=opt.repeat,
-                           return_test=True,
-                           distributed=True,
-                           target_path=EXPDIR,
-                            )
+                           return_test=True)
     
     train_batches = mirrored_strategy.experimental_distribute_dataset(loaders['train'])
     valid_batches = mirrored_strategy.experimental_distribute_dataset(loaders['validation'])

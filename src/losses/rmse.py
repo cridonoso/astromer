@@ -15,10 +15,8 @@ def custom_rmse(y_true, y_pred, mask=None, weights=None, root=True):
     mse_mean = tf.reduce_mean(mse_mean)
     
     if root:
-        print('[INFO] Using RMSE')
         return tf.math.sqrt(mse_mean)
     else:
-        print('[INFO] Using MSE')
         return mse_mean
     
 def pearson_loss(y_true, y_pred, mask):
