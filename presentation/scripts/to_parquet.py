@@ -14,13 +14,12 @@ from joblib import Parallel, delayed
 
 def process_sample(i, row):
     if 'OGLE' in row['path']:
-        df = pd.read_csv(row['path'], delim_whitespace=True)
-        
+        df = pd.read_csv(row['path'], sep='\s+')
     elif 'lmc' in row['path'] or \
          'bul' in row['path'] or \
          'car' in row['path'] or \
          'smc' in row['path']: 
-        df = pd.read_csv(row['path'], delim_whitespace=True)
+        df = pd.read_csv(row['path'], sep='\s+')
         df = df.iloc[:, :3]
     else:
         df = pd.read_csv(row['path'], engine='c', na_filter=False)
@@ -31,11 +30,12 @@ def process_sample(i, row):
     return df
 
 def process_sample_2(i, row):
-    df = pd.read_csv(row['path'], names=['mjd', 'mag', 'err'], delim_whitespace=True)
+    df = pd.read_csv(row['path'], names=['mjd', 'mag', 'err'], sep='\s+')
     df = df.iloc[:, :3]
     df.columns = ['mjd', 'mag', 'errmag']
     df['newID'] = row.newID*np.ones(df.shape[0]).astype(np.int64)
     return df
+    
 def run(opt):
     
     opt.data = os.path.normpath(opt.data)
@@ -60,7 +60,7 @@ def run(opt):
 
     threads = Parallel(n_jobs=opt.n_jobs, backend='loky')
 
-    dfs = threads(delayed(process_sample_2)(i, row) for i, row in metadata.iterrows()) 
+    dfs = threads(delayed(process_sample)(i, row) for i, row in metadata.iterrows()) 
 
     ids_parquet = []
     for batch, begin in enumerate(np.arange(0, len(dfs), opt.samples_per_chunk)):

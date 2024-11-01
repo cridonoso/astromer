@@ -164,14 +164,16 @@ class DataPipeline:
         b = [self.context_features_dtype, self.sequential_features_dtype]
         c = ['context', 'sequence']
         d = [self.metadata, sample]
+        
         for features, fdtype, name, df in zip(a, b, c, d):
             partial = []
-
             for key in features:
-                if df[key].dtype == object:
+                if df[key].dtype in [object, 'string']:
                     partial.append('string')
-                if df[key].dtype == float:
+
+                if np.issubdtype(df[key].dtype, np.floating):
                     partial.append('float')
+
                 if np.issubdtype(df[key].dtype, np.integer):
                     partial.append('integer')
 
@@ -298,7 +300,7 @@ class DataPipeline:
         shards_data = []
         for shard in range(n_shards):
             # Get the shard number padded with 0s
-            shard_name = str(shard+1).rjust(name_length, '0')
+            shard_name = str(shard).rjust(name_length, '0')
             # Get the shard store name
             shard_path= os.path.join(root, '{}.record'.format(shard_name))
             # Get shard observations

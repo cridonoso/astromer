@@ -40,7 +40,6 @@ def positional_encoding(times, d_model, base=10000, mjd=False, c=2.):
             indices = tf.tile(indices, [tf.shape(times)[0], 1])
             indices = tf.expand_dims(indices, 2)
         
-        print(f'[INFO] Using PE with c: {c}')
         angle_rads = get_angles_astromer(indices, d_model)
         
         # SIN AND COS
@@ -56,6 +55,11 @@ def positional_encoding(times, d_model, base=10000, mjd=False, c=2.):
         pos_encoding = tf.transpose(x_transpose, [2, 1, 0])
         return tf.cast(pos_encoding, dtype=tf.float32)
 
+class PositionalEncoder2(tf.keras.layers.Layer):
+    def call(self, times, d_model, base=10000, mjd=False, c=2.):
+        return positional_encoding(times, d_model, base=base, mjd=mjd, c=c)
+
+   
 class PositionalEncoder(tf.keras.layers.Layer):
     def __init__(self, d_model, base=1000, c=2, **kwargs):
         super(PositionalEncoder, self).__init__(**kwargs) 

@@ -14,8 +14,8 @@ from presentation.pipelines.steps.model_design import load_pt_model, build_class
 from presentation.pipelines.steps.load_data import build_loader 
 from presentation.pipelines.steps.metrics import evaluate_ft, evaluate_clf
 
-def clf_step(opt, data_path, mlp_arch='avg_mlp'):
-    factos = data_path.split('/')
+def clf_step(opt, mlp_arch='avg_mlp'):
+    factos = opt.data.split('/')
     ft_model = '/'.join(factos[-3:])
     
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
@@ -29,7 +29,7 @@ def clf_step(opt, data_path, mlp_arch='avg_mlp'):
     astromer, model_config = load_pt_model(FTDIR)
 
     # ========== DATA ========================================
-    loaders = build_loader(data_path, 
+    loaders = build_loader(opt.data, 
                            model_config, 
                            batch_size=opt.bs, 
                            clf_mode=True, 
@@ -81,6 +81,8 @@ def clf_step(opt, data_path, mlp_arch='avg_mlp'):
             
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--data', default='./data/records/alcock/fold_0/alcock_20', type=str,
+                    help='DOWNSTREAM data path')
     parser.add_argument('--exp-name', default='classification', type=str,
                     help='Project name')
     parser.add_argument('--pt-model', default='-1', type=str,
@@ -96,27 +98,6 @@ if __name__ == '__main__':
 
     opt = parser.parse_args()        
     
-    datapaths = [
-                 './data/records/alcock/fold_0/alcock_20', 
-                 './data/records/alcock/fold_1/alcock_20',
-                 './data/records/alcock/fold_2/alcock_20',
-                 './data/records/alcock/fold_0/alcock_100', 
-                 './data/records/alcock/fold_1/alcock_100',
-                 './data/records/alcock/fold_2/alcock_100',
-                 './data/records/alcock/fold_0/alcock_500', 
-                 './data/records/alcock/fold_1/alcock_500',
-                 './data/records/alcock/fold_2/alcock_500',
-                 './data/records/atlas/fold_0/atlas_20', 
-                 './data/records/atlas/fold_1/atlas_20',
-                 './data/records/atlas/fold_2/atlas_20',
-                 './data/records/atlas/fold_0/atlas_100', 
-                 './data/records/atlas/fold_1/atlas_100',
-                 './data/records/atlas/fold_2/atlas_100',
-                 './data/records/atlas/fold_0/atlas_500', 
-                 './data/records/atlas/fold_1/atlas_500',
-                 './data/records/atlas/fold_2/atlas_500'
-    ]
     
     for clf_arch in ['avg_mlp']:
-        for dp in datapaths:
-            clf_step(opt, dp, clf_arch)
+        clf_step(opt, clf_arch)

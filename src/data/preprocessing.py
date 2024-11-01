@@ -90,10 +90,12 @@ def min_max_scaler(batch, on='input', axis=0):
     
     return batch
 
-def sample_lc(sample, max_obs, binary=True):
+@tf.function
+def sample_lc(sample, max_obs=200, binary=False):
     '''
     Sample a random window of "max_obs" observations from the input sequence
     '''
+    sample = sample.copy()
     if binary:
         input_dict = deserialize(sample)
     else:
@@ -121,12 +123,13 @@ def get_window(sequence, length, pivot, max_obs):
 
     sliced = tf.slice(sequence, [pivot, 0], [end, -1])
     return sliced
-
+    
+@tf.function
 def get_windows(sample, max_obs, binary=True):
     if binary:
         input_dict = deserialize(sample)
     else:
-        input_dict = sample
+        input_dict = sample.copy()
 
     sequence = input_dict['input']
     rest = input_dict['length']%(max_obs)

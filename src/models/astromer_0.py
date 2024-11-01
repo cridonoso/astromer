@@ -263,6 +263,7 @@ def get_ASTROMER(num_layers=2,
 
 ### KERAS MODEL 
 class CustomModel(Model):
+    __name__ = 'zero'
     def __init__(self,correct_loss=False, loss_format='mse', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.loss_format = loss_format

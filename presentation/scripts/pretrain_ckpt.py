@@ -6,9 +6,10 @@ import os
 
 from tensorflow.keras.optimizers import Adam
 from datetime import datetime
+from tqdm import tqdm
 
 from src.training.scheduler import CustomSchedule
-from src.training.utils import train
+from src.training.utils import train_step, test_step, tensorboard_log
 
 from presentation.pipelines.steps.model_design import build_model, load_pt_model
 from presentation.pipelines.steps.load_data import build_loader
@@ -16,7 +17,7 @@ from presentation.pipelines.steps.metrics import evaluate_ft
 
 
 def replace_config(source, target):
-    for key in ['data', 'no_cache', 'exp_name', 'checkpoint', 
+    for key in ['data', 'no_cache', 'exp_name', 'checkpoisnt', 
                 'gpu', 'lr', 'bs', 'patience', 'num_epochs', 'scheduler']:
         target[key] = source[key]
     return target
@@ -64,13 +65,76 @@ def run(opt):
         toml.dump(opt.__dict__, f)
 
     
-    train(astromer, optimizer, 
-          train_data=loaders['train'], 
-          validation_data=loaders['validation'], 
-          num_epochs=2 if opt.debug else opt.num_epochs, 
-          es_patience=opt.patience, 
-          project_folder=EXPDIR)
+    # TRAINING LOOP
+    train_writer = tf.summary.create_file_writer(os.path.join(EXPDIR, 'tensorboard', 'train'))
+    valid_writer = tf.summary.create_file_writer(os.path.join(EXPDIR, 'tensorboard', 'validation'))
 
+    pbar  = tqdm(range(opt.num_epochs), total=opt.num_epochs)
+    pbar.set_description("Epoch 0 (p={}) - rmse: -/- rsquare: -/-", refresh=True)
+    pbar.set_postfix(item=0)    
+
+    # ========= Training Loop ==================================
+    es_count = 0
+    min_loss = 1e9
+    for epoch in pbar:
+        pbar.set_postfix(item1=epoch)
+        epoch_tr_rmse    = []
+        epoch_tr_rsquare = []
+        epoch_tr_loss    = []
+        epoch_vl_rmse    = []
+        epoch_vl_rsquare = []
+        epoch_vl_loss    = []
+
+        for numbatch, batch in enumerate(loaders['train']):
+            pbar.set_postfix(item=numbatch)
+            metrics = train_step(astromer, batch, optimizer)
+            epoch_tr_rmse.append(metrics['rmse'])
+            epoch_tr_rsquare.append(metrics['rsquare'])
+            epoch_tr_loss.append(metrics['loss'])
+
+        for batch in loaders['validation']:
+            metrics = test_step(astromer, batch)
+            epoch_vl_rmse.append(metrics['rmse'])
+            epoch_vl_rsquare.append(metrics['rsquare'])
+            epoch_vl_loss.append(metrics['loss'])
+
+        tr_rmse    = tf.reduce_mean(epoch_tr_rmse)
+        tr_rsquare = tf.reduce_mean(epoch_tr_rsquare)
+        vl_rmse    = tf.reduce_mean(epoch_vl_rmse)
+        vl_rsquare = tf.reduce_mean(epoch_vl_rsquare)
+        tr_loss    = tf.reduce_mean(epoch_tr_loss)
+        vl_loss    = tf.reduce_mean(epoch_vl_loss)
+
+        tensorboard_log('loss', tr_loss, train_writer, step=epoch)
+        tensorboard_log('loss', vl_loss, valid_writer, step=epoch)
+        
+        tensorboard_log('rmse', tr_rmse, train_writer, step=epoch)
+        tensorboard_log('rmse', vl_rmse, valid_writer, step=epoch)
+        
+        tensorboard_log('rsquare', tr_rsquare, train_writer, step=epoch)
+        tensorboard_log('rsquare', vl_rsquare, valid_writer, step=epoch)
+        
+        if epoch % 50 == 0:
+            print('[INFO] Saving chekcpoints at epoch {}'.format(epoch))
+            astromer.save_weights(os.path.join(EXPDIR, 'ckpts', 'epoch_{}'.format(epoch)))
+
+        if tf.math.greater(min_loss, vl_rmse):
+            min_loss = vl_rmse
+            es_count = 0
+            astromer.save_weights(os.path.join(EXPDIR, 'ckpts', 'best_{}'.format(epoch)))
+        else:
+            es_count = es_count + 1
+
+        if es_count == opt.patience:
+            print('[INFO] Early Stopping Triggered at epoch {:03d}'.format(epoch))
+            break
+        
+        pbar.set_description("Epoch {} (p={}) - rmse: {:.3f}/{:.3f} rsquare: {:.3f}/{:.3f}".format(epoch, 
+                                                                                            es_count,
+                                                                                            tr_rmse,
+                                                                                            vl_rmse,
+                                                                                            tr_rsquare,
+                                                                                            vl_rsquare))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

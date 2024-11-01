@@ -1,6 +1,8 @@
 import tensorflow as tf
 import multiprocessing
+import numpy as np
 import glob
+import toml
 import os
 from src.data import preprocessing as pp
 from src.data.masking import mask_dataset
@@ -11,6 +13,49 @@ from src.data.record import deserialize
 
 
 
+def get_validation(path, validation=0.2, test_folder=None, target_path=''):
+    file = os.path.join(target_path, 'train_val_split.toml')
+    if os.path.exists(file):
+        print('[INFO] Loading train and validation datasets')
+        with open(file, 'r') as f:
+            output = toml.load(f)
+        return output
+    
+    records_path = glob.glob(os.path.join(path, '*', 'fold_*', '*', '*.record'))
+    number_records = len(records_path)
+    indices = np.arange(number_records)
+    np.random.shuffle(indices)
+    val_indices = indices[:int(validation*number_records)]
+    train_indices = indices[int(validation*number_records):]
+    validation_paths  = np.array(records_path)[val_indices].tolist()
+    train_paths       = np.array(records_path)[train_indices].tolist()
+
+    output = {'validation': validation_paths, 'train': train_paths}
+    
+    if test_folder is not None:
+        test_paths = glob.glob(os.path.join(test_folder, '*.record'))
+        output['test'] = test_paths
+        
+    if target_path is not None:
+        with open(file, 'w') as f:
+            toml.dump(output, f )
+        print('[INFO] Train and validation samples saved at {}'.format(file))
+    return output
+
+def load_records_v2(record_files):
+    """
+    Load records files containing serialized light curves.
+
+    Args:
+        records_dir (str): records folder
+    Returns:
+        type: tf.Dataset instance
+    """
+    records_dir = os.path.dirname(record_files[0])
+    raw_dataset = tf.data.TFRecordDataset(record_files)
+    raw_dataset = raw_dataset.map(lambda x: deserialize(x, records_dir))
+    return raw_dataset
+    
 def load_records(records_dir):
     """
     Load records files containing serialized light curves.
@@ -27,6 +72,28 @@ def load_records(records_dir):
     raw_dataset = tf.data.TFRecordDataset(record_files)
     raw_dataset = raw_dataset.map(lambda x: deserialize(x, records_dir))
     return raw_dataset
+
+def load_records_distributed(records_dir, validation, target_path):
+    """
+    Load records files containing serialized light curves.
+
+    Args:
+        records_dir (str): records folder
+    Returns:
+        type: tf.Dataset instance
+    """
+
+    paths = get_validation(records_dir,
+                           validation=validation, 
+                           target_path=target_path)
+    
+    datasets = []
+    for sset in paths.keys():
+        raw_dataset = tf.data.TFRecordDataset(paths[sset])
+        raw_dataset = raw_dataset.map(lambda x: deserialize(x, os.path.join(records_dir, sset)))
+        datasets.append(raw_dataset)
+
+    return datasets
 
 def create_generator(list_of_arrays, labels=None, ids=None):
     """
@@ -147,13 +214,13 @@ def get_loader(dataset,
     print('[INFO] Probed: {:.2f} Random: {:.2f} Same: {:.2f}'.format(probed_frac, random_frac, same_frac))
     print('[INFO] Normalization: ', normalize)
     
-    
+
     if isinstance(dataset, list):
-        dataset = load_numpy(dataset)
+        dataset = load_records_v2(dataset)
 
     if isinstance(dataset, str):
         dataset = load_records(records_dir=dataset)
-    
+        
     if shuffle:
         SHUFFLE_BUFFER = 10000
         dataset = dataset.shuffle(SHUFFLE_BUFFER)
@@ -165,11 +232,12 @@ def get_loader(dataset,
     
     dataset = dataset.filter(filter_fn)
     
+    
     # CREATE WINDOWS
     dataset = pp.to_windows(dataset,
                          window_size=window_size,
-                         sampling=sampling)
-   
+                         sampling=sampling)        
+    
     if normalize is None:
         dataset = dataset.map(pp.nothing)
         
@@ -188,6 +256,7 @@ def get_loader(dataset,
                            rnd_frac=random_frac,
                            same_frac=same_frac,
                            window_size=window_size)
+    
     dataset = dataset.padded_batch(batch_size, padded_shapes=shapes)
 
     # FORMAT INPUT DICTONARY
@@ -200,7 +269,6 @@ def get_loader(dataset,
         print('[INFO] Cache activated')
         dataset = dataset.cache()
 
-    # #PREFETCH BATCHES
-    dataset = dataset.prefetch(2)
-
+    #PREFETCH BATCHES
+    dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
     return dataset

@@ -57,8 +57,8 @@ def get_ASTROMER(num_layers=2,
     if trainable_mask:
         print('[INFO] Adding trainable MSK token')
         placeholder = AddMSKToken(trainable=True, 
-                                    window_size=window_size, 
-                                    on=['input'], name='msk_token')(placeholder)
+                                  window_size=window_size, 
+                                  on=['input'], name='msk_token')(placeholder)
 
     encoder = Encoder(window_size=window_size,
                       num_layers=num_layers,
@@ -83,6 +83,7 @@ def get_ASTROMER(num_layers=2,
                        inputs=placeholder, outputs=x, name="ASTROMER-1")
 
 class CustomModel(Model):
+    __name__ = 'base'
     def __init__(self, correct_loss=False, loss_format='rmse', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.loss_format = loss_format
@@ -96,28 +97,19 @@ class CustomModel(Model):
             rmse = custom_rmse(y_true=y['target'],
                                y_pred=y_pred,
                                mask=y['mask_out'],
-                               weights=y['w_error'] if self.correct_loss else None)
-            
-            corr = pearson_loss(y['target'], y_pred, x['mask_in'])
+                               weights=y['w_error'] if self.correct_loss else None,
+                               root=True if self.loss_format == 'rmse' else False)
             
             r2_value = custom_r2(y_true=y['target'], 
                                  y_pred=y_pred, 
                                  mask=y['mask_out'])
             
-            if self.loss_format == 'rmse':
-                loss = rmse
-                
-            if self.loss_format == 'rmse+p':
-                loss = rmse + corr
-            
-            if self.loss_format == 'p':
-                loss = corr
                 
         trainable_vars = self.trainable_variables
-        gradients = tape.gradient(loss, trainable_vars)
+        gradients = tape.gradient(rmse, trainable_vars)
         self.optimizer.apply_gradients(zip(gradients, trainable_vars))
 
-        return {'loss': loss, 'r_square':r2_value, 'rmse':rmse, 'p': corr}
+        return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
 
     def test_step(self, data):
         x, y = data
@@ -125,23 +117,14 @@ class CustomModel(Model):
         rmse = custom_rmse(y_true=y['target'],
                            y_pred=y_pred,
                            mask=y['mask_out'],
+                           root=False if self.loss_format == 'mse' else True,
                            weights=y['w_error'] if self.correct_loss else None)
-        corr = pearson_loss(y['target'], y_pred, x['mask_in'])
         
         r2_value = custom_r2(y_true=y['target'], 
                              y_pred=y_pred, 
                              mask=y['mask_out'])
         
-        if self.loss_format == 'rmse':
-            loss = rmse
-
-        if self.loss_format == 'rmse+p':
-            loss = rmse + corr
-
-        if self.loss_format == 'p':
-            loss = corr
-            
-        return {'loss': loss, 'r_square':r2_value, 'rmse':rmse, 'p': corr}
+        return {'loss': rmse, 'r_square':r2_value, 'rmse':rmse}
     
     def predict_step(self, data):
         x, y = data

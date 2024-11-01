@@ -1,33 +1,64 @@
 #!/bin/bash
-
-# model_paths=('./presentation/results/macho_1e3/2024-08-06_10-22-38/'
-#              './presentation/results/macho_1e3/2024-08-05_00-59-21/')
-# model_paths=('./presentation/results/macho_100/2024-07-18_18-21-35'
-#              './presentation/results/macho_1000/2024-07-18_20-15-41'
-#              './presentation/results/macho_10000/2024-07-18_20-16-07'
-#              './presentation/results/macho_100000/2024-07-19_10-03-35'
-#              './presentation/results/macho_500000/2024-07-23_14-47-04'
-#              './presentation/results/macho_500000/2024-07-30_09-04-21'
-#              './presentation/results/macho_500000/2024-07-30_09-04-45'
-#              './presentation/results/macho_750000/2024-07-23_14-45-39'
-#              './presentation/results/macho_1000000/2024-07-23_14-46-24')
             
-# model_paths=('./presentation/results/macho_alpha/2024-08-13_11-26-48'
-#              './presentation/results/macho_alpha/2024-08-13_23-16-07'
-#              './presentation/results/macho_alpha/2024-08-13_23-16-52'
-#              './presentation/results/macho_alpha/2024-08-15_20-48-51'
-#              './presentation/results/macho_alpha/2024-08-15_20-48-57'
-#              './presentation/results/macho_alpha/2024-08-15_20-49-05')
+data_paths=('./data/shared/records/alcock/fold_0/alcock_20' 
+            './data/shared/records/alcock/fold_1/alcock_20'
+            './data/shared/records/alcock/fold_2/alcock_20'
+            './data/shared/records/alcock/fold_0/alcock_100' 
+            './data/shared/records/alcock/fold_1/alcock_100'
+            './data/shared/records/alcock/fold_2/alcock_100'
+            './data/shared/records/alcock/fold_0/alcock_500' 
+            './data/shared/records/alcock/fold_1/alcock_500'
+            './data/shared/records/alcock/fold_2/alcock_500'
+            './data/shared/records/atlas/fold_0/atlas_20' 
+            './data/shared/records/atlas/fold_1/atlas_20'
+            './data/shared/records/atlas/fold_2/atlas_20'
+            './data/shared/records/atlas/fold_0/atlas_100' 
+            './data/shared/records/atlas/fold_1/atlas_100'
+            './data/shared/records/atlas/fold_2/atlas_100'
+            './data/shared/records/atlas/fold_0/atlas_500' 
+            './data/shared/records/atlas/fold_1/atlas_500'
+            './data/shared/records/atlas/fold_2/atlas_500')
+                 
+# model_paths=('./presentation/results/nsamples/2024-09-01_15-36-42'
+#              './presentation/results/nsamples/2024-09-01_13-48-56'
+#              './presentation/results/nsamples/2024-09-01_13-41-27'
+#              './presentation/results/nsamples/2024-09-01_14-09-09'
+#              './presentation/results/nsamples/2024-09-01_13-44-34')
 
-model_paths=('./presentation/results/paper/')
+# model_paths=('./presentation/results/new/2024-08-29_15-53-42'
+#              './presentation/results/new/2024-09-01_20-04-41')
+
+# model_paths=('./presentation/results/mask-alpha/2024-09-07_18-49-20'
+#              './presentation/results/mask-alpha/2024-09-08_13-47-31'
+#              './presentation/results/mask-alpha/2024-09-05_05-46-12'
+#              './presentation/results/mask-alpha/2024-09-05_20-03-00'
+#              './presentation/results/mask-alpha/2024-09-04_11-40-14'
+#              './presentation/results/mask-alpha/2024-09-09_06-32-27'
+#              './presentation/results/mask-alpha/2024-09-06_15-25-45')
+
+# model_paths=('./presentation/results/temperature/2024-09-20_12-27-40'
+#              './presentation/results/temperature/2024-09-13_15-46-31'
+#              './presentation/results/temperature/2024-09-20_12-24-35'
+#              './presentation/results/temperature/2024-09-16_14-45-05'
+#              './presentation/results/temperature/2024-09-20_12-25-37',
+#              './presentation/results/temperature/2024-09-25_10-21-22')
+
+#model_paths=('./presentation/results/astromer_0.5/2024-10-01_22-30-05'
+#             './presentation/results/astromer_0.5/2024-10-01_22-30-40')
+
+model_paths=('./presentation/results/final/v1.2')
+
+#for str in ${model_paths[@]}; do
+#    echo [INFO] Testing $str
+#    python -m presentation.scripts.test_model  --model $str/pretraining --gpu 3
+#done
 
 for str in ${model_paths[@]}; do
-  echo [INFO] Testing $str
-  python -m presentation.scripts.test_model  --model $str/pretraining --gpu 1
-  
-  echo [INFO] Starting FT $str
-  python -m presentation.pipelines.pipeline_0.finetune --pt-model $str/pretraining --gpu 1
-  
-  echo [INFO] Starting CLF $str
-  python -m presentation.pipelines.pipeline_0.classify --pt-model $str/pretraining --gpu 1
+    for dp in ${data_paths[@]}; do
+        echo [INFO] Starting FT $str
+        python -m presentation.pipelines.pipeline_0.finetune --pt-model $str/pretraining --data $dp --gpu 3
+        
+        echo [INFO] Starting CLF $str
+        python -m presentation.pipelines.pipeline_0.classify --pt-model $str/pretraining --data $dp --gpu 3
+    done
 done
