@@ -17,28 +17,6 @@ import polars as pl
 
 os.environ["CUDA_VISIBLE_DEVICES"]="-1"
 
-class CustomCleanPipeline(DataPipeline):
-    def lightcurve_step(self, inputs):
-        """
-        Preprocessing applied to each light curve separately
-        """
-        # First feature is time
-        inputs = inputs.sort(self.sequential_features[0], descending=True) 
-        p99 = inputs.quantile(0.99, 'nearest')
-        p01 = inputs.quantile(0.01, 'nearest')
-        inputs = inputs.filter(pl.col('mag') < p99['mag'])
-        inputs = inputs.filter(pl.col('mag') > p01['mag'])
-        return inputs
-
-    def observations_step(self):
-        """
-        Preprocessing applied to all observations. Filter only
-        """
-        fn_0 = pl.col("errmag") < 1.  # Clean the data on the big lazy dataframe
-        fn_1 = pl.col("errmag") > 0.
-
-        return fn_0 & fn_1
-
 def run(opt):
     
     start = time.time()
@@ -86,7 +64,7 @@ def run(opt):
         metadata = pd.merge(metadata, curr_meta[cols_to_use], left_index=True, right_index=True, how='outer')
 
         
-    pipeline = CustomCleanPipeline(metadata=metadata,
+    pipeline = DataPipeline(metadata=metadata,
                                    config_path=opt.config)
     
     var = pipeline.run(n_jobs=opt.njobs,

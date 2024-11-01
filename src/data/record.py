@@ -345,7 +345,7 @@ class DataPipeline:
                                               str(s).rjust(3, '0')) for s in self.metadata['shard'].unique()]
 
         scan = pl.scan_parquet(paths)
-
+                
         # Using partial information, extract only the necessary objects
         ID_series = pl.Series(self.metadata[self.id_column].values)
         f1 = pl.col(self.id_column).is_in(ID_series)

@@ -1,15 +1,18 @@
-[general]
-	[general.id_column]
-		value = 'newID'
-		dtype = 'integer'  
-	[general.target]
-		value = './data/records_parquet/macho'
-		dtype = 'string' 
+[id_column]
+value = "newID"
+dtype = "integer"
+
+[target]
+path = "./data/records/macho/" # can be overwritten
+dtype = "string"
 
 [context_features]
-	value = ['label', 'length', 'id']
-	dtypes = ['integer', 'integer', 'string']
+path = "./data/raw_data/macho/cleaned_metadata.parquet"
+test_path = "./data/raw_data/macho/test_metadata.parquet"
+value = [ "ID", "Class", "N", "Band", "Label", "shard",]
+dtypes = [ "string", "string", "integer", "string", "integer", "integer",]
 
 [sequential_features]
-	value = ['dim_0', 'dim_1', 'dim_2']
-	dtypes = ['float', 'float', 'float']
+path = "./data/raw_data/macho/light_curves"
+value = [ "mjd", "mag", "errmag"]
+dtypes = [ "float", "float", "float"]
