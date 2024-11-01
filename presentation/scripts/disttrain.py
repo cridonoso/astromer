@@ -32,6 +32,7 @@ def tensorboard_log(name, value, writer, step=0):
 	with writer.as_default():
 		tf.summary.scalar(name, value, step=step)
 
+@tf.function()
 def train_step(model, inputs, optimizer):
     x, y = inputs
     with tf.GradientTape() as tape:
@@ -49,7 +50,7 @@ def train_step(model, inputs, optimizer):
     gradients = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
     return {'loss':loss, 'rmse': rmse, 'rsquare':r2_value}
-
+@tf.function()
 def test_step(model, inputs):
     x, y = inputs
 
@@ -142,34 +143,38 @@ def run(opt):
         # ========= Training Loop ==================================
         es_count = 0
         min_loss = 1e9
+        batch_idx = 0
         for epoch in pbar:
             pbar.set_postfix(item1=epoch)
-            epoch_tr_rmse    = []
-            epoch_tr_rsquare = []
-            epoch_vl_rmse    = []
-            epoch_vl_rsquare = []
+            epoch_tr_rmse    = 0.
+            epoch_tr_rsquare = 0.
+            epoch_vl_rmse    = 0.
+            epoch_vl_rsquare = 0.
 
             for numbatch, batch in enumerate(train_batches):
                 pbar.set_postfix(item=numbatch)
 
                 metrics = distributed_train_step(astromer, batch, optimizer, mirrored_strategy)
-                epoch_tr_rmse.append(metrics['rmse'])
-                epoch_tr_rsquare.append(metrics['rsquare'])
-
-            for batch in valid_batches:
+                epoch_tr_rmse+=metrics['rmse']
+                epoch_tr_rsquare+=metrics['rsquare']
+                
+                tensorboard_log('rmse', metrics['rmse'], train_writer, step=batch_idx)
+                tensorboard_log('rsquare', metrics['rsquare'], train_writer, step=batch_idx)
+                batch_idx+=1
+            
+            tr_rmse    = epoch_tr_rmse/numbatch
+            tr_rsquare = epoch_tr_rsquare/numbatch
+            
+            for numbatch, batch in enumerate(valid_batches):
                 metrics = distributed_test_step(astromer, batch, mirrored_strategy)
-                epoch_vl_rmse.append(metrics['rmse'])
-                epoch_vl_rsquare.append(metrics['rsquare'])
+                epoch_vl_rmse+=metrics['rmse']
+                epoch_vl_rsquare+=metrics['rsquare']
 
-            tr_rmse    = tf.reduce_mean(epoch_tr_rmse)
-            tr_rsquare = tf.reduce_mean(epoch_tr_rsquare)
-            vl_rmse    = tf.reduce_mean(epoch_vl_rmse)
-            vl_rsquare = tf.reduce_mean(epoch_vl_rsquare)
-
-            tensorboard_log('rmse', tr_rmse, train_writer, step=epoch)
-            tensorboard_log('rsquare', tr_rsquare, train_writer, step=epoch)
-            tensorboard_log('rmse', vl_rmse, valid_writer, step=epoch)
-            tensorboard_log('rsquare', vl_rsquare, valid_writer, step=epoch)
+            vl_rmse    = epoch_vl_rmse/numbatch
+            vl_rsquare = epoch_vl_rsquare/numbatch
+            
+            tensorboard_log('rmse', vl_rmse, valid_writer, step=batch_idx)
+            tensorboard_log('rsquare', vl_rsquare, valid_writer, step=batch_idx)
             
             if tf.math.greater(min_loss, vl_rmse):
                 min_loss = vl_rmse

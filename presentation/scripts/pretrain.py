@@ -16,7 +16,7 @@ from presentation.pipelines.steps.metrics import evaluate_ft
 
 
 def replace_config(source, target):
-    for key in ['data', 'no_cache', 'exp_name', 'checkpoisnt', 
+    for key in ['data', 'no_cache', 'exp_name', 'checkpoint', 
                 'gpu', 'lr', 'bs', 'patience', 'num_epochs', 'scheduler']:
         target[key] = source[key]
     return target

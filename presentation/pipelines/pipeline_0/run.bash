@@ -46,19 +46,19 @@ data_paths=('./data/shared/records/alcock/fold_0/alcock_20'
 #model_paths=('./presentation/results/astromer_0.5/2024-10-01_22-30-05'
 #             './presentation/results/astromer_0.5/2024-10-01_22-30-40')
 
-model_paths=('./presentation/results/astromer_0.5/2024-10-15_09-58-27')
+model_paths=('./presentation/results/final/v1.2')
 
-for str in ${model_paths[@]}; do
-    echo [INFO] Testing $str
-    python -m presentation.scripts.test_model  --model $str/pretraining --gpu 0
-done
+#for str in ${model_paths[@]}; do
+#    echo [INFO] Testing $str
+#    python -m presentation.scripts.test_model  --model $str/pretraining --gpu 3
+#done
 
 for str in ${model_paths[@]}; do
     for dp in ${data_paths[@]}; do
         echo [INFO] Starting FT $str
-        python -m presentation.pipelines.pipeline_0.finetune --pt-model $str/pretraining --data $dp --gpu 0
+        python -m presentation.pipelines.pipeline_0.finetune --pt-model $str/pretraining --data $dp --gpu 3
         
         echo [INFO] Starting CLF $str
-        python -m presentation.pipelines.pipeline_0.classify --pt-model $str/pretraining --data $dp --gpu 0
+        python -m presentation.pipelines.pipeline_0.classify --pt-model $str/pretraining --data $dp --gpu 3
     done
 done
