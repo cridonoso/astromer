@@ -12,10 +12,10 @@ def connect_to_drive():
         # Authenticate if they're not there
         print('[INFO] Need to authenticate')
         # This is what solved the issues:
-        # gauth.GetFlow()
-        # gauth.flow.params.update({'access_type': 'offline'})
-        # gauth.flow.params.update({'approval_prompt': 'force'})
-        gauth.LocalWebserverAuth()
+        gauth.GetFlow()
+        gauth.flow.params.update({'access_type': 'offline'})
+        gauth.flow.params.update({'approval_prompt': 'force'})
+        gauth.LocalWebserverAuth(host_name='0.0.0.0', port_number=8080, open_browser=False, headless=True)
 
     elif gauth.access_token_expired:
         # Refresh them if expired
