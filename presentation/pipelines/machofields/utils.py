@@ -15,7 +15,13 @@ def connect_to_drive():
         gauth.GetFlow()
         gauth.flow.params.update({'access_type': 'offline'})
         gauth.flow.params.update({'approval_prompt': 'force'})
-        gauth.LocalWebserverAuth(host_name='0.0.0.0', port_numbers=[8080], headless=True)
+        # gauth.LocalWebserverAuth(host_name='0.0.0.0', port_numbers=[8080], headless=True)
+        auth_url = gauth.GetAuthUrl()
+        print(f"Please visit the following URL and authenticate: {auth_url}")
+
+        # Wait for the user to complete the authentication process
+        code = input("Enter the authorization code: ")
+        gauth.Auth(code)
 
     elif gauth.access_token_expired:
         # Refresh them if expired
