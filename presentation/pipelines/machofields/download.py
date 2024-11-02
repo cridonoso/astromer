@@ -25,7 +25,6 @@ def run(opt):
     i = 0
     to_change = {}
     for file in pbar:    
-        print(file['originalFilename'])
         if 'metadata' in file['originalFilename']:
             target_file = os.path.join(opt.temp_dir, 'metadata.parquet')
         else:
