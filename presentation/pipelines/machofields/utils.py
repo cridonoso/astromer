@@ -10,7 +10,7 @@ def connect_to_drive():
 
     if gauth.credentials is None:
         # Authenticate if they're not there
-
+        print('[INFO] Need to authenticate')
         # This is what solved the issues:
         gauth.GetFlow()
         gauth.flow.params.update({'access_type': 'offline'})

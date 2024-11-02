@@ -13,6 +13,10 @@ do
             python -m presentation.pipelines.machofields.download --id $idcode \
                                                                   --field $field_n \
                                                                   --target ./data/shared/records/bigmacho
+
+
+
+                                                                  
             echo Transforming to records...
             python -m presentation.pipelines.machofields.to_record --config ./data/shared/records/bigmacho/$field_n/config.toml
     
