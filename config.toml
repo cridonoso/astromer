@@ -1,2 +1,0 @@
-context_features = [ "ID", "Label", "Class",]
-sequential_features = [ "mjd", "mag",]
