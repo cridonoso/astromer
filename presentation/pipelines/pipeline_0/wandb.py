@@ -1,85 +1,120 @@
 import tensorflow as tf
+
+
+# ==== PIPELINE ====
+# Given a set of Hyperparameter we want to 
+# Start pretraining a model
+# Capture validation R2 and RMSE
+# At a given number of batches, evaluate on classification 
+# Capture F1 SCORE
+
 import argparse
-import math
-import toml
+import wandb
 import os
+from tqdm import tqdm
+
 
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
+from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
-from datetime import datetime
+from functools import partial
 
-from src.training.scheduler import CustomSchedule
-from presentation.pipelines.steps.model_design import build_model, load_pt_model
+from presentation.pipelines.steps.model_design import build_model, load_pt_model, build_classifier
 from presentation.pipelines.steps.load_data import build_loader
-from presentation.pipelines.steps.metrics import evaluate_ft
+from presentation.pipelines.steps.metrics import evaluate_clf
+
+from src.training.utils import train_step, test_step
+from src.data.loaders import get_loader
+from src.losses.rmse import custom_rmse
+from src.metrics import custom_r2
 
 
-def replace_config(source, target):
-    for key in ['data', 'no_cache', 'exp_name', 'checkpoint', 
-                'gpu', 'lr', 'bs', 'patience', 'num_epochs', 'scheduler']:
-        target[key] = source[key]
-    return target
+def replace_param(params, replace):
+    for key in replace.keys():
+        print('[INFO] REPLACING {}'.format(key))
+        params[key] = replace[key]
 
-def run(opt):
-    os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
+    return params
 
-    ROOT = './presentation/'
-    trial = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    EXPDIR = os.path.join(ROOT, 'results', opt.exp_name, trial, 'pretraining')
-    os.makedirs(EXPDIR, exist_ok=True)
-
-    # ======= MODEL ========================================
-    if opt.checkpoint != '-1':
-        print('[INFO] Restoring previous training')
-        astromer, pconfig = load_pt_model(opt.checkpoint, optimizer=None)
-        opt.__dict__ = replace_config(source=opt.__dict__, target=pconfig)
-    else:
-        astromer = build_model(opt.__dict__)
+def train(config=None, params=None):
+    with wandb.init(config=config):
+        curr_config = wandb.config
+        params = replace_param(params, curr_config)
+       
+        train_loader = get_loader(os.path.join(params['data'], 'train'),
+                            batch_size=params['bs'],
+                            window_size=params['window_size'],
+                            probed_frac=params['probed'],
+                            random_frac=params['rs'],
+                            same_frac=params['same'],
+                            sampling=True,
+                            shuffle=True,
+                            normalize='zero-mean',
+                            repeat=0,
+                            aversion='base')
         
-    # ========== DATA ========================================
-    loaders = build_loader(data_path=opt.data, 
-                           params=opt.__dict__,
-                           batch_size=opt.bs,
-                           debug=opt.debug,
-                           normalize=opt.norm,
-                           sampling=opt.sampling,
-                           repeat=opt.repeat,
-                           return_test=True,
-                           )
-    # ========== COMPILE =====================================
-    if opt.scheduler:
-        print('[INFO] Using Custom Scheduler')
-        lr = CustomSchedule(d_model=int(opt.head_dim*opt.num_heads))
-    else:
-        lr = opt.lr
+        clf_loaders = build_loader(params['downstream_data'], 
+                                   params, 
+                                   batch_size=params['bs'], 
+                                   clf_mode=True, 
+                                   normalize='zero-mean', 
+                                   sampling=True,
+                                   repeat=1,
+                                   return_test=True)
+        
+        astromer = build_model(params)
 
-    astromer.compile(optimizer=Adam(lr, 
-                     beta_1=0.9,
-                     beta_2=0.98,
-                     epsilon=1e-9,
-                     name='astromer_optimizer'))
 
-    with open(os.path.join(EXPDIR, 'config.toml'), 'w') as f:
-        toml.dump(opt.__dict__, f)
+        optimizer = Adam(params['lr'], 
+                         beta_1=0.9,
+                         beta_2=0.98,
+                         epsilon=1e-9,
+                         name='astromer_optimizer') 
+        
+        pbar  = tqdm(range(params['num_epochs']), total=params['num_epochs'])
+        pbar.set_description("Epoch 0 (p={}) - rmse: -/- rsquare: -/-", refresh=True)
+        pbar.set_postfix(item=0)    
+        for epoch in pbar:
+            # pbar.set_postfix(item1=epoch)
+            for numbatch, batch in enumerate(train_loader):
+                pbar.set_postfix(item=numbatch)
+                metrics = train_step(astromer, batch, optimizer)
+                wandb.log({"batch_loss": metrics['loss'],
+                           "batch_rmse": metrics['rmse'],
+                           "batch_rsquare": metrics['rsquare']})
+                
+                if numbatch % 100 == 0: 
+                    val_loss, val_acc = clf_step(astromer, params, loaders=clf_loaders)       
+                    wandb.log({"accuracy": val_acc, 
+                               'val_clf_loss': val_loss})
 
-    cbks = [TensorBoard(log_dir=os.path.join(EXPDIR, 'tensorboard')),
-            EarlyStopping(monitor='val_loss', patience=opt.patience),
-            ModelCheckpoint(filepath=os.path.join(EXPDIR, 'weights'),
-                            save_weights_only=True,
-                            save_best_only=True,
-                            save_freq='epoch',
-                            verbose=0)]
 
-    astromer.fit(loaders['train'], 
-                 epochs=2 if opt.debug else opt.num_epochs, 
-                 batch_size=5 if opt.debug else opt.bs,
-                 validation_data=loaders['validation'],
-                 validation_batch_size=opt.bs,
-                 callbacks=cbks)
+def clf_step(astromer, params, loaders):    
+    # ========== CLASIFIER ==================================== 
+    model = build_classifier(astromer, 
+                             params, 
+                             False, 
+                             loaders['n_classes'],
+                             arch='avg_mlp',
+                             verbose=0)
+    
+    model.compile(optimizer=Adam(opt.lr, 
+                  name='classifier_optimizer'),
+                  loss=CategoricalCrossentropy(from_logits=True),
+                  metrics=['accuracy'])
+    
+    model.fit(loaders['train'], 
+              epochs=50, 
+              batch_size=opt.bs,
+              validation_data=loaders['validation'],
+              verbose=0)
+    
+    val_loss, val_acc = model.evaluate(loaders['test'])
+    return val_loss, val_acc
 
-    evaluate_ft(astromer, loaders['test'], opt.__dict__)
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser()
 
     # ==== ECOSYSTEM ==================================================
@@ -147,15 +182,36 @@ if __name__ == '__main__':
     parser.add_argument('--mask-format', default='K', type=str,
                         help='mask on Query and Key tokens (QK) or Query tokens only (Q)')
     parser.add_argument('--loss-format', default='rmse', type=str,
-                        help='what consider during loss: rmse - rmse+p - p')
+                        help='what consider during loss: rmse - mse - p')
     parser.add_argument('--use-leak', action='store_true',
                         help='Use Custom Scheduler during training')  
     parser.add_argument('--temperature', default=0., type=float,
                         help='Temperature used within the softmax argument')
 
-
-
-
-
     opt = parser.parse_args()        
-    run(opt)
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
+
+    preloaded = partial(train, params=opt.__dict__)
+
+
+    wandb.login()
+    sweep_config = {
+        'method': 'random',
+        'metric': {
+            'name': 'accuracy',
+            'goal': 'maximize'
+        },
+        'parameters':{
+            'm_alpha': {'values': [-1000000000., -1000., -100., -10., -1., 0., 1.]},
+            'temperature': {'distribution': 'uniform', 'min': 1, 'max':5},
+            'no_msk_token': {'values': [True, False]},
+            'downstream_data': {'values': ['./data/records/alcock/fold_0/alcock_20',
+                                           './data/records/atlas/fold_0/atlas_20']}
+        }
+    }
+
+    sweep_id = wandb.sweep(sweep_config, 
+                           project="pipeline_0")
+
+    wandb.agent(sweep_id, preloaded, count=5)

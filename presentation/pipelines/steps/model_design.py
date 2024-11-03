@@ -138,7 +138,7 @@ def get_skip_avg_mlp(inputs, mask, num_cls):
 
     return y_pred
 
-def build_classifier(astromer, params, astromer_trainable, num_cls=None, arch='avg_mlp'):
+def build_classifier(astromer, params, astromer_trainable, num_cls=None, arch='avg_mlp', verbose=1):
     # Build classifier
     if params['arch'] == 'zero':
         inp_placeholder = build_input_zero(params['window_size'])
@@ -157,8 +157,10 @@ def build_classifier(astromer, params, astromer_trainable, num_cls=None, arch='a
         
         
     mask = 1.- inp_placeholder['mask_in']
-       
-    print('[INFO] Using {} clf architecture with {}'.format(arch, params['arch']))
+    
+    if verbose == 1:
+        print('[INFO] Using {} clf architecture with {}'.format(arch, params['arch']))
+    
     if arch == 'avg_clf':
         output = get_avg_clf(embedding[-1], mask, num_cls)
         
