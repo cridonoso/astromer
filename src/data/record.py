@@ -460,7 +460,7 @@ def deserialize(sample, records_path=None):
         with open(os.path.join(records_path, 'config.toml'), 'r') as f:
             config = toml.load(f)
     except:
-        with open('./data/config.toml', 'r') as f:
+        with open('./data/config_v0.toml', 'r') as f:
             config = toml.load(f)
 
     # Define context features as strings
