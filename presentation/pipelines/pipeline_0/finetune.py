@@ -49,7 +49,6 @@ def ft_step(opt):
     with open(os.path.join(EXPDIR, 'config.toml'), 'w') as f:
         toml.dump(model_config, f)
 
-
     model = train(model, 
                   optimizer, 
                   train_data=loaders['train'], 

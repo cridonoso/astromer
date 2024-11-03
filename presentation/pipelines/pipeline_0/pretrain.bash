@@ -1,6 +1,6 @@
 #!/bin/bash
 
-nsamples=(1000 10000 100000)
+nsamples=(1000)
 
 for str in ${nsamples[@]}; do
    echo TRAINING WITH $str  
