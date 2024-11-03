@@ -41,6 +41,19 @@ def train(config=None, params=None):
         curr_config = wandb.config
         params = replace_param(params, curr_config)
        
+        val_loader = get_loader(os.path.join(params['data'], 'validation'),
+                                batch_size=params['bs'],
+                                window_size=params['window_size'],
+                                probed_frac=params['probed'],
+                                random_frac=params['rs'],
+                                same_frac=params['same'],
+                                sampling=True,
+                                shuffle=False,
+                                normalize='zero-mean',
+                                repeat=0,
+                                cache=True,
+                                aversion='base')
+        
         train_loader = get_loader(os.path.join(params['data'], 'train'),
                             batch_size=params['bs'],
                             window_size=params['window_size'],
@@ -72,10 +85,10 @@ def train(config=None, params=None):
                          name='astromer_optimizer') 
         
         pbar  = tqdm(range(params['num_epochs']), total=params['num_epochs'])
-        pbar.set_description("Epoch 0 (p={}) - rmse: -/- rsquare: -/-", refresh=True)
-        pbar.set_postfix(item=0)    
+        # pbar.set_description("Epoch 0 (p={}) - rmse: -/- rsquare: -/-", refresh=True)
+        # pbar.set_postfix(item=0)    
         for epoch in pbar:
-            # pbar.set_postfix(item1=epoch)
+            pbar.set_postfix(item1=epoch)
             for numbatch, batch in enumerate(train_loader):
                 pbar.set_postfix(item=numbatch)
                 metrics = train_step(astromer, batch, optimizer)
@@ -83,10 +96,24 @@ def train(config=None, params=None):
                            "batch_rmse": metrics['rmse'],
                            "batch_rsquare": metrics['rsquare']})
                 
-                if numbatch % 100 == 0: 
-                    val_loss, val_acc = clf_step(astromer, params, loaders=clf_loaders)       
-                    wandb.log({"accuracy": val_acc, 
-                               'val_clf_loss': val_loss})
+            metrics = val_step(astromer, val_loader)
+            wandb.log(metrics)
+            val_loss, val_acc = clf_step(astromer, params, loaders=clf_loaders)       
+            wandb.log({"val_acc": val_acc, 'val_cce': val_loss})
+
+def val_step(astromer, loader):
+    val_loss, val_rmse, val_rsquare = 0., 0., 0.
+    for numbatch, batch in enumerate(loader):
+        metrics = test_step(astromer, batch)
+        val_loss+=metrics['loss']
+        val_rmse+=metrics['rmse']
+        val_rsquare+=metrics['rsquare']
+    val_loss = val_loss/numbatch
+    val_rmse = val_rsquare/numbatch
+    val_rsquare = val_rmse/numbatch
+    return {"val_loss": val_loss,
+             "val_rmse": val_rmse,
+             "val_rsquare": val_rsquare}  
 
 
 def clf_step(astromer, params, loaders):    
@@ -153,7 +180,7 @@ if __name__ == '__main__':
                         help='Batch size')
     parser.add_argument('--patience', default=20, type=int,
                         help='Earlystopping threshold in number of epochs')
-    parser.add_argument('--num_epochs', default=10000, type=int,
+    parser.add_argument('--num_epochs', default=500, type=int,
                         help='Number of epochs')
     parser.add_argument('--scheduler', action='store_true', help='Use Custom Scheduler during training')
     parser.add_argument('--correct-loss', action='store_true', help='Use error bars to weigh loss')
@@ -202,15 +229,15 @@ if __name__ == '__main__':
     sweep_config = {
         'method': 'random',
         'metric': {
-            'name': 'accuracy',
+            'name': 'val_acc',
             'goal': 'maximize'
         },
         'parameters':{
             'm_alpha': {'values': [-1000000000., -1000., -100., -10., -1., 0., 1.]},
             'temperature': {'distribution': 'uniform', 'min': 1, 'max':5},
             'no_msk_token': {'values': [True, False]},
-            'downstream_data': {'values': ['./data/records/alcock/fold_0/alcock_20',
-                                           './data/records/atlas/fold_0/atlas_20']}
+            'downstream_data': {'values': ['./data/shared/records/alcock/fold_0/alcock_20',
+                                           './data/shared/records/atlas/fold_0/atlas_20']}
         },
         'early_terminate': {
             "type": "hyperband",
