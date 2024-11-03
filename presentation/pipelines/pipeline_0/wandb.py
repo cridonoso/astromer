@@ -105,7 +105,7 @@ def clf_step(astromer, params, loaders):
     
     model.fit(loaders['train'], 
               epochs=50, 
-              batch_size=opt.bs,
+              batch_size=512,
               validation_data=loaders['validation'],
               verbose=0)
     
@@ -188,6 +188,9 @@ if __name__ == '__main__':
     parser.add_argument('--temperature', default=0., type=float,
                         help='Temperature used within the softmax argument')
 
+    parser.add_argument('--sweep-id', default='', type=str,
+                        help='SWEEP ID')
+
     opt = parser.parse_args()        
 
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
@@ -208,10 +211,16 @@ if __name__ == '__main__':
             'no_msk_token': {'values': [True, False]},
             'downstream_data': {'values': ['./data/records/alcock/fold_0/alcock_20',
                                            './data/records/atlas/fold_0/atlas_20']}
+        },
+        'early_terminate': {
+            "type": "hyperband",
+            "eta": 2,
+            "min_iter":2,
+            "max_iter":opt.num_epochs
         }
     }
 
     sweep_id = wandb.sweep(sweep_config, 
-                           project="pipeline_0")
+                project="pipeline_0")
 
     wandb.agent(sweep_id, preloaded, count=5)
