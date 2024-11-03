@@ -20,8 +20,7 @@ data_paths=('./data/records/alcock/fold_0/alcock_20'
             './data/records/atlas/fold_2/atlas_500')
                  
 
-model_paths=('./presentation/results/nsamples/2024-11-03_12-10-45'
-             './presentation/results/nsamples/2024-11-01_16-28-27')
+model_paths=('./presentation/results/n_samples/2024-11-01_16-56-14')
 
 #for str in ${model_paths[@]}; do
 #    echo [INFO] Testing $str
