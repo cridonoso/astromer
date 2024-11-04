@@ -17,8 +17,7 @@ for i in range(10):
     command1 = 'python -m presentation.pipelines.pipeline_0.hp \
                                         --data ./data/records/macho/100000/fold_0/ \
                                         --bs 2500 \
-                                        --gpu {} \
-                                        --debug'.format(gpu)
+                                        --gpu {}'.format(gpu)
 
     
     try:
