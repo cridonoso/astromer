@@ -61,7 +61,7 @@ def train(config=None, params=None):
                             probed_frac=params['probed'],
                             random_frac=params['rs'],
                             same_frac=params['same'],
-                            sampling=True,
+                            sampling=False,
                             shuffle=True,
                             normalize='zero-mean',
                             repeat=0,
