@@ -28,6 +28,7 @@ from src.data.loaders import get_loader
 from src.losses.rmse import custom_rmse
 from src.metrics import custom_r2
 
+tf.executing_eagerly()
 
 def replace_param(params, replace):
     for key in replace.keys():
