@@ -93,19 +93,30 @@ def run(opt):
     os.makedirs(EXPDIR, exist_ok=True)
 
     # ========== DATA ========================================
-    sset_dictonary = get_validation(os.path.join(opt.data, 'train'), 
-                                    validation=0.2, 
-                                    test_folder=os.path.join(opt.data, 'test'),
-                                    target_path=EXPDIR)
-    
-    loaders = build_loader(data_path=sset_dictonary, 
-                           params=opt.__dict__,
-                           batch_size=opt.bs,
-                           debug=opt.debug,
-                           normalize=opt.norm,
-                           sampling=opt.sampling,
-                           repeat=opt.repeat,
-                           return_test=True)
+    if opt.default_loader:
+        loaders = build_loader(data_path=opt.data, 
+                               params=opt.__dict__,
+                               batch_size=opt.bs,
+                               debug=opt.debug,
+                               normalize=opt.norm,
+                               sampling=opt.sampling,
+                               repeat=opt.repeat,
+                               return_test=True,
+                               )
+    else:
+        sset_dictonary = get_validation(os.path.join(opt.data, 'train'), 
+                                        validation=0.2, 
+                                        test_folder=os.path.join(opt.data, 'test'),
+                                        target_path=EXPDIR)
+        
+        loaders = build_loader(data_path=sset_dictonary, 
+                               params=opt.__dict__,
+                               batch_size=opt.bs,
+                               debug=opt.debug,
+                               normalize=opt.norm,
+                               sampling=opt.sampling,
+                               repeat=opt.repeat,
+                               return_test=True)
     
     train_batches = mirrored_strategy.experimental_distribute_dataset(loaders['train'])
     valid_batches = mirrored_strategy.experimental_distribute_dataset(loaders['validation'])
@@ -275,6 +286,8 @@ if __name__ == '__main__':
                         help='Temperature used within the softmax argument')
 
 
+    parser.add_argument('--default-loader', action='store_true',
+                    help='Use defaut loader based on standard dataset') 
 
 
 

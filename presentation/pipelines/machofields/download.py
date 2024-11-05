@@ -69,7 +69,7 @@ def run(opt):
             "dtype": "string"
         },
         "context_features": {
-            'path': "./data/temp/metadata.parquet",
+            'path': "./data/temp/cleaned_metadata.parquet", #USE FILTERED VERSION
             'dtype': "string",
             'value': [ "ID", "Class", "Band", "Label", "shard",],
             'dtypes': [ "string", "string", "integer", "integer", "integer",]
