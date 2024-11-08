@@ -48,7 +48,7 @@ for str in ${temperatures[@]}; do
                                            --mask-format K \
                                            --patience 20 \
                                            --m-alpha 1 \
-                                           --temperature $str
+                                           --temperature $str \
                                            --repeat 0 \
                                            --lr 1e-5
 

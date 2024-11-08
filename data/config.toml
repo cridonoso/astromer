@@ -9,8 +9,8 @@ dtype = "string"
 [context_features]
 path = "./data/raw_data/macho/cleaned_metadata.parquet"
 test_path = "./data/raw_data/macho/test_metadata.parquet"
-value = [ "ID", "Class", "N", "Band", "Label", "shard",]
-dtypes = [ "string", "string", "integer", "string", "integer", "integer",]
+value = [ "ID", "Class", "Band", "Label", "shard",]
+dtypes = [ "string", "string", "string", "integer", "integer",]
 
 [sequential_features]
 path = "./data/raw_data/macho/light_curves"

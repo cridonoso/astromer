@@ -404,7 +404,7 @@ class DataPipeline:
         self.new_df = new_df
 
         for fold_n, fold_col in enumerate(fold_groups):
-            pbar = tqdm(self.metadata[fold_col].unique(), colour='#00ff00') # progress bar
+            pbar = tqdm(self.metadata[fold_col].dropna().unique(), colour='#00ff00') # progress bar
             for subset in pbar:               
                 pbar.set_description(f"Processing fold {fold_n+1}/{len(fold_groups)} - {subset}")
                 # ============ Processing Samples ===========

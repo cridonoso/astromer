@@ -65,7 +65,7 @@ def run(opt):
 
         
     pipeline = DataPipeline(metadata=metadata,
-                                   config_path=opt.config)
+                           config_path=opt.config)
     
     var = pipeline.run(n_jobs=opt.njobs,
                        elements_per_shard=opt.elements_per_shard)
