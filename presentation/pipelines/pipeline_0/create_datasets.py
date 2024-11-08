@@ -12,6 +12,7 @@ def run(opt):
     data = opt.data
     
     metapath = os.path.join(opt.data, 'metadata.parquet')
+        
     lcspath  = os.path.join(opt.data, 'light_curves')
     basename = os.path.basename(os.path.normpath(opt.target))
 
@@ -21,16 +22,23 @@ def run(opt):
     for spc in [20, 100, 500, '']:    
         start = time.time()
         metadata = pd.read_parquet(metapath)
+        metadata = metadata[metadata['Class'] != 'Dubious']
+                
         for nfold in range(opt.folds):
+            fold_path = os.path.join(opt.target, str(spc), 'fold_{}'.format(nfold))
+            os.makedirs(fold_path, exist_ok=True)
+            
             test_metadata = metadata.groupby('Label').sample(n=opt.ntest)
             rest_metadata = metadata[~metadata['newID'].isin(test_metadata['newID'])]
-        
+                        
             # Train Val and Test splits
             if spc != '':
                 nval = int(opt.val_frac*spc)
                 valid_meta = rest_metadata.sample(n=nval)
                 train_meta = rest_metadata[~rest_metadata['newID'].isin(valid_meta['newID'])].groupby('Label').sample(n=spc,
                                                                                                                       replace=True)
+                objects = train_meta['Class'].value_counts().reset_index()
+                objects.to_csv(os.path.join(fold_path, 'objects.csv'), index=False)
             else:
                 nval = int(opt.val_frac*rest_metadata.shape[0])
                 valid_meta = rest_metadata.sample(n=nval)

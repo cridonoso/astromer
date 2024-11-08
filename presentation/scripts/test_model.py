@@ -7,7 +7,6 @@ import sys
 import os
 from tqdm import tqdm
 
-from sklearn.metrics import r2_score, root_mean_squared_error
 from src.utils import get_metrics
 from presentation.pipelines.steps.model_design import load_pt_model
 from presentation.pipelines.steps.load_data import build_loader 
