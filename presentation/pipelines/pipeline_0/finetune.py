@@ -22,8 +22,8 @@ def ft_step(opt):
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
     EXPDIR = os.path.join(opt.pt_model, '..', opt.exp_name, ft_model)
     print('[INFO] Exp dir: ', EXPDIR)
+
     os.makedirs(EXPDIR, exist_ok=True)
-    
     
     # ======= MODEL ========================================
     optimizer = Adam(opt.lr, 

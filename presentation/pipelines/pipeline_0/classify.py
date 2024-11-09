@@ -22,7 +22,9 @@ def clf_step(opt, mlp_arch='avg_mlp'):
     
     CLFDIR = os.path.join(opt.pt_model, '..', opt.exp_name, ft_model, mlp_arch)
     FTDIR  = os.path.join(opt.pt_model, '..', 'finetuning', ft_model)
+    
     print('[INFO] Exp dir: ', CLFDIR)
+
     os.makedirs(CLFDIR, exist_ok=True)
     
     # ========= MODEL ========================================

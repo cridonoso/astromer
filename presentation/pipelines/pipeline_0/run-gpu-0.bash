@@ -1,25 +1,31 @@
 #!/bin/bash
             
-data_paths=('./data/records/alcock/20/fold_0' 
-            './data/records/alcock/20/fold_1'
-            './data/records/alcock/20/fold_2'
-            './data/records/alcock/20/fold_3'
-            './data/records/alcock/20/fold_4'
-            './data/records/alcock/100/fold_0' 
-            './data/records/alcock/100/fold_1'
-            './data/records/alcock/100/fold_2'
-            './data/records/alcock/100/fold_3'
-            './data/records/alcock/100/fold_4'
-            './data/records/alcock/500/fold_0' 
-            './data/records/alcock/500/fold_1'
-            './data/records/alcock/500/fold_2'
-            './data/records/alcock/500/fold_3'
-            './data/records/alcock/500/fold_4')
+data_paths=('./data/shared/records/alcock/fold_0/alcock_20' 
+            './data/shared/records/alcock/fold_1/alcock_20'
+            './data/shared/records/alcock/fold_2/alcock_20'
+            './data/shared/records/alcock/fold_0/alcock_100' 
+            './data/shared/records/alcock/fold_1/alcock_100'
+            './data/shared/records/alcock/fold_2/alcock_100'
+            './data/shared/records/alcock/fold_0/alcock_500' 
+            './data/shared/records/alcock/fold_1/alcock_500'
+            './data/shared/records/alcock/fold_2/alcock_500'
+
+            './data/shared/records/atlas/fold_0/atlas_20' 
+            './data/shared/records/atlas/fold_1/atlas_20'
+            './data/shared/records/atlas/fold_2/atlas_20'
+            './data/shared/records/atlas/fold_0/atlas_100' 
+            './data/shared/records/atlas/fold_1/atlas_100'
+            './data/shared/records/atlas/fold_2/atlas_100'
+            './data/shared/records/atlas/fold_0/atlas_500' 
+            './data/shared/records/atlas/fold_1/atlas_500'
+            './data/shared/records/atlas/fold_2/atlas_500'
+)
                  
 
-model_paths=('./presentation/results/m_alpha/2024-11-05_14-18-53'
-             './presentation/results/m_alpha/2024-11-06_01-49-31'
-             './presentation/results/m_alpha/2024-11-06_06-52-07')
+model_paths=('./presentation/results/m_alpha/2024-11-06_13-11-38'
+             './presentation/results/m_alpha/2024-11-05_14-18-53'
+             './presentation/results/m_alpha/2024-11-05_14-19-11'
+             './presentation/results/m_alpha/2024-11-06_02-28-03')
 
 # for str in ${model_paths[@]}; do
 #    echo [INFO] Testing $str
