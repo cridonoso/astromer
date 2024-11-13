@@ -90,7 +90,7 @@ if __name__ == '__main__':
     parser.add_argument('--njobs', default=4, type=int,
                     help='Number of cores to use')
     
-    parser.add_argument('--elements-per-shard', default=20000, type=int,
+    parser.add_argument('--elements-per-shard', default=200000, type=int,
                     help='Number of light curves per shard')
 
 
