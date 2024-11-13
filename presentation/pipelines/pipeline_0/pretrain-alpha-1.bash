@@ -16,10 +16,10 @@
 #                                            --lr 1e-5
 # done
 
-alphas=(-10 -1 0 1)                                           
+alphas=(10 100)                                           
 for str in ${alphas[@]}; do
    echo TRAINING WITH $str 
-   python -m presentation.scripts.pretrain --exp-name mask-alpha \
+   python -m presentation.scripts.pretrain --exp-name m_alpha_1e-3 \
                                            --gpu 1 \
                                            --data ./data/records/macho/100000/fold_0 \
                                            --bs 2500 \
@@ -29,7 +29,7 @@ for str in ${alphas[@]}; do
                                            --patience 20 \
                                            --m-alpha $str \
                                            --repeat 0 \
-                                           --lr 1e-5
+                                           --lr 1e-3
 
 done
 

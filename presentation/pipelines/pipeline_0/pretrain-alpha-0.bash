@@ -21,8 +21,8 @@ alphas=(-1000000000 -1000 -100)
 
 for str in ${alphas[@]}; do
    echo TRAINING WITH $str 
-   python -m presentation.scripts.pretrain --exp-name m_alpha \
-                                           --gpu 0 \
+   python -m presentation.scripts.pretrain --exp-name m_alpha_1e-3 \
+                                           --gpu 3 \
                                            --data ./data/records/macho/100000/fold_0 \
                                            --bs 2500 \
                                            --no-msk-token \
@@ -31,7 +31,7 @@ for str in ${alphas[@]}; do
                                            --patience 20 \
                                            --m-alpha $str \
                                            --repeat 0 \
-                                           --lr 1e-5
+                                           --lr 1e-3
 done
 
 

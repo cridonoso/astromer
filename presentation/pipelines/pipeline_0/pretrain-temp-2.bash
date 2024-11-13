@@ -39,7 +39,7 @@ temperatures=(0.5 1 1.5)
 
 for str in ${temperatures[@]}; do
    echo TRAINING WITH $str 
-   python -m presentation.scripts.pretrain --exp-name temperature \
+   python -m presentation.scripts.pretrain --exp-name m100_1e-3_temp \
                                            --gpu 2 \
                                            --data ./data/records/macho/100000/fold_0 \
                                            --bs 2500 \
@@ -47,10 +47,10 @@ for str in ${temperatures[@]}; do
                                            --pe-base 10000 \
                                            --mask-format K \
                                            --patience 20 \
-                                           --m-alpha 1 \
+                                           --m-alpha -100 \
                                            --temperature $str \
                                            --repeat 0 \
-                                           --lr 1e-5
+                                           --lr 1e-3
 
 done
 
