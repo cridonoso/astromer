@@ -1,38 +1,37 @@
 #!/bin/bash
 
-# nsamples=(1000)
+nsamples=(1000 10000 100000 200000 400000)
 
-# for str in ${nsamples[@]}; do
-#    echo TRAINING WITH $str  
-#    python -m presentation.scripts.pretrain --exp-name nsamples \
+for str in ${nsamples[@]}; do
+   echo TRAINING WITH $str  
+   python -m presentation.scripts.pretrain --exp-name nsamples_msk \
+                                           --gpu 0 \
+                                           --data ./data/records/macho/$str/fold_0/ \
+                                           --bs 2000 \
+                                           --pe-base 10000 \
+                                           --mask-format K \
+                                           --patience 20 \
+                                           --m-alpha -1000000000 \
+                                           --lr 1e-5
+done
+
+# temperatures=(0.5 1 1.5 2 2.5)
+
+# for str in ${temperatures[@]}; do
+#    echo TRAINING WITH $str 
+#    python -m presentation.scripts.pretrain --exp-name temp_msk_token \
 #                                            --gpu 0 \
-#                                            --data ./data/records/macho/$str/fold_0/ \
+#                                            --data ./data/records/macho/100000/fold_0 \
 #                                            --bs 2500 \
 #                                            --no-msk-token \
 #                                            --pe-base 10000 \
 #                                            --mask-format K \
 #                                            --patience 20 \
-#                                            --m-alpha 1 \
-#                                            --lr 1e-5
+#                                            --m-alpha  -1000000000\
+#                                            --repeat 0 \
+#                                            --temperature $str \
+#                                            --lr 1e-3
 # done
-
-# alphas=(-10 -1 0 1)                                           
-alphas=(-1000000000 -1000 -100)
-
-for str in ${alphas[@]}; do
-   echo TRAINING WITH $str 
-   python -m presentation.scripts.pretrain --exp-name m_alpha_1e-3 \
-                                           --gpu 3 \
-                                           --data ./data/records/macho/100000/fold_0 \
-                                           --bs 2500 \
-                                           --no-msk-token \
-                                           --pe-base 10000 \
-                                           --mask-format K \
-                                           --patience 20 \
-                                           --m-alpha $str \
-                                           --repeat 0 \
-                                           --lr 1e-3
-done
 
 
 # temperatures=(0.5 1 1.5 2 2.5)

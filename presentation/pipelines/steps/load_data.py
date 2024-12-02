@@ -16,7 +16,8 @@ def build_loader(data_path,
                  shuffle=True,
                  probed=None,
                  same=None,
-                 random=None):
+                 random=None,
+                 cache=True):
     
     norm = normalize if normalize is not None else params['norm']
 
@@ -46,7 +47,8 @@ def build_loader(data_path,
                                   normalize=norm,
                                   repeat=repeat,
                                   aversion=params['arch'],
-                                  num_cls=num_cls)
+                                  num_cls=num_cls,
+                                  cache=cache)
         valid_loader = get_loader(data_path['validation'],
                                   batch_size=batch_size,
                                   window_size=params['window_size'],
@@ -58,7 +60,8 @@ def build_loader(data_path,
                                   normalize=norm,
                                   repeat=repeat,
                                   aversion=params['arch'],
-                                  num_cls=num_cls)
+                                  num_cls=num_cls,
+                                  cache=cache)
         if return_test:
             test_loader = get_loader(data_path['test'],
                                      batch_size=batch_size,
@@ -71,7 +74,8 @@ def build_loader(data_path,
                                      normalize=norm,
                                      repeat=1,
                                      aversion=params['arch'],
-                                     num_cls=num_cls)
+                                     num_cls=num_cls,
+                                     cache=cache)
     if isinstance(data_path, str):
         print('[INFO] String based loader')
         val_path = os.path.join(data_path, 'validation')
@@ -90,7 +94,8 @@ def build_loader(data_path,
                                     normalize=norm,
                                     repeat=repeat,
                                     aversion=params['arch'],
-                                    num_cls=num_cls)
+                                    num_cls=num_cls,
+                                    cache=cache)
         
         valid_loader = get_loader(val_path,
                                     batch_size=batch_size,
@@ -116,7 +121,8 @@ def build_loader(data_path,
                                         normalize=norm,
                                         repeat=1,
                                         aversion=params['arch'],
-                                        num_cls=num_cls)
+                                        num_cls=num_cls,
+                                        cache=cache)
         
     if return_test:
         return {

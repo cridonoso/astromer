@@ -22,14 +22,12 @@ data_paths=('./data/shared/records/alcock/fold_0/alcock_20'
 )
                  
 
-model_paths=('./presentation/results/temperature/2024-11-06_09-20-44'
-             './presentation/results/temperature/2024-11-05_17-13-54'
-             './presentation/results/temperature/2024-11-06_02-04-44')
+model_paths=('./presentation/results/bigastromer/2024-11-22_09-39-41')
 
-# for str in ${model_paths[@]}; do
-#    echo [INFO] Testing $str
-#    python -m presentation.scripts.test_model  --model $str/pretraining --gpu 2
-# done
+for str in ${model_paths[@]}; do
+   echo [INFO] Testing $str
+   python -m presentation.scripts.test_model  --model $str/pretraining --gpu 2
+done
 
 for str in ${model_paths[@]}; do
     for dp in ${data_paths[@]}; do

@@ -21,12 +21,14 @@ def classification_metrics(root, sset=['alcock', 'atlas'], spc_list=[20, 100], n
                                      '{}_{}'.format(sset, spc), 
                                      clf_arch, 
                                      'test_metrics.toml')
-                
-                with open(tfile, 'r') as handle:
-                    test_metrics = toml.load(handle)
-                    f1_test = test_metrics['test_f1']
-                    fold_metrics.append(float(f1_test))
-
+                try:
+                    with open(tfile, 'r') as handle:
+                        test_metrics = toml.load(handle)
+                        f1_test = test_metrics['test_f1']
+                        fold_metrics.append(float(f1_test))
+                except:
+                    fold_metrics.append(-1.)
+                    
             rows.append({'exp_name': config['exp_name'],
                          'probed': config['probed'],
                          'rs': config['rs'],
@@ -38,5 +40,5 @@ def classification_metrics(root, sset=['alcock', 'atlas'], spc_list=[20, 100], n
                          'spc': spc, 
                          'mean': np.mean(fold_metrics), 
                          'std': np.std(fold_metrics)})
-    
+
     return pd.DataFrame(rows)

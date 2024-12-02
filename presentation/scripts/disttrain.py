@@ -9,7 +9,7 @@ import os
 from tqdm import tqdm
 
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, AdamW
 from datetime import datetime
 
 from src.training.scheduler import CustomSchedule
@@ -37,10 +37,11 @@ def train_step(model, inputs, optimizer):
     x, y = inputs
     with tf.GradientTape() as tape:
         y_pred = model(x, training=True)
+        
         rmse = custom_rmse(y_true=y['target'],
                             y_pred=y_pred,
                             mask=y['mask_out'],
-                            weights=None)
+                            weights=y['w_error'])
                     
         r2_value = custom_r2(y_true=y['target'], 
                             y_pred=y_pred, 
@@ -55,11 +56,12 @@ def test_step(model, inputs):
     x, y = inputs
 
     y_pred = model(x, training=False)
+
     rmse = custom_rmse(y_true=y['target'],
                         y_pred=y_pred,
                         mask=y['mask_out'],
-                        weights=None)
-                
+                        weights=y['w_error'])
+
     r2_value = custom_r2(y_true=y['target'], 
                         y_pred=y_pred, 
                         mask=y['mask_out'])
@@ -102,6 +104,7 @@ def run(opt):
                                sampling=opt.sampling,
                                repeat=opt.repeat,
                                return_test=True,
+                               cache=False if opt.no_cache else True,
                                )
     else:
         sset_dictonary = get_validation(os.path.join(opt.data, 'train'), 
@@ -117,7 +120,8 @@ def run(opt):
                                sampling=opt.sampling,
                                repeat=opt.repeat,
                                return_test=True)
-    
+
+
     train_batches = mirrored_strategy.experimental_distribute_dataset(loaders['train'])
     valid_batches = mirrored_strategy.experimental_distribute_dataset(loaders['validation'])
     train_writer = tf.summary.create_file_writer(os.path.join(EXPDIR, 'tensorboard', 'train'))
@@ -144,6 +148,8 @@ def run(opt):
                          beta_2=0.98,
                          epsilon=1e-9,
                          name='astromer_optimizer')
+        # print('AdamW')
+        # optimizer = AdamW(lr)
                         
         with open(os.path.join(EXPDIR, 'config.toml'), 'w') as f:
             toml.dump(opt.__dict__, f)
@@ -159,8 +165,10 @@ def run(opt):
             pbar.set_postfix(item1=epoch)
             epoch_tr_rmse    = 0.
             epoch_tr_rsquare = 0.
+            epoch_tr_loss = 0.
             epoch_vl_rmse    = 0.
             epoch_vl_rsquare = 0.
+            epoch_vl_loss = 0.
 
             for numbatch, batch in enumerate(train_batches):
                 pbar.set_postfix(item=numbatch)
@@ -171,6 +179,7 @@ def run(opt):
                 
                 tensorboard_log('rmse', metrics['rmse'], train_writer, step=batch_idx)
                 tensorboard_log('rsquare', metrics['rsquare'], train_writer, step=batch_idx)
+                tensorboard_log('loss', metrics['loss'], train_writer, step=batch_idx)
                 batch_idx+=1
             
             tr_rmse    = epoch_tr_rmse/numbatch
@@ -180,12 +189,14 @@ def run(opt):
                 metrics = distributed_test_step(astromer, batch, mirrored_strategy)
                 epoch_vl_rmse+=metrics['rmse']
                 epoch_vl_rsquare+=metrics['rsquare']
-
+                epoch_vl_loss+=metrics['loss']
+                
             vl_rmse    = epoch_vl_rmse/numbatch
             vl_rsquare = epoch_vl_rsquare/numbatch
-            
+            vl_loss = epoch_vl_loss/numbatch 
             tensorboard_log('rmse', vl_rmse, valid_writer, step=batch_idx)
             tensorboard_log('rsquare', vl_rsquare, valid_writer, step=batch_idx)
+            tensorboard_log('loss', vl_loss, valid_writer, step=batch_idx)
             
             if tf.math.greater(min_loss, vl_rmse):
                 min_loss = vl_rmse
