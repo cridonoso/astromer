@@ -22,6 +22,7 @@ def get_validation(path, validation=0.2, test_folder=None, target_path=''):
         return output
     
     records_path = glob.glob(os.path.join(path, '*', 'fold_*', '*', '*.record'))
+
     number_records = len(records_path)
     indices = np.arange(number_records)
     np.random.shuffle(indices)
@@ -51,6 +52,7 @@ def load_records_v2(record_files):
     Returns:
         type: tf.Dataset instance
     """
+
     records_dir = os.path.dirname(record_files[0])
     raw_dataset = tf.data.TFRecordDataset(record_files)
     raw_dataset = raw_dataset.map(lambda x: deserialize(x, records_dir))
@@ -170,7 +172,9 @@ def format_inp_astromer(batch,
     if aversion == 'base':
         input_original  = pp.unstandardize(batch)
         inputs['input'] =  batch['input_modified']
-        inputs['times'] =  tf.slice(input_original, [0, 0, 0], [-1, -1, 1])
+        inputs['times'] =  tf.slice(batch['input'], [0, 0, 0], [-1, -1, 1])
+        # zero_time       = tf.reduce_min(inputs['times'], 1) 
+        # inputs['times'] = inputs['times'] - tf.expand_dims(zero_time, 1)
         inputs['mask_in'] =  batch['mask_in']
 
         errors = tf.slice(input_original, [0, 0, 2], [-1,-1, 1])

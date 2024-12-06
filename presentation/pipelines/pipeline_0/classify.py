@@ -22,7 +22,9 @@ def clf_step(opt, mlp_arch='avg_mlp'):
     
     CLFDIR = os.path.join(opt.pt_model, '..', opt.exp_name, ft_model, mlp_arch)
     FTDIR  = os.path.join(opt.pt_model, '..', 'finetuning', ft_model)
+    
     print('[INFO] Exp dir: ', CLFDIR)
+
     os.makedirs(CLFDIR, exist_ok=True)
     
     # ========= MODEL ========================================
@@ -91,7 +93,7 @@ if __name__ == '__main__':
                         help='GPU to be used. -1 means no GPU will be used')
     parser.add_argument('--bs', default=256, type=int,
                         help='Finetuning batch size')
-    parser.add_argument('--lr', default=0.001, type=float,
+    parser.add_argument('--lr', default=0.00001, type=float,
                         help='Finetuning learning rate')
     parser.add_argument('--train-astromer', action='store_true', help='Train Astromer when classifying')
 
@@ -99,5 +101,5 @@ if __name__ == '__main__':
     opt = parser.parse_args()        
     
     
-    for clf_arch in ['avg_mlp']:
+    for clf_arch in ['skip_avg_mlp']:
         clf_step(opt, clf_arch)

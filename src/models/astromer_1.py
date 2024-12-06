@@ -76,7 +76,6 @@ def get_ASTROMER(num_layers=2,
                       name='encoder')
 
     x = encoder(placeholder)
-
     x = RegLayer(name='regression')(x)
 
     return CustomModel(correct_loss=correct_loss, loss_format=loss_format, 

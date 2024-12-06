@@ -49,16 +49,16 @@ def run(opt):
             
         # ========== DATA ========================================
         loaders = build_loader(data_path=opt.data, 
-                            params=opt.__dict__,
-                            batch_size=opt.bs,
-                            debug=opt.debug,
-                            normalize=opt.norm,
-                            sampling=False,
-                            repeat=opt.repeat,
-                            return_test=True,
-                            distributed=True,
-                            target_path=EXPDIR,
-                            )
+                               params=opt.__dict__,
+                               batch_size=opt.bs,
+                               debug=opt.debug,
+                               normalize=opt.norm,
+                               sampling=opt.sampling,
+                               repeat=opt.repeat,
+                               return_test=True,
+                               )
+
+
         # ========== COMPILE =====================================
         if opt.scheduler:
             print('[INFO] Using Custom Scheduler')
@@ -121,6 +121,8 @@ if __name__ == '__main__':
                         help='Fraction to make visible during masked-self attention while evaluating during loss')
     parser.add_argument('--norm', default='zero-mean', type=str,
                         help='normalization: zero-mean - random-mean')
+    parser.add_argument('--sampling', action='store_true', help='sampling windows')
+
     parser.add_argument('--no-msk-token', action='store_true', help='Do not add trainable MSK token in the input')
 
     # ==== TRAINING ===================================================
@@ -130,7 +132,7 @@ if __name__ == '__main__':
                         help='Batch size')
     parser.add_argument('--patience', default=20, type=int,
                         help='Earlystopping threshold in number of epochs')
-    parser.add_argument('--num_epochs', default=10000, type=int,
+    parser.add_argument('--num-epochs', default=10000, type=int,
                         help='Number of epochs')
     parser.add_argument('--scheduler', action='store_true', help='Use Custom Scheduler during training')
     parser.add_argument('--correct-loss', action='store_true', help='Use error bars to weigh loss')
@@ -146,7 +148,7 @@ if __name__ == '__main__':
                         help='Head dimension')
     parser.add_argument('--pe-dim', default=256, type=int,
                         help='Positional encoder size - i.e., Number of frequencies')
-    parser.add_argument('--pe-base', default=10000, type=int,
+    parser.add_argument('--pe-base', default=1000, type=int,
                         help='Positional encoder base')
     parser.add_argument('--pe-exp', default=2, type=int,
                         help='Positional encoder exponent')
@@ -166,8 +168,8 @@ if __name__ == '__main__':
                         help='Temperature used within the softmax argument')
 
 
-
-
+    parser.add_argument('--default-loader', action='store_true',
+                    help='Use defaut loader based on standard dataset') 
 
     opt = parser.parse_args()        
     run(opt)

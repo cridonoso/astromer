@@ -14,7 +14,6 @@ from presentation.pipelines.steps.model_design import build_model, load_pt_model
 from presentation.pipelines.steps.load_data import build_loader
 from presentation.pipelines.steps.metrics import evaluate_ft
 
-
 def replace_config(source, target):
     for key in ['data', 'no_cache', 'exp_name', 'checkpoint', 
                 'gpu', 'lr', 'bs', 'patience', 'num_epochs', 'scheduler']:
@@ -47,6 +46,7 @@ def run(opt):
                            repeat=opt.repeat,
                            return_test=True,
                            )
+
     # ========== COMPILE =====================================
     if opt.scheduler:
         print('[INFO] Using Custom Scheduler')

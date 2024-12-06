@@ -30,7 +30,11 @@ def scaled_dot_product_attention(q, k, v, mask, m_alpha, mask_format='QK', tempe
         mask_rshp = tf.transpose(mask_rshp, [0,2,1])
         mask_rshp = tf.minimum(1., mask_rshp)
         mask_rshp = tf.expand_dims(mask_rshp, 1)
+        # selfattmask = tf.eye(steps) # Avoid to put attention on the same observation
+        # mask_rshp  += selfattmask
         scaled_attention_logits += (mask_rshp*m_alpha)
+        
+        
         attention_weights = tf.nn.softmax(scaled_attention_logits, axis=-1, name='MaskedSoftMax')  # (..., seq_len_q, seq_len_k)
 
     if mask_format == 'Q':

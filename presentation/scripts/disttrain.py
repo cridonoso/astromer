@@ -9,7 +9,7 @@ import os
 from tqdm import tqdm
 
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, AdamW
 from datetime import datetime
 
 from src.training.scheduler import CustomSchedule
@@ -37,10 +37,11 @@ def train_step(model, inputs, optimizer):
     x, y = inputs
     with tf.GradientTape() as tape:
         y_pred = model(x, training=True)
+        
         rmse = custom_rmse(y_true=y['target'],
                             y_pred=y_pred,
                             mask=y['mask_out'],
-                            weights=None)
+                            weights=y['w_error'])
                     
         r2_value = custom_r2(y_true=y['target'], 
                             y_pred=y_pred, 
@@ -55,11 +56,12 @@ def test_step(model, inputs):
     x, y = inputs
 
     y_pred = model(x, training=False)
+
     rmse = custom_rmse(y_true=y['target'],
                         y_pred=y_pred,
                         mask=y['mask_out'],
-                        weights=None)
-                
+                        weights=y['w_error'])
+
     r2_value = custom_r2(y_true=y['target'], 
                         y_pred=y_pred, 
                         mask=y['mask_out'])
@@ -93,20 +95,33 @@ def run(opt):
     os.makedirs(EXPDIR, exist_ok=True)
 
     # ========== DATA ========================================
-    sset_dictonary = get_validation(os.path.join(opt.data, 'train'), 
-                                    validation=0.2, 
-                                    test_folder=os.path.join(opt.data, 'test'),
-                                    target_path=EXPDIR)
-    
-    loaders = build_loader(data_path=sset_dictonary, 
-                           params=opt.__dict__,
-                           batch_size=opt.bs,
-                           debug=opt.debug,
-                           normalize=opt.norm,
-                           sampling=opt.sampling,
-                           repeat=opt.repeat,
-                           return_test=True)
-    
+    if opt.default_loader:
+        loaders = build_loader(data_path=opt.data, 
+                               params=opt.__dict__,
+                               batch_size=opt.bs,
+                               debug=opt.debug,
+                               normalize=opt.norm,
+                               sampling=opt.sampling,
+                               repeat=opt.repeat,
+                               return_test=True,
+                               cache=False if opt.no_cache else True,
+                               )
+    else:
+        sset_dictonary = get_validation(os.path.join(opt.data, 'train'), 
+                                        validation=0.2, 
+                                        test_folder=os.path.join(opt.data, 'test'),
+                                        target_path=EXPDIR)
+        
+        loaders = build_loader(data_path=sset_dictonary, 
+                               params=opt.__dict__,
+                               batch_size=opt.bs,
+                               debug=opt.debug,
+                               normalize=opt.norm,
+                               sampling=opt.sampling,
+                               repeat=opt.repeat,
+                               return_test=True)
+
+
     train_batches = mirrored_strategy.experimental_distribute_dataset(loaders['train'])
     valid_batches = mirrored_strategy.experimental_distribute_dataset(loaders['validation'])
     train_writer = tf.summary.create_file_writer(os.path.join(EXPDIR, 'tensorboard', 'train'))
@@ -133,6 +148,8 @@ def run(opt):
                          beta_2=0.98,
                          epsilon=1e-9,
                          name='astromer_optimizer')
+        # print('AdamW')
+        # optimizer = AdamW(lr)
                         
         with open(os.path.join(EXPDIR, 'config.toml'), 'w') as f:
             toml.dump(opt.__dict__, f)
@@ -143,39 +160,49 @@ def run(opt):
         # ========= Training Loop ==================================
         es_count = 0
         min_loss = 1e9
-        batch_idx = 0
+        
         for epoch in pbar:
             pbar.set_postfix(item1=epoch)
             epoch_tr_rmse    = 0.
             epoch_tr_rsquare = 0.
+            epoch_tr_loss = 0.
             epoch_vl_rmse    = 0.
             epoch_vl_rsquare = 0.
+            epoch_vl_loss = 0.
 
+            batch_idx = 0
             for numbatch, batch in enumerate(train_batches):
                 pbar.set_postfix(item=numbatch)
-
                 metrics = distributed_train_step(astromer, batch, optimizer, mirrored_strategy)
                 epoch_tr_rmse+=metrics['rmse']
                 epoch_tr_rsquare+=metrics['rsquare']
-                
-                tensorboard_log('rmse', metrics['rmse'], train_writer, step=batch_idx)
-                tensorboard_log('rsquare', metrics['rsquare'], train_writer, step=batch_idx)
+                epoch_tr_loss+=metrics['loss']
                 batch_idx+=1
             
-            tr_rmse    = epoch_tr_rmse/numbatch
-            tr_rsquare = epoch_tr_rsquare/numbatch
-            
+            tr_rmse    = epoch_tr_rmse/batch_idx
+            tr_rsquare = epoch_tr_rsquare/batch_idx
+            tr_loss    = epoch_tr_loss/batch_idx
+
+            batch_idx = 0
             for numbatch, batch in enumerate(valid_batches):
                 metrics = distributed_test_step(astromer, batch, mirrored_strategy)
                 epoch_vl_rmse+=metrics['rmse']
                 epoch_vl_rsquare+=metrics['rsquare']
+                epoch_vl_loss+=metrics['loss']
+                batch_idx+=1
+                
+            vl_rmse    = epoch_vl_rmse/batch_idx
+            vl_rsquare = epoch_vl_rsquare/batch_idx
+            vl_loss = epoch_vl_loss/batch_idx 
+            
+            tensorboard_log('rmse', vl_rmse, valid_writer, step=epoch)
+            tensorboard_log('rsquare', vl_rsquare, valid_writer, step=epoch)
+            tensorboard_log('loss', vl_loss, valid_writer, step=epoch)
+            
+            tensorboard_log('rmse', tr_rmse, train_writer, step=epoch)
+            tensorboard_log('rsquare', tr_rsquare, train_writer, step=epoch)
+            tensorboard_log('loss', tr_loss, train_writer, step=epoch)
 
-            vl_rmse    = epoch_vl_rmse/numbatch
-            vl_rsquare = epoch_vl_rsquare/numbatch
-            
-            tensorboard_log('rmse', vl_rmse, valid_writer, step=batch_idx)
-            tensorboard_log('rsquare', vl_rsquare, valid_writer, step=batch_idx)
-            
             if tf.math.greater(min_loss, vl_rmse):
                 min_loss = vl_rmse
                 es_count = 0
@@ -275,6 +302,8 @@ if __name__ == '__main__':
                         help='Temperature used within the softmax argument')
 
 
+    parser.add_argument('--default-loader', action='store_true',
+                    help='Use defaut loader based on standard dataset') 
 
 
 

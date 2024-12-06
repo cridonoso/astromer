@@ -160,7 +160,7 @@ class EncoderLayer(tf.keras.layers.Layer):
             out2 = self.layernorm2(ffn_output)
         
         if return_weights:
-            return out2, w, qkvalues, (q,k,v)
+            return out2, w, qkvalues
         return out2
 
 class Encoder(tf.keras.layers.Layer):
@@ -198,7 +198,7 @@ class Encoder(tf.keras.layers.Layer):
             return x, w, qkvalues
         
         if z_by_layer:
-            return output_by_layer
+            return output_by_layer, w, qkvalues
         return x  # (batch_size, input_seq_len, d_model)
     
 def build_input(length):
