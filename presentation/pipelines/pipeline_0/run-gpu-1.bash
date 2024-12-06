@@ -22,22 +22,19 @@ data_paths=('./data/shared/records/alcock/fold_0/alcock_20'
 )
                  
 
-model_paths=('./presentation/results/m_alpha/2024-11-05_14-19-11'
-             './presentation/results/m_alpha/2024-11-06_02-28-03'
-             './presentation/results/m_alpha/2024-11-06_13-11-38',
-             './presentation/results/m_alpha/2024-11-06_19-13-54')
-
-for str in ${model_paths[@]}; do
-   echo [INFO] Testing $str
-   python -m presentation.scripts.test_model  --model $str/pretraining --gpu 1
-done
+model_paths=('./presentation/results/diagstromer/2024-12-02_14-13-12')
 
 # for str in ${model_paths[@]}; do
-#     for dp in ${data_paths[@]}; do
-#         echo [INFO] Starting FT $str
-#         python -m presentation.pipelines.pipeline_0.finetune --pt-model $str/pretraining --data $dp --gpu 1
-        
-#         echo [INFO] Starting CLF $str
-#         python -m presentation.pipelines.pipeline_0.classify --pt-model $str/pretraining --data $dp --gpu 1
-#     done
+#    echo [INFO] Testing $str
+#    python -m presentation.scripts.test_model  --model $str/pretraining --gpu 3
 # done
+
+for str in ${model_paths[@]}; do
+    for dp in ${data_paths[@]}; do
+        # echo [INFO] Starting FT $str
+        # python -m presentation.pipelines.pipeline_0.finetune --pt-model $str/pretraining --data $dp --gpu 0,1,2,3 --bs 2000
+        
+        echo [INFO] Starting CLF $str
+        python -m presentation.pipelines.pipeline_0.classify --pt-model $str/pretraining --data $dp --gpu 2 --bs 512
+    done
+done

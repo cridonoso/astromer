@@ -160,7 +160,7 @@ def run(opt):
         # ========= Training Loop ==================================
         es_count = 0
         min_loss = 1e9
-        batch_idx = 0
+        
         for epoch in pbar:
             pbar.set_postfix(item1=epoch)
             epoch_tr_rmse    = 0.
@@ -170,34 +170,39 @@ def run(opt):
             epoch_vl_rsquare = 0.
             epoch_vl_loss = 0.
 
+            batch_idx = 0
             for numbatch, batch in enumerate(train_batches):
                 pbar.set_postfix(item=numbatch)
-
                 metrics = distributed_train_step(astromer, batch, optimizer, mirrored_strategy)
                 epoch_tr_rmse+=metrics['rmse']
                 epoch_tr_rsquare+=metrics['rsquare']
-                
-                tensorboard_log('rmse', metrics['rmse'], train_writer, step=batch_idx)
-                tensorboard_log('rsquare', metrics['rsquare'], train_writer, step=batch_idx)
-                tensorboard_log('loss', metrics['loss'], train_writer, step=batch_idx)
+                epoch_tr_loss+=metrics['loss']
                 batch_idx+=1
             
-            tr_rmse    = epoch_tr_rmse/numbatch
-            tr_rsquare = epoch_tr_rsquare/numbatch
-            
+            tr_rmse    = epoch_tr_rmse/batch_idx
+            tr_rsquare = epoch_tr_rsquare/batch_idx
+            tr_loss    = epoch_tr_loss/batch_idx
+
+            batch_idx = 0
             for numbatch, batch in enumerate(valid_batches):
                 metrics = distributed_test_step(astromer, batch, mirrored_strategy)
                 epoch_vl_rmse+=metrics['rmse']
                 epoch_vl_rsquare+=metrics['rsquare']
                 epoch_vl_loss+=metrics['loss']
+                batch_idx+=1
                 
-            vl_rmse    = epoch_vl_rmse/numbatch
-            vl_rsquare = epoch_vl_rsquare/numbatch
-            vl_loss = epoch_vl_loss/numbatch 
-            tensorboard_log('rmse', vl_rmse, valid_writer, step=batch_idx)
-            tensorboard_log('rsquare', vl_rsquare, valid_writer, step=batch_idx)
-            tensorboard_log('loss', vl_loss, valid_writer, step=batch_idx)
+            vl_rmse    = epoch_vl_rmse/batch_idx
+            vl_rsquare = epoch_vl_rsquare/batch_idx
+            vl_loss = epoch_vl_loss/batch_idx 
             
+            tensorboard_log('rmse', vl_rmse, valid_writer, step=epoch)
+            tensorboard_log('rsquare', vl_rsquare, valid_writer, step=epoch)
+            tensorboard_log('loss', vl_loss, valid_writer, step=epoch)
+            
+            tensorboard_log('rmse', tr_rmse, train_writer, step=epoch)
+            tensorboard_log('rsquare', tr_rsquare, train_writer, step=epoch)
+            tensorboard_log('loss', tr_loss, train_writer, step=epoch)
+
             if tf.math.greater(min_loss, vl_rmse):
                 min_loss = vl_rmse
                 es_count = 0

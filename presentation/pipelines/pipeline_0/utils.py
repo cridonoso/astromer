@@ -28,7 +28,9 @@ def classification_metrics(root, sset=['alcock', 'atlas'], spc_list=[20, 100], n
                         fold_metrics.append(float(f1_test))
                 except:
                     fold_metrics.append(-1.)
-                    
+
+            valid_values = [x for x in fold_metrics if x != -1]
+
             rows.append({'exp_name': config['exp_name'],
                          'probed': config['probed'],
                          'rs': config['rs'],
@@ -38,7 +40,7 @@ def classification_metrics(root, sset=['alcock', 'atlas'], spc_list=[20, 100], n
                          'temperature': config['temperature'],
                          'data':sset, 
                          'spc': spc, 
-                         'mean': np.mean(fold_metrics), 
-                         'std': np.std(fold_metrics)})
+                         'mean': np.mean(valid_values), 
+                         'std': np.std(valid_values)})
 
     return pd.DataFrame(rows)

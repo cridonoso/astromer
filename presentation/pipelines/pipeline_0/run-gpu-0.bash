@@ -1,14 +1,15 @@
 #!/bin/bash
             
-data_paths=('./data/shared/records/alcock/fold_0/alcock_20' 
-            './data/shared/records/alcock/fold_1/alcock_20'
-            './data/shared/records/alcock/fold_2/alcock_20'
-            './data/shared/records/alcock/fold_0/alcock_100' 
-            './data/shared/records/alcock/fold_1/alcock_100'
-            './data/shared/records/alcock/fold_2/alcock_100'
-            './data/shared/records/alcock/fold_0/alcock_500' 
-            './data/shared/records/alcock/fold_1/alcock_500'
-            './data/shared/records/alcock/fold_2/alcock_500'
+data_paths=(
+            # './data/shared/records/alcock/fold_0/alcock_20' 
+            # './data/shared/records/alcock/fold_1/alcock_20'
+            # './data/shared/records/alcock/fold_2/alcock_20'
+            # './data/shared/records/alcock/fold_0/alcock_100' 
+            # './data/shared/records/alcock/fold_1/alcock_100'
+            # './data/shared/records/alcock/fold_2/alcock_100'
+            # './data/shared/records/alcock/fold_0/alcock_500' 
+            # './data/shared/records/alcock/fold_1/alcock_500'
+            # './data/shared/records/alcock/fold_2/alcock_500'
 
             './data/shared/records/atlas/fold_0/atlas_20' 
             './data/shared/records/atlas/fold_1/atlas_20'
@@ -22,19 +23,19 @@ data_paths=('./data/shared/records/alcock/fold_0/alcock_20'
 )
                  
 
-model_paths=('./presentation/results/pavlos/2024-11-14_20-36-48')
+model_paths=('./presentation/results/diagstromer/2024-12-02_14-13-12')
 
-for str in ${model_paths[@]}; do
-   echo [INFO] Testing $str
-   python -m presentation.scripts.test_model  --model $str/pretraining --gpu 0
-done
+# for str in ${model_paths[@]}; do
+#    echo [INFO] Testing $str
+#    python -m presentation.scripts.test_model  --model $str/pretraining --gpu 3
+# done
 
 for str in ${model_paths[@]}; do
     for dp in ${data_paths[@]}; do
         echo [INFO] Starting FT $str
-        python -m presentation.pipelines.pipeline_0.finetune --pt-model $str/pretraining --data $dp --gpu 0
+        python -m presentation.pipelines.pipeline_0.finetune --pt-model $str/pretraining --data $dp --gpu 0,1,3 --bs 2000
         
-        echo [INFO] Starting CLF $str
-        python -m presentation.pipelines.pipeline_0.classify --pt-model $str/pretraining --data $dp --gpu 0
+        # echo [INFO] Starting CLF $str
+        # python -m presentation.pipelines.pipeline_0.classify --pt-model $str/pretraining --data $dp --gpu 3 --bs 512
     done
 done
