@@ -16,8 +16,8 @@ Training ASTROMER from scratch can be expensive. However, we provide pre-trained
 
 | Version Tag | Pretraining data | Description | Test RMSE/R-square | Link |
 | --- | --- | --- | --- | --- |
-| v0 | MACHO | Paper's model | 0.147/0.80 | [Download Weights](https://github.com/astromer-science/weights/raw/refs/heads/main/macho_a0.zip)
-| v1*  | MACHO | Mask token and residual connections. | 0.113/0.73 | [Download Weights](https://github.com/astromer-science/weights/raw/refs/heads/main/macho_a1.zip)
+| v0 | MACHO | Paper's model | 0.147/0.80 | [Download Weights](https://github.com/astromer-science/weights/raw/main/macho_a0.zip)
+| v1*  | MACHO | Mask token and residual connections. | 0.113/0.73 | [Download Weights](https://github.com/astromer-science/weights/raw/main/macho_a1.zip)
 
 \* best performance up to date
 ## Directory tree
@@ -36,7 +36,7 @@ Training ASTROMER from scratch can be expensive. However, we provide pre-trained
  ┃ ┃ ┃ ┗ 📜 finetune.py: Script for running finetunining step on a pretrained model
  ┃ ┃ ┃ ┗ 📜 classify.py: Script for running classification on a pretrained/finetuned model
  ┃ ┃ ┃ ┗ 📜 utils.py: utils functions for pipeline_0
- ┃ ┃ ┃ ┗ 📜 run.bash: bash script to run the whole pipeline on several pre-trained models
+ ┃ ┃ ┃ ┗ 📜 run-gpu-{ID}.bash: bash script to run the whole pipeline on several pre-trained models
  ┃ ┃ ┗ 📂 steps: functions that are invariant to the pipeline and will be always used 
  ┃ ┃ ┃ ┗ 📜 load_data.py: functions to easily load records
  ┃ ┃ ┃ ┗ 📜 metrics.py: functions to get general metrics and tensorboard logs 
@@ -78,10 +78,6 @@ Training ASTROMER from scratch can be expensive. However, we provide pre-trained
  ┃ ┣ 📜 __init__.py
  ┃ ┗ 📜 utils.py: universal functions to use on different ASTROMER modules
  ┣ 📜 .gitignore: files that should not be considered during a GitHub push
- ┣ 📜 .dockerignore: files to exclude when building a Docker container.
- ┣ 📜 build_container.sh: script to build the ASTROMER Docker image
- ┣ 📜 run_container.sh: script to run the ASTROMER Docker image (up container)
- ┣ 📜 Dockerfile: Docker image definition
  ┣ 📜 requirements.txt: python dependencies
  ┗ 📜 README.md: what you are currently reading
  ```
