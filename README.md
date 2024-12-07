@@ -2,6 +2,8 @@
     <img src="./presentation/figures/branding/banner.png"> 
 </p>
 
+![TensorFlow](https://img.shields.io/badge/TensorFlow-%23FF6F00.svg?style=for-the-badge&logo=TensorFlow&logoColor=white)
+
 This is the latest source code of <b>Astromer</b> used by authors to run experiments and analysis. Use this code if you want to adapt or extend functionalities of <b>Astromer</b>. Our Python package contains a snapshot of this repository in its stable version. 
 
 ## About ASTROMER
