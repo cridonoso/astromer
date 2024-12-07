@@ -1,23 +1,25 @@
-# ASTROMER
-
 <p align="center">
-  <img src="https://github.com/cridonoso/astromer/blob/astromer-ii/presentation/figures/logo.png?raw=true" width="600" title="hover text">
+    <img src="./presentation/figures/branding/banner.png"> 
 </p>
 
-Welcome to the latest version of ASTROMER. This repository may not be aligned with the [Python Package](https://github.com/astromer-science/python-library), since most of the updates have not been published yet. Source code associated to the paper publication can be found [in this repository](https://github.com/astromer-science/main-code).
+This is the latest source code of <b>Astromer</b> used by authors to run experiments and analysis. Use this code if you want to adapt or extend functionalities of <b>Astromer</b>. Our Python package contains a snapshot of this repository in its stable version. 
 
 ## About ASTROMER
-ASTROMER is a deep learning model that can encode single-band light curves using internal representations. The encoding process consists of creating embeddings of light curves, which are features that summarize the variability of the brightness over time.   
 
+ASTROMER is a deep learning model that can encode single-band light curves using internal representations. The encoding process consists of creating embeddings of light curves, which are features that summarize the variability of the brightness over time.   
+<p align="center">
+<img src="./presentation/figures/branding/astromer-arch-trans.png"> 
+</p>
 Training ASTROMER from scratch can be expensive. However, we provide pre-trained weights that can be used to load representations already adjusted on millions of samples. Users can then easily fine-tune the model on new data. Fine-tuning involves training the pre-trained model on new datasets, which are typically smaller than the pre-training dataset.
 
 ## Weights
 
 | Version Tag | Pretraining data | Description | Test RMSE/R-square | Link |
 | --- | --- | --- | --- | --- |
-| v0 | MACHO | Paper's model | 0.147/0.80 | [Download Weights](https://github.com/astromer-science/weights/raw/nightly/macho_0.zip)
-| v1  | MACHO | New implementation of the paper's model | 0.135/0.198 | [Download Weights](https://drive.google.com/file/d/1AB5ubqlQtMheSnYlIxYTYGa_Xm-_L8FL/view?usp=sharing)
+| v0 | MACHO | Paper's model | 0.147/0.80 | [Download Weights](https://github.com/astromer-science/weights/raw/refs/heads/main/macho_a0.zip)
+| v1*  | MACHO | Mask token and residual connections. | 0.113/0.73 | [Download Weights](https://github.com/astromer-science/weights/raw/refs/heads/main/macho_a1.zip)
 
+\* best performance up to date
 ## Directory tree
 ```
 📦astromer
@@ -85,9 +87,15 @@ Training ASTROMER from scratch can be expensive. However, we provide pre-trained
  ```
 ## Get started
 
-The easiest way to run Astromer code on your 
+Use conda to create a virtual environment, for example:
+```
+conda create -n astromer python==3.9
+```
+Then install all the python packages use `requirements.txt`
+```
+pip install -r requirements.txt
+```
 
-## USAGE
 
 ## Contributing
 
@@ -96,5 +104,3 @@ Contributions are always welcome!
 Issues and featuring can be directly published in this repository
 via [Pull Request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests). 
 Similarly, New pre-trained weights must be uploaded to the [weights repo](https://github.com/astromer-science/weights) using the same mechanism.
-
-Look at [this tutorial](https://cridonoso.github.io/articles/github.html) for more information about pull requests
