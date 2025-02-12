@@ -198,7 +198,7 @@ class Encoder(tf.keras.layers.Layer):
             return x, w, qkvalues
         
         if z_by_layer:
-            return output_by_layer, w, qkvalues
+            return output_by_layer
         return x  # (batch_size, input_seq_len, d_model)
     
 def build_input(length):
