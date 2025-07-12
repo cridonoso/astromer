@@ -11,7 +11,7 @@ for fold_N in ${folds[@]}; do
             for clfmodel in ${clf_models[@]}; do
                 echo [INFO] Starting CLF $fold_N $spc
                 python -m presentation.pipelines.referee.train \
-                --pt-path $model_path/$dp/fold_$fold_N/$dp\_$spc/ --data ./data/records/$dp/fold_$fold_N/$dp\_$spc/ --gpu 0 --bs 512 \
+                --pt-path $model_path/$dp/fold_$fold_N/$dp\_$spc/ --data ./data/records/$dp/$dp\_$spc/fold_$fold_N --gpu 0 --bs 512 \
                 --exp-name clf_$dp\_$fold_N\_$spc --clf-arch $clfmodel
                 done
             done
