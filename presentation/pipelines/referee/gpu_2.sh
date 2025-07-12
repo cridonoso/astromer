@@ -1,6 +1,6 @@
 #!/bin/bash
                  
-folds=('0')
+folds=('2')
 datasets=('atlas' 'alcock')
 spcs=('20' '100' '500')
 model_path='./presentation/results/diagstromer/2024-12-02_14-13-12/finetuning'
