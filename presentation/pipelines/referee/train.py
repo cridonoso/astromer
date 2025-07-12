@@ -60,7 +60,7 @@ def clf_step(opt):
                     metrics=['accuracy'])
 
     cbks = [TensorBoard(log_dir=os.path.join(CLFDIR, 'tensorboard')),
-            EarlyStopping(monitor='val_loss', patience=40),
+            EarlyStopping(monitor='val_loss', patience=20),
             ModelCheckpoint(filepath=os.path.join(CLFDIR, 'weights'),
                             save_weights_only=True,
                             save_best_only=True,
