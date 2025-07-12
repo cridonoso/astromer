@@ -9,7 +9,7 @@ for fold_N in ${folds[@]}; do
     for dp in ${datasets[@]}; do
         for spc in ${spcs[@]}; do
             for clfmodel in ${clf_models[@]}; do
-                echo [INFO] Starting CLF $fold_N $spc
+                echo [INFO] Starting CLF $fold_N $spc $clfmodel
                 python -m presentation.pipelines.referee.train \
                 --pt-path $model_path/$dp/fold_$fold_N/$dp\_$spc/ --data ./data/records/$dp/$spc/fold_$fold_N --gpu 0 --bs 512 \
                 --exp-name clf_$dp\_$fold_N\_$spc --clf-arch $clfmodel --num-epochs 1
