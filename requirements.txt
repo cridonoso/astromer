@@ -1,4 +1,5 @@
 tensorflow==2.14
+numpy<2.0
 scikit-learn
 notebook
 seaborn
@@ -6,6 +7,7 @@ PyDrive
 joblib
 polars==0.20.10
 pandas
+pytest
 mlflow
 gdown
 tqdm
