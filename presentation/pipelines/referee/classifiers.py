@@ -73,7 +73,7 @@ def att_avg(astromer: Model, config: dict, train_encoder: bool = False) -> Model
 
     y_pred = layers.Dense(config['num_cls'], name='output_layer')(x)
 
-    return Model(inputs=inp_placeholder, outputs=y_pred, name='Attention_Pooling_Classifier')
+    return CustomModel(inputs=inp_placeholder, outputs=y_pred, name='Attention_Pooling_Classifier')
 
 def att_cls(astromer: Model, config: dict, train_encoder: bool = False) -> Model:
     """
@@ -144,7 +144,7 @@ def att_cls(astromer: Model, config: dict, train_encoder: bool = False) -> Model
 
     y_pred = layers.Dense(config['num_cls'], name='output_layer')(x)
 
-    return Model(inputs=inp_placeholder, outputs=y_pred, name='CLS_Attention_Classifier')
+    return CustomModel(inputs=inp_placeholder, outputs=y_pred, name='CLS_Attention_Classifier')
 
     
 def max_clf(astromer: Model, config: dict, train_encoder: bool = False) -> Model:
@@ -193,7 +193,7 @@ def max_clf(astromer: Model, config: dict, train_encoder: bool = False) -> Model
 
     y_pred = layers.Dense(config['num_cls'], name='output_layer')(x)
 
-    return Model(inputs=inp_placeholder, outputs=y_pred, name='Max_Pooling_Classifier')
+    return CustomModel(inputs=inp_placeholder, outputs=y_pred, name='Max_Pooling_Classifier')
 
 def avg_clf(astromer: Model, config: dict, train_encoder: bool = False) -> Model:
     """
@@ -237,7 +237,7 @@ def avg_clf(astromer: Model, config: dict, train_encoder: bool = False) -> Model
     y_pred = layers.Dense(config['num_cls'], name='output_layer')(x)
 
     # 4. Build and return the final Keras Model
-    return Model(inputs=inp_placeholder, outputs=y_pred, name='Average_MLP_Classifier')
+    return CustomModel(inputs=inp_placeholder, outputs=y_pred, name='Average_MLP_Classifier')
 
 def skip_avg_clf(astromer: Model, config: dict, train_encoder: bool = False) -> Model:
     """
@@ -288,4 +288,15 @@ def skip_avg_clf(astromer: Model, config: dict, train_encoder: bool = False) -> 
     y_pred = layers.Dense(config['num_cls'], name='output_layer')(x)
 
     # 6. Build and return the final Keras Model
-    return Model(inputs=inp_placeholder, outputs=y_pred, name='Skip_Connection_Classifier')
+    return CustomModel(inputs=inp_placeholder, outputs=y_pred, name='Skip_Connection_Classifier')
+
+class CustomModel(tf.keras.Model):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    def predict_step(self, data):
+        x, y = data
+        y_pred = self(x, training=False)
+        
+        return {'y_pred': y_pred, 
+                'y_true': y}
