@@ -15,9 +15,9 @@ from tensorflow.keras.optimizers import Adam
 
 # https://github.com/astromer-science/weights/raw/refs/heads/main/macho_a1.zip
 
-def clf_step(opt, clf_arch):
+def clf_step(opt):
     root = './presentation/pipelines/referee/output'
-    CLFDIR = os.path.join(root, opt.exp_name, clf_arch)
+    CLFDIR = os.path.join(root, opt.exp_name, opt.clf_arch)
     os.makedirs(CLFDIR, exist_ok=True)
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
 
@@ -38,19 +38,19 @@ def clf_step(opt, clf_arch):
 
     # Build Classifiers
     pt_config['num_cls'] = loaders['n_classes']
-    if clf_arch == 'max':
+    if opt.clf_arch == 'max':
         classifier = classifiers.max_clf(pt_model, pt_config)
 
-    if clf_arch == 'avg':
+    if opt.clf_arch == 'avg':
         classifier = classifiers.avg_clf(pt_model, pt_config)
 
-    if clf_arch == 'skip':
+    if opt.clf_arch == 'skip':
         classifier = classifiers.skip_avg_clf(pt_model, pt_config)
 
-    if clf_arch == 'att_avg':
+    if opt.clf_arch == 'att_avg':
         classifier = classifiers.att_avg(pt_model, pt_config)
 
-    if clf_arch == 'att_cls':
+    if opt.clf_arch == 'att_cls':
         classifier = classifiers.att_cls(pt_model, pt_config)
     
     # Compile and train
@@ -100,6 +100,10 @@ if __name__ == '__main__':
             default='./presentation/pipelines/referee/weights/astromer_2/macho-clean', 
             type=str,
             help='Pretrained weights')
+    parser.add_argument('--clf-arch', 
+            default='skip', 
+            type=str,
+            help='Pretrained weights')
     
     parser.add_argument('--gpu', default='-1', type=str,
                         help='GPU to be used. -1 means no GPU will be used')
@@ -112,6 +116,4 @@ if __name__ == '__main__':
 
     opt = parser.parse_args()        
     
-    
-    for clf_arch in ['max', 'avg', 'skip','att_avg', 'att_cls']:
-        clf_step(opt, clf_arch)
+    clf_step(opt)
