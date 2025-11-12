@@ -1,0 +1,4 @@
+test_acc = 0.20192307692307693
+test_precision = "0.05048076923076923"
+test_recall = "0.25"
+test_f1 = "0.084"
