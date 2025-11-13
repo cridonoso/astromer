@@ -6,7 +6,7 @@ import os
 
 from presentation.pipelines.steps import model_design
 from presentation.pipelines.steps import build_loader
-from presentation.pipelines.referee import classifiers
+from presentation.pipelines.referee import classifiers, baseline_clf
 from presentation.pipelines.steps.metrics import evaluate_clf
 
 from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
@@ -27,17 +27,18 @@ def clf_step(opt):
 
     # Load data 
     loaders = build_loader(data_path=opt.data, 
-                        params=pt_config,
-                        batch_size=opt.bs, 
-                        clf_mode=True, 
-                        sampling=False,
-                        return_test=True,
-                        shuffle=True)
+                           params=pt_config,
+                           batch_size=opt.bs, 
+                           clf_mode=True, 
+                           sampling=False,
+                           return_test=True,
+                           shuffle=True)
 
     pt_config['embedding_dim'] = pt_config['num_heads']*pt_config['head_dim']
-
+    
     # Build Classifiers
     pt_config['num_cls'] = loaders['n_classes']
+
     if opt.clf_arch == 'max':
         classifier = classifiers.max_clf(pt_model, pt_config)
 
@@ -52,7 +53,15 @@ def clf_step(opt):
 
     if opt.clf_arch == 'att_cls':
         classifier = classifiers.att_cls(pt_model, pt_config)
-    
+
+    if opt.clf_arch == 'base_avgpool':
+        print('BASE AVG POOL')
+        classifier = baseline_clf.build_supervised_pooling_classifier(pt_config)    
+
+    if opt.clf_arch == 'base_gru':
+        print('BASE GRU')
+        classifier = baseline_clf.build_supervised_rnn_classifier(pt_config)
+
     # Compile and train
     classifier.compile(optimizer=Adam(opt.lr, 
                     name='classifier_optimizer'),
