@@ -13,6 +13,7 @@ from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoi
 from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
 
+
 # https://github.com/astromer-science/weights/raw/refs/heads/main/macho_a1.zip
 
 def clf_step(opt):
@@ -26,13 +27,16 @@ def clf_step(opt):
     pt_model, pt_config = model_design.load_pt_model(opt.pt_path, optimizer=None)
 
     # Load data 
-    loaders = build_loader(data_path=opt.data, 
-                           params=pt_config,
+    loaders = build_loader(opt.data, 
+                           pt_config, 
                            batch_size=opt.bs, 
                            clf_mode=True, 
-                           sampling=False,
+                           normalize='zero-mean', 
+                           sampling=True,
+                           repeat=1,
                            return_test=True,
-                           shuffle=True)
+                          )
+
 
     pt_config['embedding_dim'] = pt_config['num_heads']*pt_config['head_dim']
     
@@ -69,7 +73,7 @@ def clf_step(opt):
                     metrics=['accuracy'])
 
     cbks = [TensorBoard(log_dir=os.path.join(CLFDIR, 'tensorboard')),
-            EarlyStopping(monitor='val_loss', patience=20),
+            EarlyStopping(monitor='val_loss', patience=40),
             ModelCheckpoint(filepath=os.path.join(CLFDIR, 'weights'),
                             save_weights_only=True,
                             save_best_only=True,

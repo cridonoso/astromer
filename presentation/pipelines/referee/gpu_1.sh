@@ -4,8 +4,8 @@ folds=('1')
 datasets=('atlas' 'alcock')
 spcs=('20' '100' '500')
 model_path='./presentation/results/diagstromer/2024-12-02_14-13-12/finetuning'
-# 'max' 'avg' 'skip' 'att_avg' 'att_cls'
-clf_models=('base_avgpool' 'base_gru')
+# 'base_avgpool' 'base_gru' 'max' 'avg' 'skip' 'att_avg' 'att_cls'
+clf_models=('avg' 'skip')
 for fold_N in ${folds[@]}; do
     for dp in ${datasets[@]}; do
         for spc in ${spcs[@]}; do
