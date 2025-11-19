@@ -13,7 +13,7 @@ DESTINATION_ROOT="/home/users/cdonoso/astromer/presentation/pipelines/referee/ou
 
 # Patrón de búsqueda relativo a SOURCE_ROOT.
 # Busca todas las carpetas 'skip' dentro de 'output/clf*'.
-SEARCH_PATTERN="output/clf*_*_500/skip"
+SEARCH_PATTERN="output/clf*_*_500/*"
 
 # ===================================================================
 # LOGICA DEL SCRIPT

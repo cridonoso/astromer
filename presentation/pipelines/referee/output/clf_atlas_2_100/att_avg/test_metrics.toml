@@ -1,4 +1,0 @@
-test_acc = 0.4
-test_precision = "0.1"
-test_recall = "0.25"
-test_f1 = "0.14285714285714285"

@@ -61,7 +61,6 @@ def att_avg(astromer: Model, config: dict, train_encoder: bool = False) -> Model
     )
 
     # 3. Masked Average-Pooling
-    # Aggregate the output of the attention layer (the contextualized vectors).
     aggregated_vector = layers.GlobalAveragePooling1D()(context_sequence, mask=attention_mask)
 
     # 4. Classifier Head

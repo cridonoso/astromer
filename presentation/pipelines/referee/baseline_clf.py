@@ -106,3 +106,34 @@ def build_supervised_rnn_classifier(config: dict) -> Model:
     return CustomClassifier(inputs=inp_placeholder, 
                        outputs=y_pred, 
                        name='Supervised_RNN_Baseline')
+
+def build_raw_rnn_classifier(config: dict) -> Model:
+    """
+    Baseline Supervisado 3: Raw Input (Mags + Times) -> GRU -> Clasificador.
+    
+    Este modelo NO usa embeddings ni proyecciones iniciales. 
+    Concatena magnitud y tiempo y alimenta directamente a la RNN.
+    """
+    # 1. Definir Entradas
+    inp_placeholder = build_input_base(config['window_size'])
+    mask_2d = tf.squeeze(tf.cast(1. - inp_placeholder['mask_in'], tf.bool), axis=-1)
+
+    # 2. Concatenación "En Bruto"
+    raw_features = tf.concat([inp_placeholder['input'], inp_placeholder['times']], axis=-1)
+
+    # 3. RNN Layer
+    rnn_output = GRU(256, return_sequences=False, name='gru_raw_layer')(
+        raw_features, 
+        mask=mask_2d
+    )
+    
+    # 4. Classifier Head (Mismo MLP que los otros baselines para comparación justa)
+    x = Dense(1024, activation='relu')(rnn_output)
+    x = Dense(512, activation='relu')(x)
+    x = Dense(256, activation='relu')(x)
+    x = LayerNormalization(name='layer_norm')(x)
+    y_pred = Dense(config['num_cls'], name='output_layer')(x)
+
+    return CustomClassifier(inputs=inp_placeholder, 
+                            outputs=y_pred, 
+                            name='Raw_RNN_Baseline')

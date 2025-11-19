@@ -21,7 +21,6 @@ def clf_step(opt):
     CLFDIR = os.path.join(root, opt.exp_name, opt.clf_arch)
     os.makedirs(CLFDIR, exist_ok=True)
     os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu
-
     # Load pretrained model
     
     pt_model, pt_config = model_design.load_pt_model(opt.pt_path, optimizer=None)
@@ -65,6 +64,10 @@ def clf_step(opt):
     if opt.clf_arch == 'base_gru':
         print('BASE GRU')
         classifier = baseline_clf.build_supervised_rnn_classifier(pt_config)
+        
+    if opt.clf_arch == 'raw_gru':
+            print('RAW GRU (No Embeddings)')
+            classifier = baseline_clf.build_raw_rnn_classifier(pt_config)
 
     # Compile and train
     classifier.compile(optimizer=Adam(opt.lr, 

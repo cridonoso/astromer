@@ -30,7 +30,7 @@ def read_toml(path):
         print(f"Error: El archivo TOML no es válido. Detalles: {e}")
         raise
 
-def procesar_metricas(paths_simulados):
+def procesar_metricas(paths_simulados, folder='output'):
     """
     Procesa una lista de rutas de archivos TOML simulados y retorna un DataFrame.
     (Se mantiene la simulación de lectura del TOML y la extracción de parámetros del path)
@@ -38,8 +38,7 @@ def procesar_metricas(paths_simulados):
     datos_tabla = []
     models = paths_simulados
     
-    patron = re.compile(r'^\.\/output\/clf_([a-z]+)_(\d+)_(\d+)\/([a-z_]+)\/test_metrics\.toml$')
-
+    patron = re.compile(rf'^\./{re.escape(folder)}/clf_([a-z]+)_(\d+)_(\d+)/([a-z_]+)/test_metrics\.toml$')
     for path in models:
         match = patron.match(path)
 

@@ -37,3 +37,5 @@ data/temp/
 client_secrets.json
 mycreds.txt
 presentation/pipelines/referee/output
+presentation/pipelines/referee/output_old
+presentation/pipelines/referee/results.pdf
