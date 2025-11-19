@@ -14,7 +14,7 @@ for fold_N in ${folds[@]}; do
                 python -m presentation.pipelines.referee.train \
                 --pt-path $model_path/$dp/fold_$fold_N/$dp\_$spc/ \
                 --data ./data/records/$dp/$spc/fold_$fold_N \
-                --gpu 3 \
+                --gpu 0 \
                 --bs 512 \
                 --exp-name clf_$dp\_$fold_N\_$spc \
                 --clf-arch $clfmodel

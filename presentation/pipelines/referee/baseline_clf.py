@@ -5,7 +5,7 @@ from tensorflow.keras import layers, Model
 from tensorflow.keras.layers import Input, Dense, Layer, GRU, LayerNormalization
 from src.layers.positional import PositionalEncoder2
 from src.models.astromer_1 import build_input as build_input_base
-from presentation.pipelines.referee.classifiers import CustomModel
+from presentation.pipelines.referee.classifiers import CustomClassifier
 
 
 class AstromerInputEmbedding(Layer):
@@ -66,7 +66,7 @@ def build_supervised_pooling_classifier(config: dict) -> Model:
     x = LayerNormalization(name='layer_norm')(x)
     y_pred = Dense(config['num_cls'], name='output_layer')(x)
 
-    return CustomModel(inputs=inp_placeholder, 
+    return CustomClassifier(inputs=inp_placeholder, 
                        outputs=y_pred, 
                        name='Supervised_Pooling_Baseline')
 
@@ -103,6 +103,6 @@ def build_supervised_rnn_classifier(config: dict) -> Model:
     x = LayerNormalization(name='layer_norm')(x)
     y_pred = Dense(config['num_cls'], name='output_layer')(x)
 
-    return CustomModel(inputs=inp_placeholder, 
+    return CustomClassifier(inputs=inp_placeholder, 
                        outputs=y_pred, 
                        name='Supervised_RNN_Baseline')
