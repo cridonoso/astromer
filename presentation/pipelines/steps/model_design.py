@@ -189,7 +189,7 @@ def build_classifier(astromer, params, astromer_trainable, num_cls=None, arch='a
 class CustomModel(tf.keras.Model):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-    
+
     def predict_step(self, data):
         x, y = data
         y_pred = self(x, training=False)
