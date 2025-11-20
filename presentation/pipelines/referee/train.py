@@ -31,7 +31,7 @@ def clf_step(opt):
                            batch_size=opt.bs, 
                            clf_mode=True, 
                            normalize='zero-mean', 
-                           sampling=True,
+                           sampling=False,
                            repeat=1,
                            return_test=True,
                           )
@@ -83,6 +83,10 @@ def clf_step(opt):
                             save_freq='epoch',
                             verbose=1)]
 
+    import numpy as np
+    for x, y in loaders['train']: 
+        print(np.unique(np.argmax(y, 1), return_counts=True))
+
     classifier.fit(loaders['train'], 
                 epochs=opt.num_epochs, 
                 batch_size=opt.bs,
@@ -127,7 +131,7 @@ if __name__ == '__main__':
                         help='Finetuning batch size')
     parser.add_argument('--bs', default=256, type=int,
                         help='Finetuning batch size')
-    parser.add_argument('--lr', default=0.00001, type=float,
+    parser.add_argument('--lr', default=0.001, type=float,
                         help='Finetuning learning rate')
 
     opt = parser.parse_args()        
