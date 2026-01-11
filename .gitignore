@@ -39,3 +39,6 @@ mycreds.txt
 presentation/pipelines/referee/output
 presentation/pipelines/referee/output_old
 presentation/pipelines/referee/results.pdf
+
+get_code.sh
+context
