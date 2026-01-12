@@ -1,7 +1,7 @@
 # ASTROMER 2: Generalizing Across Astronomical Surveys
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18207945.svg)](https://doi.org/10.5281/zenodo.18207945)
-[![arXiv](https://img.shields.io/badge/arXiv-2501.xxxxx-b31b1b.svg)](https://arxiv.org/abs/2501.xxxxx)
+[![arXiv](https://img.shields.io/badge/arXiv-2501.xxxxx-b31b1b.svg)](https://arxiv.org/abs/2502.02717)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Astromer 2** is a foundational model for light curve analysis, designed to extract robust embeddings from astronomical time-series data using self-supervised learning. Building upon the original Astromer architecture, this version introduces significant enhancements in input representation, encoder depth, and pretraining objectives, enabling superior generalization across diverse surveys like MACHO and ATLAS.
